@@ -13,6 +13,8 @@ el-alloc.workspace = true
 el-proto.workspace = true
 el-sim = { workspace = true, features = ["deterministic"] }
 el-match.workspace = true
+el-client-core.workspace = true
+crossbeam-queue.workspace = true
 tokio.workspace = true
 wtransport.workspace = true
 axum.workspace = true

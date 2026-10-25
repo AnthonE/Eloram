@@ -105,6 +105,12 @@ impl FreeList {
         self.len = n;
     }
 
+    /// Becomes a copy of `other` (the same capacity), in place.
+    pub fn copy_from(&mut self, other: &FreeList) {
+        self.stack.copy_from_slice(&other.stack);
+        self.len = other.len;
+    }
+
     pub fn pop(&mut self) -> Option<u16> {
         if self.len == 0 {
             return None;

@@ -65,6 +65,7 @@ pub async fn accept_loop(
     mode: Mode,
     stats: Arc<NetStats>,
     admission: Arc<Admission>,
+    lobby: Option<Arc<crate::lobby::Lobby>>,
     mut shutdown: tokio::sync::watch::Receiver<bool>,
 ) {
     loop {
@@ -94,6 +95,7 @@ pub async fn accept_loop(
             }
         };
         let stats = stats.clone();
+        let lobby = lobby.clone();
         tokio::spawn(async move {
             // Both handshakes within their deadline, or the place goes to someone else.
             let request = match tokio::time::timeout(HANDSHAKE, incoming).await {
@@ -125,9 +127,9 @@ pub async fn accept_loop(
             pass.established();
             NetStats::add(&stats.sessions_total, 1);
             NetStats::add(&stats.sessions_active, 1);
-            match mode {
-                Mode::Echo => super::echo::run(conn, stats.clone()).await,
-                Mode::Game => super::session::run(conn, stats.clone()).await,
+            match (mode, lobby) {
+                (Mode::Game, Some(lobby)) => super::session::run(conn, stats.clone(), lobby).await,
+                _ => super::echo::run(conn, stats.clone()).await,
             }
             stats.sessions_active.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
             drop(pass);

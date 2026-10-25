@@ -42,6 +42,14 @@ struct Args {
     /// Connections taken from one address (loopback excepted).
     #[arg(long, default_value_t = el_server::net::admit::Limits::default().per_address)]
     per_address: u32,
+    /// Shard threads (a core each), and the matches each holds.
+    #[arg(long, default_value_t = 1)]
+    shards: usize,
+    #[arg(long, default_value_t = 64)]
+    matches: usize,
+    /// Seconds the first in the queue waits before bots take the empty seats.
+    #[arg(long, default_value_t = 30.0)]
+    fill_after: f64,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -66,6 +74,9 @@ fn main() -> anyhow::Result<()> {
             per_address: args.per_address.max(1),
             ..el_server::net::admit::Limits::default()
         },
+        shards: args.shards.max(1),
+        matches_per_shard: args.matches.max(1),
+        fill_after: std::time::Duration::from_secs_f64(args.fill_after.max(0.0)),
         ..Config::default()
     };
     // Two workers are plenty: the matches run on their own shard threads.

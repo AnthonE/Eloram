@@ -1,0 +1,29 @@
+[package]
+name = "el-bot"
+description = "Eloram's agents: they play over the same WebTransport protocol, client core and team view as people"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+el-client-core.workspace = true
+el-proto.workspace = true
+el-sim = { workspace = true, features = ["deterministic"] }
+wtransport.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+clap.workspace = true
+rustls.workspace = true
+serde_json.workspace = true
+hex.workspace = true
+
+[dev-dependencies]
+el-server.workspace = true
+
+[lints]
+workspace = true

@@ -13,15 +13,15 @@ use crate::units::{BuffKind, SEATS, Stats, team_of_seat};
 
 impl Match {
     /// A champion's stats now: base, growth to its level, its items' and augments' changes, its
-    /// buffs. Maximum health or mana gained comes with as much health or mana.
-    pub(crate) fn refresh_stats(&mut self, seat: usize) {
+    /// buffs.
+    pub(crate) fn stats_of(&self, seat: usize) -> Stats {
         let now = self.tick;
         let c = &self.champs[seat];
         let def = c.def();
         let lvl = f32::from(c.level - 1);
         let (b, g, m) = (def.base, def.growth, c.mods);
         let u = &self.units[seat];
-        let s = Stats {
+        Stats {
             max_hp: b.max_hp + g.max_hp * lvl + m.hp,
             hp_regen: b.hp_regen + g.hp_regen * lvl + m.hp_regen,
             max_mana: b.max_mana + g.max_mana * lvl + m.mana,
@@ -37,7 +37,13 @@ impl Match {
                 * (1.0 + m.move_share + u.buff(BuffKind::MoveSpeed, now)),
             haste: m.haste,
             lifesteal: m.lifesteal,
-        };
+        }
+    }
+
+    /// Refreshes a champion's stats; maximum health or mana gained comes with as much health or
+    /// mana.
+    pub(crate) fn refresh_stats(&mut self, seat: usize) {
+        let s = self.stats_of(seat);
         let u = &mut self.units[seat];
         let old = u.stats;
         u.stats = s;
@@ -94,7 +100,7 @@ impl Match {
         }
     }
 
-    fn recompute_mods(&mut self, seat: usize) {
+    pub(crate) fn recompute_mods(&mut self, seat: usize) {
         let c = &self.champs[seat];
         let mut m = StatMods::ZERO;
         for &it in c.items.iter().filter(|&&it| it != items::NONE) {

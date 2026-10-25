@@ -36,6 +36,17 @@ impl Source {
         }
     }
 
+    /// The source a [`code`](Self::code) stands for.
+    pub fn from_code(c: u32) -> Source {
+        match c {
+            1 => Source::Turret,
+            3 => Source::Relic,
+            c if c & 0x200 != 0 => Source::Augment((c & 0xFF) as u8),
+            c if c & 0x100 != 0 => Source::Ability { champ: ((c >> 4) & 0xF) as u8, slot: (c & 0xF) as u8 },
+            _ => Source::Auto,
+        }
+    }
+
     /// A small number for hashes and the wire.
     pub fn code(self) -> u32 {
         match self {

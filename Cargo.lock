@@ -2691,6 +2691,25 @@ name = "el-alloc"
 version = "0.1.0"
 
 [[package]]
+name = "el-bot"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "el-client-core",
+ "el-proto",
+ "el-server",
+ "el-sim",
+ "hex",
+ "rustls",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "wtransport",
+]
+
+[[package]]
 name = "el-client"
 version = "0.1.0"
 dependencies = [
@@ -2714,11 +2733,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "el-client-core"
+version = "0.1.0"
+dependencies = [
+ "el-proto",
+ "el-sim",
+ "glam",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "el-match"
 version = "0.1.0"
 dependencies = [
  "crossbeam-queue",
  "el-alloc",
+ "el-client-core",
  "el-proto",
  "el-sim",
  "glam",
@@ -2741,7 +2772,9 @@ dependencies = [
  "anyhow",
  "axum",
  "clap",
+ "crossbeam-queue",
  "el-alloc",
+ "el-client-core",
  "el-match",
  "el-proto",
  "el-sim",

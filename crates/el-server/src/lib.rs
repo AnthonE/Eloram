@@ -1,13 +1,17 @@
 //! Eloram's game server: WebTransport sessions on tokio, shard threads stepping the matches, and a
 //! small HTTP side for the page, the certificate hash and the store's status polls.
 
+pub mod game;
 pub mod http;
+pub mod lobby;
 pub mod net;
 pub mod telemetry;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 use net::NetStats;
 use net::admit::{Admission, Limits};
@@ -36,6 +40,11 @@ pub struct Config {
     pub limits: Limits,
     /// Places for players, for `/status.json`.
     pub max_players: usize,
+    /// Shard threads, and the matches each holds.
+    pub shards: usize,
+    pub matches_per_shard: usize,
+    /// How long the first in the queue waits before bots fill the empty seats.
+    pub fill_after: Duration,
 }
 
 impl Default for Config {
@@ -49,6 +58,9 @@ impl Default for Config {
             cors_origins: vec![STORE_ORIGIN.to_string()],
             limits: Limits::default(),
             max_players: 640,
+            shards: 1,
+            matches_per_shard: 64,
+            fill_after: Duration::from_secs(30),
         }
     }
 }
@@ -69,12 +81,16 @@ pub fn split_list(values: &[String]) -> Vec<String> {
 pub struct Handle {
     pub http_addr: SocketAddr,
     pub wt_port: u16,
+    pub lobby: Option<Arc<lobby::Lobby>>,
     shutdown: tokio::sync::watch::Sender<bool>,
 }
 
 impl Handle {
     pub fn shutdown(&self) {
         let _ = self.shutdown.send(true);
+        if let Some(l) = &self.lobby {
+            l.game.halt();
+        }
     }
 }
 
@@ -102,17 +118,41 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
     let stats = Arc::new(NetStats::default());
     let admission = Admission::new(cfg.limits);
     let (shutdown, rx) = tokio::sync::watch::channel(false);
-    tokio::spawn(net::endpoint::accept_loop(endpoint, cfg.mode, stats.clone(), admission, rx.clone()));
+    let lobby = match cfg.mode {
+        Mode::Game => {
+            let map = el_sim::map::Map::leaked();
+            let game = game::Game::start(cfg.shards.max(1), cfg.matches_per_shard.max(1), map)?;
+            let lobby = lobby::Lobby::new(game, cfg.fill_after);
+            tokio::spawn(lobby.clone().run());
+            Some(lobby)
+        }
+        Mode::Echo => None,
+    };
+    tokio::spawn(net::endpoint::accept_loop(
+        endpoint,
+        cfg.mode,
+        stats.clone(),
+        admission,
+        lobby.clone(),
+        rx.clone(),
+    ));
 
     let mode = cfg.mode;
     let max_players = cfg.max_players;
     let status_stats = stats.clone();
     let launcher_stats = stats.clone();
+    let status_lobby = lobby.clone();
     let state = http::HttpState {
         cert_hash_hex: pinned.then(|| hex::encode(hash)),
         wt_port,
         web_dir: cfg.web_dir.clone(),
-        status: Arc::new(move || net::status_json(&status_stats, mode)),
+        status: Arc::new(move || {
+            let mut doc = net::status_json(&status_stats, mode);
+            if let Some(l) = &status_lobby {
+                doc["game"] = game_json(l);
+            }
+            doc
+        }),
         launcher_status: Arc::new(move || net::launcher_status_json(&launcher_stats, max_players)),
         cors_origins: cfg.cors_origins.clone().into(),
     };
@@ -127,5 +167,42 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
             tracing::error!("http: {e}");
         }
     });
-    Ok(Handle { http_addr, wt_port, shutdown })
+    Ok(Handle { http_addr, wt_port, lobby, shutdown })
+}
+
+/// `/status`'s `game`: the lobby, and each shard's ticks, costs and traffic.
+fn game_json(lobby: &lobby::Lobby) -> serde_json::Value {
+    let (live, queued, started) = lobby.counts();
+    let r = |c: &std::sync::atomic::AtomicU64| c.load(Ordering::Relaxed);
+    let shards: Vec<_> = lobby
+        .game
+        .shards
+        .iter()
+        .map(|s| {
+            let m = &s.shared.metrics;
+            let e = s.egress_stats();
+            serde_json::json!({
+                "ticks": s.shared.tick.load(Ordering::Relaxed),
+                "matches": r(&m.matches),
+                "overruns": r(&m.overruns),
+                "tick_us": { "p50": m.tick_hist.quantile_us(0.5), "p99": m.tick_hist.quantile_us(0.99) },
+                "match_sim_us": { "p50": m.sim_hist.quantile_us(0.5), "p99": m.sim_hist.quantile_us(0.99) },
+                "match_replicate_us": { "p50": m.replicate_hist.quantile_us(0.5), "p99": m.replicate_hist.quantile_us(0.99) },
+                "inputs": r(&m.inputs),
+                "snapshots": r(&m.snapshots),
+                "snapshot_bytes": r(&m.snapshot_bytes),
+                "snapshot_max_bytes": r(&m.snapshot_max_bytes),
+                "out_drops": r(&m.out_drops),
+                "sent": r(&e.datagrams),
+                "sent_bytes": r(&e.bytes),
+                "refused": r(&e.refused),
+            })
+        })
+        .collect();
+    serde_json::json!({
+        "matches": live,
+        "queued": queued,
+        "matches_started": started,
+        "shards": shards,
+    })
 }

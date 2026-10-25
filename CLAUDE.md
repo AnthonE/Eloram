@@ -25,6 +25,12 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
 - `cargo test -p el-sim --test map -- --ignored --nocapture` prints the Causeway as text.
 - `cargo run -p el-sim --release --example headless -- [seed]`: ten bots play a whole match, minute
   by minute; `cargo bench -p el-sim --bench match_tick`: a match's ticks, p50/p99 and by phase.
+- `cargo test -p el-match --release --test netcode -- --nocapture`: a shard and clients over a
+  100 ms, 5%-loss link in virtual time, prediction error by cause; `--test vision_leak` the fog
+  oracle, `--test no_alloc_match` the shard's tick. `cargo bench -p el-match --bench shard
+  [-- matches minutes]`: a shard of matches, every seat replicated, p50/p99 and matches a core.
+- `cargo run -p el-bot --release --bin el-swarm -- --bots 20 --secs 30` against a running server
+  (`--fill-after 3` makes matches fast): agents over WebTransport, then the server's `/status`.
 - `cargo test -p el-sim --target wasm32-unknown-unknown --release --test determinism`: the golden
   hashes on wasm32 (no `-q`: the wasm runner refuses it). Native, `cargo test --workspace` turns on
   `deterministic` (glam's scalar maths) by feature unification; alone, pass `--features deterministic`.

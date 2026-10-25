@@ -24,10 +24,12 @@ pub mod hash;
 pub mod map;
 pub mod math;
 pub mod missile;
+mod own;
 pub mod path;
 pub mod storage;
 pub mod units;
 mod vision;
+mod wire;
 mod world;
 pub mod zone;
 

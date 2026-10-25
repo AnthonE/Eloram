@@ -16,9 +16,12 @@ pub mod ack;
 pub mod auth;
 pub mod bits;
 pub mod control;
+pub mod event;
 pub mod input;
 pub mod order;
 pub mod quant;
+pub mod snapshot;
+pub mod unit;
 
 pub use bits::{BitReader, BitWriter};
 pub use input::{InputCmd, InputPacket, StampedOrder};

@@ -17,6 +17,11 @@ rtrb.workspace = true
 
 [dev-dependencies]
 el-alloc.workspace = true
+el-client-core.workspace = true
+
+[[bench]]
+name = "shard"
+harness = false
 
 [lints]
 workspace = true

@@ -248,7 +248,7 @@ pub struct Match {
     pub champs: [Champ; SEATS],
     pub missiles: Box<[Missile]>,
     pub zones: Box<[Zone]>,
-    minion_slots: FreeList,
+    pub(crate) minion_slots: FreeList,
     pub next_wave: u32,
     pub waves: u16,
     pub relics: [Relic; 4],
