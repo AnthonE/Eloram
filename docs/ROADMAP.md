@@ -48,6 +48,20 @@ Left for later phases: the record (Phase 5, with the referee), the champion rero
 The Bevy client: the camera, orders by mouse and keys, champions, minions, missiles drawn on the
 predicted clock, fog, the HUD, the shop, the augment cards. You and nine bots in a browser.
 
+What landed: the queue from the page (`?queue=0` stays in the lobby), League's default keys
+(`DESIGN.md`, "Controls"), a camera locked on the champion or free, the Causeway drawn from the
+map's own shapes, every unit slot an entity with its health bar, missiles at the own clock, area
+flashes, relics, fog from the same sight windows the server uses (`el_client_core::fog`, checked
+against the server's grids), and the HUD in Bevy UI: abilities with their cooldowns, health, mana,
+experience, gold, items, the kill feed, a minimap, the augment cards, the shop, the scoreboard.
+`scripts/dev.sh` serves it with the bots filling in; `scripts/e2e.sh match` plays one in headless
+Chromium (queue, augment, shop, a skill, Flash, a walk with no correction at all, the enemy seen
+only once the waves meet).
+
+Not yet: champion art (they're capsules in their colours), cast indicators, WASD bound on the
+page, the champion reroll and bench, five more champions (with Phase 5's). Not measured: the frame
+rate on a real GPU (headless Chromium here draws in software, about a frame a second at 960×540).
+
 ## 5. Mayhem, the record, spectating, Elo Pros
 The augment set across four screens, Combo Breaker, headliners, more champions. The referee,
 replays and the 60 s spectator feed from the record. Wallet sign-in, `/status.json` and

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs a Playwright suite against a freshly started server.
 #   scripts/e2e.sh spike [project]   # transport smoke test: echo, then the game's Hello and Welcome
+#   scripts/e2e.sh match [project]   # a match from the queue against the server's bots
 # Anything after the project goes to Playwright.
 # The server listens on EL_HTTP_PORT (8080) and EL_WT_PORT (UDP, 4433).
 set -euo pipefail
@@ -17,9 +18,11 @@ fi
 cargo build --release -p el-server
 bin="${CARGO_TARGET_DIR:-target}/release"
 wt="${EL_WT_PORT:-4433}"
-server() { "$bin/el-server" --web-dir web/dist "$@"; }
+# `exec`, so the pid kept is the server's own and killing it stops the server.
+server() { exec "$bin/el-server" --web-dir web/dist "$@"; }
 pids=()
-cleanup() { for p in "${pids[@]}"; do kill "$p" 2>/dev/null || true; done; }
+# Each server is waited for, so the next suite's can have its ports.
+cleanup() { for p in "${pids[@]}"; do kill "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; done; }
 trap cleanup EXIT
 
 case "$suite" in
@@ -30,6 +33,11 @@ case "$suite" in
     server --mode game --http "127.0.0.1:$((port + 1))" --wt-port "$((wt + 1))" &
     pids+=($!)
     export EL_GAME_URL="http://127.0.0.1:$((port + 1))"
+    ;;
+  match)
+    # Bots take the empty seats a second after the first player queues.
+    server --mode game --fill-after 1 --http "127.0.0.1:${port}" --wt-port "$wt" &
+    pids+=($!)
     ;;
   *) echo "unknown suite $suite" >&2; exit 1 ;;
 esac

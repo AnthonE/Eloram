@@ -1,14 +1,20 @@
-//! The transport slot, the dial, and the first words with the server: the echo spike's pings
-//! (`?mode=echo`), or the Hello and its Welcome.
+//! The transport slot, the dial, and the session: the echo spike's pings (`?mode=echo`), or the
+//! Hello and its Welcome, the queue, and a match: the snapshot datagrams into the client core as
+//! they arrived, and each frame's orders and command out.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use bevy::prelude::*;
-use el_proto::control::{ControlMsg, Frame, PlayerKind};
+use el_client_core::Client;
+use el_client_core::lobby::{ToClient, ToServer};
+use el_proto::control::{ControlMsg, Frame, PlayerKind, encode_lobby};
+use el_proto::quant::pos_code;
 
 use crate::config::LaunchConfig;
 use crate::dev_hooks::DevStatus;
+use crate::input::Controls;
+use crate::session::{Phase, Session};
 use crate::transport::Transport;
 
 #[derive(Default)]
@@ -27,12 +33,15 @@ impl NetState {
 #[derive(Resource, Clone)]
 pub struct LaunchConfigRes(pub LaunchConfig);
 
+/// The map, built once.
+#[derive(Resource, Clone, Copy)]
+pub struct MapRes(pub &'static el_sim::map::Map);
+
 /// What the session has heard back.
 #[derive(Default)]
 struct Link {
     hello_sent: bool,
     ctrl: Vec<u8>,
-    session: Option<u32>,
     rejected: Option<String>,
     // The echo spike's counters.
     seq: u32,
@@ -46,17 +55,33 @@ struct Link {
 
 pub struct NetPlugin;
 
+/// The order the frame's net work goes in.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum NetSet {
+    /// What came in, into the session.
+    Receive,
+    /// The orders and the command out.
+    Send,
+}
+
 impl Plugin for NetPlugin {
     fn build(&self, app: &mut App) {
         app.insert_non_send(NetState::default())
             .insert_non_send(Link::default())
+            .init_resource::<Session>()
+            .configure_sets(Update, NetSet::Receive.before(NetSet::Send))
             .add_systems(Startup, connect)
-            .add_systems(Update, (talk, report));
+            .add_systems(Update, (talk.in_set(NetSet::Receive), send.in_set(NetSet::Send), report));
     }
 }
 
 pub fn now_ms() -> f64 {
     web_sys::window().and_then(|w| w.performance()).map_or(0.0, |p| p.now())
+}
+
+/// The page's clock, s: what the client core and the datagram pump both run on.
+pub fn now_s() -> f64 {
+    now_ms() / 1_000.0
 }
 
 fn connect(net: NonSend<NetState>, cfg: Res<LaunchConfigRes>) {
@@ -71,7 +96,7 @@ fn connect(net: NonSend<NetState>, cfg: Res<LaunchConfigRes>) {
     wasm_bindgen_futures::spawn_local(async move {
         match Transport::connect(&url, hash).await {
             Ok(t) => {
-                t.start_pump(|| now_ms() / 1_000.0);
+                t.start_pump(now_s);
                 say_goodbye_on_leaving(&t);
                 *slot.borrow_mut() = Some(t);
             }
@@ -103,8 +128,29 @@ fn say_goodbye_on_leaving(t: &Transport) {
     bye.forget();
 }
 
-fn talk(net: NonSend<NetState>, mut link: NonSendMut<Link>, cfg: Res<LaunchConfigRes>) {
-    let Some(t) = net.get() else { return };
+/// Sends a lobby message.
+pub fn send_lobby(t: &Transport, msg: &ToServer) {
+    let Ok(json) = serde_json::to_vec(msg) else { return };
+    let mut buf = vec![0u8; json.len() + 3];
+    if let Some(n) = encode_lobby(&json, &mut buf) {
+        t.send_control(buf[..n].to_vec());
+    }
+}
+
+fn talk(
+    net: NonSend<NetState>,
+    mut link: NonSendMut<Link>,
+    cfg: Res<LaunchConfigRes>,
+    map: Res<MapRes>,
+    mut session: ResMut<Session>,
+) {
+    let Some(t) = net.get() else {
+        if let Some(e) = net.error.borrow().as_ref() {
+            session.phase = Phase::Failed;
+            session.error = Some(e.clone());
+        }
+        return;
+    };
     if cfg.0.echo {
         echo(&t, &mut link);
         return;
@@ -121,11 +167,78 @@ fn talk(net: NonSend<NetState>, mut link: NonSendMut<Link>, cfg: Res<LaunchConfi
     link.ctrl.extend_from_slice(&incoming);
     while let Ok(Some((frame, used))) = Frame::decode(&link.ctrl) {
         match frame {
-            Frame::Msg(ControlMsg::Welcome { session, .. }) => link.session = Some(session),
-            Frame::Msg(ControlMsg::Reject { reason }) => link.rejected = Some(format!("{reason:?}")),
+            Frame::Msg(ControlMsg::Welcome { session: id, .. }) => {
+                session.session = Some(id);
+                session.phase = Phase::Lobby;
+                if cfg.0.queue {
+                    send_lobby(&t, &ToServer::Queue);
+                    session.phase = Phase::Queued;
+                }
+            }
+            Frame::Msg(ControlMsg::Reject { reason }) => {
+                link.rejected = Some(format!("{reason:?}"));
+                session.phase = Phase::Failed;
+                session.error = Some(format!("the server turned us away ({reason:?})"));
+            }
+            Frame::Lobby(bytes) => match serde_json::from_slice::<ToClient>(bytes) {
+                Ok(ToClient::Queued { waiting, fill_in }) => {
+                    session.waiting = waiting;
+                    session.fill_in = fill_in;
+                }
+                Ok(m @ ToClient::Match { .. }) => {
+                    if let (Some(seed), Some(picks), ToClient::Match { seat, roster, .. }) =
+                        (m.seed(), m.picks(), &m)
+                    {
+                        let seat = usize::from(*seat).min(el_sim::units::SEATS - 1);
+                        session.client = Some(Box::new(Client::new(map.0, seat, seed, picks)));
+                        session.roster = roster.clone();
+                        session.winner = None;
+                        session.kd = Default::default();
+                        session.feed.clear();
+                        session.phase = Phase::Playing;
+                    }
+                }
+                Ok(ToClient::Over { winner }) => {
+                    session.winner = Some(winner);
+                    session.phase = Phase::Over;
+                }
+                Err(e) => web_sys::console::warn_1(&format!("lobby message: {e}").into()),
+            },
             _ => {}
         }
         link.ctrl.drain(..used);
+    }
+    // The snapshots, each at the time it arrived.
+    let datagrams = t.drain();
+    if let Some(c) = session.client.as_mut() {
+        for (d, arrived) in datagrams {
+            let _ = c.on_datagram(&d, arrived);
+        }
+    }
+    if t.is_closed() && session.phase != Phase::Failed {
+        session.phase = Phase::Failed;
+        session.error.get_or_insert_with(|| "the link to the server dropped".into());
+    }
+}
+
+/// The frame's orders given, the commands due made, and the input packet sent.
+fn send(net: NonSend<NetState>, mut session: ResMut<Session>, mut controls: ResMut<Controls>) {
+    let Some(t) = net.get() else { return };
+    if session.phase != Phase::Playing {
+        controls.pending.clear();
+        return;
+    }
+    let Some(c) = session.client.as_mut() else { return };
+    for o in controls.pending.drain(..) {
+        c.order(o);
+    }
+    let view = pos_code(controls.view);
+    let steer = controls.steer;
+    if let Some(p) = c.poll(now_s(), view, &mut |_, _, out| out.steer = steer) {
+        let mut buf = [0u8; 256];
+        if let Some(n) = p.encode(&mut buf) {
+            t.send_datagram(&buf[..n]);
+        }
     }
 }
 
@@ -161,7 +274,7 @@ fn echo(t: &Transport, s: &mut Link) {
     }
 }
 
-fn report(net: NonSend<NetState>, link: NonSend<Link>, mut dev: ResMut<DevStatus>) {
+fn report(net: NonSend<NetState>, link: NonSend<Link>, session: Res<Session>, mut dev: ResMut<DevStatus>) {
     match net.get() {
         Some(t) => {
             dev.set("connected", !t.is_closed());
@@ -174,12 +287,13 @@ fn report(net: NonSend<NetState>, link: NonSend<Link>, mut dev: ResMut<DevStatus
             }
         }
     }
-    if let Some(s) = link.session {
+    if let Some(s) = session.session {
         dev.set("session", s);
     }
     if let Some(r) = &link.rejected {
         dev.set("rejected", r.as_str());
     }
+    dev.set("phase", session.phase.name());
     dev.set("pings", link.pings);
     dev.set("pongs", link.pongs);
     dev.set("rtt_ms", link.rtt_ms);

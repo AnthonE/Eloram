@@ -19,9 +19,14 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `cargo clippy -p el-client --target wasm32-unknown-unknown [--features webgpu] -- -D warnings`.
 - `scripts/build-web.sh [webgl2] [webgpu]`: the browser build into `web/dist/` (needs
   wasm-bindgen-cli 0.2.128).
-- `cargo run -p el-server --release`, then open http://127.0.0.1:8080 (`--mode echo` is the
-  transport smoke test).
-- `scripts/e2e.sh spike [webgl2]`: Playwright against a real server.
+- `scripts/dev.sh`: the page built and a server to play on at http://127.0.0.1:8080, the server's
+  bots in the other nine seats after 3 s (`EL_FILL`). The server alone: `cargo run -p el-server
+  --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
+- `scripts/e2e.sh spike|match [webgl2]`: Playwright against a real server (`match`: queue, augment,
+  shop, Flash, a walk predicted exactly, the fog; screenshots in `e2e/artifacts/`). A test or the
+  console drives the champion through `window.__elInbox` (`{t:"move",x,y}`, `cast`, `buy`, `pick`,
+  `level`...: `el-client/src/dev_hooks.rs`) and reads `window.__el`. Headless Chromium draws with
+  SwiftShader at about a frame a second: its pictures are right, its frame rates mean nothing.
 - `cargo test -p el-sim --test map -- --ignored --nocapture` prints the Causeway as text.
 - `cargo run -p el-sim --release --example headless -- [seed]`: ten bots play a whole match, minute
   by minute; `cargo bench -p el-sim --bench match_tick`: a match's ticks, p50/p99 and by phase.

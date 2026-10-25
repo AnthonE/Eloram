@@ -117,6 +117,8 @@ pub struct Client {
     scratch: PathScratch,
     /// The next tick to make a command for; the prediction is at this tick.
     next_cmd: u32,
+    /// The first order no packet has carried yet.
+    unsent: u16,
     /// The own champion's state has come at least once.
     started: bool,
     was_dead: bool,
@@ -171,6 +173,7 @@ impl Client {
             feed_n: 0,
             scratch: PathScratch::new(),
             next_cmd: 0,
+            unsent: 0,
             started: false,
             was_dead: false,
             own_ticks: [(u32::MAX, Vec2::ZERO); OWN_KEPT],
@@ -343,6 +346,7 @@ impl Client {
         }
         self.orders.clear();
         self.replay_seq = 0;
+        self.unsent = 0;
     }
 
     fn event(&mut self, tick: u32, e: &WireEvent) {
@@ -511,8 +515,10 @@ impl Client {
         }
         let target = self.clock.input_tick(now);
         if target >= self.next_cmd + CATCH_UP {
-            // Far behind (a stalled page): the ticks missed are the server's to stand in for.
+            // Far behind (a stalled page): the ticks missed are the server's to stand in for, and
+            // what was ordered since the last packet is for the ticks the clock is on now.
             self.next_cmd = target.saturating_sub(2).max(self.world.tick);
+            self.orders.restamp(self.unsent, self.next_cmd);
             self.reseed(now, false);
         }
         while self.next_cmd <= target {
@@ -539,6 +545,7 @@ impl Client {
             return None;
         }
         self.orders.fill(&mut p);
+        self.unsent = self.orders.next_seq;
         self.stats.packets += 1;
         Some(p)
     }

@@ -1,6 +1,6 @@
 // Boots the Bevy client: picks the WebGPU or WebGL2 build and hands the launch config to Rust via
 // window.EL_CONFIG. The game asks window.elDiscover() where to connect (a restarted dev server has
-// a new certificate). `?mode=echo` is the transport smoke test.
+// a new certificate). `?mode=echo` is the transport smoke test; `?name=` the player's name.
 const params = new URLSearchParams(location.search);
 
 // Where to connect (window.elServer: config.js and the page's query, boot.js). A named server
@@ -57,6 +57,8 @@ async function main() {
   const config = {
     echo: params.get("mode") === "echo",
     name: params.get("name") || "",
+    // Into the queue as soon as the server says hello (`?queue=0`: stay in the lobby).
+    queue: params.get("queue") !== "0",
   };
   if (!("WebTransport" in window)) {
     config.noWebTransport = true;

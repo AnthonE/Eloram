@@ -60,7 +60,7 @@ impl Rect {
     pub const fn new(x0: f32, y0: f32, x1: f32, y1: f32) -> Self {
         Rect(Vec2::new(x0, y0), Vec2::new(x1, y1))
     }
-    fn contains(&self, p: Vec2, inset: f32) -> bool {
+    pub fn contains(&self, p: Vec2, inset: f32) -> bool {
         p.x >= self.0.x + inset
             && p.x <= self.1.x - inset
             && p.y >= self.0.y + inset
@@ -80,7 +80,7 @@ impl Disc {
     pub const fn new(x: f32, y: f32, r: f32) -> Self {
         Disc(Vec2::new(x, y), r)
     }
-    fn contains(&self, p: Vec2, grow: f32) -> bool {
+    pub fn contains(&self, p: Vec2, grow: f32) -> bool {
         let r = self.1 + grow;
         (p - self.0).length_squared() <= r * r
     }
@@ -203,7 +203,7 @@ pub fn march_goal(team: u8) -> Vec2 {
 }
 
 /// Is `p` on the floor (the lane, the bases, the platforms), `margin` inside its edge?
-fn on_floor(p: Vec2, margin: f32) -> bool {
+pub fn on_floor(p: Vec2, margin: f32) -> bool {
     let floor_rects = [LANE, NECK, NECK.mirrored()];
     let floor_discs = [BASE, BASE.mirrored(), PLATFORM, PLATFORM.mirrored()];
     floor_rects.iter().any(|r| r.contains(p, margin)) || floor_discs.iter().any(|d| d.contains(p, -margin))

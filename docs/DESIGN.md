@@ -113,10 +113,12 @@ League's defaults, because that is what players' hands know:
   **S** stops, **H** holds.
 - **Q, W, E, R** cast; **D, F** are the summoner spells. Smart cast by default (cast where the cursor
   is on the press), with indicators on a setting. **Ctrl** with an ability's key levels it.
-- **1–6** items, **4** the trinket. **P** the shop, **Tab** the scoreboard.
-- **Space** centres the camera on your champion, **Y** locks it there; the camera pans at the
-  screen's edge.
-- **WASD** movement as an option (League added it in 2025).
+- **1, 2, 3** take an augment card while a screen is open, **Shift** with one rerolls it (items have
+  no actives yet, so the number keys are free). **P** the shop, **Tab** the scoreboard.
+- **Y** locks the camera on your champion (locked to start) or frees it; free, it pans at the
+  screen's edge and with the arrows, and **Space** held brings it back. The wheel zooms a little.
+- **WASD** movement as an option (League added it in 2025): the wire carries it (`InputCmd`'s
+  steer), the page doesn't bind it yet.
 
 ## Sources
 

@@ -1,0 +1,83 @@
+import { expect, test } from "@playwright/test";
+import { collectConsole, el, luminanceStdDev } from "./util";
+
+const push = (page: any, cmd: Record<string, unknown>) =>
+  page.evaluate((c: Record<string, unknown>) => {
+    const w = window as any;
+    (w.__elInbox ||= []).push(c);
+  }, cmd);
+
+const until = async (page: any, what: string, pred: (s: Record<string, any>) => boolean, timeout = 60_000) => {
+  const end = Date.now() + timeout;
+  for (;;) {
+    const s = await el(page);
+    if (pred(s)) return s;
+    if (Date.now() > end) throw new Error(`waited for ${what}: ${JSON.stringify(s)}`);
+    await page.waitForTimeout(250);
+  }
+};
+
+// A match from the queue, with the server's bots in the other nine seats (`--fill-after 1`):
+// seated at level 3 with ARAM's gold on the platform, an augment picked, an item bought, a skill
+// levelled and cast, a walk down the lane predicted exactly, and fog that hides the enemy until
+// someone of ours can see them.
+test("a match: queue, augment, shop, walk, cast, fog", async ({ page }, info) => {
+  const logs = collectConsole(page);
+  const shots = `artifacts/match-${info.project.name}`;
+  await page.goto(`/?gfx=${info.project.name}&name=Tester`);
+  let s: Record<string, any>;
+  try {
+    s = await until(page, "a seat in a match", (s) => s.started === true, 150_000);
+  } catch (e) {
+    console.log(logs.slice(-40).join("\n"));
+    throw e;
+  }
+  expect(s.phase).toBe("playing");
+  expect(s.level).toBe(3);
+  expect(s.gold).toBeGreaterThanOrEqual(1400);
+  expect(s.in_shop).toBe(true);
+  expect(s.enemy_champions).toBe(0);
+  await page.screenshot({ path: `${shots}-start.png` });
+
+  // The first augment screen is open at the start: take the first card.
+  expect(s.screen_open).toBe(true);
+  await push(page, { t: "pick", card: 0 });
+  s = await until(page, "an augment", (s) => s.augments === 1 && s.screen_open === false);
+
+  // The shop: a Long Blade (350).
+  const gold = s.gold;
+  await push(page, { t: "shop", open: true });
+  await push(page, { t: "buy", item: 0 });
+  s = await until(page, "the item", (s) => s.items === "0" && s.gold <= gold - 349);
+  await page.screenshot({ path: `${shots}-shop.png` });
+  await push(page, { t: "shop", open: false });
+
+  // A skill point into Q; Flash (D) down the lane.
+  await push(page, { t: "level", slot: 0 });
+  s = await until(page, "Q levelled", (s) => s.ranks.startsWith("1,"));
+  const ahead = (x: number) => (s.team === 0 ? x : 15360 - x);
+  const before = s.x;
+  await push(page, { t: "cast", slot: 4, x: ahead(3000), y: 1920 });
+  s = await until(page, "Flash on cooldown", (s) => Number(s.cds.split(",")[4]) > 0);
+  expect(Math.abs(s.x - before)).toBeGreaterThan(200);
+
+  // Walk down the lane to the outer turret: predicted exactly.
+  await push(page, { t: "move", x: ahead(5000), y: 1920 });
+  s = await until(page, "the walk", (s) => Math.abs(s.x - ahead(5000)) < 150, 90_000);
+  await page.screenshot({ path: `${shots}-lane.png` });
+  expect(s.walk_err_max).toBeLessThan(1);
+
+  // Minions come at 0:50: the enemy's are seen only once ours meet them.
+  s = await until(page, "the enemy in sight", (s) => s.enemy_mobile > 0, 120_000);
+  const shot = await page.screenshot({ path: `${shots}-fight.png` });
+  expect(luminanceStdDev(shot)).toBeGreaterThan(5);
+
+  s = await el(page);
+  console.log(`match status: ${JSON.stringify(s)}`);
+  expect(s.errors).toBe(0);
+  expect(s.datagrams).toBeGreaterThan(600);
+  expect(s.orders_unacked).toBeLessThanOrEqual(2);
+  const status = await (await page.request.get("/status")).json();
+  expect(status.game.matches).toBe(1);
+  expect(status.hot_path_allocations).toBe(0);
+});

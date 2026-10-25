@@ -12,6 +12,8 @@ pub struct LaunchConfig {
     pub name: String,
     /// `?mode=echo`: transport smoke test only.
     pub echo: bool,
+    /// Into the queue at once (`?queue=0`: not).
+    pub queue: bool,
     /// The browser has no WebTransport (the page still loads, to say so).
     pub no_web_transport: bool,
 }
@@ -38,6 +40,7 @@ impl LaunchConfig {
             cert_hash: get(&cfg, "certHash").as_string().and_then(|h| decode_hex(&h)),
             name: string("name"),
             echo: flag("echo"),
+            queue: flag("queue"),
             no_web_transport: flag("noWebTransport"),
         }
     }

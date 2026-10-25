@@ -16,6 +16,9 @@ webgpu = ["bevy/webgpu"]
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 el-proto.workspace = true
 el-sim.workspace = true
+el-client-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 bevy = { workspace = true, features = ["3d", "ui"] }
 # Bevy's derive macros resolve `bevy` by reading only [dependencies]; since ours is target-specific
 # they fall back to `bevy_ecs::…` and so on, so name the (already-built) crates directly.

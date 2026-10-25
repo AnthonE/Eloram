@@ -13,5 +13,6 @@ step "determinism on wasm";   cargo test -p el-sim --target wasm32-unknown-unkno
 if [ "${EL_E2E:-0}" = "1" ]; then
   step "web build";           ./scripts/build-web.sh webgl2
   step "e2e: transport";      ./scripts/e2e.sh spike webgl2
+  step "e2e: a match";        ./scripts/e2e.sh match webgl2
 fi
 echo; echo "all green"

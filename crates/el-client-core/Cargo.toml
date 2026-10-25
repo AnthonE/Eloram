@@ -10,11 +10,15 @@ repository.workspace = true
 
 [dependencies]
 el-proto.workspace = true
-# The prediction steps the server's own code: it must take the same bits (glam's scalar maths).
-el-sim = { workspace = true, features = ["deterministic"] }
+el-sim.workspace = true
 glam.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+# The prediction steps the server's own code, so it must take the same bits: natively that means
+# glam's scalar maths; wasm (no `simd128`) has nothing else, and Bevy's glam won't build with it.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+el-sim = { workspace = true, features = ["deterministic"] }
 
 [lints]
 workspace = true

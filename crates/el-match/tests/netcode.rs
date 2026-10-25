@@ -133,3 +133,19 @@ fn bots_play_a_match_through_the_wire() {
     orders_applied_once(&rig);
     assert!(rig.players.iter().all(|p| p.seat < SEATS));
 }
+
+#[test]
+fn a_page_drawing_twice_a_second_still_plays() {
+    // Software rendering, a page in the background: a frame (and so a poll) every half second,
+    // with commands for thirty ticks made at once.
+    let mut rig = Rig::new(5, vec![(4, BAD, walker(9))]);
+    rig.players[0].period = 0.5;
+    rig.run(60.0);
+    rig.players[0].period = 1.0 / 60.0;
+    rig.settle(5.0);
+    report(&rig);
+    let p = &rig.players[0];
+    assert_eq!((p.client.stats.errors, p.client.stats.no_baseline), (0, 0));
+    assert!(p.given.len() > 20, "{} orders", p.given.len());
+    orders_applied_once(&rig);
+}

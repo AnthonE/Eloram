@@ -3,13 +3,25 @@
 #[cfg(target_arch = "wasm32")]
 mod app;
 #[cfg(target_arch = "wasm32")]
+mod camera;
+#[cfg(target_arch = "wasm32")]
 mod config;
+#[cfg(target_arch = "wasm32")]
+mod coords;
 #[cfg(target_arch = "wasm32")]
 mod dev_hooks;
 #[cfg(target_arch = "wasm32")]
+mod hud;
+#[cfg(target_arch = "wasm32")]
+mod input;
+#[cfg(target_arch = "wasm32")]
 mod net;
 #[cfg(target_arch = "wasm32")]
+mod session;
+#[cfg(target_arch = "wasm32")]
 mod transport;
+#[cfg(target_arch = "wasm32")]
+mod view;
 
 #[cfg(target_arch = "wasm32")]
 fn main() {

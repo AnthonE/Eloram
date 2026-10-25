@@ -46,6 +46,17 @@ impl Orders {
         Some(seq)
     }
 
+    /// Stamps every outstanding order from `from` on (none of them sent yet) for `tick` at the
+    /// earliest: after the client's clock jumped, they're for the ticks it's on now.
+    pub fn restamp(&mut self, from: u16, tick: u32) {
+        let mut seq = from;
+        while seq != self.next_seq && usize::from(seq.wrapping_sub(self.acked)) < self.outstanding() {
+            let o = &mut self.ring[usize::from(seq) % OUTSTANDING];
+            o.tick = o.tick.max(tick);
+            seq = seq.wrapping_add(1);
+        }
+    }
+
     /// A snapshot says the server expects `next` now.
     pub fn on_ack(&mut self, next: u16) {
         // Only forward, and never past what was given.
@@ -115,6 +126,18 @@ mod tests {
         o.fill(&mut p);
         assert_eq!(p.orders[0].tick, 500 - 63);
         assert!(p.encode(&mut [0u8; 256]).is_some());
+    }
+
+    #[test]
+    fn only_orders_not_yet_sent_are_stamped_again() {
+        let mut o = Orders::default();
+        o.give(Order::Stop, 10).unwrap();
+        o.give(Order::Hold, 11).unwrap();
+        o.restamp(1, 90);
+        assert_eq!((o.get(0).unwrap().tick, o.get(1).unwrap().tick), (10, 90));
+        // Never earlier than it was.
+        o.restamp(1, 50);
+        assert_eq!(o.get(1).unwrap().tick, 90);
     }
 
     #[test]

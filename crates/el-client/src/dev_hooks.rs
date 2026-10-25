@@ -79,3 +79,182 @@ fn hide_boot_overlay() {
         let _ = el.class_list().add_1("hidden");
     }
 }
+
+/// What a test (or the console) can tell the champion through `window.__elInbox`: an array of
+/// commands, read and emptied every frame, each becoming the order the mouse or keys would give.
+#[derive(serde::Deserialize, Debug)]
+#[serde(tag = "t", rename_all = "snake_case")]
+enum Cmd {
+    Move { x: f32, y: f32 },
+    AttackMove { x: f32, y: f32 },
+    Attack { slot: u8 },
+    Cast { slot: u8, x: Option<f32>, y: Option<f32>, unit: Option<u8> },
+    Stop,
+    Hold,
+    Level { slot: u8 },
+    Pick { card: u8 },
+    Reroll { card: u8 },
+    Buy { item: u8 },
+    Sell { inv: u8 },
+    Shop { open: bool },
+    Lock { on: bool },
+}
+
+pub struct InboxPlugin;
+
+impl Plugin for InboxPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            Update,
+            (
+                inbox.after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send),
+                match_status.after(crate::net::NetSet::Send),
+            ),
+        );
+    }
+}
+
+fn inbox(
+    mut controls: ResMut<crate::input::Controls>,
+    mut rig: ResMut<crate::camera::Rig>,
+    drawn: Res<crate::view::Drawn>,
+) {
+    use el_proto::{Aim, Order, UnitRef};
+    let Some(window) = web_sys::window() else { return };
+    let Ok(arr) = js_sys::Reflect::get(&window, &JsValue::from_str("__elInbox")) else { return };
+    let Ok(arr) = arr.dyn_into::<js_sys::Array>() else { return };
+    let unit = |slot: u8| UnitRef {
+        slot,
+        generation: drawn.units.get(usize::from(slot)).copied().flatten().map_or(0, |d| d.generation),
+    };
+    while arr.length() > 0 {
+        let v = arr.shift();
+        let text = js_sys::JSON::stringify(&v).ok().and_then(|s| s.as_string()).unwrap_or_default();
+        let cmd = match serde_json::from_str::<Cmd>(&text) {
+            Ok(c) => c,
+            Err(e) => {
+                web_sys::console::warn_1(&format!("__elInbox: {e}: {text}").into());
+                continue;
+            }
+        };
+        let order = match cmd {
+            Cmd::Move { x, y } => Order::Move { to: Vec2::new(x, y) },
+            Cmd::AttackMove { x, y } => Order::AttackMove { to: Vec2::new(x, y) },
+            Cmd::Attack { slot } => Order::Attack { unit: unit(slot) },
+            Cmd::Cast { slot, x, y, unit: u } => {
+                let aim = match (x.zip(y), u) {
+                    (Some((x, y)), _) => Aim::Point(Vec2::new(x, y)),
+                    (None, Some(s)) => Aim::Unit(unit(s)),
+                    (None, None) => Aim::None,
+                };
+                Order::Cast { slot, aim }
+            }
+            Cmd::Stop => Order::Stop,
+            Cmd::Hold => Order::Hold,
+            Cmd::Level { slot } => Order::LevelSkill { slot },
+            Cmd::Pick { card } => Order::PickAugment { card },
+            Cmd::Reroll { card } => Order::Reroll { card },
+            Cmd::Buy { item } => Order::Buy { item },
+            Cmd::Sell { inv } => Order::Sell { inv },
+            Cmd::Shop { open } => {
+                controls.shop_open = open;
+                continue;
+            }
+            Cmd::Lock { on } => {
+                rig.locked = on;
+                continue;
+            }
+        };
+        controls.pending.push(order);
+    }
+}
+
+/// The match, for `window.__el`.
+fn match_status(
+    session: Res<crate::session::Session>,
+    drawn: Res<crate::view::Drawn>,
+    mut status: ResMut<DevStatus>,
+    mut walk_max: Local<f32>,
+    mut corrections: Local<(u64, u32)>,
+) {
+    let Some(c) = session.client.as_deref() else { return };
+    let s = c.seat;
+    let u = &c.pred.units[s];
+    let ch = &c.pred.champs[s];
+    if let Some(k) = c.correction
+        && corrections.1 != k.tick
+    {
+        corrections.1 = k.tick;
+        corrections.0 += 1;
+        if k.cause == el_client_core::Cause::Walking {
+            *walk_max = walk_max.max(k.error);
+        }
+    }
+    let seen = |enemy: bool, champs: bool| {
+        drawn
+            .units
+            .iter()
+            .enumerate()
+            .filter(|(i, d)| {
+                d.is_some_and(|d| (d.team != c.team) == enemy && (!champs || *i < el_sim::units::SEATS))
+            })
+            .count() as u32
+    };
+    let items: Vec<String> =
+        ch.items.iter().filter(|&&i| i != el_sim::content::items::NONE).map(|i| i.to_string()).collect();
+    let st = &c.stats;
+    status.set("seat", s as u32);
+    status.set("team", u32::from(c.team));
+    status.set("champion", ch.def().name);
+    status.set("started", c.started());
+    status.set("tick", c.world.tick);
+    status.set("pred_tick", c.pred.tick);
+    status.set("x", u.pos.x);
+    status.set("y", u.pos.y);
+    status.set("alive", u.alive);
+    status.set("hp", u.hp);
+    status.set("max_hp", u.stats.max_hp);
+    status.set("level", u32::from(ch.level));
+    status.set("gold", ch.gold);
+    status.set("items", items.join(","));
+    status.set("augments", u32::from(ch.n_aug));
+    status.set("screen_open", ch.screen.open);
+    status.set("in_shop", c.pred.in_shop(s));
+    status.set("points", u32::from(ch.points));
+    status.set("enemies", seen(true, false));
+    status.set("enemy_champions", seen(true, true));
+    // Enemies that move (champions and minions): what fog hides.
+    let mobile = drawn
+        .units
+        .iter()
+        .enumerate()
+        .filter(|(i, d)| {
+            d.is_some_and(|d| d.team != c.team)
+                && !(el_sim::units::SEATS..el_sim::units::FIRST_MINION).contains(i)
+        })
+        .count() as u32;
+    status.set("enemy_mobile", mobile);
+    status.set("ranks", ch.ranks.iter().map(|r| r.to_string()).collect::<Vec<_>>().join(","));
+    status.set(
+        "cds",
+        ch.ready.iter().map(|r| r.saturating_sub(c.pred.tick).to_string()).collect::<Vec<_>>().join(","),
+    );
+    status.set("allies", seen(false, false));
+    status.set("missiles", c.missiles.live().count() as u32);
+    status.set("datagrams", st.datagrams as f64);
+    status.set("stale", st.stale as f64);
+    status.set("errors", st.errors as f64);
+    status.set("records", st.records as f64);
+    status.set("depth", u32::from(st.depth));
+    status.set("missed", u32::from(st.missed));
+    status.set("match_rtt_ms", c.clock.rtt * 1_000.0);
+    status.set("orders_given", c.orders.given as f64);
+    status.set("orders_unacked", c.orders.outstanding() as u32);
+    status.set("corrections", corrections.0 as f64);
+    status.set("walk_err_max", *walk_max);
+    status.set("kills", u32::from(session.kd[s].0));
+    status.set("deaths", u32::from(session.kd[s].1));
+    if let Some(w) = session.winner {
+        status.set("winner", u32::from(w));
+    }
+}
