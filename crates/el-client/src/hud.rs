@@ -70,12 +70,21 @@ enum Act {
 #[derive(Component)]
 struct Dot(usize);
 
+/// The minimap: a left click (or drag) looks there, a right click walks there.
+#[derive(Component)]
+struct Minimap;
+
 pub struct HudPlugin;
 
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PostStartup, setup)
-            .add_systems(Update, (press, (texts, fills, panels, dots).after(crate::net::NetSet::Send)));
+        app.add_systems(PostStartup, setup).add_systems(
+            Update,
+            (
+                (press, minimap).after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send),
+                (texts, fills, panels, dots).after(crate::net::NetSet::Send),
+            ),
+        );
     }
 }
 
@@ -250,6 +259,9 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>) {
                 ..default()
             },
             ImageNode::new(floor.0.clone()),
+            Button,
+            bevy::ui::RelativeCursorPosition::default(),
+            Minimap,
         ))
         .id();
     for slot in 0..el_sim::units::FIRST_MINION {
@@ -396,13 +408,67 @@ fn mmss(ticks: u32) -> String {
     format!("{}:{:02}", s / 60, s % 60)
 }
 
+/// The HUD's words while watching a record.
+fn watching(label: Label, w: &crate::watch::Watch) -> String {
+    let m = &w.referee.m;
+    let kills = |team: u8| {
+        (0..SEATS).filter(|&s| team_of_seat(s) == team).map(|s| u32::from(m.champs[s].kills)).sum::<u32>()
+    };
+    match label {
+        Label::Top => format!("{}     Dawn {}  -  {} Dusk", mmss(m.tick), kills(0), kills(1)),
+        Label::Ping => {
+            if w.live {
+                "watching, a minute behind".into()
+            } else {
+                format!("replay at {}x   [ and ] change it", w.speed)
+            }
+        }
+        Label::Center => match (&w.error, w.referee.outcome) {
+            (Some(e), _) => e.clone(),
+            (None, Some((tick, winner))) if m.tick >= tick => {
+                format!("{} won", if winner == 0 { "Dawn" } else { "Dusk" })
+            }
+            _ if m.tick == 0 => "Loading the record...".into(),
+            _ => String::new(),
+        },
+        Label::Score => {
+            let mut out = String::new();
+            for team in 0..2u8 {
+                out.push_str(if team == 0 { "DAWN\n" } else { "\nDUSK\n" });
+                for s in (0..SEATS).filter(|&s| team_of_seat(s) == team) {
+                    let ch = &m.champs[s];
+                    out.push_str(&format!(
+                        "{:<10} {:>2}   {}/{}/{}\n",
+                        CHAMPIONS[usize::from(ch.def) % CHAMPIONS.len()].name,
+                        ch.level,
+                        ch.kills,
+                        ch.deaths,
+                        ch.assists
+                    ));
+                }
+            }
+            out
+        }
+        _ => String::new(),
+    }
+}
+
 fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &mut Text)>) {
     let now = crate::net::now_s();
     let c = session.client.as_deref();
     for (label, mut t) in &mut q {
+        if let Some(w) = session.watch.as_deref() {
+            let s = watching(*label, w);
+            if **t != s {
+                **t = s;
+            }
+            continue;
+        }
         let s: String = match (*label, c) {
             (Label::Center, _) => match session.phase {
                 Phase::Connecting => "Connecting...".into(),
+                Phase::SigningIn => "Sign in with your wallet...".into(),
+                Phase::Watching => String::new(),
                 Phase::Lobby => "In the lobby".into(),
                 Phase::Queued => format!(
                     "Finding a match: {} waiting, bots take the empty seats in {} s",
@@ -560,8 +626,10 @@ fn fills(session: Res<Session>, mut q: Query<(&Fill, &mut Node)>) {
 
 fn panels(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Panel, &mut Node)>) {
     let c = session.client.as_deref().filter(|c| c.started() && session.phase == Phase::Playing);
+    let watching = session.watch.is_some();
     for (p, mut node) in &mut q {
         let show = match (*p, c) {
+            (Panel::Score, _) if watching => controls.scoreboard,
             (Panel::Bottom, Some(_)) => true,
             (Panel::Cards, Some(c)) => c.pred.champs[c.seat].screen.open && c.pred.in_shop(c.seat),
             (Panel::Shop, Some(c)) => controls.shop_open && c.pred.in_shop(c.seat),
@@ -591,6 +659,26 @@ fn dots(
             }
             None => *vis = Visibility::Hidden,
         }
+    }
+}
+
+fn minimap(
+    mouse: Res<ButtonInput<MouseButton>>,
+    q: Query<&bevy::ui::RelativeCursorPosition, With<Minimap>>,
+    mut rig: ResMut<crate::camera::Rig>,
+    mut controls: ResMut<Controls>,
+    session: Res<Session>,
+) {
+    let Some(n) = q.iter().find(|r| r.cursor_over()).and_then(|r| r.normalized) else { return };
+    // (-0.5, -0.5) is the top left: the map's far end of its first half.
+    let at = Vec2::new((n.x + 0.5) * MAP_W, (0.5 - n.y) * MAP_H);
+    if mouse.pressed(MouseButton::Left) {
+        rig.locked = false;
+        rig.focus = at;
+    }
+    if mouse.just_pressed(MouseButton::Right) && session.phase == Phase::Playing {
+        controls.pending.push(Order::Move { to: at });
+        controls.marker = Some((at, crate::net::now_s(), false));
     }
 }
 

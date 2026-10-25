@@ -7,6 +7,7 @@ use crate::hud::HudPlugin;
 use crate::input::InputPlugin;
 use crate::net::{LaunchConfigRes, MapRes, NetPlugin};
 use crate::view::ViewPlugin;
+use crate::watch::WatchPlugin;
 
 pub fn run() {
     console_error_panic_hook::set_once();
@@ -36,6 +37,7 @@ pub fn run() {
             CameraPlugin,
             ViewPlugin,
             HudPlugin,
+            WatchPlugin,
         ))
         .run();
 }

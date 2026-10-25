@@ -58,6 +58,9 @@ pub struct Metrics {
     pub record_bits: AtomicU64,
     pub deltas: AtomicU64,
     pub out_drops: AtomicU64,
+    /// Record frames that didn't fit their ring (the recorder fell behind): each breaks a record.
+    pub record_drops: AtomicU64,
+    pub record_bytes: AtomicU64,
     pub inputs: AtomicU64,
     pub inputs_stale: AtomicU64,
     pub inputs_missing: AtomicU64,

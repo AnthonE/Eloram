@@ -186,16 +186,27 @@ Before Colony's, sized for a match:
 
 ### The record
 
-- Each match writes one file: its seed, content and build, then each tick's *applied* commands and
-  orders, everything from outside (joins, leaves, reconnects), and a state hash every 30 ticks.
-  About 250 KB for twenty minutes.
-- **A referee** re-steps every live match about a minute behind, checks the hashes, and keeps a
-  checkpoint every minute. A divergence is caught within a minute and named to the tick and the
-  unit (Riot's first-divergence tool).
-- **Spectating** is the checkpoint at least 60 s old plus the record from there, stepped in the
-  browser by the same sim with full vision. The delay is the server's, so it can't be skipped.
-- **A replay** is the same from tick 0, and any recorded match can be re-run faster than real time.
-- **A crash** is recovered from the last checkpoint and the record, and clients resume their seats.
+- Each match writes one file (`el_sim::record`, `.elr`): its seed, champions, protocol and content
+  version, then each tick's *applied* inputs for all ten seats (the bots' too), everything from
+  outside (a seat taken or left), and a state hash every 30 ticks. The shard thread writes the
+  frames into a ring a match without allocating; a recorder thread a shard keeps them
+  (`el-server/src/records.rs`; `--records dir` writes them out). Measured: 25 KB a match a minute
+  with two people and eight bots, about 500 KB for twenty minutes.
+- **A referee** (`el_sim::record::Referee`) re-steps a record and checks every hash: `el-replay
+  verify` over files, and every spectator's page as it watches. A divergence is named to the 30
+  ticks it happened in; one order changed in a record is caught at the next hash
+  (`el-match/tests/record.rs`). Still to come: a referee thread on the server re-stepping live
+  matches a minute behind with a checkpoint a minute, and naming the unit that went astray.
+- **Spectating** is the record served a minute behind its players (`/records/{id}`: a live record
+  is cut at the last hash at least 60 s old), stepped in the browser by the same sim with full
+  vision (`?watch=<id>`; `/records.json` lists them). The delay is the server's, so it can't be
+  skipped. The page steps the record from the start, catching up at 900 ticks a frame;
+  checkpoints will shorten that.
+- **A replay** is the same from tick 0 (`?replay=<url>`; `[` and `]` change the speed), and any
+  recorded match re-runs far faster than real time: `el-replay verify` re-steps a minute of play
+  in about 0.1 s.
+- **A crash** will be recovered from the last checkpoint and the record, and clients resume their
+  seats (not built yet).
 - CI re-steps every match it records and fails on the first differing hash.
 
 ### Many matches a process

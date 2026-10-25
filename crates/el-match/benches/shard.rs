@@ -30,7 +30,8 @@ fn main() {
     let matches: usize = args.first().and_then(|s| s.parse().ok()).unwrap_or(64);
     let minutes: f64 = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(4.0);
     let map = Map::leaked();
-    let (mut shard, shared, mut leases, mut egress) = build(ShardConfig { matches, map, hot_guard: None });
+    let (mut shard, shared, mut leases, mut egress, mut records) =
+        build(ShardConfig { matches, map, hot_guard: None });
     for m in 0..matches {
         let seed = 1 + m as u64;
         let picks = std::array::from_fn(|s| {
@@ -92,6 +93,13 @@ fn main() {
         if t >= warm {
             times.push(us);
         }
+        // The records, as a recorder would take them (not timed).
+        for ring in &mut records.rings {
+            let n = ring.slots();
+            if let Ok(chunk) = ring.read_chunk(n) {
+                chunk.commit_all();
+            }
+        }
     }
     times.sort_unstable();
     let q = |p: f64| times[((times.len() as f64 - 1.0) * p) as usize];
@@ -122,4 +130,10 @@ fn main() {
     );
     println!("  down a seat: {:.1} KB/s", sent_bytes as f64 / secs / (matches * SEATS) as f64 / 1_000.0);
     println!("  matches a core at p99: {}", (budget * matches as u64) / q(0.99).max(1));
+    let rec = shared.metrics.record_bytes.load(std::sync::atomic::Ordering::Relaxed) as f64;
+    println!(
+        "  the record: {:.1} KB a match a minute ({} frames lost)",
+        rec / matches as f64 / minutes / 1_000.0,
+        shared.metrics.record_drops.load(std::sync::atomic::Ordering::Relaxed)
+    );
 }

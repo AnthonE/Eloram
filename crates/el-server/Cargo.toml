@@ -14,7 +14,9 @@ el-proto.workspace = true
 el-sim = { workspace = true, features = ["deterministic"] }
 el-match.workspace = true
 el-client-core.workspace = true
+el-auth = { path = "../el-auth", default-features = false, features = ["verify"] }
 crossbeam-queue.workspace = true
+getrandom = "0.3"
 tokio.workspace = true
 wtransport.workspace = true
 axum.workspace = true

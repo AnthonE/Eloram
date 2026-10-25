@@ -17,7 +17,8 @@ mod shard;
 pub use jitter::{JitterBuffer, Ticked};
 pub use metrics::{Hist, Metrics};
 pub use queues::{
-    Control, EgressEnds, InputMsg, MatchState, Outcome, SeatLease, ShardShared, build, read_packet,
+    Control, EgressEnds, InputMsg, MatchState, Outcome, RecordEnds, SeatLease, ShardShared, build,
+    read_packet,
 };
 pub use runtime::{ShardThread, spawn};
 pub use shard::{Shard, ShardConfig};

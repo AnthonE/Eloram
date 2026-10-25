@@ -1,0 +1,18 @@
+[package]
+name = "el-replay"
+description = "Eloram's records (.elr): verify a match against its hashes, or dump its frames"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+el-proto.workspace = true
+el-sim = { workspace = true, features = ["deterministic"] }
+anyhow.workspace = true
+clap.workspace = true
+
+[lints]
+workspace = true

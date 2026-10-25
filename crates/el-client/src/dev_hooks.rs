@@ -177,6 +177,17 @@ fn match_status(
     mut walk_max: Local<f32>,
     mut corrections: Local<(u64, u32)>,
 ) {
+    if let Some(w) = session.watch.as_deref() {
+        status.set("watch_tick", w.referee.m.tick);
+        status.set("watch_available", w.available);
+        status.set("watch_hashes", w.referee.checked);
+        status.set("watch_live", w.live);
+        status.set("watch_units", drawn.units.iter().filter(|d| d.is_some()).count() as u32);
+        if let Some(e) = &w.error {
+            status.set("watch_error", e.as_str());
+        }
+        return;
+    }
     let Some(c) = session.client.as_deref() else { return };
     let s = c.seat;
     let u = &c.pred.units[s];

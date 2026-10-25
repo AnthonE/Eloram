@@ -72,5 +72,7 @@ pub fn launcher_status_json(stats: &NetStats, max_players: usize) -> serde_json:
         "players": r(&stats.humans_active),
         "agents": r(&stats.agents_active),
         "max_players": max_players,
+        // What a page must speak to be let in (`scripts/publish-web.sh` checks it before publishing).
+        "proto": el_proto::PROTOCOL_VERSION,
     })
 }

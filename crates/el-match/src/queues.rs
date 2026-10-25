@@ -94,22 +94,33 @@ pub struct EgressEnds {
     pub rings: Vec<rtrb::Consumer<u8>>,
 }
 
+/// Record ends: one byte ring a match, its record's frames (`el_sim::record`) as the shard writes
+/// them, for the recorder.
+pub struct RecordEnds {
+    pub rings: Vec<rtrb::Consumer<u8>>,
+}
+
 /// The shard thread's ends.
 pub(crate) struct ShardEnds {
     pub inputs: Vec<rtrb::Consumer<InputMsg>>,
     pub outputs: Vec<rtrb::Producer<u8>>,
+    pub records: Vec<rtrb::Producer<u8>>,
 }
 
 /// Bytes of a seat's outbound queue (about thirty full datagrams).
 pub const OUT_RING_BYTES: usize = 32 * 1024;
 /// Input messages a seat buffers.
 pub const IN_RING: usize = 64;
+/// Bytes of a match's record ring: a few seconds of its busiest ticks.
+pub const RECORD_RING_BYTES: usize = 64 * 1024;
 
 /// Allocates every queue of a shard of `matches` matches: the shard itself, its shared state, the
-/// seats' leases (index `match × 10 + seat`) and the egress ends. The only place the runtime
+/// seats' leases (index `match × 10 + seat`), the egress ends and the record ends. The only place the runtime
 /// allocates.
 #[allow(clippy::disallowed_methods, clippy::disallowed_macros)]
-pub fn build(cfg: crate::ShardConfig) -> (crate::Shard, Arc<ShardShared>, Vec<SeatLease>, EgressEnds) {
+pub fn build(
+    cfg: crate::ShardConfig,
+) -> (crate::Shard, Arc<ShardShared>, Vec<SeatLease>, EgressEnds, RecordEnds) {
     let seats = cfg.matches * SEATS;
     let mut inputs = Vec::with_capacity(seats);
     let mut outputs = Vec::with_capacity(seats);
@@ -123,6 +134,8 @@ pub fn build(cfg: crate::ShardConfig) -> (crate::Shard, Arc<ShardShared>, Vec<Se
         outputs.push(op);
         rings.push(oc);
     }
+    let (records, record_rings): (Vec<_>, Vec<_>) =
+        (0..cfg.matches).map(|_| rtrb::RingBuffer::<u8>::new(RECORD_RING_BYTES)).unzip();
     let shared = Arc::new(ShardShared {
         control: ArrayQueue::new(cfg.matches * 16 + 16),
         outcomes: ArrayQueue::new(cfg.matches + 16),
@@ -134,8 +147,8 @@ pub fn build(cfg: crate::ShardConfig) -> (crate::Shard, Arc<ShardShared>, Vec<Se
         matches: cfg.matches,
         started: std::time::Instant::now(),
     });
-    let shard = crate::Shard::new(cfg, shared.clone(), ShardEnds { inputs, outputs });
-    (shard, shared, leases, EgressEnds { rings })
+    let shard = crate::Shard::new(cfg, shared.clone(), ShardEnds { inputs, outputs, records });
+    (shard, shared, leases, EgressEnds { rings }, RecordEnds { rings: record_rings })
 }
 
 /// Reads one `[u16 len][payload]` frame from an egress ring into `buf`. Returns the payload length.

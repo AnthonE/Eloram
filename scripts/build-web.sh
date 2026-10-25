@@ -24,7 +24,7 @@ if [ "$crate_ver" != "$cli_ver" ]; then
 fi
 
 mkdir -p web/dist
-cp web/index.html web/config.js web/boot.js web/loader.js web/style.css web/favicon.svg web/dist/
+cp web/index.html web/config.js web/boot.js web/loader.js web/wallet.js web/style.css web/favicon.svg web/dist/
 
 for v in "${variants[@]}"; do
   feats=()

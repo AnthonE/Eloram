@@ -21,6 +21,10 @@ struct Args {
     bots: usize,
     #[arg(long, default_value_t = 30)]
     secs: u64,
+    /// Each agent signs in with a throwaway test key (the secret is its number, from 1): the
+    /// server's `/online.json` then lists their wallets.
+    #[arg(long)]
+    sign_in: bool,
 }
 
 #[derive(Default)]
@@ -46,8 +50,15 @@ async fn main() -> anyhow::Result<()> {
         let totals = totals.clone();
         let server = a.server.clone();
         let secs = a.secs;
+        let key = a.sign_in.then(|| {
+            let mut secret = [0u8; 32];
+            secret[30..].copy_from_slice(&(k as u16 + 1).to_be_bytes());
+            secret
+        });
         tasks.push(tokio::spawn(async move {
-            if let Err(e) = one(k, server, secs, &totals).await {
+            if let Err(e) =
+                one(k, BotConfig { server, name: format!("Swarm-{k:03}"), key }, secs, &totals).await
+            {
                 eprintln!("agent {k}: {e:#}");
                 totals.failed.fetch_add(1, Ordering::Relaxed);
             }
@@ -87,8 +98,9 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn one(k: usize, server: String, secs: u64, t: &Totals) -> anyhow::Result<()> {
-    let mut bot = BotClient::connect(&BotConfig { server, name: format!("Swarm-{k:03}") }).await?;
+async fn one(k: usize, cfg: BotConfig, secs: u64, t: &Totals) -> anyhow::Result<()> {
+    let mut bot = BotClient::connect(&cfg).await?;
+    let _ = k;
     bot.queue().await?;
     bot.wait_match(Duration::from_secs(120)).await?;
     t.seated.fetch_add(1, Ordering::Relaxed);

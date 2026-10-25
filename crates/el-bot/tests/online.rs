@@ -1,5 +1,6 @@
-//! Agents over real WebTransport against a real server: the handshake, the queue, a match with the
-//! server's bots in the empty seats, snapshots in and orders out, and the store's counts.
+//! Agents over real WebTransport against a real server: the handshake (one signing in with a
+//! wallet), the queue, a match with the server's bots in the empty seats, snapshots in and orders
+//! out, and the store's counts and roster.
 
 use std::time::Duration;
 
@@ -18,10 +19,18 @@ async fn agents_play_a_match_over_webtransport() {
     let h = el_server::start(cfg).await.expect("the server starts");
     let server = format!("http://{}", h.http_addr);
     let mut tasks = Vec::new();
-    for k in 0..2 {
+    // The first signs in with a wallet; the second plays as a guest.
+    let key = |k: u8| {
+        let mut secret = [0u8; 32];
+        secret[31] = k;
+        secret
+    };
+    for k in 0..2u8 {
         let server = server.clone();
+        let key = (k == 0).then(|| key(1));
         tasks.push(tokio::spawn(async move {
-            let mut bot = BotClient::connect(&BotConfig { server, name: format!("Agent-{k}") }).await?;
+            let mut bot = BotClient::connect(&BotConfig { server, name: format!("Agent-{k}"), key }).await?;
+            anyhow::ensure!(bot.address.is_some() == key.is_some(), "signed in as it asked");
             bot.queue().await?;
             bot.wait_match(Duration::from_secs(10)).await?;
             bot.play(Duration::from_secs(12), &mut el_bot::scripted()).await?;
@@ -36,6 +45,12 @@ async fn agents_play_a_match_over_webtransport() {
     assert_eq!((launcher["players"].as_u64(), launcher["agents"].as_u64()), (Some(0), Some(2)), "{launcher}");
     let status = el_bot::get_json(&server, "/status").await.unwrap();
     assert_eq!(status["game"]["matches"], 1, "{status}");
+    // The store's roster: the signed-in agent's wallet (test key 1's), and not the guest.
+    let online = el_bot::get_json(&server, "/online.json").await.unwrap();
+    let on = online["online"].as_array().unwrap();
+    assert_eq!(on.len(), 1, "{online}");
+    assert_eq!(on[0]["wallet"], "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf");
+    assert_eq!((on[0]["name"].as_str(), on[0]["agent"].as_bool()), (Some("Agent-0"), Some(true)));
     let mut seats = Vec::new();
     for t in tasks {
         let (stats, given, unacked, seat, roster) = t.await.unwrap().expect("an agent plays");

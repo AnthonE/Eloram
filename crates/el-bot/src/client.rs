@@ -1,13 +1,16 @@
-//! An agent's session: the handshake (as an agent: the store shows agents for what they are), the
-//! queue, a seat, then frames of play: datagrams in, the brain asked for its orders, the input
-//! packet out. Everything it knows comes from what its team is sent.
+//! An agent's session: the handshake (as an agent: the store shows agents for what they are), a
+//! wallet sign-in if it has a key (`el_auth::LocalWallet` signs the server's challenge, as a
+//! browser wallet would), the queue, a seat, then frames of play: datagrams in, the brain asked
+//! for its orders, the input packet out. Everything it knows comes from what its team is sent.
 
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use el_client_core::Client;
 use el_client_core::lobby::{Player, ToClient, ToServer};
-use el_proto::control::{ControlMsg, Frame, MAX_FRAME, MAX_LOBBY_FRAME, PlayerKind, encode_lobby};
+use el_proto::control::{
+    ControlMsg, Frame, MAX_FRAME, MAX_LOBBY_FRAME, PlayerKind, encode_lobby, hello_flags,
+};
 use el_proto::quant::pos_code;
 use el_sim::Match;
 use el_sim::game::SeatInput;
@@ -26,11 +29,25 @@ pub fn map() -> &'static Map {
 /// A browser frame.
 const FRAME: Duration = Duration::from_millis(16);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Default)]
 pub struct BotConfig {
     /// The server's HTTP side, `http://host:port`.
     pub server: String,
     pub name: String,
+    /// The agent's wallet key, to sign in with (its own, on its machine); without one it plays as
+    /// a guest.
+    pub key: Option<[u8; 32]>,
+}
+
+/// Not printed: a key in a log is a key given away.
+impl std::fmt::Debug for BotConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BotConfig")
+            .field("server", &self.server)
+            .field("name", &self.name)
+            .field("key", &self.key.map(|_| "…"))
+            .finish()
+    }
 }
 
 /// What plays the seat: given the prediction, the seat and the tick, its steer and orders.
@@ -51,24 +68,47 @@ pub struct BotClient {
     pub roster: Vec<Player>,
     /// The winner, once the match is over.
     pub over: Option<u8>,
+    /// The wallet it signed in as, if it did.
+    pub address: Option<el_proto::auth::Address>,
     start: Instant,
 }
 
 impl BotClient {
-    /// Connects and says hello as an agent named `cfg.name`.
+    /// Connects and says hello as an agent named `cfg.name`, signing in with its key if it has
+    /// one.
     pub async fn connect(cfg: &BotConfig) -> anyhow::Result<BotClient> {
         let info = transport::discover(&cfg.server).await?;
         let conn = transport::connect(&info.url, info.cert_hash).await?;
         let (mut tx, rx) = conn.open_bi().await?.await?;
+        let wallet = cfg.key.as_ref().and_then(el_auth::LocalWallet::from_secret);
+        anyhow::ensure!(cfg.key.is_none() || wallet.is_some(), "the key isn't a valid secp256k1 secret");
+        let mut hello = ControlMsg::hello(PlayerKind::Agent, &cfg.name);
+        if let (ControlMsg::Hello { flags, .. }, Some(_)) = (&mut hello, &wallet) {
+            *flags |= hello_flags::SIGN_IN;
+        }
         let mut buf = [0u8; MAX_FRAME];
-        let n = ControlMsg::hello(PlayerKind::Agent, &cfg.name).encode(&mut buf).expect("a hello fits");
+        let n = hello.encode(&mut buf).expect("a hello fits");
         tx.write_all(&buf[..n]).await?;
         let (frames_tx, mut frames) = mpsc::channel(16);
         tokio::spawn(read_frames(rx, frames_tx));
-        let session = match tokio::time::timeout(Duration::from_secs(10), frames.recv()).await {
-            Ok(Some(Incoming::Msg(ControlMsg::Welcome { session, .. }))) => session,
-            Ok(Some(Incoming::Msg(ControlMsg::Reject { reason }))) => anyhow::bail!("refused: {reason:?}"),
-            _ => anyhow::bail!("no welcome"),
+        let mut address = None;
+        let session = loop {
+            match tokio::time::timeout(Duration::from_secs(10), frames.recv()).await {
+                Ok(Some(Incoming::Msg(ControlMsg::Challenge { nonce, issued_at, domain }))) => {
+                    let Some(w) = &wallet else { anyhow::bail!("challenged, with no key to sign with") };
+                    let signature = w.sign_in(domain.as_str(), &nonce, issued_at);
+                    let n = (ControlMsg::Auth { address: w.address(), signature })
+                        .encode(&mut buf)
+                        .expect("an auth fits");
+                    tx.write_all(&buf[..n]).await?;
+                    address = Some(w.address());
+                }
+                Ok(Some(Incoming::Msg(ControlMsg::Welcome { session, .. }))) => break session,
+                Ok(Some(Incoming::Msg(ControlMsg::Reject { reason }))) => {
+                    anyhow::bail!("refused: {reason:?}")
+                }
+                _ => anyhow::bail!("no welcome"),
+            }
         };
         Ok(BotClient {
             conn,
@@ -78,6 +118,7 @@ impl BotClient {
             client: None,
             roster: Vec::new(),
             over: None,
+            address,
             start: Instant::now(),
         })
     }

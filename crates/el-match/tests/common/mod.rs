@@ -8,7 +8,7 @@ use std::sync::{Arc, OnceLock};
 
 use el_client_core::{Client, Correction};
 use el_match::{
-    Control, EgressEnds, InputMsg, SeatLease, Shard, ShardConfig, ShardShared, build, read_packet,
+    Control, EgressEnds, InputMsg, RecordEnds, SeatLease, Shard, ShardConfig, ShardShared, build, read_packet,
 };
 use el_proto::quant::pos_code;
 use el_proto::{InputPacket, Order};
@@ -149,6 +149,9 @@ pub struct Rig {
     pub shared: Arc<ShardShared>,
     leases: Vec<SeatLease>,
     egress: EgressEnds,
+    records: RecordEnds,
+    /// Match 0's record so far.
+    pub record: Vec<u8>,
     pub players: Vec<Player>,
     pub now: f64,
     next_tick: f64,
@@ -167,7 +170,8 @@ impl Rig {
     /// Match 0 of a one-match shard, `seed`, with these seats played over links; bots on the server
     /// play the rest.
     pub fn new(seed: u64, humans: Vec<(usize, LinkSpec, Brain)>) -> Rig {
-        let (shard, shared, leases, egress) = build(ShardConfig { matches: 1, map: map(), hot_guard: None });
+        let (shard, shared, leases, egress, records) =
+            build(ShardConfig { matches: 1, map: map(), hot_guard: None });
         let mask = humans.iter().fold(0u16, |m, (s, _, _)| m | 1 << s);
         shared.control.push(Control::Start { m: 0, seed, picks: picks(seed), humans: mask }).unwrap();
         let mut players = Vec::new();
@@ -193,6 +197,8 @@ impl Rig {
             shared,
             leases,
             egress,
+            records,
+            record: Vec::new(),
             players,
             now: 0.0,
             next_tick: 0.0,
@@ -251,6 +257,9 @@ impl Rig {
             let ((), ops) = el_alloc::count(|| shard.tick_at(now_us));
             self.heap_ops += ops;
             self.ticks += 1;
+            while let Ok(b) = self.records.rings[0].pop() {
+                self.record.push(b);
+            }
             for p in &mut self.players {
                 while let Some(n) = read_packet(&mut self.egress.rings[p.seat], &mut self.buf) {
                     let bytes = self.buf[..n].to_vec();

@@ -10,6 +10,7 @@ use el_proto::MAX_DATAGRAM;
 use el_sim::game::SeatInput;
 use el_sim::map::Map;
 use el_sim::path::PathScratch;
+use el_sim::record;
 use el_sim::storage::boxed;
 use el_sim::units::SEATS;
 use el_sim::{Match, bot};
@@ -41,6 +42,8 @@ pub struct Shard {
     reported: Box<[bool]>,
     scratch: PathScratch,
     buf: Box<[u8]>,
+    /// A record frame being written.
+    frame: Box<[u8]>,
 }
 
 impl Shard {
@@ -58,6 +61,7 @@ impl Shard {
             reported: boxed(n, false),
             scratch: PathScratch::new(),
             buf: boxed(MAX_DATAGRAM, 0u8),
+            frame: boxed(record::MAX_FRAME, 0u8),
         }
     }
 
@@ -92,6 +96,16 @@ impl Shard {
         self.shared.tick.fetch_add(1, Ordering::Release);
     }
 
+    /// Puts the frame in `self.frame[..n]` on match `m`'s record ring (or counts it lost).
+    fn record(&mut self, m: usize, n: usize) {
+        let ring = &mut self.ends.records[m];
+        if n == 0 || ring.slots() < n || ring.push_entire_slice(&self.frame[..n]).is_err() {
+            Metrics::add(&self.shared.metrics.record_drops, 1);
+            return;
+        }
+        Metrics::add(&self.shared.metrics.record_bytes, n as u64);
+    }
+
     fn control(&mut self, c: Control) {
         match c {
             Control::Start { m, seed, picks, humans } => {
@@ -100,6 +114,8 @@ impl Shard {
                     return;
                 }
                 self.matches[m].reset(seed, picks);
+                let n = record::write_header(&mut self.frame, &record::Header::new(seed, picks));
+                self.record(m, n);
                 for seat in 0..SEATS {
                     let g = m * SEATS + seat;
                     self.seats[g] = SeatNet::default();
@@ -118,12 +134,18 @@ impl Shard {
                     while self.ends.inputs[g].pop().is_ok() {}
                     self.seats[g].seat(max_datagram);
                     self.replicas[g].reset();
+                    let (m, tick) = (usize::from(m), self.matches[usize::from(m)].tick);
+                    let n = record::write_seat(&mut self.frame, tick, seat, true);
+                    self.record(m, n);
                 }
             }
             Control::Unseat { m, seat } => {
                 let g = usize::from(m) * SEATS + usize::from(seat);
                 if g < self.seats.len() {
                     self.seats[g].human = false;
+                    let (m, tick) = (usize::from(m), self.matches[usize::from(m)].tick);
+                    let n = record::write_seat(&mut self.frame, tick, seat, false);
+                    self.record(m, n);
                 }
             }
             Control::End { m } => {
@@ -161,7 +183,15 @@ impl Shard {
                 bot::think(&self.matches[mi], seat, input);
             }
         }
+        // The record: what the match is stepped with, and now and then what it came to.
+        let n = record::write_tick(&mut self.frame, next, &inputs);
+        self.record(mi, n);
         self.matches[mi].step(&inputs, &mut self.scratch);
+        if self.matches[mi].tick.is_multiple_of(record::HASH_EVERY) {
+            let m = &self.matches[mi];
+            let n = record::write_hash(&mut self.frame, m.tick, m.hash());
+            self.record(mi, n);
+        }
         let stepped = Instant::now();
         self.shared.metrics.sim_hist.record((stepped - started).as_micros() as u64);
         // Replication: each seat a player holds.
@@ -191,13 +221,11 @@ impl Shard {
             && !self.reported[mi]
         {
             self.reported[mi] = true;
-            let _ = self.shared.outcomes.push(Outcome::Over {
-                m: mi as u16,
-                winner,
-                tick: m.tick,
-                hash: m.hash(),
-            });
+            let (tick, hash) = (m.tick, m.hash());
+            let _ = self.shared.outcomes.push(Outcome::Over { m: mi as u16, winner, tick, hash });
             self.shared.states[mi].store(MatchState::Over as u32, Ordering::Release);
+            let n = record::write_outcome(&mut self.frame, tick, winner);
+            self.record(mi, n);
         }
     }
 }

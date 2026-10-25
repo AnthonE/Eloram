@@ -10,6 +10,7 @@ repository.workspace = true
 
 [dependencies]
 el-client-core.workspace = true
+el-auth = { path = "../el-auth" }
 el-proto.workspace = true
 el-sim = { workspace = true, features = ["deterministic"] }
 wtransport.workspace = true

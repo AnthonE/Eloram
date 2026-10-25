@@ -66,6 +66,7 @@ pub async fn accept_loop(
     stats: Arc<NetStats>,
     admission: Arc<Admission>,
     lobby: Option<Arc<crate::lobby::Lobby>>,
+    signin: Arc<crate::signin::SignIn>,
     mut shutdown: tokio::sync::watch::Receiver<bool>,
 ) {
     loop {
@@ -96,6 +97,7 @@ pub async fn accept_loop(
         };
         let stats = stats.clone();
         let lobby = lobby.clone();
+        let signin = signin.clone();
         tokio::spawn(async move {
             // Both handshakes within their deadline, or the place goes to someone else.
             let request = match tokio::time::timeout(HANDSHAKE, incoming).await {
@@ -113,6 +115,8 @@ pub async fn accept_loop(
                 request.not_found().await;
                 return;
             }
+            // The page's origin: a sign-in's challenge names its domain.
+            let origin = request.origin().map(str::to_string);
             let conn = match tokio::time::timeout(HANDSHAKE, request.accept()).await {
                 Ok(Ok(conn)) => conn,
                 Ok(Err(e)) => {
@@ -128,7 +132,9 @@ pub async fn accept_loop(
             NetStats::add(&stats.sessions_total, 1);
             NetStats::add(&stats.sessions_active, 1);
             match (mode, lobby) {
-                (Mode::Game, Some(lobby)) => super::session::run(conn, stats.clone(), lobby).await,
+                (Mode::Game, Some(lobby)) => {
+                    super::session::run(conn, stats.clone(), lobby, signin, origin).await
+                }
                 _ => super::echo::run(conn, stats.clone()).await,
             }
             stats.sessions_active.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);

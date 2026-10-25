@@ -2,6 +2,10 @@
 //! `el_client_core::lobby`), then a seat in a match: the client's input datagrams go into the
 //! seat's ring, and the seat's egress sends it its snapshots.
 //!
+//! A Hello may sign in with a wallet (`crate::signin`): a challenge, the wallet's signature over
+//! the SIWE text for it, checked; or a resume token from an earlier sign-in. Without either the
+//! player is a guest, unless the server requires people to sign in.
+//!
 //! Every hostile byte is survivable: frames are bounded ([`el_proto::control::MAX_FRAME`], lobby
 //! frames [`el_proto::control::MAX_LOBBY_FRAME`]), a session that sends what isn't a frame is
 //! closed, and a datagram that isn't an input packet is counted and dropped.
@@ -12,8 +16,10 @@ use std::time::Duration;
 
 use el_client_core::lobby::{ToClient, ToServer};
 use el_match::InputMsg;
+use el_proto::auth::{Address, Domain, TOKEN_BYTES};
 use el_proto::control::{
-    ControlMsg, Frame, MAX_FRAME, MAX_LOBBY_FRAME, PlayerKind, RejectReason, encode_lobby,
+    ControlMsg, Frame, MAX_FRAME, MAX_LOBBY_FRAME, PlayerKind, RejectReason, encode_lobby, hello_flags,
+    welcome_flags,
 };
 use el_proto::{InputPacket, MAX_DATAGRAM, PROTOCOL_VERSION, TICK_HZ};
 use tokio::sync::mpsc;
@@ -21,6 +27,7 @@ use wtransport::{Connection, RecvStream, SendStream};
 
 use super::NetStats;
 use crate::lobby::{Lobby, LobbyEvent, Seating};
+use crate::signin::{SignIn, pick_domain, short};
 
 /// How long a client has to say Hello.
 const HELLO_WAIT: Duration = Duration::from_secs(10);
@@ -36,7 +43,13 @@ enum Incoming {
     Lobby(Vec<u8>),
 }
 
-pub async fn run(conn: Connection, stats: Arc<NetStats>, lobby: Arc<Lobby>) {
+pub async fn run(
+    conn: Connection,
+    stats: Arc<NetStats>,
+    lobby: Arc<Lobby>,
+    signin: Arc<SignIn>,
+    origin: Option<String>,
+) {
     let Ok(Ok((mut tx, mut rx))) = tokio::time::timeout(HELLO_WAIT, async {
         let stream = conn.accept_bi().await?;
         anyhow::Ok(stream)
@@ -50,7 +63,7 @@ pub async fn run(conn: Connection, stats: Arc<NetStats>, lobby: Arc<Lobby>) {
         Ok(Some(Incoming::Msg(msg))) => msg,
         _ => return,
     };
-    let ControlMsg::Hello { version, player, name, .. } = hello else {
+    let ControlMsg::Hello { version, player, name, flags, resume } = hello else {
         NetStats::add(&stats.sessions_rejected, 1);
         let _ = send(&mut tx, ControlMsg::Reject { reason: RejectReason::BadHello }).await;
         return;
@@ -60,6 +73,15 @@ pub async fn run(conn: Connection, stats: Arc<NetStats>, lobby: Arc<Lobby>) {
         let _ = send(&mut tx, ControlMsg::Reject { reason: RejectReason::VersionMismatch }).await;
         return;
     }
+    let ask = Ask { flags, resume: &resume, player, origin: origin.as_deref() };
+    let address = match identify(&signin, &mut tx, &mut rx, &mut inbox, ask).await {
+        Ok(a) => a,
+        Err(reason) => {
+            NetStats::add(&stats.sessions_rejected, 1);
+            let _ = send(&mut tx, ControlMsg::Reject { reason }).await;
+            return;
+        }
+    };
     let session = NEXT_SESSION.fetch_add(1, Ordering::Relaxed);
     let max_datagram = conn.max_datagram_size().unwrap_or(MAX_DATAGRAM).min(MAX_DATAGRAM) as u16;
     let welcome = ControlMsg::Welcome {
@@ -67,16 +89,35 @@ pub async fn run(conn: Connection, stats: Arc<NetStats>, lobby: Arc<Lobby>) {
         session,
         tick_hz: TICK_HZ as u8,
         max_datagram,
-        flags: 0,
+        flags: if address.is_some() { welcome_flags::SIGNED_IN } else { 0 },
     };
     if send(&mut tx, welcome).await.is_err() {
         return;
     }
     let agent = player == PlayerKind::Agent;
+    let name = name.as_str().to_string();
+    // Signed in: a token to come back on without the wallet, and a place on the store's roster
+    // while this session lasts.
+    let _here = match address {
+        Some(a) => {
+            let token = signin.tokens.issue(a, signin.token_ttl);
+            if send(&mut tx, ControlMsg::Token { token }).await.is_err() {
+                return;
+            }
+            Some(signin.online.enter(a, session, &name, agent))
+        }
+        None => None,
+    };
     let present = if agent { &stats.agents_active } else { &stats.humans_active };
     NetStats::add(present, 1);
-    let name = name.as_str().to_string();
-    tracing::info!(session, name = name.as_str(), ?player, "welcomed");
+    let wallet = address.map(|a| short(&a));
+    tracing::info!(
+        session,
+        name = name.as_str(),
+        ?player,
+        wallet = wallet.as_deref().unwrap_or("guest"),
+        "welcomed"
+    );
 
     // The control stream is read on its own task, so a frame half-read is never dropped by the
     // select below.
@@ -163,6 +204,55 @@ pub async fn run(conn: Connection, stats: Arc<NetStats>, lobby: Arc<Lobby>) {
     lobby.leave(session);
     present.fetch_sub(1, Ordering::Relaxed);
     tracing::info!(session, "left");
+}
+
+/// What a Hello asks about who the player is.
+struct Ask<'a> {
+    flags: u8,
+    resume: &'a [u8; TOKEN_BYTES],
+    player: PlayerKind,
+    /// The page's origin (the WebTransport request's), which picks the challenge's domain.
+    origin: Option<&'a str>,
+}
+
+/// Who a Hello says the player is: a wallet proved by a signature (or a resume token), or a guest.
+async fn identify(
+    signin: &SignIn,
+    tx: &mut SendStream,
+    rx: &mut RecvStream,
+    inbox: &mut Vec<u8>,
+    ask: Ask<'_>,
+) -> Result<Option<Address>, RejectReason> {
+    if ask.flags & hello_flags::RESUME != 0 {
+        return signin.tokens.redeem(ask.resume).map(Some).ok_or(RejectReason::ResumeExpired);
+    }
+    if ask.flags & hello_flags::SIGN_IN == 0 {
+        return if signin.required && ask.player == PlayerKind::Human {
+            Err(RejectReason::AuthRequired)
+        } else {
+            Ok(None)
+        };
+    }
+    // Only so many sign-ins may wait on a wallet at once.
+    let Ok(_permit) = signin.waiting.clone().try_acquire_owned() else {
+        return Err(RejectReason::ServerFull);
+    };
+    let (nonce, issued_at) = SignIn::challenge();
+    let domain = Domain::new(pick_domain(&signin.domains, ask.origin));
+    send(tx, ControlMsg::Challenge { nonce, issued_at, domain }).await.map_err(|_| RejectReason::BadHello)?;
+    let answer = tokio::time::timeout(signin.wait, read_frame(rx, inbox))
+        .await
+        .map_err(|_| RejectReason::AuthTimeout)?;
+    let Some(Incoming::Msg(ControlMsg::Auth { address, signature })) = answer else {
+        return Err(RejectReason::BadHello);
+    };
+    match el_auth::verify(domain.as_str(), &nonce, issued_at, &address, &signature) {
+        Ok(()) => Ok(Some(address)),
+        Err(e) => {
+            tracing::info!(address = short(&address).as_str(), "sign-in refused: {e:?}");
+            Err(RejectReason::AuthFailed)
+        }
+    }
 }
 
 /// Writes one control message.

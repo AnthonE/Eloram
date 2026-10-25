@@ -1,6 +1,7 @@
 //! The transport slot, the dial, and the session: the echo spike's pings (`?mode=echo`), or the
-//! Hello and its Welcome, the queue, and a match: the snapshot datagrams into the client core as
-//! they arrived, and each frame's orders and command out.
+//! Hello and its Welcome (signing in with the browser's wallet on `?signin=1`), the queue, and a
+//! match: the snapshot datagrams into the client core as they arrived, and each frame's orders and
+//! command out.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -8,7 +9,9 @@ use std::rc::Rc;
 use bevy::prelude::*;
 use el_client_core::Client;
 use el_client_core::lobby::{ToClient, ToServer};
-use el_proto::control::{ControlMsg, Frame, PlayerKind, encode_lobby};
+use el_proto::control::{
+    ControlMsg, Frame, PlayerKind, RejectReason, encode_lobby, hello_flags, welcome_flags,
+};
 use el_proto::quant::pos_code;
 
 use crate::config::LaunchConfig;
@@ -71,7 +74,12 @@ impl Plugin for NetPlugin {
             .init_resource::<Session>()
             .configure_sets(Update, NetSet::Receive.before(NetSet::Send))
             .add_systems(Startup, connect)
-            .add_systems(Update, (talk.in_set(NetSet::Receive), send.in_set(NetSet::Send), report));
+            // `report` after `talk`: a frame that seats us and feeds the first snapshot shows
+            // both, never `started` beside the phase it left.
+            .add_systems(
+                Update,
+                (talk.in_set(NetSet::Receive), send.in_set(NetSet::Send), report.after(NetSet::Receive)),
+            );
     }
 }
 
@@ -89,6 +97,10 @@ fn connect(net: NonSend<NetState>, cfg: Res<LaunchConfigRes>) {
     let err = net.error.clone();
     let url = cfg.0.wt_url.clone();
     let hash = cfg.0.cert_hash.clone();
+    if cfg.0.record_url.is_some() {
+        // Watching: the record comes over HTTP (`watch`), nothing is dialled.
+        return;
+    }
     if cfg.0.no_web_transport {
         *err.borrow_mut() = Some("this browser has no WebTransport: use Chrome or Edge".into());
         return;
@@ -128,6 +140,68 @@ fn say_goodbye_on_leaving(t: &Transport) {
     bye.forget();
 }
 
+/// What a JavaScript call threw, in words.
+fn js_said(e: wasm_bindgen::JsValue) -> String {
+    js_sys::Reflect::get(&e, &"message".into())
+        .ok()
+        .and_then(|m| m.as_string())
+        .or_else(|| e.as_string())
+        .unwrap_or_else(|| "it said no".into())
+}
+
+/// Calls `window.elWallet[method](args…)` and waits for its promise.
+async fn wallet_call(method: &str, args: &[wasm_bindgen::JsValue]) -> Result<wasm_bindgen::JsValue, String> {
+    use wasm_bindgen::JsCast;
+    let window = web_sys::window().ok_or("no window")?;
+    let wallet = js_sys::Reflect::get(&window, &"elWallet".into()).map_err(js_said)?;
+    let f: js_sys::Function = js_sys::Reflect::get(&wallet, &method.into())
+        .map_err(js_said)?
+        .dyn_into()
+        .map_err(|_| "no wallet script on the page")?;
+    let list = js_sys::Array::new();
+    for a in args {
+        list.push(a);
+    }
+    let promise: js_sys::Promise =
+        f.apply(&wallet, &list).map_err(js_said)?.dyn_into().map_err(|_| "the wallet didn't answer")?;
+    wasm_bindgen_futures::JsFuture::from(promise).await.map_err(js_said)
+}
+
+/// Answers the server's challenge: the wallet's account, the SIWE text for it (`el_auth`, the same
+/// text the server rebuilds to check), the wallet's signature over it.
+fn sign_with_wallet(
+    t: Transport,
+    nonce: [u8; el_proto::auth::NONCE_BYTES],
+    issued_at: u64,
+    domain: el_proto::auth::Domain,
+    err: Rc<RefCell<Option<String>>>,
+) {
+    wasm_bindgen_futures::spawn_local(async move {
+        let signed: Result<(), String> = async {
+            let account =
+                wallet_call("connect", &[]).await?.as_string().ok_or("the wallet gave no account")?;
+            let address =
+                el_auth::parse_address(&account).ok_or("the wallet's account doesn't read as an address")?;
+            let mut text = [0u8; el_auth::SIWE_MAX];
+            let n = el_auth::siwe_message(domain.as_str(), &address, &nonce, issued_at, &mut text);
+            let text = std::str::from_utf8(&text[..n]).map_err(|_| "the sign-in text")?;
+            let sig = wallet_call("sign", &[text.into(), account.as_str().into()]).await?;
+            let signature = el_auth::parse_signature(&sig.as_string().unwrap_or_default())
+                .ok_or("the wallet's answer isn't a signature")?;
+            let mut buf = [0u8; el_proto::control::MAX_FRAME];
+            let n =
+                (ControlMsg::Auth { address, signature }).encode(&mut buf).ok_or("the answer didn't fit")?;
+            t.send_control(buf[..n].to_vec());
+            Ok(())
+        }
+        .await;
+        if let Err(e) = signed {
+            *err.borrow_mut() = Some(format!("The wallet didn't sign in: {e}"));
+            t.close();
+        }
+    });
+}
+
 /// Sends a lobby message.
 pub fn send_lobby(t: &Transport, msg: &ToServer) {
     let Ok(json) = serde_json::to_vec(msg) else { return };
@@ -155,10 +229,25 @@ fn talk(
         echo(&t, &mut link);
         return;
     }
+    if let Some(e) = net.error.borrow().as_ref() {
+        session.phase = Phase::Failed;
+        session.error = Some(e.clone());
+    }
     if !link.hello_sent {
         let name = if cfg.0.name.is_empty() { "Summoner" } else { cfg.0.name.as_str() };
+        let mut hello = ControlMsg::hello(PlayerKind::Human, name);
+        if let ControlMsg::Hello { flags, resume, .. } = &mut hello {
+            match (cfg.0.sign_in, cfg.0.resume) {
+                (true, Some(token)) => {
+                    *flags |= hello_flags::RESUME;
+                    *resume = token;
+                }
+                (true, None) => *flags |= hello_flags::SIGN_IN,
+                (false, _) => {}
+            }
+        }
         let mut buf = [0u8; el_proto::control::MAX_FRAME];
-        if let Some(n) = ControlMsg::hello(PlayerKind::Human, name).encode(&mut buf) {
+        if let Some(n) = hello.encode(&mut buf) {
             t.send_control(buf[..n].to_vec());
         }
         link.hello_sent = true;
@@ -167,18 +256,44 @@ fn talk(
     link.ctrl.extend_from_slice(&incoming);
     while let Ok(Some((frame, used))) = Frame::decode(&link.ctrl) {
         match frame {
-            Frame::Msg(ControlMsg::Welcome { session: id, .. }) => {
+            Frame::Msg(ControlMsg::Welcome { session: id, flags, .. }) => {
                 session.session = Some(id);
+                session.signed_in = flags & welcome_flags::SIGNED_IN != 0;
                 session.phase = Phase::Lobby;
                 if cfg.0.queue {
                     send_lobby(&t, &ToServer::Queue);
                     session.phase = Phase::Queued;
                 }
             }
+            Frame::Msg(ControlMsg::Challenge { nonce, issued_at, domain }) => {
+                session.phase = Phase::SigningIn;
+                sign_with_wallet(t.clone(), nonce, issued_at, domain, net.error.clone());
+            }
+            // Kept for the next visit, so the wallet isn't asked again while it's good.
+            Frame::Msg(ControlMsg::Token { token }) => crate::config::store_resume(Some(&token)),
             Frame::Msg(ControlMsg::Reject { reason }) => {
                 link.rejected = Some(format!("{reason:?}"));
                 session.phase = Phase::Failed;
-                session.error = Some(format!("the server turned us away ({reason:?})"));
+                session.error = Some(match reason {
+                    RejectReason::ResumeExpired => {
+                        crate::config::store_resume(None);
+                        "Your sign-in has expired. Reload to sign in again.".into()
+                    }
+                    RejectReason::AuthFailed => {
+                        "The signature didn't check out. Reload to sign in again.".into()
+                    }
+                    RejectReason::AuthRequired => {
+                        "This server is for signed-in players: add ?signin=1 to sign in with a wallet.".into()
+                    }
+                    RejectReason::AuthTimeout => {
+                        "The wallet took too long to sign. Reload to try again.".into()
+                    }
+                    RejectReason::VersionMismatch => {
+                        "This page is older than the server. Reload to update the game.".into()
+                    }
+                    RejectReason::ServerFull => "The server is full. Try again in a moment.".into(),
+                    RejectReason::BadHello => "The server didn't understand this client.".into(),
+                });
             }
             Frame::Lobby(bytes) => match serde_json::from_slice::<ToClient>(bytes) {
                 Ok(ToClient::Queued { waiting, fill_in }) => {
@@ -294,6 +409,10 @@ fn report(net: NonSend<NetState>, link: NonSend<Link>, session: Res<Session>, mu
         dev.set("rejected", r.as_str());
     }
     dev.set("phase", session.phase.name());
+    dev.set("signed_in", session.signed_in);
+    if let Some(e) = &session.error {
+        dev.set("session_error", e.as_str());
+    }
     dev.set("pings", link.pings);
     dev.set("pongs", link.pongs);
     dev.set("rtt_ms", link.rtt_ms);

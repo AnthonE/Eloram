@@ -12,6 +12,8 @@ use std::time::Duration;
 
 use crossbeam_queue::ArrayQueue;
 use el_match::{EgressEnds, SeatLease, ShardConfig, ShardShared, ShardThread, build, read_packet};
+
+use crate::records::RecordStore;
 use el_sim::map::Map;
 use el_sim::units::SEATS;
 use wtransport::Connection;
@@ -57,15 +59,29 @@ impl Shard {
 pub struct Game {
     pub shards: Vec<Shard>,
     pub matches_per_shard: usize,
+    /// Every match's record, live and finished.
+    pub records: Arc<Mutex<RecordStore>>,
+    recorders: Vec<JoinHandle<()>>,
+    recorders_stop: Arc<AtomicBool>,
 }
 
 impl Game {
-    /// Starts `shards` shard threads of `matches` matches each.
-    pub fn start(shards: usize, matches: usize, map: &'static Map) -> std::io::Result<Game> {
+    /// Starts `shards` shard threads of `matches` matches each (with their egress and recorder
+    /// threads), writing finished records to `records_dir` if there is one.
+    pub fn start(
+        shards: usize,
+        matches: usize,
+        map: &'static Map,
+        records_dir: Option<std::path::PathBuf>,
+    ) -> std::io::Result<Game> {
         let mut out = Vec::with_capacity(shards);
+        let records = Arc::new(Mutex::new(RecordStore::new(shards, matches, records_dir)));
+        let recorders_stop = Arc::new(AtomicBool::new(false));
+        let mut recorders = Vec::with_capacity(shards);
         for k in 0..shards {
-            let (shard, shared, leases, ends) =
+            let (shard, shared, leases, ends, record_ends) =
                 build(ShardConfig { matches, map, hot_guard: Some(el_alloc::set_hot) });
+            recorders.push(crate::records::spawn(k, record_ends, records.clone(), recorders_stop.clone())?);
             let egress = Arc::new(Egress {
                 cmds: ArrayQueue::new(matches * SEATS * 2 + 16),
                 stop: AtomicBool::new(false),
@@ -83,7 +99,7 @@ impl Game {
                 leases: Mutex::new(leases.into_iter().map(Some).collect()),
             });
         }
-        Ok(Game { shards: out, matches_per_shard: matches })
+        Ok(Game { shards: out, matches_per_shard: matches, records, recorders, recorders_stop })
     }
 
     /// Takes seat `g`'s lease from shard `k` (none if a session holds it already).
@@ -116,6 +132,7 @@ impl Game {
 
     /// Tells every thread to stop, without waiting for them.
     pub fn halt(&self) {
+        self.recorders_stop.store(true, Ordering::Release);
         for s in &self.shards {
             s.shared.stop.store(true, Ordering::Release);
             s.egress.stop.store(true, Ordering::Release);
@@ -127,6 +144,10 @@ impl Game {
 
     /// Stops every thread and waits for them.
     pub fn stop(&mut self) {
+        self.recorders_stop.store(true, Ordering::Release);
+        for t in self.recorders.drain(..) {
+            let _ = t.join();
+        }
         for s in &mut self.shards {
             if let Some(t) = s.thread.take() {
                 t.stop();

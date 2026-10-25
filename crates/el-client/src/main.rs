@@ -22,6 +22,8 @@ mod session;
 mod transport;
 #[cfg(target_arch = "wasm32")]
 mod view;
+#[cfg(target_arch = "wasm32")]
+mod watch;
 
 #[cfg(target_arch = "wasm32")]
 fn main() {

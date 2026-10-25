@@ -385,41 +385,57 @@ fn draw_units(
     mut parts: Query<(&mut Transform, &mut Mesh3d, &mut MeshMaterial3d<StandardMaterial>), Without<UnitView>>,
 ) {
     let now = now_s();
-    let Some(c) = session.client.as_ref() else {
+    // What's drawn: the match being played, as the team sees it, or the one being watched, all
+    // of it.
+    let watch = session.watch.as_deref();
+    let client = session.client.as_deref().filter(|_| watch.is_none());
+    if watch.is_none() && client.is_none() {
         for (_, _, mut vis) in &mut roots {
             *vis = Visibility::Hidden;
         }
         return;
-    };
-    let seat = c.seat;
+    }
+    let (seat, my_team) = client.map_or((usize::MAX, u8::MAX), |c| (c.seat, c.team));
     for (mut uv, mut tf, mut vis) in &mut roots {
         let i = uv.slot;
-        let unit = if i == seat {
-            let u = &c.pred.units[seat];
-            u.alive.then(|| {
-                let frac = u.hp / u.stats.max_hp.max(1.0);
-                (c.own_pos(now), u.facing, Kind::Champion, u.team, u.generation as u8, frac)
-            })
-        } else if let Some(s) = c.unit(i, now) {
-            Some((
-                s.pos,
-                s.facing,
-                Kind::from_u8(s.q.kind),
-                s.q.team,
-                s.q.generation,
-                s.q.hp as f32 / 1_023.0,
-            ))
-        } else {
-            // A structure no record has come for yet: where the map puts it.
-            let u = &c.world.units[i];
-            (u.alive && u.kind.is_structure() && c.tracks[i].newest().is_none()).then_some((
-                u.pos,
-                u.facing,
-                u.kind,
-                u.team,
-                u.generation as u8,
-                1.0,
-            ))
+        let unit = match (watch, client) {
+            (Some(w), _) => {
+                let u = &w.referee.m.units[i];
+                u.alive.then(|| {
+                    let frac = u.hp / u.stats.max_hp.max(1.0);
+                    (w.pos(i), u.facing, u.kind, u.team, u.generation as u8, frac)
+                })
+            }
+            (None, Some(c)) if i == seat => {
+                let u = &c.pred.units[seat];
+                u.alive.then(|| {
+                    let frac = u.hp / u.stats.max_hp.max(1.0);
+                    (c.own_pos(now), u.facing, Kind::Champion, u.team, u.generation as u8, frac)
+                })
+            }
+            (None, Some(c)) => match c.unit(i, now) {
+                Some(s) => Some((
+                    s.pos,
+                    s.facing,
+                    Kind::from_u8(s.q.kind),
+                    s.q.team,
+                    s.q.generation,
+                    s.q.hp as f32 / 1_023.0,
+                )),
+                None => {
+                    // A structure no record has come for yet: where the map puts it.
+                    let u = &c.world.units[i];
+                    (u.alive && u.kind.is_structure() && c.tracks[i].newest().is_none()).then_some((
+                        u.pos,
+                        u.facing,
+                        u.kind,
+                        u.team,
+                        u.generation as u8,
+                        1.0,
+                    ))
+                }
+            },
+            (None, None) => None,
         };
         let Some((pos, facing, kind, team, generation, hp)) = unit else {
             *vis = Visibility::Hidden;
@@ -429,7 +445,8 @@ fn draw_units(
         *vis = Visibility::Visible;
         tf.translation = world(pos, 0.0);
         drawn.units[i] = Some(DrawnUnit { pos, radius: radius_of(kind), team, generation });
-        let def = if i < SEATS { c.world.champs[i].def } else { 0 };
+        let champs = watch.map_or_else(|| client.map(|c| &c.world.champs), |w| Some(&w.referee.m.champs));
+        let def = if i < SEATS { champs.map_or(0, |ch| ch[i].def) } else { 0 };
         let (w, h) = bar_of(kind);
         if uv.shown != Some((kind, team, def)) {
             uv.shown = Some((kind, team, def));
@@ -450,9 +467,10 @@ fn draw_units(
                 t.scale = Vec3::new(w, 1.0, 1.0);
             }
             if let Ok((_, _, mut m)) = parts.get_mut(uv.fill) {
+                // Yours, your team's, theirs; watching, each side its own colour.
                 let k = if i == seat {
                     0
-                } else if team == c.team {
+                } else if team == my_team || (watch.is_some() && team == 0) {
                     1
                 } else {
                     2
@@ -488,22 +506,33 @@ fn draw_missiles(
     drawn: Res<Drawn>,
     mut q: Query<(&MissileView, &mut Transform, &mut Visibility, &mut MeshMaterial3d<StandardMaterial>)>,
 ) {
-    let Some(c) = session.client.as_ref() else { return };
-    let at = c.missile_tick(now_s());
-    let mut live = c.missiles.live();
+    // Each live missile: where it's drawn, how big, whose.
+    let mut shots: Vec<(Vec2, f32, u8)> = Vec::new();
+    if let Some(w) = session.watch.as_deref() {
+        let m = &w.referee.m;
+        for ms in m.missiles.iter().filter(|ms| ms.alive) {
+            let r = if ms.homing { 0.14 } else { (ms.width * S * 0.5).clamp(0.16, 0.6) };
+            shots.push((ms.pos, r, ms.team));
+        }
+    } else if let Some(c) = session.client.as_ref() {
+        let at = c.missile_tick(now_s());
+        for (_, s) in c.missiles.live() {
+            let target = drawn.units.get(usize::from(s.target)).copied().flatten().map(|d| d.pos);
+            let r = if s.homing { 0.14 } else { (s.width * S * 0.5).clamp(0.16, 0.6) };
+            shots.push((s.pos(at, target), r, s.team));
+        }
+    }
     let mut views: Vec<_> = q.iter_mut().collect();
     views.sort_by_key(|v| v.0.0);
+    let mut shots = shots.into_iter();
     for (_, mut tf, mut vis, mut mat) in views {
-        let Some((_, s)) = live.next() else {
+        let Some((p, r, team)) = shots.next() else {
             *vis = Visibility::Hidden;
             continue;
         };
-        let target = drawn.units.get(usize::from(s.target)).copied().flatten().map(|d| d.pos);
-        let p = s.pos(at, target);
         *vis = Visibility::Visible;
-        let r = if s.homing { 0.14 } else { (s.width * S * 0.5).clamp(0.16, 0.6) };
         *tf = Transform::from_translation(world(p, 1.1)).with_scale(Vec3::splat(r));
-        mat.0 = kit.missile[usize::from(s.team.min(1))].clone();
+        mat.0 = kit.missile[usize::from(team.min(1))].clone();
     }
 }
 
@@ -554,10 +583,14 @@ fn draw_flashes(
 }
 
 fn draw_relics(session: Res<Session>, mut q: Query<(&RelicView, &mut Transform, &mut Visibility)>) {
-    let Some(c) = session.client.as_ref() else { return };
+    let relics = match (session.watch.as_deref(), session.client.as_deref()) {
+        (Some(w), _) => &w.referee.m.relics,
+        (None, Some(c)) => &c.world.relics,
+        (None, None) => return,
+    };
     let now = now_s();
     for (r, mut tf, mut vis) in &mut q {
-        let relic = &c.world.relics[r.0];
+        let relic = &relics[r.0];
         *vis = if relic.up { Visibility::Visible } else { Visibility::Hidden };
         let bob = (now * 2.0 + r.0 as f64).sin() as f32 * 0.12;
         tf.translation = world(relic.pos, 0.7 + bob);
@@ -565,11 +598,15 @@ fn draw_relics(session: Res<Session>, mut q: Query<(&RelicView, &mut Transform, 
 }
 
 fn draw_fog(session: Res<Session>, mut fog_img: ResMut<FogImage>, mut images: ResMut<Assets<Image>>) {
-    let Some(c) = session.client.as_ref() else { return };
     let now = now_s();
     let dt = (now - fog_img.last).clamp(0.0, 0.25) as f32;
     fog_img.last = now;
-    let grid = fog::team_grid(&c.pred, c.team);
+    // Watching, everything is seen.
+    let grid = match (session.watch.as_deref(), session.client.as_deref()) {
+        (Some(_), _) => [u64::MAX; el_sim::map::VIS_WORDS * VIS_H],
+        (None, Some(c)) => fog::team_grid(&c.pred, c.team),
+        (None, None) => return,
+    };
     let ease = 1.0 - (-dt * 8.0).exp();
     let handle = fog_img.handle.clone();
     let Some(mut image) = images.get_mut(&handle) else { return };

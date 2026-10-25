@@ -6,7 +6,8 @@
 //! # async fn demo() -> anyhow::Result<()> {
 //! use el_bot::{BotClient, BotConfig};
 //!
-//! let mut bot = BotClient::connect(&BotConfig { server: "http://127.0.0.1:8080".into(), name: "Agent-01".into() }).await?;
+//! let cfg = BotConfig { server: "http://127.0.0.1:8080".into(), name: "Agent-01".into(), key: None };
+//! let mut bot = BotClient::connect(&cfg).await?;
 //! bot.queue().await?;
 //! bot.wait_match(std::time::Duration::from_secs(60)).await?;
 //! bot.play(std::time::Duration::from_secs(600), &mut el_bot::scripted()).await?;

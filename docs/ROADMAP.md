@@ -66,3 +66,16 @@ rate on a real GPU (headless Chromium here draws in software, about a frame a se
 The augment set across four screens, Combo Breaker, headliners, more champions. The referee,
 replays and the 60 s spectator feed from the record. Wallet sign-in, `/status.json` and
 `/online.json`, publishing to the store.
+
+The record landed first: written by the shard thread without allocating, kept by a recorder thread,
+served at `/records/{id}` a minute behind, re-stepped by `el-replay verify` and by the page that
+watches it (`scripts/e2e.sh watch`). A match reset in place now starts every slot's generation from
+0, as a new one does, so its record replays on a fresh match. Still to come of it: the live
+referee thread, checkpoints, crash recovery.
+
+Then Elo Pros: wallet sign-in (`el-auth`, Before Colony's, signing the launcher's text for
+`eloram`) from the page (`?signin=1`) and from agents with a key, resume tokens, `/online.json`
+for the store's playtime, `proto` on `/status.json`, and `scripts/publish-web.sh` (the build onto
+`elopros.com/games/eloram/play/`, `current` flipped last). Still the operator's: where the game
+server runs (`--server`, `--http`, `--siwe-domain`), the store's route to the page, and the
+listing.

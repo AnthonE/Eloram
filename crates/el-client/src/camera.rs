@@ -71,6 +71,12 @@ fn follow(
     mut cam: Single<&mut Transform, With<MainCamera>>,
 ) {
     let me = session.client.as_ref().map(|c| c.own_pos(crate::net::now_s()));
+    // Watching, there's no champion of one's own: the camera is free from the start.
+    if session.watch.is_some() && !rig.placed {
+        rig.locked = false;
+        rig.placed = true;
+        rig.focus = Vec2::new(MAP_W * 0.5, el_sim::map::MID_Y);
+    }
     if keys.just_pressed(KeyCode::KeyY) {
         rig.locked = !rig.locked;
     }

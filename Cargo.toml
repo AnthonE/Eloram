@@ -19,6 +19,7 @@ el-sim = { path = "crates/el-sim", default-features = false }
 el-match = { path = "crates/el-match" }
 el-client-core = { path = "crates/el-client-core" }
 el-server = { path = "crates/el-server" }
+el-replay = { path = "crates/el-replay" }
 
 # Math: glam 0.32 is the version Bevy 0.19 re-exports, so the client shares types with no conversion.
 glam = { version = "0.32.1", default-features = false, features = ["libm"] }

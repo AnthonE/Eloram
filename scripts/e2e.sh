@@ -2,6 +2,8 @@
 # Runs a Playwright suite against a freshly started server.
 #   scripts/e2e.sh spike [project]   # transport smoke test: echo, then the game's Hello and Welcome
 #   scripts/e2e.sh match [project]   # a match from the queue against the server's bots
+#   scripts/e2e.sh watch [project]   # an agent's match watched live from its record, then replayed
+#   scripts/e2e.sh login [project]   # wallet sign-in with a stub wallet, /online.json, the resume token
 # Anything after the project goes to Playwright.
 # The server listens on EL_HTTP_PORT (8080) and EL_WT_PORT (UDP, 4433).
 set -euo pipefail
@@ -37,6 +39,20 @@ case "$suite" in
   match)
     # Bots take the empty seats a second after the first player queues.
     server --mode game --fill-after 1 --http "127.0.0.1:${port}" --wt-port "$wt" &
+    pids+=($!)
+    ;;
+  watch)
+    # An agent plays a match for the page to watch.
+    cargo build --release -p el-bot
+    server --mode game --fill-after 1 --http "127.0.0.1:${port}" --wt-port "$wt" &
+    pids+=($!)
+    (sleep 2; exec "$bin/el-swarm" --server "$EL_URL" --bots 1 --secs 600 >/dev/null) &
+    pids+=($!)
+    ;;
+  login)
+    # The stub wallet signs through el-auth's example with a throwaway key.
+    cargo build --release -p el-auth --example sign
+    server --mode game --http "127.0.0.1:${port}" --wt-port "$wt" &
     pids+=($!)
     ;;
   *) echo "unknown suite $suite" >&2; exit 1 ;;

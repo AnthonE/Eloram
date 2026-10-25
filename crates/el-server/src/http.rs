@@ -1,7 +1,8 @@
 //! The HTTP side: serves the built web client, `/cert-hash` for WebTransport's
 //! `serverCertificateHashes` (its `hash` is null when the certificate is CA-issued: nothing to pin),
 //! `/status` metrics and `/status.json`, the player count in the shape the Elo Pros launcher and
-//! store poll. The JSON routes answer pages on the store's origin too (CORS, `Config::cors_origins`),
+//! store poll; `/online.json`, the signed-in wallets on now (the store's playtime); and the
+//! matches' records (`/records.json`, `/records/{id}`). The JSON routes answer pages on the store's origin too (CORS, `Config::cors_origins`),
 //! since the store serves the game's page from its own site.
 
 use std::path::PathBuf;
@@ -30,6 +31,10 @@ pub struct HttpState {
     pub launcher_status: StatusFn,
     /// Origins allowed to read the JSON routes from another site.
     pub cors_origins: Arc<[String]>,
+    /// The matches' records (game mode).
+    pub records: Option<Arc<std::sync::Mutex<crate::records::RecordStore>>>,
+    /// `/online.json`: the signed-in wallets on now, for the store's playtime.
+    pub online: StatusFn,
 }
 
 pub fn router(state: HttpState) -> Router {
@@ -39,6 +44,9 @@ pub fn router(state: HttpState) -> Router {
         .route("/cert-hash", get(cert_hash))
         .route("/status", get(status))
         .route("/status.json", get(launcher_status))
+        .route("/online.json", get(online))
+        .route("/records.json", get(records_list))
+        .route("/records/{id}", get(record))
         .with_state(state)
         .layer(middleware::from_fn(move |req: Request, next: Next| {
             let origins = origins.clone();
@@ -89,6 +97,30 @@ async fn status(State(s): State<HttpState>) -> Json<serde_json::Value> {
 
 async fn launcher_status(State(s): State<HttpState>) -> Json<serde_json::Value> {
     Json((s.launcher_status)())
+}
+
+async fn online(State(s): State<HttpState>) -> Json<serde_json::Value> {
+    Json((s.online)())
+}
+
+/// The records kept: the live matches' and the last finished ones.
+async fn records_list(State(s): State<HttpState>) -> Json<serde_json::Value> {
+    let list = s.records.as_ref().and_then(|r| r.lock().ok().map(|r| r.list()));
+    Json(list.unwrap_or_else(|| serde_json::json!([])))
+}
+
+/// One record, as far as it may be served (a live match's a minute behind).
+async fn record(
+    State(s): State<HttpState>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
+    use axum::response::IntoResponse;
+    let id = id.trim_end_matches(".elr");
+    let bytes = s.records.as_ref().and_then(|r| r.lock().ok().and_then(|r| r.get(id)));
+    match bytes {
+        Some(b) => ([(header::CONTENT_TYPE, "application/octet-stream")], b).into_response(),
+        None => axum::http::StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 #[cfg(test)]

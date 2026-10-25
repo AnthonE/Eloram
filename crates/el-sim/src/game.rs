@@ -306,11 +306,9 @@ impl Match {
         self.seed = seed;
         self.tick = 0;
         self.rng = Rng::new(seed);
-        for u in self.units.iter_mut() {
-            let g = u.generation;
-            *u = Unit::default();
-            u.generation = g;
-        }
+        // Every slot's generation from 0 again, as a new match's: a match reset in place is the
+        // same match as one built from its seed, so its record replays on a fresh one.
+        self.units.fill(Unit::default());
         self.champs = picks.map(Champ::new);
         self.missiles.fill(Missile::default());
         self.zones.fill(Zone::default());

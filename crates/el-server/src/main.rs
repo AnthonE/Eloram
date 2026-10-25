@@ -50,6 +50,16 @@ struct Args {
     /// Seconds the first in the queue waits before bots take the empty seats.
     #[arg(long, default_value_t = 30.0)]
     fill_after: f64,
+    /// Where finished matches' records are written (`{id}.elr`; `el-replay verify` checks them).
+    #[arg(long)]
+    records: Option<PathBuf>,
+    /// The hosts a wallet sign-in may name: the pages' (`elopros.com,game.elopros.com`). Repeat it
+    /// or separate with commas. Without it, this server's own HTTP address.
+    #[arg(long)]
+    siwe_domain: Vec<String>,
+    /// People must sign in with a wallet to play (agents may still come as guests).
+    #[arg(long)]
+    require_sign_in: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -77,6 +87,9 @@ fn main() -> anyhow::Result<()> {
         shards: args.shards.max(1),
         matches_per_shard: args.matches.max(1),
         fill_after: std::time::Duration::from_secs_f64(args.fill_after.max(0.0)),
+        records_dir: args.records,
+        siwe_domains: el_server::split_list(&args.siwe_domain),
+        require_sign_in: args.require_sign_in,
         ..Config::default()
     };
     // Two workers are plenty: the matches run on their own shard threads.

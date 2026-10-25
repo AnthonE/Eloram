@@ -10,23 +10,29 @@ use el_sim::units::SEATS;
 pub enum Phase {
     #[default]
     Connecting,
+    /// The server asked for a signature; the wallet has it.
+    SigningIn,
     /// Welcomed, not queued.
     Lobby,
     Queued,
     Playing,
     Over,
     Failed,
+    /// Watching a record.
+    Watching,
 }
 
 impl Phase {
     pub fn name(self) -> &'static str {
         match self {
             Phase::Connecting => "connecting",
+            Phase::SigningIn => "signing_in",
             Phase::Lobby => "lobby",
             Phase::Queued => "queued",
             Phase::Playing => "playing",
             Phase::Over => "over",
             Phase::Failed => "failed",
+            Phase::Watching => "watching",
         }
     }
 }
@@ -43,7 +49,11 @@ pub struct FeedLine {
 pub struct Session {
     pub phase: Phase,
     pub session: Option<u32>,
+    /// Welcomed as a wallet (not a guest).
+    pub signed_in: bool,
     pub client: Option<Box<Client>>,
+    /// The record being watched, instead of a match being played.
+    pub watch: Option<Box<crate::watch::Watch>>,
     pub roster: Vec<Player>,
     pub winner: Option<u8>,
     pub waiting: usize,

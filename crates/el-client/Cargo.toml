@@ -17,6 +17,8 @@ webgpu = ["bevy/webgpu"]
 el-proto.workspace = true
 el-sim.workspace = true
 el-client-core.workspace = true
+# The sign-in text only: the browser's wallet signs it, the server checks it.
+el-auth = { path = "../el-auth", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
 bevy = { workspace = true, features = ["3d", "ui"] }
@@ -32,7 +34,7 @@ wasm-bindgen-futures.workspace = true
 js-sys.workspace = true
 web-sys = { workspace = true, features = [
     "Window", "Location", "UrlSearchParams", "Document", "Element", "HtmlElement", "Performance", "DomTokenList",
-    "Storage", "console", "EventTarget",
+    "Storage", "console", "EventTarget", "Response",
 ] }
 web-transport-wasm.workspace = true
 console_error_panic_hook.workspace = true

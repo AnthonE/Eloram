@@ -5,6 +5,8 @@ pub mod game;
 pub mod http;
 pub mod lobby;
 pub mod net;
+pub mod records;
+pub mod signin;
 pub mod telemetry;
 
 use std::net::SocketAddr;
@@ -45,6 +47,13 @@ pub struct Config {
     pub matches_per_shard: usize,
     /// How long the first in the queue waits before bots fill the empty seats.
     pub fill_after: Duration,
+    /// Where finished records are written (`{id}.elr`), if anywhere.
+    pub records_dir: Option<PathBuf>,
+    /// The domains a wallet sign-in may name (`--siwe-domain`): the pages' hosts. Empty: this
+    /// server's own HTTP address.
+    pub siwe_domains: Vec<String>,
+    /// People must sign in with a wallet (agents may still play as guests).
+    pub require_sign_in: bool,
 }
 
 impl Default for Config {
@@ -61,6 +70,9 @@ impl Default for Config {
             shards: 1,
             matches_per_shard: 64,
             fill_after: Duration::from_secs(30),
+            records_dir: None,
+            siwe_domains: Vec::new(),
+            require_sign_in: false,
         }
     }
 }
@@ -121,23 +133,46 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
     let lobby = match cfg.mode {
         Mode::Game => {
             let map = el_sim::map::Map::leaked();
-            let game = game::Game::start(cfg.shards.max(1), cfg.matches_per_shard.max(1), map)?;
+            if let Some(dir) = &cfg.records_dir {
+                std::fs::create_dir_all(dir)?;
+            }
+            let game = game::Game::start(
+                cfg.shards.max(1),
+                cfg.matches_per_shard.max(1),
+                map,
+                cfg.records_dir.clone(),
+            )?;
             let lobby = lobby::Lobby::new(game, cfg.fill_after);
             tokio::spawn(lobby.clone().run());
             Some(lobby)
         }
         Mode::Echo => None,
     };
+    // The HTTP side's address first: a sign-in names it when no other domain is given.
+    let listener = tokio::net::TcpListener::bind(cfg.http_addr).await?;
+    let http_addr = listener.local_addr()?;
+    let domains = if cfg.siwe_domains.is_empty() {
+        let mut own = vec![http_addr.to_string()];
+        if http_addr.ip().is_loopback() {
+            own.push(format!("localhost:{}", http_addr.port()));
+        }
+        own
+    } else {
+        cfg.siwe_domains.clone()
+    };
+    let signin = Arc::new(signin::SignIn::new(domains, cfg.require_sign_in));
     tokio::spawn(net::endpoint::accept_loop(
         endpoint,
         cfg.mode,
         stats.clone(),
         admission,
         lobby.clone(),
+        signin.clone(),
         rx.clone(),
     ));
 
     let mode = cfg.mode;
+    let online = signin.online.clone();
     let max_players = cfg.max_players;
     let status_stats = stats.clone();
     let launcher_stats = stats.clone();
@@ -155,9 +190,9 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
         }),
         launcher_status: Arc::new(move || net::launcher_status_json(&launcher_stats, max_players)),
         cors_origins: cfg.cors_origins.clone().into(),
+        records: lobby.as_ref().map(|l| l.game.records.clone()),
+        online: Arc::new(move || online.json()),
     };
-    let listener = tokio::net::TcpListener::bind(cfg.http_addr).await?;
-    let http_addr = listener.local_addr()?;
     let mut http_shutdown = rx;
     tokio::spawn(async move {
         let serve = axum::serve(listener, http::router(state)).with_graceful_shutdown(async move {

@@ -59,8 +59,29 @@ async function main() {
     name: params.get("name") || "",
     // Into the queue as soon as the server says hello (`?queue=0`: stay in the lobby).
     queue: params.get("queue") !== "0",
+    // Sign in with the browser's wallet (`?signin=1`): back on the resume token from the last
+    // sign-in while it's good, so the wallet isn't asked every time.
+    signIn: params.get("signin") === "1",
   };
-  if (!("WebTransport" in window)) {
+  if (config.signIn) {
+    try {
+      config.resume = localStorage.getItem("el.resume") || "";
+    } catch (_) {
+      config.resume = "";
+    }
+  }
+  // Watching: a live match's record a minute behind (`?watch=<id>`, from /records.json), or any
+  // record (`?replay=<url>`). No connection is made: the record is fetched over HTTP.
+  const srv = window.elServer || { url: (p) => p };
+  if (params.get("watch")) {
+    config.recordUrl = srv.url(`records/${encodeURIComponent(params.get("watch"))}`);
+    config.watchLive = true;
+  } else if (params.get("replay")) {
+    config.recordUrl = params.get("replay");
+  }
+  if (config.recordUrl) {
+    // Nothing to dial.
+  } else if (!("WebTransport" in window)) {
     config.noWebTransport = true;
   } else {
     step("loader", "finding the server…");
