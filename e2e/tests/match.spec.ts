@@ -19,8 +19,8 @@ const until = async (page: any, what: string, pred: (s: Record<string, any>) => 
 
 // A match from the queue, with the server's bots in the other nine seats (`--fill-after 1`):
 // seated at level 3 with ARAM's gold on the platform, an augment picked, an item bought, a skill
-// levelled and cast, a walk down the lane predicted exactly, and fog that hides the enemy until
-// someone of ours can see them.
+// levelled and cast, a ping, a walk down the lane predicted exactly, and fog that hides the enemy
+// until someone of ours can see them.
 test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({ page }, info) => {
   const logs = collectConsole(page);
   const shots = `artifacts/match-${info.project.name}`;
@@ -84,6 +84,11 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   await push(page, { t: "cast", slot: 4, x: ahead(3000), y: 1920 });
   s = await until(page, "Blink on cooldown", (s) => Number(s.cds.split(",")[4]) > 0);
   expect(Math.abs(s.x - before)).toBeGreaterThan(200);
+
+  // A ping down the lane: the server tells it to the team, the pinger too, and it's drawn there.
+  await push(page, { t: "ping", x: ahead(4500), y: 1920, kind: 2 });
+  s = await until(page, "the ping heard back", (s) => s.pings_heard >= 1);
+  await page.screenshot({ path: `${shots}-ping.png` });
 
   // Walk down the lane to the outer turret: predicted exactly.
   await push(page, { t: "move", x: ahead(5000), y: 1920 });

@@ -6,7 +6,7 @@
 use crate::quant::{POS_X_BITS, POS_Y_BITS};
 use crate::{BitReader, BitWriter, DecodeError};
 
-const KIND_BITS: u32 = 4;
+const KIND_BITS: u32 = 5;
 /// An event's tick (when a unit left sight, where a missile was): how many ticks before its
 /// snapshot's, in [`AGE_BITS`] after a bit, or else whole.
 const AGE_BITS: u32 = 5;
@@ -94,6 +94,22 @@ pub enum WireEvent {
     Outcome {
         winner: u8,
     },
+    /// A teammate's ping ([`crate::order::ping`]): where, and the unit it names (255: none).
+    Ping {
+        seat: u8,
+        kind: u8,
+        at: [u32; 2],
+        unit: u8,
+    },
+    /// The team's surrender vote as it stands: who said yes and who no (a bit a seat of the team,
+    /// in seat order), whether it's still open, and whether it passed.
+    Vote {
+        team: u8,
+        yes: u8,
+        no: u8,
+        open: bool,
+        passed: bool,
+    },
     // Unreliable.
     Damage {
         target: u8,
@@ -152,7 +168,9 @@ impl WireEvent {
             WireEvent::Attack { .. } => 12,
             WireEvent::Area { .. } => 13,
             WireEvent::Blink { .. } => 14,
-            WireEvent::Nothing => 15,
+            WireEvent::Ping { .. } => 15,
+            WireEvent::Vote { .. } => 16,
+            WireEvent::Nothing => 31,
         }
     }
 
@@ -178,6 +196,8 @@ impl WireEvent {
                 WireEvent::Attack { .. } => 16,
                 WireEvent::Area { .. } => pos + 11 + 1,
                 WireEvent::Blink { .. } => 8 + pos,
+                WireEvent::Ping { .. } => 4 + 3 + pos + 8,
+                WireEvent::Vote { .. } => 1 + 5 + 5 + 2,
                 WireEvent::Nothing => 0,
             }) as usize
     }
@@ -273,6 +293,19 @@ impl WireEvent {
                 w.write_u8(unit);
                 pos(w, to);
             }
+            WireEvent::Ping { seat, kind, at, unit } => {
+                w.write_bits(u32::from(seat), 4);
+                w.write_bits(u32::from(kind), 3);
+                pos(w, at);
+                w.write_u8(unit);
+            }
+            WireEvent::Vote { team, yes, no, open, passed } => {
+                w.write_bits(u32::from(team), 1);
+                w.write_bits(u32::from(yes), 5);
+                w.write_bits(u32::from(no), 5);
+                w.write_bool(open);
+                w.write_bool(passed);
+            }
             WireEvent::Nothing => {}
         }
     }
@@ -311,6 +344,19 @@ impl WireEvent {
             12 => WireEvent::Attack { unit: r.read_u8(), target: r.read_u8() },
             13 => WireEvent::Area { at: pos(r), radius: r.read_bits(11) as u16, team: r.read_bits(1) as u8 },
             14 => WireEvent::Blink { unit: r.read_u8(), to: pos(r) },
+            15 => WireEvent::Ping {
+                seat: r.read_bits(4) as u8,
+                kind: r.read_bits(3) as u8,
+                at: pos(r),
+                unit: r.read_u8(),
+            },
+            16 => WireEvent::Vote {
+                team: r.read_bits(1) as u8,
+                yes: r.read_bits(5) as u8,
+                no: r.read_bits(5) as u8,
+                open: r.read_bool(),
+                passed: r.read_bool(),
+            },
             _ => WireEvent::Nothing,
         };
         if r.overflowed() { Err(DecodeError::Truncated) } else { Ok(e) }
@@ -390,6 +436,8 @@ mod tests {
             WireEvent::Attack { unit: 30, target: 2 },
             WireEvent::Area { at: [100, 200], radius: 350, team: 0 },
             WireEvent::Blink { unit: 4, to: [1, 2] },
+            WireEvent::Ping { seat: 9, kind: 5, at: [3, 4], unit: 255 },
+            WireEvent::Vote { team: 1, yes: 0b10110, no: 0b00001, open: true, passed: false },
         ];
         for e in all {
             let mut buf = [0u8; 64];

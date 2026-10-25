@@ -357,3 +357,77 @@ fn a_cast_augment_answers_a_cast_and_waits_its_cooldown() {
     order(&mut m, &mut s, 0, Order::Cast { slot: 0, aim });
     assert!(speed(&m) > 0.0, "and answers again once it's ready");
 }
+
+fn events(m: &Match) -> Vec<el_sim::events::Event> {
+    m.events.as_slice().to_vec()
+}
+
+#[test]
+fn pings_are_a_few_at_once_then_one_a_second_and_name_only_what_the_team_sees() {
+    use el_proto::order::ping;
+    use el_sim::events::Event;
+    let (mut m, mut s) = quiet([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    idle(&mut m, &mut s, 30);
+    let at = Vec2::new(4_000.0, MID_Y);
+    let mut pinged = 0;
+    for _ in 0..8 {
+        order(&mut m, &mut s, 0, Order::Ping { kind: ping::DANGER, at, unit: None });
+        pinged += events(&m).iter().filter(|e| matches!(e, Event::Ping { seat: 0, .. })).count();
+    }
+    assert_eq!(pinged, rules::PING_BURST as usize, "a burst, then no more");
+    idle(&mut m, &mut s, ticks(rules::PING_EVERY));
+    order(&mut m, &mut s, 0, Order::Ping { kind: ping::LOOK, at, unit: None });
+    assert!(events(&m).iter().any(|e| matches!(e, Event::Ping { seat: 0, kind: ping::LOOK, .. })));
+    // An enemy across the map isn't seen: the ping keeps its place and drops the unit.
+    let enemy = UnitRef { slot: 5, generation: m.units[5].generation as u8 };
+    assert!(!m.vision.units[0].get(5));
+    idle(&mut m, &mut s, 5 * ticks(rules::PING_EVERY));
+    order(&mut m, &mut s, 1, Order::Ping { kind: ping::ATTACK, at, unit: Some(enemy) });
+    let named = events(&m).iter().find_map(|e| match *e {
+        Event::Ping { seat: 1, unit, .. } => Some(unit),
+        _ => None,
+    });
+    assert_eq!(named, Some(el_sim::voice::NO_UNIT));
+    // An ally is: and the dead may ping.
+    m.units[2].hp = 0.0;
+    let ally = UnitRef { slot: 3, generation: m.units[3].generation as u8 };
+    order(&mut m, &mut s, 2, Order::Ping { kind: ping::COMING, at, unit: Some(ally) });
+    assert!(events(&m).iter().any(|e| matches!(e, Event::Ping { seat: 2, unit: 3, .. })));
+}
+
+#[test]
+fn a_team_surrenders_with_four_of_five_of_its_players_and_only_from_eight_minutes() {
+    use el_sim::events::Event;
+    let (mut m, mut s) = quiet([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    // Dawn has two players (the rest are bots); Dusk one.
+    for seat in [0, 3, 7] {
+        m.set_seated(seat, true);
+    }
+    let yes = Order::Surrender { yes: true };
+    order(&mut m, &mut s, 0, yes);
+    assert!(!m.surrender[0].open(), "not before 8:00");
+    m.tick = ticks(rules::SURRENDER_FROM);
+    order(&mut m, &mut s, 1, yes);
+    assert!(!m.surrender[0].open(), "a bot's seat has no vote");
+    order(&mut m, &mut s, 0, yes);
+    assert!(m.surrender[0].open());
+    assert!(events(&m).iter().any(|e| matches!(e, Event::Vote { team: 0, yes: 1, open: true, .. })));
+    // One no of two players: four of five can't be had, so it fails, and the next waits.
+    order(&mut m, &mut s, 3, Order::Surrender { yes: false });
+    assert!(!m.surrender[0].open());
+    assert!(events(&m).iter().any(|e| matches!(e, Event::Vote { team: 0, open: false, passed: false, .. })));
+    order(&mut m, &mut s, 0, yes);
+    assert!(!m.surrender[0].open(), "a failed vote's wait");
+    // Time's up on one nobody else answers.
+    m.tick += ticks(rules::SURRENDER_AGAIN);
+    order(&mut m, &mut s, 0, yes);
+    assert!(m.surrender[0].open());
+    idle(&mut m, &mut s, ticks(rules::SURRENDER_VOTE) + 1);
+    assert!(!m.surrender[0].open() && m.outcome.is_none());
+    // Both say yes: Dusk wins. Dusk's lone player could have alone.
+    m.tick += ticks(rules::SURRENDER_AGAIN);
+    order(&mut m, &mut s, 3, yes);
+    order(&mut m, &mut s, 0, yes);
+    assert_eq!(m.outcome, Some(DUSK));
+    assert!(events(&m).iter().any(|e| matches!(e, Event::Outcome { winner: DUSK })));
+}

@@ -56,6 +56,9 @@ impl Match {
             Order::Reroll { card } => return self.reroll_augment(seat, card),
             Order::Buy { item } => return self.buy(seat, item),
             Order::Sell { inv } => return self.sell(seat, inv),
+            // And speak to the team.
+            Order::Ping { kind, at, unit } => return self.ping(seat, kind, at, unit),
+            Order::Surrender { yes } => return self.vote(seat, yes),
             _ => {}
         }
         if !self.units[seat].alive {

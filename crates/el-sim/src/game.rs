@@ -173,6 +173,8 @@ pub struct Champ {
     /// Combo Breaker: which of the last window's ticks it couldn't move, and how many.
     pub immobile: [u64; 4],
     pub immobile_n: u16,
+    /// When its pings are spent (one a [`rules::PING_EVERY`], a few at once).
+    pub ping_at: u32,
     /// Items' and augments' stat changes, summed.
     pub mods: StatMods,
 }
@@ -206,6 +208,7 @@ impl Champ {
             last_hits: 0,
             immobile: [0; 4],
             immobile_n: 0,
+            ping_at: 0,
             mods: StatMods::ZERO,
         }
     }
@@ -271,8 +274,12 @@ pub struct Match {
     pub(crate) keys_drawn_n: u8,
     pub events: FixedVec<Event>,
     pub events_dropped: u32,
-    /// The team that won, once a nexus falls.
+    /// The team that won, once a nexus falls or a team surrenders.
     pub outcome: Option<u8>,
+    /// The seats players hold (a bit a seat), as the record's seat frames say: who votes.
+    pub seated: u16,
+    /// Each team's vote to surrender.
+    pub surrender: [crate::voice::Vote; 2],
     /// A* searches left this tick.
     pub(crate) path_budget: u8,
 }
@@ -339,6 +346,8 @@ impl Match {
             events: FixedVec::new(MAX_EVENTS, Event::default()),
             events_dropped: 0,
             outcome: None,
+            seated: 0,
+            surrender: [crate::voice::Vote::default(); 2],
             path_budget: PATH_BUDGET,
         };
         m.reset(seed, picks);
@@ -378,6 +387,8 @@ impl Match {
         self.events.clear();
         self.events_dropped = 0;
         self.outcome = None;
+        self.seated = 0;
+        self.surrender = [crate::voice::Vote::default(); 2];
         for team in [map::DAWN, map::DUSK] {
             self.spawn_structures(team);
         }
@@ -579,6 +590,7 @@ impl Match {
         for (seat, input) in inputs.iter().enumerate() {
             self.apply_input(seat, input, scratch);
         }
+        self.surrender_tick();
         for seat in 0..SEATS {
             self.refresh_stats(seat);
         }
@@ -718,6 +730,15 @@ impl Match {
         }
         h.u32(self.inhib_back[0]);
         h.u32(self.inhib_back[1]);
+        // Who votes, and the votes: only once there are any (what came before them hashes as it did).
+        if self.seated != 0 || self.surrender != [crate::voice::Vote::default(); 2] {
+            h.u32(u32::from(self.seated));
+            for v in &self.surrender {
+                h.u32(v.until);
+                h.u32(u32::from(v.yes) | u32::from(v.no) << 8);
+                h.u32(v.next);
+            }
+        }
         h.0
     }
 }

@@ -415,6 +415,7 @@ impl Client {
                 }
             }
             WireEvent::Outcome { winner } => self.world.outcome = Some(winner),
+            WireEvent::Vote { team, yes, no, open, .. } => self.world.set_vote(team, yes, no, open),
             // For the page alone.
             WireEvent::Cast { .. }
             | WireEvent::Death { .. }
@@ -426,6 +427,7 @@ impl Client {
             | WireEvent::Attack { .. }
             | WireEvent::Area { .. }
             | WireEvent::Blink { .. }
+            | WireEvent::Ping { .. }
             | WireEvent::Nothing => {}
         }
         self.feed[(self.feed_n % FEED as u64) as usize] = (tick, *e);

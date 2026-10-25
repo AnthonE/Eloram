@@ -138,6 +138,7 @@ impl Shard {
                     self.seats[g].seat(max_datagram);
                     self.replicas[g].reset();
                     let (m, tick) = (usize::from(m), self.matches[usize::from(m)].tick);
+                    self.matches[m].set_seated(usize::from(seat), true);
                     let n = record::write_seat(&mut self.frame, tick, seat, true);
                     self.record(m, n);
                 }
@@ -147,6 +148,7 @@ impl Shard {
                 if g < self.seats.len() {
                     self.seats[g].human = false;
                     let (m, tick) = (usize::from(m), self.matches[usize::from(m)].tick);
+                    self.matches[m].set_seated(usize::from(seat), false);
                     let n = record::write_seat(&mut self.frame, tick, seat, false);
                     self.record(m, n);
                 }

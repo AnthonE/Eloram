@@ -26,7 +26,10 @@ change to a golden hash.
 - **Deaths** last 11 s at the start, growing with level to 40 s.
 - **Healing** from any source is halved. Damage from an enemy champion more than 1,000 units away is
   reduced to between 85% and 70%, by distance.
-- **Surrender** is offered from 8:00.
+- **Surrender** is offered from 8:00: a yes opens a vote for a minute, among the team's players
+  (bots don't vote), and it passes with four of five of them, rounded up (alone with bots, one;
+  two players, both). It fails once enough say no, or when its minute is up, and the team waits
+  three minutes for the next.
 - **The end**: a nexus falls.
 
 ## The map: the Causeway
@@ -142,7 +145,10 @@ League's defaults, because that is what players' hands know:
   skillshot's lane, an area's circle kept in range, a dash's path, a blink's landing) and letting go
   casts; **Esc** or a right click calls it off. **Ctrl** with an ability's key levels it.
 - **1, 2, 3** take an augment card while a screen is open, **Shift** with one rerolls it (items have
-  no actives yet, so the number keys are free). **P** the shop, **Tab** the scoreboard.
+  no actives yet, so the number keys are free). **P** the shop, **Tab** the scoreboard (with the
+  button that opens a vote to surrender, from 8:00; an open vote shows its yes and no).
+- **G** (or **Alt**) with a left click pings "look here", **Ctrl** with one "careful", on the unit
+  under the cursor if there is one. Five at once, then one a second; the team alone sees them.
 - **Y** locks the camera on your champion (locked to start) or frees it; free, it pans at the
   screen's edge and with the arrows, and **Space** held brings it back. The wheel zooms a little.
 - **WASD** as an option (`?keys=wasd`, remembered), League's own layout for it (2025): **W, A, S,

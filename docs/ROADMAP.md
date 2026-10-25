@@ -44,6 +44,19 @@ Left for later phases: the record (Phase 5, with the referee), the champion rero
 (Phase 4, with the page that shows them), the agents' own team-view bots in the empty seats
 (the server's bots read the match, held to what their team sees by `el_sim::bot`).
 
+Then the wire again (protocol 3, `NETCODE.md`, "The wire"): the own champion as fields against the
+state the client acked, a unit's record once and once more and again only when an ack names it
+lost, baselines however old, input packets a tick rather than a frame; and what a team says, pings
+and the vote to surrender, as orders with team-only events. Measured against the commit before:
+- Down a client over 100 ms and 5% loss, 11.6 to 3.8 KB/s (the own champion 212 B a datagram to
+  18), up 1.9 to 0.8; walking still predicted exactly, every order applied once, and what a client
+  takes its team's view to be is the server's for 99.9% of the units it sees (a new check in
+  `netcode.rs`, which also rides out a 3 s outage).
+- The shard bench (64 matches): 9.7 to 3.2 KB/s a seat, a match's tick 136 to 127 µs at p50,
+  149 to 158 matches a core at p99.
+- 25 agents over WebTransport (`el-swarm`, 30 s): 1.0 KB/s down each (7.5 when this phase landed),
+  no stale or bad datagrams, all 2,749 orders acked, `hot_path_allocations` 0.
+
 ## 4. The client, playable
 The Bevy client: the camera, orders by mouse and keys, champions, minions, missiles drawn on the
 predicted clock, fog, the HUD, the shop, the augment cards. You and nine bots in a browser.

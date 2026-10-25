@@ -21,7 +21,7 @@ use crate::units::SEATS;
 pub const MAGIC: [u8; 4] = *b"ELR1";
 /// Bumped whenever the content (champions, items, augments, the map, the rules) changes what a
 /// match does with the same inputs: a record names the content it was played on.
-pub const CONTENT_VERSION: u32 = 2;
+pub const CONTENT_VERSION: u32 = 3;
 /// Ticks between the state's hashes.
 pub const HASH_EVERY: u32 = 30;
 /// The longest frame (a tick of ten seats, each with its most orders, fits with room to spare).
@@ -370,7 +370,8 @@ impl Referee {
                 self.checked += 1;
             }
             Frame::Outcome { tick, winner } => self.outcome = Some((tick, winner)),
-            Frame::Seat { .. } => {}
+            // Who holds a seat decides who votes.
+            Frame::Seat { seat, joined, .. } => self.m.set_seated(usize::from(seat), joined),
         }
         Ok(())
     }

@@ -30,6 +30,7 @@ pub mod record;
 pub mod storage;
 pub mod units;
 mod vision;
+pub mod voice;
 mod wire;
 mod world;
 pub mod zone;

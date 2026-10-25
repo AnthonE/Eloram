@@ -120,15 +120,18 @@ standby takes a room over on the old clock's timeline. Riot built the same thing
 ### Inputs: a small command, and orders
 
 - **The command** rides every tick, as Before Colony's does: a WASD direction for those who steer,
-  held keys, and the camera's centre (used for priority only, never for what you're shown). Each
-  input packet repeats the last four. A slow frame that makes more than four sends as many packets
-  as carry them all, the newest first (`Client::poll`; the page raises the browser's datagram
-  high-water mark to fit them), since a command never sent is a step the prediction took and the
-  server didn't. The orders given in a frame are stamped for the newest tick it makes, not its
-  oldest, which on a slow frame is already the server's past.
+  held keys, and the camera's centre (used for priority only, never for what you're shown; one a
+  packet, the newest command's). Each input packet repeats the last four. A packet goes when a
+  tick's command is made or an order is given, so 30 a second whatever the frame rate (a frame
+  between two ticks has nothing new to say). A slow frame that makes more than four sends as many
+  packets as carry them all, the newest first (`Client::poll`; the page raises the browser's
+  datagram high-water mark to fit them), since a command never sent is a step the prediction took
+  and the server didn't. The orders given in a frame are stamped for the newest tick it makes, not
+  its oldest, which on a slow frame is already the server's past.
 - **Orders** are what a MOBA player gives: move, attack-move, attack a unit, cast a slot (pressed
   and released, at a point, a unit or a direction), stop, hold, level a skill, pick an augment,
-  reroll one, buy, sell, ping. Each carries a sequence number and repeats in every packet until
+  reroll one, buy, sell; and to the team, a ping and a vote to surrender (`el_sim::voice`). Each
+  carries a sequence number and repeats in every packet until
   acked, and the server applies each exactly once, at its stamped tick or the next. A stalled
   client's champion keeps doing what it was last told, because intent (where to go, whom to hit)
   lives in the sim, not in the input.
@@ -141,7 +144,11 @@ standby takes a room over on the old clock's timeline. Riot built the same thing
   moves you on the next frame: the path, dashes, blinks, wind-ups and your own missiles' launch.
   League makes this optional; we make it the default.
 - Each snapshot reseeds the prediction from the server's state of your champion, and the unacked
-  commands and orders are replayed on it. A difference is blended out over a few frames (Gates'
+  commands and orders are replayed on it. That state is one fixed list of fields, floats as their
+  bits (`el_sim::own::OwnState`), sent against the newest the client acked (`el_proto::fields`: a
+  bit a group of eight unchanged, else a bit a field, and a changed 32-bit field as the significant
+  bits of its XOR with the baseline's): what changed in the tick, to the bit, about 18 B where the
+  whole is about 210. A difference is blended out over a few frames (Gates'
   0.95 a frame for small errors) and snapped only past a few hundred units.
 - The client's clock runs ahead of the server by RTT/2 and one or two ticks, steered on the
   buffer depth the server reports in every snapshot (Gates, after Overwatch).
@@ -172,6 +179,10 @@ standby takes a room over on the old clock's timeline. Riot built the same thing
   goes out.
 - **Every event has a team rule, with no catch-all.** A missile from a caster you can't see first
   appears where it enters your vision, with no owner, so it cannot place its caster.
+- **A team's word is its own.** A ping goes to the pinger's team, naming a unit only if the team
+  sees it (when it's given, and when it's sent); a vote to surrender, as it stands and as it
+  closes, to the voting team. The enemy hears only the outcome. Who may vote is who holds a seat,
+  as the record's seat frames say, so the referee counts the same votes.
 - The client draws fog from the same precomputed table, so the fog on screen is exactly the fog the
   server enforces.
 - A test decodes every datagram every client gets and fails if any record or event names an enemy
@@ -190,13 +201,28 @@ standby takes a room over on the old clock's timeline. Riot built the same thing
 ### The wire
 
 Before Colony's, sized for a match:
-- An ack on every datagram (a sequence and the 32 before it as bits).
+- An ack on every datagram (a sequence and the 32 before it as bits). The ack names losses too: a
+  client takes nothing older than the newest datagram it has, so one the server sent before a
+  datagram acked, and not acked itself, is lost for good, and the server knows it a round trip on.
 - Per-unit deltas against the last state the client acked, in integer codes both ends agree on to
-  the bit, falling back to a whole record from the same encoder.
+  the bit, falling back to a whole record from the same encoder. The seat keeps each unit's acked
+  record however old (and the client each unit's newest 16), so a unit that says nothing new for
+  minutes is still a delta; a delta's age is 5 bits, or 17 past 16 ticks.
+- **A record goes once, and once more.** A unit's record is sent when it says something its last
+  one didn't (a unit at rest, or walking straight, says nothing), then again the next tick it can
+  be, so one datagram lost costs nothing; after that only if the ack names the datagram that held
+  it lost, or none comes for 16 ticks. Gaffer's way sends the newest of everything every tick until
+  an ack; at 100 ms that is each change four or five times, which was three bytes in four.
+- Events: the reliable ones (a unit leaving sight, a missile's start and end, deaths, casts,
+  levels, pings, votes) repeat until a datagram holding them is acked; their ticks go as ages
+  from the snapshot's.
 - A priority accumulator under a byte budget.
 - Every datagram ≤1,100 B, never fragmented (at 1% loss a 10-fragment packet is lost 9.5% of the
   time).
-- About 100 units in sight fit in one datagram a tick. The estimate is 18–27 KB/s down a client.
+- Measured over 100 ms, ±20 ms and 5% loss with eight bots and two clients playing
+  (`el-match/tests/netcode.rs`): 3.7 KB/s down a client, the largest datagram 450 B, 0.8 KB/s up;
+  what the client takes a unit to be is what the server's record of it said at the snapshot's
+  tick for 99.9% of the units its team sees. The estimate was 18–27 KB/s.
 
 ### The record
 
@@ -266,6 +292,8 @@ Before Colony's, sized for a match:
 - Prediction error by cause (chasing, your own dash, an enemy's crowd control, bodies), through a
   link with 100 ms RTT, 20 ms jitter and 5% loss.
 - Bytes a client a second, and records a datagram.
+- What a client knows of its team's view: the units whose newest record, carried on, isn't what
+  the server's said at the snapshot's tick, under half a percent over 5% loss (the netcode test).
 - Vision leaks: zero, by the test.
 - The referee's divergences: zero.
 

@@ -135,6 +135,17 @@ enum Cmd {
     Aim {
         slot: Option<u8>,
     },
+    /// A ping (`el_proto::order::ping`; 0, look here, by default), at a place, naming a unit.
+    Ping {
+        x: f32,
+        y: f32,
+        kind: Option<u8>,
+        unit: Option<u8>,
+    },
+    /// A vote to surrender (a yes opens one).
+    Surrender {
+        yes: bool,
+    },
 }
 
 pub struct InboxPlugin;
@@ -194,6 +205,10 @@ fn inbox(
             Cmd::Reroll { card } => Order::Reroll { card },
             Cmd::Buy { item } => Order::Buy { item },
             Cmd::Sell { inv } => Order::Sell { inv },
+            Cmd::Ping { x, y, kind, unit: u } => {
+                Order::Ping { kind: kind.unwrap_or(0), at: Vec2::new(x, y), unit: u.map(unit) }
+            }
+            Cmd::Surrender { yes } => Order::Surrender { yes },
             Cmd::Shop { open } => {
                 controls.shop_open = open;
                 continue;
@@ -344,6 +359,10 @@ fn match_status(
     status.set("orders_unacked", c.orders.outstanding() as u32);
     status.set("corrections", corrections.0 as f64);
     status.set("walk_err_max", *walk_max);
+    let vote = &c.world.surrender[usize::from(c.team)];
+    status.set("vote_open", vote.open());
+    status.set("vote_yes", vote.yes.count_ones());
+    status.set("pings_heard", session.pings);
     status.set("kills", u32::from(session.kd[s].0));
     status.set("deaths", u32::from(session.kd[s].1));
     if let Some(w) = session.winner {

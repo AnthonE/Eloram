@@ -349,6 +349,19 @@ impl Replica {
                     }
                 }
                 Event::Outcome { winner } => self.queue(WireEvent::Outcome { winner }),
+                // A team's word is the team's: its pings (naming a unit only while it's seen) and its
+                // vote.
+                Event::Ping { seat, kind, at, unit } => {
+                    if team_of_seat(usize::from(seat)) == team {
+                        let unit = if sees(unit) { unit as u8 } else { HIDDEN };
+                        self.queue(WireEvent::Ping { seat, kind, at: pos_code(at), unit });
+                    }
+                }
+                Event::Vote { team: voters, yes, no, open, passed } => {
+                    if voters == team {
+                        self.queue(WireEvent::Vote { team: voters, yes, no, open, passed });
+                    }
+                }
                 // Missiles are told below, from what the team sees of each.
                 Event::MissileSpawn { .. } | Event::MissileEnd { .. } => {}
             }

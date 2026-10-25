@@ -249,3 +249,58 @@ fn an_outage_is_ridden_out() {
     told_as_seen(&rig);
     orders_applied_once(&rig);
 }
+
+#[test]
+fn a_ping_reaches_the_team_alone_and_a_vote_ends_the_match() {
+    use el_proto::event::WireEvent;
+    use el_proto::order::ping;
+    use el_sim::content::rules;
+    use el_sim::ticks;
+    let from = ticks(rules::SURRENDER_FROM);
+    // Seat 0 pings once, and opens a vote at 8:00; seat 1, its teammate, says yes when it sees one
+    // open; seat 5 is the enemy's.
+    let opener: Brain = Box::new(move |_, _, k, out| {
+        if k == 150 {
+            out.push(el_proto::Order::Ping {
+                kind: ping::COMING,
+                at: glam::Vec2::new(3_000.0, 1_900.0),
+                unit: None,
+            });
+        }
+        if k == from + 30 {
+            out.push(el_proto::Order::Surrender { yes: true });
+        }
+    });
+    let mut voted = false;
+    let follower: Brain = Box::new(move |m, _, _, out| {
+        if m.surrender[0].open() && !voted {
+            voted = true;
+            out.push(el_proto::Order::Surrender { yes: true });
+        }
+    });
+    let mut rig =
+        Rig::new(3, vec![(0, BAD, opener), (1, BAD, follower), (5, BAD, Box::new(|_, _, _, _| {}))]);
+    rig.run(10.0);
+    let pings = |k: usize| {
+        let c = &rig.players[k].client;
+        c.feed[..(c.feed_n as usize).min(c.feed.len())]
+            .iter()
+            .filter(|(_, e)| matches!(e, WireEvent::Ping { seat: 0, kind: ping::COMING, .. }))
+            .count()
+    };
+    assert_eq!((pings(0), pings(1), pings(2)), (1, 1, 0), "the team's, once each, and not the enemy's");
+    rig.run_until(f64::from(from) / 30.0 + 10.0, |r| r.m().outcome.is_some());
+    assert_eq!(rig.m().outcome, Some(el_sim::map::DUSK), "two players of two said yes");
+    rig.run(1.0);
+    for p in &rig.players {
+        assert!(p.client.over, "seat {} was told", p.seat);
+    }
+    // The record holds the votes and who could vote: it replays to the same end.
+    let mut referee = el_sim::record::Referee::new(common::map());
+    for f in el_sim::record::Frames::new(&rig.record) {
+        referee.take(&f).expect("the replay keeps to the record");
+    }
+    referee.flush();
+    assert_eq!(referee.m.hash(), rig.m().hash());
+    assert_eq!(referee.m.outcome, Some(el_sim::map::DUSK));
+}

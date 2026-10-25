@@ -274,6 +274,8 @@ impl Match {
         self.events.clear();
         self.events_dropped = 0;
         self.outcome = from.outcome;
+        self.seated = from.seated;
+        self.surrender = from.surrender;
     }
 
     /// The champion of `seat` as its fields.
