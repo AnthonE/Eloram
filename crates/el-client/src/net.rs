@@ -2,6 +2,10 @@
 //! Hello and its Welcome (signing in with the browser's wallet on `?signin=1`), the queue, and a
 //! match: the snapshot datagrams into the client core as they arrived, and each frame's orders and
 //! command out.
+//!
+//! A link that drops mid-match (closed, or silent for [`STALE`]) is dialled again, with a backoff,
+//! and the seat taken back with the match's rejoin token (`ToServer::Rejoin`); a page reloaded
+//! mid-match does the same with the token this tab kept.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -40,12 +44,29 @@ pub struct LaunchConfigRes(pub LaunchConfig);
 #[derive(Resource, Clone, Copy)]
 pub struct MapRes(pub &'static el_sim::map::Map);
 
+/// A match's link with no snapshot for this long (s) has gone: it is dialled again.
+const STALE: f64 = 4.0;
+/// Dials to take a seat back before giving up (about the server's `REJOIN_FOR`).
+const REDIALS: u32 = 16;
+
+/// How long (s) before the `n`th redial.
+fn backoff(n: u32) -> f64 {
+    (0.5 * f64::from(1u32 << n.min(3))).min(4.0)
+}
+
 /// What the session has heard back.
 #[derive(Default)]
 struct Link {
     hello_sent: bool,
     ctrl: Vec<u8>,
     rejected: Option<String>,
+    /// The resume token this page was given (newer than the launch config's).
+    resume: Option<[u8; el_proto::auth::TOKEN_BYTES]>,
+    /// Reconnecting: when the next dial goes, and how many have.
+    redial_at: Option<f64>,
+    redials: u32,
+    /// When the last snapshot came (s).
+    last_datagram: f64,
     // The echo spike's counters.
     seq: u32,
     last_ping: f64,
@@ -93,18 +114,23 @@ pub fn now_s() -> f64 {
 }
 
 fn connect(net: NonSend<NetState>, cfg: Res<LaunchConfigRes>) {
-    let slot = net.transport.clone();
-    let err = net.error.clone();
-    let url = cfg.0.wt_url.clone();
-    let hash = cfg.0.cert_hash.clone();
     if cfg.0.record_url.is_some() {
         // Watching: the record comes over HTTP (`watch`), nothing is dialled.
         return;
     }
     if cfg.0.no_web_transport {
-        *err.borrow_mut() = Some("this browser has no WebTransport: use Chrome or Edge".into());
+        *net.error.borrow_mut() = Some("this browser has no WebTransport: use Chrome or Edge".into());
         return;
     }
+    dial(&net, &cfg.0);
+}
+
+/// Dials the server; the transport lands in `net`'s slot, or the reason it didn't in its error.
+fn dial(net: &NetState, cfg: &LaunchConfig) {
+    let slot = net.transport.clone();
+    let err = net.error.clone();
+    let url = cfg.wt_url.clone();
+    let hash = cfg.cert_hash.clone();
     wasm_bindgen_futures::spawn_local(async move {
         match Transport::connect(&url, hash).await {
             Ok(t) => {
@@ -218,6 +244,9 @@ fn talk(
     map: Res<MapRes>,
     mut session: ResMut<Session>,
 ) {
+    if session.phase == Phase::Reconnecting && !redial(&net, &mut link, &cfg.0, &mut session) {
+        return;
+    }
     let Some(t) = net.get() else {
         if let Some(e) = net.error.borrow().as_ref() {
             session.phase = Phase::Failed;
@@ -237,7 +266,7 @@ fn talk(
         let name = if cfg.0.name.is_empty() { "Summoner" } else { cfg.0.name.as_str() };
         let mut hello = ControlMsg::hello(PlayerKind::Human, name);
         if let ControlMsg::Hello { flags, resume, .. } = &mut hello {
-            match (cfg.0.sign_in, cfg.0.resume) {
+            match (cfg.0.sign_in, link.resume.or(cfg.0.resume)) {
                 (true, Some(token)) => {
                     *flags |= hello_flags::RESUME;
                     *resume = token;
@@ -254,15 +283,36 @@ fn talk(
     }
     let incoming = t.take_control();
     link.ctrl.extend_from_slice(&incoming);
-    while let Ok(Some((frame, used))) = Frame::decode(&link.ctrl) {
+    loop {
+        let (frame, used) = match Frame::decode(&link.ctrl) {
+            Ok(Some(f)) => f,
+            Ok(None) => break,
+            Err(_) => {
+                // Never left waiting on a stream it can't read: say so and hang up.
+                session.phase = Phase::Failed;
+                session.error = Some("The server sent something this page can't read. Reload.".into());
+                link.ctrl.clear();
+                t.close();
+                return;
+            }
+        };
         match frame {
             Frame::Msg(ControlMsg::Welcome { session: id, flags, .. }) => {
                 session.session = Some(id);
                 session.signed_in = flags & welcome_flags::SIGNED_IN != 0;
                 session.phase = Phase::Lobby;
                 if cfg.0.queue {
-                    send_lobby(&t, &ToServer::Queue);
-                    session.phase = Phase::Queued;
+                    // Back to the seat this tab had, if its match may still be on.
+                    match crate::config::rejoin_token() {
+                        Some(token) => {
+                            send_lobby(&t, &ToServer::Rejoin { token });
+                            session.phase = Phase::Reconnecting;
+                        }
+                        None => {
+                            send_lobby(&t, &ToServer::Queue);
+                            session.phase = Phase::Queued;
+                        }
+                    }
                 }
             }
             Frame::Msg(ControlMsg::Challenge { nonce, issued_at, domain }) => {
@@ -270,7 +320,10 @@ fn talk(
                 sign_with_wallet(t.clone(), nonce, issued_at, domain, net.error.clone());
             }
             // Kept for the next visit, so the wallet isn't asked again while it's good.
-            Frame::Msg(ControlMsg::Token { token }) => crate::config::store_resume(Some(&token)),
+            Frame::Msg(ControlMsg::Token { token }) => {
+                crate::config::store_resume(Some(&token));
+                link.resume = Some(token);
+            }
             Frame::Msg(ControlMsg::Reject { reason }) => {
                 link.rejected = Some(format!("{reason:?}"));
                 session.phase = Phase::Failed;
@@ -314,9 +367,12 @@ fn talk(
                     session.phase = Phase::Selecting;
                 }
                 Ok(m @ ToClient::Match { .. }) => {
-                    if let (Some(picks), ToClient::Match { seat, tiers, headliner, roster, .. }) =
+                    if let (Some(picks), ToClient::Match { seat, tiers, headliner, roster, rejoin, .. }) =
                         (m.picks(), &m)
                     {
+                        crate::config::store_rejoin(Some(rejoin.as_str()).filter(|r| !r.is_empty()));
+                        link.redials = 0;
+                        link.last_datagram = now_s();
                         let seat = usize::from(*seat).min(el_sim::units::SEATS - 1);
                         session.client = Some(Box::new(Client::new(map.0, seat, picks, *tiers, *headliner)));
                         session.roster = roster.clone();
@@ -328,8 +384,20 @@ fn talk(
                     }
                 }
                 Ok(ToClient::Over { winner }) => {
+                    crate::config::store_rejoin(None);
                     session.winner = Some(winner);
                     session.phase = Phase::Over;
+                }
+                // The match it would have come back to is gone: a new one.
+                Ok(ToClient::NoSeat) => {
+                    crate::config::store_rejoin(None);
+                    session.client = None;
+                    if cfg.0.queue {
+                        send_lobby(&t, &ToServer::Queue);
+                        session.phase = Phase::Queued;
+                    } else {
+                        session.phase = Phase::Lobby;
+                    }
                 }
                 Err(e) => web_sys::console::warn_1(&format!("lobby message: {e}").into()),
             },
@@ -339,15 +407,54 @@ fn talk(
     }
     // The snapshots, each at the time it arrived.
     let datagrams = t.drain();
+    if let Some((_, at)) = datagrams.last() {
+        link.last_datagram = *at;
+    }
     if let Some(c) = session.client.as_mut() {
         for (d, arrived) in datagrams {
             let _ = c.on_datagram(&d, arrived);
         }
     }
+    // A match's link that closed or went quiet is dialled again, to take the seat back.
+    let quiet = session.phase == Phase::Playing && now_s() - link.last_datagram > STALE;
+    let in_match = matches!(session.phase, Phase::Playing | Phase::Reconnecting);
+    if in_match && (t.is_closed() || quiet) && crate::config::rejoin_token().is_some() {
+        t.close();
+        *net.transport.borrow_mut() = None;
+        link.hello_sent = false;
+        link.ctrl.clear();
+        link.redial_at = Some(now_s() + backoff(link.redials));
+        session.phase = Phase::Reconnecting;
+        return;
+    }
     if t.is_closed() && session.phase != Phase::Failed {
         session.phase = Phase::Failed;
         session.error.get_or_insert_with(|| "the link to the server dropped".into());
     }
+}
+
+/// While reconnecting: the next dial when it's due, a failed one counted (and the next put off),
+/// and true once a transport is up to say hello on.
+fn redial(net: &NetState, link: &mut Link, cfg: &LaunchConfig, session: &mut Session) -> bool {
+    if let Some(at) = link.redial_at {
+        if now_s() >= at {
+            link.redial_at = None;
+            link.redials += 1;
+            dial(net, cfg);
+        }
+        return false;
+    }
+    if net.error.borrow_mut().take().is_some() {
+        if link.redials >= REDIALS {
+            crate::config::store_rejoin(None);
+            session.phase = Phase::Failed;
+            session.error = Some("Lost the server, and couldn't get back. Reload to try again.".into());
+        } else {
+            link.redial_at = Some(now_s() + backoff(link.redials));
+        }
+        return false;
+    }
+    net.get().is_some()
 }
 
 /// The frame's orders given, the commands due made, and the input packet sent.

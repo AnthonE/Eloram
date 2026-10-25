@@ -19,6 +19,8 @@ pub enum Phase {
     /// Champion select: a reroll, the bench, ready.
     Selecting,
     Playing,
+    /// The link dropped mid-match: dialling again to take the seat back.
+    Reconnecting,
     Over,
     Failed,
     /// Watching a record.
@@ -34,6 +36,7 @@ impl Phase {
             Phase::Queued => "queued",
             Phase::Selecting => "selecting",
             Phase::Playing => "playing",
+            Phase::Reconnecting => "reconnecting",
             Phase::Over => "over",
             Phase::Failed => "failed",
             Phase::Watching => "watching",

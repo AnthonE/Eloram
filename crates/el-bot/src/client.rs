@@ -70,6 +70,10 @@ pub struct BotClient {
     pub over: Option<u8>,
     /// The wallet it signed in as, if it did.
     pub address: Option<el_proto::auth::Address>,
+    /// The token its match gave it, to take the seat back on another connection.
+    pub rejoin: Option<String>,
+    /// A rejoin found no seat.
+    pub no_seat: bool,
     /// In a champion select it hasn't yet said it's ready in (it plays what it's dealt).
     ready_due: bool,
     start: Instant,
@@ -121,6 +125,8 @@ impl BotClient {
             roster: Vec::new(),
             over: None,
             address,
+            rejoin: None,
+            no_seat: false,
             ready_due: false,
             start: Instant::now(),
         })
@@ -144,17 +150,33 @@ impl BotClient {
         self.send_lobby(&ToServer::Queue).await
     }
 
+    /// Asks for the seat `token` was given for (an earlier connection's), instead of queueing.
+    pub async fn rejoin(&mut self, token: &str) -> anyhow::Result<()> {
+        self.over = None;
+        self.no_seat = false;
+        self.send_lobby(&ToServer::Rejoin { token: token.to_string() }).await
+    }
+
+    /// Drops the connection without a goodbye, as a lost link would.
+    pub fn drop_link(self) {
+        self.conn.close(0u32.into(), b"");
+    }
+
     fn take(&mut self, f: Incoming) -> anyhow::Result<()> {
         match f {
             Incoming::Lobby(bytes) => match serde_json::from_slice::<ToClient>(&bytes)? {
                 m @ ToClient::Match { .. } => {
                     let picks = m.picks();
-                    let ToClient::Match { seat, tiers, headliner, roster, .. } = m else { unreachable!() };
+                    let ToClient::Match { seat, tiers, headliner, roster, rejoin, .. } = m else {
+                        unreachable!()
+                    };
                     let Some(picks) = picks else { anyhow::bail!("a match without ten picks") };
                     anyhow::ensure!(usize::from(seat) < el_sim::units::SEATS, "seat {seat}");
                     self.client = Some(Client::new(map(), usize::from(seat), picks, tiers, headliner));
                     self.roster = roster;
+                    self.rejoin = (!rejoin.is_empty()).then_some(rejoin);
                 }
+                ToClient::NoSeat => self.no_seat = true,
                 ToClient::Over { winner } => self.over = Some(winner),
                 ToClient::Queued { .. } => {}
                 ToClient::Select { .. } => self.ready_due = true,
@@ -169,6 +191,7 @@ impl BotClient {
     pub async fn wait_match(&mut self, timeout: Duration) -> anyhow::Result<()> {
         let end = tokio::time::Instant::now() + timeout;
         while self.client.is_none() {
+            anyhow::ensure!(!self.no_seat, "no seat to rejoin");
             match tokio::time::timeout_at(end, self.frames.recv()).await {
                 Ok(Some(f)) => self.take(f)?,
                 Ok(None) => anyhow::bail!("the control stream closed"),

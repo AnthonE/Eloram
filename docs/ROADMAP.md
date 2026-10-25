@@ -109,3 +109,18 @@ teammate's benched champion can be taken, and a team sees only its own; the matc
 or once everyone seated is ready, with the picks the select ended on in the record's header.
 Agents are ready at once. `scripts/e2e.sh match` rerolls, takes the dealt champion back off the
 bench, and plays it.
+
+Then the links, made hard to break (`NETCODE.md`, "Many matches a process"):
+- The egress ring could misframe a seat for good: the shard committed a length and its snapshot
+  separately, and the egress thread could read in between. Every snapshot that seat got after
+  that was garbage, and the page froze. Each frame now goes in one commit (`write_packet`), and
+  the reader takes a frame only when all of it is there; a test races a writer thread against
+  the reader.
+- A client that stops reading its control stream can no longer stall its session; lobby
+  requests are rate-limited.
+- A dropped link or a reload rejoins the same seat (an online test over WebTransport, and
+  `scripts/e2e.sh match` in the browser, where the redial is back in about a second and a half).
+- The page's frame: the fog is uploaded only when it changes; units, missiles, HUD bars and
+  minimap dots are written only when they move (a write marks a component changed, which costs
+  propagation, extraction and UI layout); flashes fade in steps; health bars are drawn opaque;
+  `window.__el` is converted to JavaScript only when it is published.

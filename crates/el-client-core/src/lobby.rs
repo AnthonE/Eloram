@@ -17,6 +17,9 @@ pub enum ToServer {
     Swap { champ: u8 },
     /// In champion select: done choosing (the match starts once everyone seated is).
     Ready,
+    /// Back into the seat a `Match` gave this `token` for, after the connection dropped (or the
+    /// page reloaded). Answered with that `Match` again, or [`ToClient::NoSeat`].
+    Rejoin { token: String },
 }
 
 /// A seat in champion select with no champion shown: the other team's, unseen until the match.
@@ -45,8 +48,19 @@ pub enum ToClient {
     Select { seat: u8, picks: Vec<u8>, bench: Vec<u8>, rerolls: u8, ends_in: u32, roster: Vec<Player> },
     /// Seated: every seat's champion, the augment screens' tiers and the headliner (all a client
     /// needs of the match's seed, which stays on the server: every seat's augment offers follow
-    /// from it), and who plays where. Snapshots follow as datagrams.
-    Match { seat: u8, picks: Vec<u8>, tiers: [u8; 4], headliner: u8, roster: Vec<Player> },
+    /// from it), and who plays where. Snapshots follow as datagrams. `rejoin` takes the seat back
+    /// on a new connection while the match lasts ([`ToServer::Rejoin`]); it's the player's alone.
+    Match {
+        seat: u8,
+        picks: Vec<u8>,
+        tiers: [u8; 4],
+        headliner: u8,
+        roster: Vec<Player>,
+        #[serde(default)]
+        rejoin: String,
+    },
+    /// A rejoin found no seat: the match is over, or the token isn't one.
+    NoSeat,
     /// The match is over; `winner` is the team whose nexus stands.
     Over { winner: u8 },
 }
@@ -74,6 +88,7 @@ mod tests {
             tiers: [0, 1, 2, 1],
             headliner: 4,
             roster: vec![Player { name: "Ash".into(), agent: false, bot: false }],
+            rejoin: "00ff".into(),
         };
         let text = serde_json::to_string(&m).unwrap();
         assert!(text.starts_with(r#"{"t":"match","seat":3,"picks":[0,1,2"#), "{text}");
@@ -85,6 +100,7 @@ mod tests {
             (r#"{"t":"reroll"}"#, ToServer::Reroll),
             (r#"{"t":"swap","champ":7}"#, ToServer::Swap { champ: 7 }),
             (r#"{"t":"ready"}"#, ToServer::Ready),
+            (r#"{"t":"rejoin","token":"ab"}"#, ToServer::Rejoin { token: "ab".into() }),
         ] {
             assert_eq!(serde_json::from_str::<ToServer>(json).unwrap(), msg);
         }
