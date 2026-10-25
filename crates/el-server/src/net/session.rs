@@ -144,6 +144,9 @@ pub async fn run(
                         lobby.enqueue(session, &name, agent, max_datagram, events_tx.clone());
                     }
                     Ok(ToServer::Leave) => lobby.leave(session),
+                    Ok(ToServer::Reroll) => lobby.reroll(session),
+                    Ok(ToServer::Swap { champ }) => lobby.swap(session, champ),
+                    Ok(ToServer::Ready) => lobby.ready(session),
                     Err(_) => NetStats::add(&stats.malformed, 1),
                 },
                 Some(Incoming::Msg(_)) => {}
@@ -151,6 +154,11 @@ pub async fn run(
             Some(ev) = events.recv() => match ev {
                 LobbyEvent::Queued { waiting, fill_in } => {
                     if send_lobby(&mut tx, &ToClient::Queued { waiting, fill_in }).await.is_err() {
+                        break;
+                    }
+                }
+                LobbyEvent::Select(msg) => {
+                    if send_lobby(&mut tx, &msg).await.is_err() {
                         break;
                     }
                 }

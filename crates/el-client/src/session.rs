@@ -1,4 +1,5 @@
-//! Where the player is (connecting, in the queue, in a match, done), and the match's client.
+//! Where the player is (connecting, in the queue, in champion select, in a match, done), and the
+//! match's client.
 
 use bevy::prelude::*;
 use el_client_core::Client;
@@ -15,6 +16,8 @@ pub enum Phase {
     /// Welcomed, not queued.
     Lobby,
     Queued,
+    /// Champion select: a reroll, the bench, ready.
+    Selecting,
     Playing,
     Over,
     Failed,
@@ -29,11 +32,36 @@ impl Phase {
             Phase::SigningIn => "signing_in",
             Phase::Lobby => "lobby",
             Phase::Queued => "queued",
+            Phase::Selecting => "selecting",
             Phase::Playing => "playing",
             Phase::Over => "over",
             Phase::Failed => "failed",
             Phase::Watching => "watching",
         }
+    }
+}
+
+/// Champion select, as the server last told it (`ToClient::Select`).
+#[derive(Clone, Debug, Default)]
+pub struct SelectView {
+    pub seat: usize,
+    /// Every seat's champion as our team sees them (the other team's `lobby::UNSEEN`).
+    pub picks: Vec<u8>,
+    pub bench: Vec<u8>,
+    pub rerolls: u8,
+    /// When it ends (s, the page's clock).
+    pub ends_at: f64,
+    /// We said we're ready.
+    pub ready: bool,
+}
+
+impl SelectView {
+    /// Our champion.
+    pub fn mine(&self) -> Option<u8> {
+        self.picks
+            .get(self.seat)
+            .copied()
+            .filter(|&c| usize::from(c) < el_sim::content::champions::CHAMPIONS.len())
     }
 }
 
@@ -52,6 +80,8 @@ pub struct Session {
     /// Welcomed as a wallet (not a guest).
     pub signed_in: bool,
     pub client: Option<Box<Client>>,
+    /// Champion select, while it lasts.
+    pub select: Option<SelectView>,
     /// The record being watched, instead of a match being played.
     pub watch: Option<Box<crate::watch::Watch>>,
     pub roster: Vec<Player>,

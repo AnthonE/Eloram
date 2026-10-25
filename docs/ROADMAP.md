@@ -59,7 +59,7 @@ Chromium (queue, augment, shop, a skill, Blink, a walk with no correction at all
 only once the waves meet).
 
 Not yet: champion art (they're capsules in their colours), cast indicators, WASD bound on the
-page, the champion reroll and bench, five more champions (with Phase 5's). Not measured: the frame
+page (the champion select and five more champions came with Phase 5). Not measured: the frame
 rate on a real GPU (headless Chromium here draws in software, about a frame a second at 960×540).
 
 ## 5. Mayhem, the record, spectating, Elo Pros
@@ -79,3 +79,19 @@ for the store's playtime, `proto` on `/status.json`, and `scripts/publish-web.sh
 `elopros.com/games/eloram/play/`, `current` flipped last). Still the operator's: where the game
 server runs (`--server`, `--http`, `--siwe-domain`), the store's route to the page, and the
 listing.
+
+Then Mayhem's content: twenty champions over six roles, dealt ten different a match; 41 augments,
+about a third a tier, with a trigger on a cast beside the others; a headliner a match, drawn from
+the seed and shown as it starts. Names that were Riot's went (items, two runes, an ability, the
+summoner spells: D is Blink, F is Tag). Measured: the golden bot match (seed 11) ends at 14:00 and
+seed 7's at 15:54; a match's tick 77 µs at p50 and 357 µs at p99 (`match_tick`, 26,813 ticks), as
+it was with five champions (73 and 389). That p99 is over the 150 µs this plan set, as it already
+was; the shard bench's 82 matches a core at p99 is the number that holds. Every augment on every
+champion ticks without allocating (`no_alloc.rs`).
+
+And ARAM's champion select, in the lobby (`el-server/src/lobby.rs`): 20 s (`--select-secs`) in which
+a reroll sends your champion to your team's bench and deals you one no one holds (two a seat), a
+teammate's benched champion can be taken, and a team sees only its own; the match starts on time
+or once everyone seated is ready, with the picks the select ended on in the record's header.
+Agents are ready at once. `scripts/e2e.sh match` rerolls, takes the dealt champion back off the
+bench, and plays it.

@@ -1,10 +1,12 @@
-//! What the player reads: their abilities and cooldowns, health, mana, level, gold and items at the
+//! What the player reads: champion select before a match (their champion, their team's, the bench,
+//! a reroll, ready); then their abilities and cooldowns, health, mana, level, gold and items at the
 //! bottom; the clock and the kills at the top; the kill feed; the minimap; the augment cards while
 //! a screen is open and the shop may be used; the shop (P); the scoreboard (Tab); and the line in
 //! the middle that says what's happening (the queue, a respawn, the result). All of it read from the
 //! prediction, so it moves when the player does.
 
 use bevy::prelude::*;
+use el_client_core::lobby::ToServer;
 use el_proto::Order;
 use el_sim::content::augments::{AUGMENTS, Tier};
 use el_sim::content::champions::{CHAMPIONS, ability};
@@ -39,6 +41,12 @@ enum Label {
     Card(usize),
     Item(usize),
     Shop(usize),
+    SelectTitle,
+    SelectMine,
+    SelectTeam,
+    SelectReroll,
+    SelectReady,
+    Bench(usize),
 }
 
 /// A bar's fill.
@@ -57,6 +65,7 @@ enum Panel {
     Cards,
     Shop,
     Score,
+    Select,
 }
 
 /// What pressing a button does.
@@ -66,7 +75,18 @@ enum Act {
     Reroll(u8),
     Buy(u8),
     Sell(u8),
+    /// Champion select: take the bench's `.0`th champion.
+    Swap(usize),
+    RerollChampion,
+    Ready,
 }
+
+/// A place on the bench in champion select, shown while the bench reaches it.
+#[derive(Component)]
+struct BenchSlot(usize);
+
+/// Places on a team's bench (it holds at most what was never dealt).
+const BENCH: usize = 10;
 
 /// A dot on the minimap, for unit slot `.0`.
 #[derive(Component)]
@@ -84,7 +104,7 @@ impl Plugin for HudPlugin {
             Update,
             (
                 (press, minimap).after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send),
-                (texts, fills, panels, dots).after(crate::net::NetSet::Send),
+                (texts, fills, panels, dots, bench_slots).after(crate::net::NetSet::Send),
             ),
         );
     }
@@ -403,6 +423,139 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>) {
             BackgroundColor(PANEL),
             children![(text("", 15.0, TEXT), Label::Score)],
         ));
+    // Champion select: your champion, your team's, the bench, a reroll, ready.
+    let button = |commands: &mut Commands, act: Act, label: Label, width: f32| {
+        commands
+            .spawn((
+                Button,
+                Node {
+                    width: px(width),
+                    height: px(30),
+                    padding: UiRect::horizontal(px(8)),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(px(1)),
+                    ..default()
+                },
+                BorderColor::all(GOLD),
+                BackgroundColor(Color::srgb(0.12, 0.13, 0.17)),
+                act,
+                children![(text("", 13.0, TEXT), label)],
+            ))
+            .id()
+    };
+    let bench: Vec<Entity> = (0..BENCH)
+        .map(|k| {
+            let b = button(&mut commands, Act::Swap(k), Label::Bench(k), 120.0);
+            commands.entity(b).insert(BenchSlot(k));
+            b
+        })
+        .collect();
+    let bench_row = commands
+        .spawn(Node {
+            flex_wrap: FlexWrap::Wrap,
+            max_width: px(640),
+            column_gap: px(6),
+            row_gap: px(6),
+            ..default()
+        })
+        .add_children(&bench)
+        .id();
+    let reroll = button(&mut commands, Act::RerollChampion, Label::SelectReroll, 170.0);
+    let ready = button(&mut commands, Act::Ready, Label::SelectReady, 220.0);
+    let actions =
+        commands.spawn(Node { column_gap: px(12), ..default() }).add_children(&[reroll, ready]).id();
+    let title = commands.spawn((text("", 14.0, GOLD), Label::SelectTitle)).id();
+    let mine = commands.spawn((text("", 26.0, TEXT), Label::SelectMine)).id();
+    let team = commands.spawn((text("", 14.0, TEXT), Label::SelectTeam)).id();
+    let bench_title = commands
+        .spawn(text("THE BENCH: click a champion to take it, yours goes in its place", 12.0, DIM))
+        .id();
+    let body = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: px(10),
+                padding: UiRect::all(px(18)),
+                ..default()
+            },
+            BackgroundColor(PANEL),
+        ))
+        .add_children(&[title, mine, team, bench_title, bench_row, actions])
+        .id();
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                top: percent(16),
+                width: percent(100),
+                justify_content: JustifyContent::Center,
+                display: Display::None,
+                ..default()
+            },
+            Panel::Select,
+        ))
+        .add_child(body);
+}
+
+/// Champion `c`'s name, or a dash if there's none to show.
+fn champ_name(c: u8) -> &'static str {
+    CHAMPIONS.get(usize::from(c)).map_or("-", |d| d.name)
+}
+
+/// The words of champion select's panel.
+fn select_text(label: Label, session: &Session) -> String {
+    let Some(s) = session.select.as_ref() else { return String::new() };
+    let left = (s.ends_at - crate::net::now_s()).max(0.0).ceil() as u32;
+    match label {
+        Label::SelectTitle => format!("CHAMPION SELECT   {left} s"),
+        Label::SelectMine => match s.mine().map(|c| &CHAMPIONS[usize::from(c)]) {
+            Some(d) => format!("{}, {}\n{}", d.name, d.title, d.role.name()),
+            None => String::new(),
+        },
+        Label::SelectTeam => {
+            let team = team_of_seat(s.seat);
+            let seats: Vec<String> = (0..SEATS)
+                .filter(|&k| team_of_seat(k) == team)
+                .map(|k| {
+                    let you = if k == s.seat { " (you)" } else { "" };
+                    format!(
+                        "{} {}{you}",
+                        session.name(k),
+                        champ_name(s.picks.get(k).copied().unwrap_or(u8::MAX))
+                    )
+                })
+                .collect();
+            format!("{}: {}", if team == 0 { "DAWN" } else { "DUSK" }, seats.join(",  "))
+        }
+        Label::SelectReroll => {
+            if s.rerolls > 0 {
+                format!("Reroll ({} left)", s.rerolls)
+            } else {
+                "No rerolls left".into()
+            }
+        }
+        Label::SelectReady => {
+            if s.ready {
+                "Ready: waiting for the others".into()
+            } else {
+                "Ready".into()
+            }
+        }
+        Label::Bench(k) => s.bench.get(k).map_or(String::new(), |&c| champ_name(c).into()),
+        _ => String::new(),
+    }
+}
+
+/// Shows as many bench places as the bench holds.
+fn bench_slots(session: Res<Session>, mut q: Query<(&BenchSlot, &mut Node)>) {
+    let n = session.select.as_ref().map_or(0, |s| s.bench.len());
+    for (slot, mut node) in &mut q {
+        let want = if slot.0 < n { Display::Flex } else { Display::None };
+        if node.display != want {
+            node.display = want;
+        }
+    }
 }
 
 fn mmss(ticks: u32) -> String {
@@ -468,10 +621,19 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
             continue;
         }
         let s: String = match (*label, c) {
+            (
+                Label::SelectTitle
+                | Label::SelectMine
+                | Label::SelectTeam
+                | Label::SelectReroll
+                | Label::SelectReady
+                | Label::Bench(_),
+                _,
+            ) => select_text(*label, &session),
             (Label::Center, _) => match session.phase {
                 Phase::Connecting => "Connecting...".into(),
                 Phase::SigningIn => "Sign in with your wallet...".into(),
-                Phase::Watching => String::new(),
+                Phase::Watching | Phase::Selecting => String::new(),
                 Phase::Lobby => "In the lobby".into(),
                 Phase::Queued => format!(
                     "Finding a match: {} waiting, bots take the empty seats in {} s",
@@ -638,6 +800,7 @@ fn panels(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Panel, 
     let watching = session.watch.is_some();
     for (p, mut node) in &mut q {
         let show = match (*p, c) {
+            (Panel::Select, _) => session.phase == Phase::Selecting && session.select.is_some(),
             (Panel::Score, _) if watching => controls.scoreboard,
             (Panel::Bottom, Some(_)) => true,
             (Panel::Cards, Some(c)) => c.pred.champs[c.seat].screen.open && c.pred.in_shop(c.seat),
@@ -691,17 +854,36 @@ fn minimap(
     }
 }
 
-/// A button pressed: its order.
-fn press(q: Query<(&Interaction, &Act), Changed<Interaction>>, mut controls: ResMut<Controls>) {
+/// A button pressed: its order, or champion select's message.
+fn press(
+    q: Query<(&Interaction, &Act), Changed<Interaction>>,
+    session: Res<Session>,
+    mut controls: ResMut<Controls>,
+) {
     for (i, act) in &q {
         if *i != Interaction::Pressed {
             continue;
         }
-        controls.pending.push(match *act {
+        let order = match *act {
             Act::Pick(card) => Order::PickAugment { card },
             Act::Reroll(card) => Order::Reroll { card },
             Act::Buy(item) => Order::Buy { item },
             Act::Sell(inv) => Order::Sell { inv },
-        });
+            Act::Swap(k) => {
+                if let Some(&champ) = session.select.as_ref().and_then(|s| s.bench.get(k)) {
+                    controls.lobby.push(ToServer::Swap { champ });
+                }
+                continue;
+            }
+            Act::RerollChampion => {
+                controls.lobby.push(ToServer::Reroll);
+                continue;
+            }
+            Act::Ready => {
+                controls.lobby.push(ToServer::Ready);
+                continue;
+            }
+        };
+        controls.pending.push(order);
     }
 }

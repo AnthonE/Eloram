@@ -70,6 +70,8 @@ pub struct BotClient {
     pub over: Option<u8>,
     /// The wallet it signed in as, if it did.
     pub address: Option<el_proto::auth::Address>,
+    /// In a champion select it hasn't yet said it's ready in (it plays what it's dealt).
+    ready_due: bool,
     start: Instant,
 }
 
@@ -119,6 +121,7 @@ impl BotClient {
             roster: Vec::new(),
             over: None,
             address,
+            ready_due: false,
             start: Instant::now(),
         })
     }
@@ -156,6 +159,7 @@ impl BotClient {
                 }
                 ToClient::Over { winner } => self.over = Some(winner),
                 ToClient::Queued { .. } => {}
+                ToClient::Select { .. } => self.ready_due = true,
             },
             Incoming::Msg(ControlMsg::Bye { reason }) => anyhow::bail!("the server said goodbye ({reason})"),
             Incoming::Msg(_) => {}
@@ -171,6 +175,9 @@ impl BotClient {
                 Ok(Some(f)) => self.take(f)?,
                 Ok(None) => anyhow::bail!("the control stream closed"),
                 Err(_) => anyhow::bail!("not seated in {timeout:?}"),
+            }
+            if std::mem::take(&mut self.ready_due) {
+                self.send_lobby(&ToServer::Ready).await?;
             }
         }
         Ok(())

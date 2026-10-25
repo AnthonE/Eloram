@@ -85,19 +85,52 @@ fn hide_boot_overlay() {
 #[derive(serde::Deserialize, Debug)]
 #[serde(tag = "t", rename_all = "snake_case")]
 enum Cmd {
-    Move { x: f32, y: f32 },
-    AttackMove { x: f32, y: f32 },
-    Attack { slot: u8 },
-    Cast { slot: u8, x: Option<f32>, y: Option<f32>, unit: Option<u8> },
+    Move {
+        x: f32,
+        y: f32,
+    },
+    AttackMove {
+        x: f32,
+        y: f32,
+    },
+    Attack {
+        slot: u8,
+    },
+    Cast {
+        slot: u8,
+        x: Option<f32>,
+        y: Option<f32>,
+        unit: Option<u8>,
+    },
     Stop,
     Hold,
-    Level { slot: u8 },
-    Pick { card: u8 },
-    Reroll { card: u8 },
-    Buy { item: u8 },
-    Sell { inv: u8 },
-    Shop { open: bool },
-    Lock { on: bool },
+    Level {
+        slot: u8,
+    },
+    Pick {
+        card: u8,
+    },
+    Reroll {
+        card: u8,
+    },
+    Buy {
+        item: u8,
+    },
+    Sell {
+        inv: u8,
+    },
+    Shop {
+        open: bool,
+    },
+    Lock {
+        on: bool,
+    },
+    /// Champion select: a reroll, a champion off the bench, ready.
+    ChampReroll,
+    ChampSwap {
+        champ: u8,
+    },
+    Ready,
 }
 
 pub struct InboxPlugin;
@@ -119,6 +152,7 @@ fn inbox(
     mut rig: ResMut<crate::camera::Rig>,
     drawn: Res<crate::view::Drawn>,
 ) {
+    use el_client_core::lobby::ToServer;
     use el_proto::{Aim, Order, UnitRef};
     let Some(window) = web_sys::window() else { return };
     let Ok(arr) = js_sys::Reflect::get(&window, &JsValue::from_str("__elInbox")) else { return };
@@ -164,6 +198,18 @@ fn inbox(
                 rig.locked = on;
                 continue;
             }
+            Cmd::ChampReroll => {
+                controls.lobby.push(ToServer::Reroll);
+                continue;
+            }
+            Cmd::ChampSwap { champ } => {
+                controls.lobby.push(ToServer::Swap { champ });
+                continue;
+            }
+            Cmd::Ready => {
+                controls.lobby.push(ToServer::Ready);
+                continue;
+            }
         };
         controls.pending.push(order);
     }
@@ -187,6 +233,26 @@ fn match_status(
             status.set("watch_error", e.as_str());
         }
         return;
+    }
+    if let Some(sel) = &session.select {
+        let names = |cs: &[u8]| -> String {
+            cs.iter()
+                .filter_map(|&c| el_sim::content::champions::CHAMPIONS.get(usize::from(c)))
+                .map(|d| d.name)
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let ids = |cs: &[u8]| cs.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(",");
+        status.set(
+            "select_champion",
+            sel.mine().map_or("", |c| el_sim::content::champions::CHAMPIONS[usize::from(c)].name),
+        );
+        status.set("select_champion_id", sel.mine().map_or(-1, i32::from));
+        status.set("select_bench", names(&sel.bench));
+        status.set("select_bench_ids", ids(&sel.bench));
+        status.set("select_rerolls", u32::from(sel.rerolls));
+        status.set("select_ready", sel.ready);
+        status.set("select_team", names(&sel.picks));
     }
     let Some(c) = session.client.as_deref() else { return };
     let s = c.seat;

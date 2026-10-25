@@ -20,14 +20,17 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
 - `scripts/build-web.sh [webgl2] [webgpu]`: the browser build into `web/dist/` (needs
   wasm-bindgen-cli 0.2.128).
 - `scripts/dev.sh`: the page built and a server to play on at http://127.0.0.1:8080, the server's
-  bots in the other nine seats after 3 s (`EL_FILL`). The server alone: `cargo run -p el-server
-  --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
+  bots in the other nine seats after 3 s (`EL_FILL`), then 20 s of champion select (`--select-secs`;
+  it ends sooner once everyone seated is ready, and agents are ready at once). The server alone:
+  `cargo run -p el-server --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
 - `scripts/e2e.sh spike|match|watch|login [webgl2]`: Playwright against a real server (`match`:
-  queue, the headliner, augment, shop, Blink, a walk predicted exactly, the fog; `watch`: an agent's match watched
-  live a minute behind, then replayed; `login`: a stub wallet signing through `el-auth`'s `sign`
-  example, `/online.json`, the resume token; screenshots in `e2e/artifacts/`). A test or the
-  console drives the champion through `window.__elInbox` (`{t:"move",x,y}`, `cast`, `buy`, `pick`,
-  `level`...: `el-client/src/dev_hooks.rs`) and reads `window.__el`. Headless Chromium draws with
+  queue, champion select (a reroll, the bench, ready), the headliner, augment, shop, Blink, a walk
+  predicted exactly, the fog; `watch`: an agent's match watched live a minute behind, then
+  replayed; `login`: a stub wallet signing through `el-auth`'s `sign` example, `/online.json`, the
+  resume token; screenshots in `e2e/artifacts/`). `scripts/e2e.sh` serves the `web/dist/` already
+  built: rebuild it first. A test or the console drives the champion through `window.__elInbox`
+  (`{t:"move",x,y}`, `cast`, `buy`, `pick`, `level`, `champ_reroll`, `champ_swap`, `ready`...:
+  `el-client/src/dev_hooks.rs`) and reads `window.__el`. Headless Chromium draws with
   SwiftShader at about a frame a second: its pictures are right, its frame rates mean nothing.
 - `cargo test -p el-sim --test map -- --ignored --nocapture` prints the Causeway as text.
 - `cargo run -p el-sim --release --example headless -- [seed]`: ten bots play a whole match, minute

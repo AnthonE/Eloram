@@ -26,6 +26,8 @@ pub enum Armed {
 pub struct Controls {
     /// Orders for the next command, in the order given.
     pub pending: Vec<Order>,
+    /// Lobby messages to send (champion select's), in the order given.
+    pub lobby: Vec<el_client_core::lobby::ToServer>,
     pub armed: Option<Armed>,
     /// The map point under the cursor.
     pub cursor: Option<Vec2>,

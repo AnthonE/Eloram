@@ -17,7 +17,7 @@ use el_proto::quant::pos_code;
 use crate::config::LaunchConfig;
 use crate::dev_hooks::DevStatus;
 use crate::input::Controls;
-use crate::session::{Phase, Session};
+use crate::session::{Phase, SelectView, Session};
 use crate::transport::Transport;
 
 #[derive(Default)]
@@ -300,6 +300,19 @@ fn talk(
                     session.waiting = waiting;
                     session.fill_in = fill_in;
                 }
+                Ok(ToClient::Select { seat, picks, bench, rerolls, ends_in, roster }) => {
+                    let ready = session.select.as_ref().is_some_and(|s| s.ready);
+                    session.select = Some(SelectView {
+                        seat: usize::from(seat).min(el_sim::units::SEATS - 1),
+                        picks,
+                        bench,
+                        rerolls,
+                        ends_at: now_s() + f64::from(ends_in),
+                        ready,
+                    });
+                    session.roster = roster;
+                    session.phase = Phase::Selecting;
+                }
                 Ok(m @ ToClient::Match { .. }) => {
                     if let (Some(seed), Some(picks), ToClient::Match { seat, roster, .. }) =
                         (m.seed(), m.picks(), &m)
@@ -310,6 +323,7 @@ fn talk(
                         session.winner = None;
                         session.kd = Default::default();
                         session.feed.clear();
+                        session.select = None;
                         session.phase = Phase::Playing;
                     }
                 }
@@ -339,6 +353,17 @@ fn talk(
 /// The frame's orders given, the commands due made, and the input packet sent.
 fn send(net: NonSend<NetState>, mut session: ResMut<Session>, mut controls: ResMut<Controls>) {
     let Some(t) = net.get() else { return };
+    // Champion select's choices, while it lasts.
+    for msg in controls.lobby.drain(..) {
+        if session.phase == Phase::Selecting {
+            if msg == ToServer::Ready
+                && let Some(s) = session.select.as_mut()
+            {
+                s.ready = true;
+            }
+            send_lobby(&t, &msg);
+        }
+    }
     if session.phase != Phase::Playing {
         controls.pending.clear();
         return;

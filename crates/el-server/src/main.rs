@@ -50,6 +50,9 @@ struct Args {
     /// Seconds the first in the queue waits before bots take the empty seats.
     #[arg(long, default_value_t = 30.0)]
     fill_after: f64,
+    /// Seconds champion select lasts, unless everyone seated is ready sooner (0: none).
+    #[arg(long, default_value_t = el_server::lobby::SELECT_FOR.as_secs_f64())]
+    select_secs: f64,
     /// Where finished matches' records are written (`{id}.elr`; `el-replay verify` checks them).
     #[arg(long)]
     records: Option<PathBuf>,
@@ -87,6 +90,7 @@ fn main() -> anyhow::Result<()> {
         shards: args.shards.max(1),
         matches_per_shard: args.matches.max(1),
         fill_after: std::time::Duration::from_secs_f64(args.fill_after.max(0.0)),
+        select_for: std::time::Duration::from_secs_f64(args.select_secs.max(0.0)),
         records_dir: args.records,
         siwe_domains: el_server::split_list(&args.siwe_domain),
         require_sign_in: args.require_sign_in,

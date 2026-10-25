@@ -47,6 +47,8 @@ pub struct Config {
     pub matches_per_shard: usize,
     /// How long the first in the queue waits before bots fill the empty seats.
     pub fill_after: Duration,
+    /// How long champion select lasts, unless everyone seated is ready sooner (0: none).
+    pub select_for: Duration,
     /// Where finished records are written (`{id}.elr`), if anywhere.
     pub records_dir: Option<PathBuf>,
     /// The domains a wallet sign-in may name (`--siwe-domain`): the pages' hosts. Empty: this
@@ -70,6 +72,7 @@ impl Default for Config {
             shards: 1,
             matches_per_shard: 64,
             fill_after: Duration::from_secs(30),
+            select_for: lobby::SELECT_FOR,
             records_dir: None,
             siwe_domains: Vec::new(),
             require_sign_in: false,
@@ -142,7 +145,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
                 map,
                 cfg.records_dir.clone(),
             )?;
-            let lobby = lobby::Lobby::new(game, cfg.fill_after);
+            let lobby = lobby::Lobby::new(game, cfg.fill_after, cfg.select_for);
             tokio::spawn(lobby.clone().run());
             Some(lobby)
         }

@@ -21,18 +21,34 @@ const until = async (page: any, what: string, pred: (s: Record<string, any>) => 
 // seated at level 3 with ARAM's gold on the platform, an augment picked, an item bought, a skill
 // levelled and cast, a walk down the lane predicted exactly, and fog that hides the enemy until
 // someone of ours can see them.
-test("a match: queue, augment, shop, walk, cast, fog", async ({ page }, info) => {
+test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({ page }, info) => {
   const logs = collectConsole(page);
   const shots = `artifacts/match-${info.project.name}`;
   await page.goto(`/?gfx=${info.project.name}&name=Tester`);
   let s: Record<string, any>;
+  let chosen = "";
   try {
-    s = await until(page, "a seat in a match", (s) => s.started === true, 150_000);
+    // Champion select: a reroll benches the dealt champion; taking it back off the bench swaps
+    // the new one onto it; ready starts the match (the bots in the other seats keep theirs).
+    s = await until(page, "champion select", (s) => s.phase === "selecting" && s.select_champion_id >= 0, 150_000);
+    expect(s.select_rerolls).toBe(2);
+    const dealt = s.select_champion_id;
+    await page.screenshot({ path: `${shots}-select.png` });
+    await push(page, { t: "champ_reroll" });
+    s = await until(page, "a reroll", (s) => s.select_rerolls === 1 && s.select_bench_ids === String(dealt));
+    const rerolled = s.select_champion_id;
+    expect(rerolled).not.toBe(dealt);
+    await push(page, { t: "champ_swap", champ: dealt });
+    s = await until(page, "the bench", (s) => s.select_champion_id === dealt && s.select_bench_ids === String(rerolled));
+    chosen = s.select_champion;
+    await push(page, { t: "ready" });
+    s = await until(page, "a seat in a match", (s) => s.started === true, 60_000);
   } catch (e) {
     console.log(logs.slice(-40).join("\n"));
     throw e;
   }
   expect(s.phase).toBe("playing");
+  expect(s.champion).toBe(chosen);
   expect(s.level).toBe(3);
   expect(s.gold).toBeGreaterThanOrEqual(1400);
   expect(s.in_shop).toBe(true);

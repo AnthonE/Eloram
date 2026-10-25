@@ -13,8 +13,12 @@ change to a golden hash.
 
 - **Ten seats**, two teams of five: Dawn and Dusk. Empty seats take bots, which play through the
   same orders as people.
-- **The draw**: each player is dealt a random champion from the pool, with one reroll; a bench
-  shows rerolled champions anyone on the team can take.
+- **The draw**: ten different champions are dealt from the pool, one a seat, and a champion select
+  of 20 s follows (`--select-secs`). A reroll sends yours to your team's bench and deals you one no
+  one holds; two a seat (League banks rerolls across games; nothing persists here yet). Anyone on
+  the team can take a champion off its bench, leaving their own in its place. You see your own
+  team's champions and bench only. The match starts when the time is up or everyone seated is
+  ready, with the picks the select ended on; the server's bots keep what they were dealt.
 - **Start**: level 3 with 1,400 gold. Passive gold from 1:00. The base gates hold champions in for
   the first 15 s.
 - **No recall, and the fountain doesn't heal.** The shop is open only while you are dead or on your
