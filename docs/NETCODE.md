@@ -260,6 +260,17 @@ Before Colony's, sized for a match:
 - The budget a match tick is about 300 µs at p99, half simulation and half replication, which
   makes at least 64 matches a core.
 - The lobby, matchmaking, sign-in and HTTP run on tokio, off the hot path.
+- An egress ring holds `[u16 len][datagram]` frames, each written in one commit and read only
+  once all of it is there: the egress thread reads while the shard writes, so a length must never
+  be seen without its datagram.
+- No client can stall its session. The control stream is written by a task of its own through a
+  bounded outbox, every write has a deadline, and a client that stops reading is let go. Lobby
+  requests are rate-limited.
+- A seat outlives its connection. Each player's `Match` carries a rejoin token, and a new
+  connection takes the seat back with it while the match lasts (`ToServer::Rejoin`). If the old
+  connection still holds the seat it is replaced; until then the server's bot plays the seat. A
+  match with nobody connected waits 60 s for its players. The page redials on its own when the
+  link closes or goes quiet for 4 s, and a reload rejoins with the token the tab kept.
 - Empty seats take bots. A bot is the client's own netcode with a brain, so it plays through the
   same orders, sees the same team's view, and is in the record like anyone. The store is for
   people and agents equally.

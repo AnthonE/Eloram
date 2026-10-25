@@ -688,6 +688,7 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                 Phase::SigningIn => "Sign in with your wallet...".into(),
                 Phase::Watching | Phase::Selecting => String::new(),
                 Phase::Lobby => "In the lobby".into(),
+                Phase::Reconnecting => "Reconnecting...".into(),
                 Phase::Queued => format!(
                     "Finding a match: {} waiting, bots take the empty seats in {} s",
                     session.waiting.max(1),
@@ -854,10 +855,13 @@ fn fills(session: Res<Session>, mut q: Query<(&Fill, &mut Node)>) {
                 }
             }
         };
+        // Written only when the percent moves: a node changed is a layout done again.
         let pct = percent((share.clamp(0.0, 1.0) * 100.0) as i32);
         match *f {
-            Fill::Cooldown(_) => node.height = pct,
-            _ => node.width = pct,
+            Fill::Cooldown(_) if node.height != pct => node.height = pct,
+            Fill::Cooldown(_) => {}
+            _ if node.width != pct => node.width = pct,
+            _ => {}
         }
     }
 }
@@ -896,13 +900,26 @@ fn dots(
     let me = session.client.as_deref().map(|c| c.seat);
     for (d, mut node, mut bg, mut vis) in &mut q {
         match drawn.units[d.0] {
+            // Only what moved is written: a node changed is a layout done again.
             Some(u) => {
-                *vis = Visibility::Inherited;
-                node.left = percent((u.pos.x / MAP_W * 100.0) as i32);
-                node.top = percent(((1.0 - u.pos.y / MAP_H) * 100.0) as i32);
-                bg.0 = if Some(d.0) == me { GOLD } else { TEAM[usize::from(u.team.min(1))] };
+                vis.set_if_neq(Visibility::Inherited);
+                let (left, top) = (
+                    percent((u.pos.x / MAP_W * 100.0) as i32),
+                    percent(((1.0 - u.pos.y / MAP_H) * 100.0) as i32),
+                );
+                if node.left != left || node.top != top {
+                    node.left = left;
+                    node.top = top;
+                }
+                bg.set_if_neq(BackgroundColor(if Some(d.0) == me {
+                    GOLD
+                } else {
+                    TEAM[usize::from(u.team.min(1))]
+                }));
             }
-            None => *vis = Visibility::Hidden,
+            None => {
+                vis.set_if_neq(Visibility::Hidden);
+            }
         }
     }
 }

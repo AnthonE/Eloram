@@ -145,3 +145,34 @@ test("WASD: the keys walk the champion", async ({ page }, info) => {
   expect(Math.abs(s.x - stopped)).toBeLessThan(150);
   expect(s.steer).toBe(0);
 });
+
+// A link that goes takes its seat back: a reload mid-match (the tab's rejoin token in
+// sessionStorage) comes back to the same seat of the same match on a new session, and a link the
+// page sees close is dialled again on its own.
+test("a reload or a dropped link takes the seat back", async ({ page }, info) => {
+  const logs = collectConsole(page);
+  await page.goto(`/?gfx=${info.project.name}&name=Rejoiner`);
+  let s: Record<string, any>;
+  try {
+    s = await until(page, "champion select", (s) => s.phase === "selecting", 150_000);
+    await push(page, { t: "ready" });
+    s = await until(page, "the match", (s) => s.started === true && s.tick > 60, 120_000);
+    const { seat, session, champion } = s;
+    const tick = s.tick;
+    await page.reload();
+    s = await until(page, "back in the match", (s) => s.phase === "playing" && s.started === true, 120_000);
+    expect(s.session).not.toBe(session);
+    expect(s.seat).toBe(seat);
+    expect(s.champion).toBe(champion);
+    expect(s.tick).toBeGreaterThan(tick);
+    expect(s.errors).toBe(0);
+    // The link closed under the page: it dials again and is back without a reload.
+    const session2 = s.session;
+    await push(page, { t: "drop_link" });
+    s = await until(page, "reconnected", (s) => s.phase === "playing" && s.session !== session2 && s.started, 120_000);
+    expect(s.seat).toBe(seat);
+  } catch (e) {
+    console.log(logs.slice(-40).join("\n"));
+    throw e;
+  }
+});

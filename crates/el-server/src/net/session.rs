@@ -8,7 +8,13 @@
 //!
 //! Every hostile byte is survivable: frames are bounded ([`el_proto::control::MAX_FRAME`], lobby
 //! frames [`el_proto::control::MAX_LOBBY_FRAME`]), a session that sends what isn't a frame is
-//! closed, and a datagram that isn't an input packet is counted and dropped.
+//! closed, a datagram that isn't an input packet is counted and dropped, and lobby requests are
+//! rate-limited ([`Requests`]).
+//!
+//! Nothing a client does or fails to do stalls its session: the control stream is written on a
+//! task of its own through a bounded outbox, every write has a deadline, and a client that stops
+//! reading (its outbox full, or a write past [`WRITE_WAIT`]) is let go rather than waited on, so
+//! its inputs keep being read until then and its seat goes to a bot after.
 
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
@@ -26,6 +32,7 @@ use tokio::sync::mpsc;
 use wtransport::{Connection, RecvStream, SendStream};
 
 use super::NetStats;
+use super::admit::{Asked, Requests};
 use crate::lobby::{Lobby, LobbyEvent, Seating};
 use crate::signin::{SignIn, pick_domain, short};
 
@@ -33,6 +40,12 @@ use crate::signin::{SignIn, pick_domain, short};
 const HELLO_WAIT: Duration = Duration::from_secs(10);
 /// A seated session that sends nothing for this long has gone.
 const QUIET: Duration = Duration::from_secs(20);
+/// How long one write to the control stream may take before the client is taken to have stopped
+/// reading.
+const WRITE_WAIT: Duration = Duration::from_secs(5);
+/// Frames waiting to be written to a session's control stream. The lobby sends a few a second at
+/// most (champion select's updates); a client this far behind isn't reading.
+const OUTBOX: usize = 64;
 
 /// The session's numbers, counted up from 1.
 static NEXT_SESSION: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
@@ -129,36 +142,69 @@ pub async fn run(
             }
         }
     });
+    // And written on its own: a client that stops reading never holds up its inputs.
+    let (out, mut outbox) = mpsc::channel::<Vec<u8>>(OUTBOX);
+    let mut writer = tokio::spawn(async move {
+        while let Some(bytes) = outbox.recv().await {
+            match tokio::time::timeout(WRITE_WAIT, tx.write_all(&bytes)).await {
+                Ok(Ok(())) => {}
+                Ok(Err(_)) => break,
+                Err(_) => {
+                    tracing::info!(session, "not reading its control stream: let go");
+                    break;
+                }
+            }
+        }
+    });
     let (events_tx, mut events) = mpsc::unbounded_channel();
     let mut seated: Option<Box<Seating>> = None;
     let mut last_heard = tokio::time::Instant::now();
+    let mut asks = Requests::new(std::time::Instant::now());
     loop {
         tokio::select! {
+            _ = &mut writer => break,
             f = frames.recv() => match f {
                 None | Some(Incoming::Msg(ControlMsg::Bye { .. })) => break,
-                Some(Incoming::Lobby(bytes)) => match serde_json::from_slice::<ToServer>(&bytes) {
-                    Ok(ToServer::Queue) => {
-                        if let Some(s) = seated.take() {
-                            lobby.unseat(*s);
-                        }
-                        lobby.enqueue(session, &name, agent, max_datagram, events_tx.clone());
+                Some(Incoming::Lobby(bytes)) => match asks.ask(std::time::Instant::now()) {
+                    Asked::End => {
+                        tracing::info!(session, "flooding the lobby: let go");
+                        break;
                     }
-                    Ok(ToServer::Leave) => lobby.leave(session),
-                    Ok(ToServer::Reroll) => lobby.reroll(session),
-                    Ok(ToServer::Swap { champ }) => lobby.swap(session, champ),
-                    Ok(ToServer::Ready) => lobby.ready(session),
-                    Err(_) => NetStats::add(&stats.malformed, 1),
+                    Asked::Refuse => NetStats::add(&stats.lobby_refused, 1),
+                    Asked::Take => match serde_json::from_slice::<ToServer>(&bytes) {
+                        Ok(ToServer::Queue) => {
+                            if let Some(s) = seated.take() {
+                                lobby.unseat(*s);
+                            }
+                            lobby.enqueue(session, &name, agent, max_datagram, events_tx.clone());
+                        }
+                        Ok(ToServer::Leave) => lobby.leave(session),
+                        Ok(ToServer::Reroll) => lobby.reroll(session),
+                        Ok(ToServer::Swap { champ }) => lobby.swap(session, champ),
+                        Ok(ToServer::Ready) => lobby.ready(session),
+                        Ok(ToServer::Rejoin { token }) => {
+                            if let Some(s) = seated.take() {
+                                lobby.unseat(*s);
+                            }
+                            if !lobby.rejoin(session, &name, agent, max_datagram, events_tx.clone(), &token)
+                                && !post_lobby(&out, &ToClient::NoSeat)
+                            {
+                                break;
+                            }
+                        }
+                        Err(_) => NetStats::add(&stats.malformed, 1),
+                    },
                 },
                 Some(Incoming::Msg(_)) => {}
             },
             Some(ev) = events.recv() => match ev {
                 LobbyEvent::Queued { waiting, fill_in } => {
-                    if send_lobby(&mut tx, &ToClient::Queued { waiting, fill_in }).await.is_err() {
+                    if !post_lobby(&out, &ToClient::Queued { waiting, fill_in }) {
                         break;
                     }
                 }
                 LobbyEvent::Select(msg) => {
-                    if send_lobby(&mut tx, &msg).await.is_err() {
+                    if !post_lobby(&out, &msg) {
                         break;
                     }
                 }
@@ -167,7 +213,7 @@ pub async fn run(
                         lobby.unseat(*old);
                     }
                     lobby.game.attach(s.shard, s.g, conn.clone());
-                    let ok = send_lobby(&mut tx, &s.msg).await.is_ok();
+                    let ok = post_lobby(&out, &s.msg);
                     tracing::info!(session, shard = s.shard, m = s.m, seat = s.seat, "seated");
                     seated = Some(s);
                     last_heard = tokio::time::Instant::now();
@@ -175,11 +221,15 @@ pub async fn run(
                         break;
                     }
                 }
+                LobbyEvent::Replaced => {
+                    tracing::info!(session, "its seat was taken back on another connection");
+                    break;
+                }
                 LobbyEvent::Over { winner } => {
                     if let Some(s) = seated.take() {
                         lobby.unseat(*s);
                     }
-                    if send_lobby(&mut tx, &ToClient::Over { winner }).await.is_err() {
+                    if !post_lobby(&out, &ToClient::Over { winner }) {
                         break;
                     }
                 }
@@ -206,6 +256,7 @@ pub async fn run(
         }
     }
     reader.abort();
+    writer.abort();
     if let Some(s) = seated.take() {
         lobby.unseat(*s);
     }
@@ -263,21 +314,30 @@ async fn identify(
     }
 }
 
-/// Writes one control message.
+/// Writes one control message (before the session's writer task takes the stream over), within
+/// [`WRITE_WAIT`].
 async fn send(tx: &mut SendStream, msg: ControlMsg) -> anyhow::Result<()> {
     let mut buf = [0u8; MAX_FRAME];
     let n = msg.encode(&mut buf).ok_or_else(|| anyhow::anyhow!("control frame too big"))?;
-    tx.write_all(&buf[..n]).await?;
+    tokio::time::timeout(WRITE_WAIT, tx.write_all(&buf[..n])).await??;
     Ok(())
 }
 
-/// Writes one lobby message.
-async fn send_lobby(tx: &mut SendStream, msg: &ToClient) -> anyhow::Result<()> {
-    let json = serde_json::to_vec(msg)?;
+/// Hands one lobby message to the session's writer. False if the client isn't keeping up (its
+/// outbox full) or the writer has stopped: either way the session is over.
+fn post_lobby(out: &mpsc::Sender<Vec<u8>>, msg: &ToClient) -> bool {
+    let Ok(json) = serde_json::to_vec(msg) else { return false };
     let mut buf = vec![0u8; json.len() + 3];
-    let n = encode_lobby(&json, &mut buf).ok_or_else(|| anyhow::anyhow!("lobby frame too big"))?;
-    tx.write_all(&buf[..n]).await?;
-    Ok(())
+    let Some(n) = encode_lobby(&json, &mut buf) else { return false };
+    buf.truncate(n);
+    match out.try_send(buf) {
+        Ok(()) => true,
+        Err(mpsc::error::TrySendError::Full(_)) => {
+            tracing::info!("a session's control stream is {OUTBOX} frames behind: let go");
+            false
+        }
+        Err(mpsc::error::TrySendError::Closed(_)) => false,
+    }
 }
 
 /// Reads until a whole frame is in `inbox`, and takes it. `None` when the stream ends or sends

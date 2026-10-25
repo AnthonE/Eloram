@@ -564,12 +564,11 @@ impl Replica {
             self.sent[self.seq as usize % SENT] =
                 Sent { seq: self.seq, tick: now, slots, events_end, own: part == 0, valid: true };
             self.seq += 1;
-            if w.overflowed() || out.slots() < bytes + 2 {
+            // Length and payload in one commit: the egress thread reads while this writes.
+            if w.overflowed() || !crate::queues::write_packet(out, &buf[..bytes]) {
                 Metrics::add(&metrics.out_drops, 1);
                 return;
             }
-            let _ = out.push_entire_slice(&(bytes as u16).to_le_bytes());
-            let _ = out.push_entire_slice(&buf[..bytes]);
             Metrics::add(&metrics.snapshots, 1);
             Metrics::add(&metrics.snapshot_bytes, bytes as u64);
             Metrics::max(&metrics.snapshot_max_bytes, bytes as u64);

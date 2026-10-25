@@ -100,7 +100,13 @@ struct Flash {
     born: f64,
     life: f64,
     radius: f32,
+    /// The fade step its material shows (a material changed is a material prepared again, so it
+    /// changes in steps, not every frame).
+    step: u8,
 }
+
+/// The steps a flash fades out in.
+const FADE_STEPS: f32 = 16.0;
 
 #[derive(Component)]
 struct RelicView(usize);
@@ -110,6 +116,9 @@ struct FogImage {
     handle: Handle<Image>,
     /// Each cell's darkness now (eased toward what the team sees).
     dark: Vec<f32>,
+    /// Each pixel's alpha as last uploaded (image rows): the image is only touched, and sent to
+    /// the GPU again, when one of them changes.
+    alpha: Vec<u8>,
     last: f64,
 }
 
@@ -245,7 +254,12 @@ fn setup_map(
         RenderAssetUsages::default(),
     );
     let handle = images.add(fog_img);
-    commands.insert_resource(FogImage { handle: handle.clone(), dark: vec![0.6; VIS_W * VIS_H], last: 0.0 });
+    commands.insert_resource(FogImage {
+        handle: handle.clone(),
+        dark: vec![0.6; VIS_W * VIS_H],
+        alpha: vec![u8::MAX; VIS_W * VIS_H],
+        last: 0.0,
+    });
     commands.spawn((
         Mesh3d(
             meshes.add(
@@ -313,10 +327,14 @@ fn setup_pools(
     };
     let ring =
         [unlit(&mut materials, TEAM[0].with_alpha(0.7)), unlit(&mut materials, TEAM[1].with_alpha(0.7))];
+    // Opaque: drawn batched in the opaque pass, not sorted with the see-through things.
+    let opaque = |materials: &mut Assets<StandardMaterial>, c: Color| {
+        materials.add(StandardMaterial { base_color: c, unlit: true, ..default() })
+    };
     let fill = [
-        unlit(&mut materials, Color::srgb(0.35, 0.92, 0.35)),
-        unlit(&mut materials, Color::srgb(0.30, 0.66, 1.0)),
-        unlit(&mut materials, Color::srgb(0.95, 0.28, 0.24)),
+        opaque(&mut materials, Color::srgb(0.35, 0.92, 0.35)),
+        opaque(&mut materials, Color::srgb(0.30, 0.66, 1.0)),
+        opaque(&mut materials, Color::srgb(0.95, 0.28, 0.24)),
     ];
     let bar_bg = unlit(&mut materials, Color::srgba(0.0, 0.0, 0.0, 0.75));
     let missile = [
@@ -413,7 +431,7 @@ fn draw_units(
     let client = session.client.as_deref().filter(|_| watch.is_none());
     if watch.is_none() && client.is_none() {
         for (_, _, mut vis) in &mut roots {
-            *vis = Visibility::Hidden;
+            vis.set_if_neq(Visibility::Hidden);
         }
         return;
     }
@@ -459,13 +477,15 @@ fn draw_units(
             },
             (None, None) => None,
         };
+        // Only what changed is written: a component written is a component changed, and changed
+        // ones are walked, propagated and extracted again.
         let Some((pos, facing, kind, team, generation, hp)) = unit else {
-            *vis = Visibility::Hidden;
+            vis.set_if_neq(Visibility::Hidden);
             drawn.units[i] = None;
             continue;
         };
-        *vis = Visibility::Visible;
-        tf.translation = world(pos, 0.0);
+        vis.set_if_neq(Visibility::Visible);
+        tf.set_if_neq(Transform { translation: world(pos, 0.0), ..*tf });
         drawn.units[i] = Some(DrawnUnit { pos, radius: radius_of(kind), team, generation });
         let champs = watch.map_or_else(|| client.map(|c| &c.world.champs), |w| Some(&w.referee.m.champs));
         let def = if i < SEATS { champs.map_or(0, |ch| ch[i].def) } else { 0 };
@@ -517,25 +537,41 @@ fn draw_units(
                 Kind::Fountain => 1.0,
                 _ => 0.6,
             };
-            t.translation.y = lift;
-            t.rotation = Quat::from_rotation_y(facing);
+            let mut n = *t;
+            n.translation.y = lift;
+            n.rotation = Quat::from_rotation_y(facing);
+            t.set_if_neq(n);
         }
         if let Ok((mut t, _, _)) = parts.get_mut(uv.fill) {
             let f = hp.clamp(0.0, 1.0);
-            t.scale = Vec3::new(w * f, 1.0, 1.0);
-            t.translation = Vec3::new(-(1.0 - f) * w * 0.5, h, 0.01);
+            let n = Transform {
+                scale: Vec3::new(w * f, 1.0, 1.0),
+                translation: Vec3::new(-(1.0 - f) * w * 0.5, h, 0.01),
+                ..*t
+            };
+            t.set_if_neq(n);
         }
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn draw_missiles(
     session: Res<Session>,
     kit: Res<Kit>,
     drawn: Res<Drawn>,
     mut q: Query<(&MissileView, &mut Transform, &mut Visibility, &mut MeshMaterial3d<StandardMaterial>)>,
+    mut views: Local<Vec<Entity>>,
+    mut shots: Local<Vec<(Vec2, f32, u8)>>,
+    ids: Query<(Entity, &MissileView)>,
 ) {
+    // The pool's entities in their order, found once.
+    if views.is_empty() {
+        let mut all: Vec<_> = ids.iter().map(|(e, v)| (v.0, e)).collect();
+        all.sort_by_key(|(k, _)| *k);
+        views.extend(all.into_iter().map(|(_, e)| e));
+    }
     // Each live missile: where it's drawn, how big, whose.
-    let mut shots: Vec<(Vec2, f32, u8)> = Vec::new();
+    shots.clear();
     if let Some(w) = session.watch.as_deref() {
         let m = &w.referee.m;
         for ms in m.missiles.iter().filter(|ms| ms.alive) {
@@ -550,17 +586,19 @@ fn draw_missiles(
             shots.push((s.pos(at, target), r, s.team));
         }
     }
-    let mut views: Vec<_> = q.iter_mut().collect();
-    views.sort_by_key(|v| v.0.0);
-    let mut shots = shots.into_iter();
-    for (_, mut tf, mut vis, mut mat) in views {
-        let Some((p, r, team)) = shots.next() else {
-            *vis = Visibility::Hidden;
+    let mut shots = shots.iter();
+    for &e in views.iter() {
+        let Ok((_, mut tf, mut vis, mut mat)) = q.get_mut(e) else { continue };
+        let Some(&(p, r, team)) = shots.next() else {
+            vis.set_if_neq(Visibility::Hidden);
             continue;
         };
-        *vis = Visibility::Visible;
-        *tf = Transform::from_translation(world(p, 1.1)).with_scale(Vec3::splat(r));
-        mat.0 = kit.missile[usize::from(team.min(1))].clone();
+        vis.set_if_neq(Visibility::Visible);
+        tf.set_if_neq(Transform::from_translation(world(p, 1.1)).with_scale(Vec3::splat(r)));
+        let want = &kit.missile[usize::from(team.min(1))];
+        if mat.0 != *want {
+            mat.0 = want.clone();
+        }
     }
 }
 
@@ -581,7 +619,7 @@ fn draw_flashes(
     mut session: ResMut<Session>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut flashes: Query<(Entity, &Flash, &mut Transform, &MeshMaterial3d<StandardMaterial>)>,
+    mut flashes: Query<(Entity, &mut Flash, &mut Transform, &MeshMaterial3d<StandardMaterial>)>,
     mut ring: Local<Option<Handle<Mesh>>>,
 ) {
     let now = now_s();
@@ -607,10 +645,10 @@ fn draw_flashes(
             MeshMaterial3d(m),
             Transform::from_translation(world(at, 0.08))
                 .with_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-            Flash { born: now, life, radius: radius * S },
+            Flash { born: now, life, radius: radius * S, step: 0 },
         ));
     }
-    for (e, f, mut tf, m) in &mut flashes {
+    for (e, mut f, mut tf, m) in &mut flashes {
         let t = ((now - f.born) / f.life) as f32;
         if t >= 1.0 {
             materials.remove(&m.0);
@@ -618,8 +656,12 @@ fn draw_flashes(
             continue;
         }
         tf.scale = Vec3::splat(f.radius * (0.6 + 0.4 * t));
-        if let Some(mut mat) = materials.get_mut(&m.0) {
-            mat.base_color.set_alpha(0.9 * (1.0 - t));
+        let step = (t * FADE_STEPS) as u8;
+        if step != f.step
+            && let Some(mut mat) = materials.get_mut(&m.0)
+        {
+            f.step = step;
+            mat.base_color.set_alpha(0.9 * (1.0 - f32::from(step) / FADE_STEPS));
         }
     }
 }
@@ -633,9 +675,11 @@ fn draw_relics(session: Res<Session>, mut q: Query<(&RelicView, &mut Transform, 
     let now = now_s();
     for (r, mut tf, mut vis) in &mut q {
         let relic = &relics[r.0];
-        *vis = if relic.up { Visibility::Visible } else { Visibility::Hidden };
-        let bob = (now * 2.0 + r.0 as f64).sin() as f32 * 0.12;
-        tf.translation = world(relic.pos, 0.7 + bob);
+        vis.set_if_neq(if relic.up { Visibility::Visible } else { Visibility::Hidden });
+        if relic.up {
+            let bob = (now * 2.0 + r.0 as f64).sin() as f32 * 0.12;
+            tf.translation = world(relic.pos, 0.7 + bob);
+        }
     }
 }
 
@@ -650,21 +694,33 @@ fn draw_fog(session: Res<Session>, mut fog_img: ResMut<FogImage>, mut images: Re
         (None, None) => return,
     };
     let ease = 1.0 - (-dt * 8.0).exp();
-    let handle = fog_img.handle.clone();
-    let Some(mut image) = images.get_mut(&handle) else { return };
-    let Some(data) = image.data.as_mut() else { return };
+    let fog_img = &mut *fog_img;
+    let mut changed = false;
     for y in 0..VIS_H {
         for x in 0..VIS_W {
             let want = if fog::lit(&grid, x, y) { 0.0 } else { 0.58 };
             let k = y * VIS_W + x;
-            fog_img.dark[k] += (want - fog_img.dark[k]) * ease;
+            let d = &mut fog_img.dark[k];
+            *d += (want - *d) * ease;
+            // Settled is settled: no endless creep in the last bit.
+            if (want - *d).abs() < 0.5 / 255.0 {
+                *d = want;
+            }
             // The image's top row is the map's far edge.
-            let px = ((VIS_H - 1 - y) * VIS_W + x) * 4;
-            data[px] = 4;
-            data[px + 1] = 6;
-            data[px + 2] = 14;
-            data[px + 3] = (fog_img.dark[k] * 255.0) as u8;
+            let a = (*d * 255.0) as u8;
+            let px = (VIS_H - 1 - y) * VIS_W + x;
+            changed |= fog_img.alpha[px] != a;
+            fog_img.alpha[px] = a;
         }
+    }
+    // Nothing moved: the texture on the GPU is still right (most frames, once the fog settles).
+    if !changed {
+        return;
+    }
+    let Some(mut image) = images.get_mut(&fog_img.handle) else { return };
+    let Some(data) = image.data.as_mut() else { return };
+    for (px, &a) in data.as_chunks_mut::<4>().0.iter_mut().zip(fog_img.alpha.iter()) {
+        *px = [4, 6, 14, a];
     }
 }
 

@@ -76,3 +76,21 @@ pub fn store_resume(token: Option<&[u8]>) {
         None => storage.remove_item("el.resume"),
     };
 }
+
+/// Keeps (or with `None`, forgets) this tab's rejoin token (`sessionStorage["el.rejoin"]`, never
+/// logged): a reload, or a dropped link, takes the seat back with it while the match lasts.
+pub fn store_rejoin(token: Option<&str>) {
+    let Some(storage) = web_sys::window().and_then(|w| w.session_storage().ok().flatten()) else { return };
+    let _ = match token {
+        Some(t) => storage.set_item("el.rejoin", t),
+        None => storage.remove_item("el.rejoin"),
+    };
+}
+
+/// This tab's rejoin token, if its last match left one.
+pub fn rejoin_token() -> Option<String> {
+    web_sys::window()
+        .and_then(|w| w.session_storage().ok().flatten())
+        .and_then(|s| s.get_item("el.rejoin").ok().flatten())
+        .filter(|t| !t.is_empty())
+}

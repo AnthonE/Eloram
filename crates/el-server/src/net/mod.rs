@@ -19,6 +19,8 @@ pub struct NetStats {
     pub bytes_in: AtomicU64,
     pub bytes_out: AtomicU64,
     pub malformed: AtomicU64,
+    /// Lobby requests refused for coming too fast (`admit::Requests`).
+    pub lobby_refused: AtomicU64,
     /// Connection attempts turned away (`admit`): the server full, an address over its share,
     /// sent a Retry to prove their address, or too slow to finish their handshakes.
     pub refused_full: AtomicU64,
@@ -57,6 +59,7 @@ pub fn status_json(stats: &NetStats, mode: crate::Mode) -> serde_json::Value {
             "refused_address": r(&stats.refused_address),
             "retried": r(&stats.retried),
             "handshake_timeouts": r(&stats.handshake_timeouts),
+            "lobby_refused": r(&stats.lobby_refused),
             "humans_active": r(&stats.humans_active),
             "agents_active": r(&stats.agents_active),
         },

@@ -3,14 +3,63 @@
 use bevy::prelude::*;
 use wasm_bindgen::{JsCast, JsValue};
 
-/// Fields published to `window.__el` a few times a second (every frame on a slow page).
+/// Fields published to `window.__el` a few times a second (every frame on a slow page). Kept as
+/// Rust values and made JavaScript's only when published: setting one is a store, not a trip
+/// across to JavaScript, however many a frame sets.
 #[derive(Resource, Default)]
 pub struct DevStatus {
-    pub fields: Vec<(&'static str, JsValue)>,
+    pub fields: Vec<(&'static str, Field)>,
+}
+
+/// A field's value.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Field {
+    Num(f64),
+    Bool(bool),
+    Text(String),
+}
+
+macro_rules! field_from_num {
+    ($($t:ty),*) => {$(
+        impl From<$t> for Field {
+            fn from(v: $t) -> Field {
+                Field::Num(v as f64)
+            }
+        }
+    )*};
+}
+field_from_num!(u8, u16, u32, u64, usize, i32, i64, f32, f64);
+
+impl From<bool> for Field {
+    fn from(v: bool) -> Field {
+        Field::Bool(v)
+    }
+}
+
+impl From<&str> for Field {
+    fn from(v: &str) -> Field {
+        Field::Text(v.to_string())
+    }
+}
+
+impl From<String> for Field {
+    fn from(v: String) -> Field {
+        Field::Text(v)
+    }
+}
+
+impl From<&Field> for JsValue {
+    fn from(f: &Field) -> JsValue {
+        match f {
+            Field::Num(n) => JsValue::from_f64(*n),
+            Field::Bool(b) => JsValue::from_bool(*b),
+            Field::Text(t) => JsValue::from_str(t),
+        }
+    }
 }
 
 impl DevStatus {
-    pub fn set(&mut self, key: &'static str, value: impl Into<JsValue>) {
+    pub fn set(&mut self, key: &'static str, value: impl Into<Field>) {
         let value = value.into();
         match self.fields.iter_mut().find(|(k, _)| *k == key) {
             Some(slot) => slot.1 = value,
@@ -61,7 +110,7 @@ fn publish(
     let Some(window) = web_sys::window() else { return };
     let obj = js_sys::Object::new();
     for (k, v) in &status.fields {
-        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str(k), v);
+        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str(k), &JsValue::from(v));
     }
     let _ = js_sys::Reflect::set(&window, &JsValue::from_str("__el"), &obj);
 }
@@ -146,6 +195,8 @@ enum Cmd {
     Surrender {
         yes: bool,
     },
+    /// The link closed under the page, as a lost connection would (it dials again).
+    DropLink,
 }
 
 pub struct InboxPlugin;
@@ -163,6 +214,7 @@ impl Plugin for InboxPlugin {
 }
 
 fn inbox(
+    net: NonSend<crate::net::NetState>,
     mut controls: ResMut<crate::input::Controls>,
     mut rig: ResMut<crate::camera::Rig>,
     drawn: Res<crate::view::Drawn>,
@@ -209,6 +261,12 @@ fn inbox(
                 Order::Ping { kind: kind.unwrap_or(0), at: Vec2::new(x, y), unit: u.map(unit) }
             }
             Cmd::Surrender { yes } => Order::Surrender { yes },
+            Cmd::DropLink => {
+                if let Some(t) = net.get() {
+                    t.close();
+                }
+                continue;
+            }
             Cmd::Shop { open } => {
                 controls.shop_open = open;
                 continue;

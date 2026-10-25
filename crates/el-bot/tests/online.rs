@@ -71,3 +71,67 @@ async fn agents_play_a_match_over_webtransport() {
     assert!(shard["sent"].as_u64().unwrap() > 500, "{shard}");
     h.shutdown();
 }
+
+/// A seat survives its connection: an agent whose link drops takes its seat back on a new one with
+/// its match's rejoin token, a second connection with the token takes it over from a first still
+/// holding it, and a token that names no seat is told so.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_dropped_agent_rejoins_its_seat() {
+    let cfg = el_server::Config {
+        wt_port: 0,
+        http_addr: "127.0.0.1:0".parse().unwrap(),
+        web_dir: None,
+        matches_per_shard: 2,
+        fill_after: Duration::from_millis(300),
+        select_for: Duration::ZERO,
+        ..el_server::Config::default()
+    };
+    let h = el_server::start(cfg).await.expect("the server starts");
+    let server = format!("http://{}", h.http_addr);
+    let join = |name: &str| BotConfig { server: server.clone(), name: name.into(), key: None };
+    let mut brain = el_bot::scripted();
+
+    let mut first = BotClient::connect(&join("Agent")).await.unwrap();
+    first.queue().await.unwrap();
+    first.wait_match(Duration::from_secs(10)).await.unwrap();
+    first.play(Duration::from_secs(3), &mut brain).await.unwrap();
+    let seat = first.client.as_ref().unwrap().seat;
+    let token = first.rejoin.clone().expect("a rejoin token with the match");
+    assert_eq!(token.len(), 32);
+    first.drop_link();
+
+    // The match waits for its player (the server's bot playing the seat meanwhile).
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let status = el_bot::get_json(&server, "/status").await.unwrap();
+    assert_eq!(status["game"]["matches"], 1, "{status}");
+
+    let mut back = BotClient::connect(&join("Agent")).await.unwrap();
+    back.rejoin(&token).await.unwrap();
+    back.wait_match(Duration::from_secs(10)).await.unwrap();
+    back.play(Duration::from_secs(4), &mut brain).await.unwrap();
+    let c = back.client.as_ref().unwrap();
+    assert_eq!(c.seat, seat, "the same seat");
+    assert!(c.started(), "playing again");
+    assert!(c.stats.datagrams > 80, "{:?}", c.stats);
+    assert_eq!((c.stats.errors, c.stats.no_baseline), (0, 0), "{:?}", c.stats);
+    assert_eq!(back.rejoin.as_deref(), Some(token.as_str()), "the same token");
+
+    // A third connection with the token while `back` still holds the seat: it takes it over.
+    let mut third = BotClient::connect(&join("Agent")).await.unwrap();
+    third.rejoin(&token).await.unwrap();
+    third.wait_match(Duration::from_secs(10)).await.unwrap();
+    third.play(Duration::from_secs(3), &mut brain).await.unwrap();
+    let c = third.client.as_ref().unwrap();
+    assert_eq!(c.seat, seat);
+    assert!(c.stats.datagrams > 60, "{:?}", c.stats);
+    assert_eq!(c.stats.errors, 0, "{:?}", c.stats);
+    // The one replaced is let go.
+    assert!(back.play(Duration::from_secs(3), &mut brain).await.is_err(), "the replaced session ends");
+
+    // A token for no seat.
+    let mut stray = BotClient::connect(&join("Stray")).await.unwrap();
+    stray.rejoin(&"7".repeat(32)).await.unwrap();
+    assert!(stray.wait_match(Duration::from_secs(5)).await.is_err());
+    assert!(stray.no_seat);
+    h.shutdown();
+}

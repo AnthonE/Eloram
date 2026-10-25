@@ -5,6 +5,11 @@
 //! another, and anyone on the team may take a champion off its bench. The match starts when the
 //! select's time is up or everyone seated is ready, with the picks it ended on.
 //!
+//! A seated player is given a rejoin token with their match: a connection that drops (or a page
+//! reloaded) takes the seat back with it while the match lasts ([`Lobby::rejoin`]), the server's
+//! bot playing it meanwhile. A match whose players have all gone is kept [`REJOIN_FOR`] for them
+//! to come back to before it ends.
+//!
 //! It runs on tokio and may lock: it is nowhere near a shard thread, which hears of a match only
 //! through its control queue, and only once its select is over.
 
@@ -22,6 +27,8 @@ use crate::game::Game;
 
 /// How long a finished match is kept (its last snapshots say who won) before its place is freed.
 const AFTER: Duration = Duration::from_secs(5);
+/// How long a match with none of its players connected is kept for them to rejoin.
+pub const REJOIN_FOR: Duration = Duration::from_secs(60);
 /// Seats in the order people fill them: a side each in turn.
 const SEAT_ORDER: [u8; SEATS] = [0, 5, 1, 6, 2, 7, 3, 8, 4, 9];
 /// How long champion select lasts, unless everyone seated is ready sooner.
@@ -41,6 +48,8 @@ pub enum LobbyEvent {
     Over {
         winner: u8,
     },
+    /// The seat was taken back on another connection (its rejoin token): this one is done.
+    Replaced,
 }
 
 /// A session's seat in a match.
@@ -68,6 +77,26 @@ struct Live {
     /// The sessions seated, by seat.
     sessions: Vec<(u32, u8, UnboundedSender<LobbyEvent>)>,
     over_at: Option<Instant>,
+    /// Since when no one has been seated in it (it ends [`REJOIN_FOR`] after).
+    empty_since: Option<Instant>,
+    /// What a player is told of the match, their seat and token aside.
+    told: ToClient,
+    /// Each seat's rejoin token (0: none, a bot's seat from the start).
+    tokens: [u128; SEATS],
+    /// Rejoins waiting for their seat's old session to hand its lease back.
+    pending: Vec<(u8, Waiting)>,
+}
+
+impl Live {
+    /// What `seat` is told of the match: everything, and its rejoin token.
+    fn match_msg(&self, seat: u8) -> ToClient {
+        let mut msg = self.told.clone();
+        if let ToClient::Match { seat: s, rejoin, .. } = &mut msg {
+            *s = seat;
+            *rejoin = format!("{:032x}", self.tokens[usize::from(seat)]);
+        }
+        msg
+    }
 }
 
 /// Each seat's champion for `seed`: ten different ones across both teams, dealt from the whole
@@ -317,17 +346,84 @@ impl Lobby {
         let Seating { shard, m, seat, lease, shared, .. } = s;
         let mut inner = self.inner();
         let mut end = false;
-        if let Some(l) = inner.live.iter_mut().find(|l| l.shard == shard && l.m == m) {
-            l.sessions.retain(|(_, st, _)| *st != seat);
-            end = l.sessions.is_empty();
-        }
         let _ = shared.control.push(Control::Unseat { m, seat });
         self.game.detach(shard, lease.g);
         self.game.give_lease(shard, lease);
+        if let Some(l) = inner.live.iter_mut().find(|l| l.shard == shard && l.m == m) {
+            l.sessions.retain(|(_, st, _)| *st != seat);
+            // Someone rejoining this seat was waiting for it.
+            if let Some(i) = l.pending.iter().position(|(st, _)| *st == seat) {
+                let (_, w) = l.pending.swap_remove(i);
+                self.seat_in(l, seat, w);
+            }
+            if l.sessions.is_empty() && l.pending.is_empty() {
+                // A finished match goes now; a running one waits for its players a while.
+                end = l.over_at.is_some();
+                l.empty_since.get_or_insert_with(Instant::now);
+            }
+        }
         if end {
             inner.live.retain(|l| !(l.shard == shard && l.m == m));
             let _ = shared.control.push(Control::End { m });
         }
+    }
+
+    /// Takes `session` back to the seat `token` was given for, in a match still running. The old
+    /// session, if it still holds the seat, is told it's been replaced and the seat follows once
+    /// it lets go. False if there's no such seat.
+    #[allow(clippy::too_many_arguments)]
+    pub fn rejoin(
+        &self,
+        session: u32,
+        name: &str,
+        agent: bool,
+        max_datagram: u16,
+        tx: UnboundedSender<LobbyEvent>,
+        token: &str,
+    ) -> bool {
+        let Some(token) = u128::from_str_radix(token, 16).ok().filter(|&t| t != 0 && token.len() == 32)
+        else {
+            return false;
+        };
+        let mut inner = self.inner();
+        inner.queue.retain(|w| w.session != session);
+        Self::out_of_select(&mut inner, session);
+        let Some(l) = inner.live.iter_mut().find(|l| l.over_at.is_none() && l.tokens.contains(&token)) else {
+            return false;
+        };
+        let Some(seat) = l.tokens.iter().position(|&t| t == token).map(|s| s as u8) else { return false };
+        let w = Waiting { session, name: name.to_string(), agent, max_datagram, tx };
+        l.pending.retain(|(st, _)| *st != seat);
+        if let Some((_, _, old)) = l.sessions.iter().find(|(_, st, _)| *st == seat) {
+            if old.send(LobbyEvent::Replaced).is_ok() {
+                l.pending.push((seat, w));
+                return true;
+            }
+            // Its session is gone already and its seat on its way back: take it now.
+            l.sessions.retain(|(_, st, _)| *st != seat);
+        }
+        self.seat_in(l, seat, w)
+    }
+
+    /// Seats `w` in `seat` of `l`, its lease taken and the shard told. False if the lease is held.
+    fn seat_in(&self, l: &mut Live, seat: u8, w: Waiting) -> bool {
+        let (shard, m) = (l.shard, l.m);
+        let g = u32::from(m) * SEATS as u32 + u32::from(seat);
+        let Some(lease) = self.game.take_lease(shard, g) else { return false };
+        let shared = self.game.shards[shard].shared.clone();
+        let _ = shared.control.push(Control::Seat { m, seat, max_datagram: w.max_datagram });
+        let seating = Seating { shard, m, seat, g, msg: l.match_msg(seat), lease, shared: shared.clone() };
+        if let Err(e) = w.tx.send(LobbyEvent::Seated(Box::new(seating))) {
+            if let LobbyEvent::Seated(s) = e.0 {
+                let _ = shared.control.push(Control::Unseat { m, seat });
+                self.game.give_lease(shard, s.lease);
+            }
+            return false;
+        }
+        tracing::info!(shard, m, seat, session = w.session, "rejoined");
+        l.sessions.push((w.session, seat, w.tx));
+        l.empty_since = None;
+        true
     }
 
     /// Matches running (or in champion select), sessions waiting, and matches started.
@@ -361,7 +457,8 @@ impl Lobby {
         }
         let game = &self.game;
         inner.live.retain(|l| {
-            let done = l.over_at.is_some_and(|t| t.elapsed() >= AFTER);
+            let done = l.over_at.is_some_and(|t| t.elapsed() >= AFTER)
+                || l.empty_since.is_some_and(|t| t.elapsed() >= REJOIN_FOR);
             if done {
                 let _ = game.shards[l.shard].shared.control.push(Control::End { m: l.m });
             }
@@ -461,6 +558,17 @@ impl Lobby {
         let secret = getrandom::u64().unwrap_or(seed.rotate_left(29) ^ 0x5EC2_E7C0_FFEE_D00D) | 1;
         let _ = shared.control.push(Control::Start { m, seed, picks, humans, secret });
         let mut sessions = Vec::new();
+        let mut tokens = [0u128; SEATS];
+        // What a player is told of the match: never the seed, from which every seat's augment
+        // offers follow.
+        let told = ToClient::Match {
+            seat: 0,
+            picks: picks.to_vec(),
+            tiers: el_sim::game::tiers_for(seed),
+            headliner: el_sim::game::headliner_for(seed),
+            roster: roster.clone(),
+            rejoin: String::new(),
+        };
         for (seat, p) in players {
             let g = u32::from(m) * SEATS as u32 + u32::from(seat);
             let Some(lease) = self.game.take_lease(shard, g) else {
@@ -468,15 +576,17 @@ impl Lobby {
                 continue;
             };
             let _ = shared.control.push(Control::Seat { m, seat, max_datagram: p.max_datagram });
-            // What a player is told of the match: never the seed, from which every seat's
-            // augment offers follow.
-            let msg = ToClient::Match {
-                seat,
-                picks: picks.to_vec(),
-                tiers: el_sim::game::tiers_for(seed),
-                headliner: el_sim::game::headliner_for(seed),
-                roster: roster.clone(),
+            let mut buf = [0u8; 16];
+            let token = match getrandom::fill(&mut buf) {
+                Ok(()) => u128::from_le_bytes(buf).max(1),
+                Err(_) => 0,
             };
+            tokens[usize::from(seat)] = token;
+            let mut msg = told.clone();
+            if let ToClient::Match { seat: s, rejoin, .. } = &mut msg {
+                *s = seat;
+                *rejoin = if token == 0 { String::new() } else { format!("{token:032x}") };
+            }
             let seating = Seating { shard, m, seat, g, msg, lease, shared: shared.clone() };
             if let Err(e) = p.tx.send(LobbyEvent::Seated(Box::new(seating))) {
                 // The session went as its match was made: its seat goes back to the bots.
@@ -493,7 +603,7 @@ impl Lobby {
             return None;
         }
         tracing::info!(shard, m, seed, humans = sessions.len(), "match started");
-        Some(Live { shard, m, sessions, over_at: None })
+        Some(Live { shard, m, sessions, over_at: None, empty_since: None, told, tokens, pending: Vec::new() })
     }
 }
 
