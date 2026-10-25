@@ -1,0 +1,27 @@
+# Hot-path rules for the match runtime. Allocation happens only in `Shard::new` / `build`
+# (explicitly allowed there); the tick itself may not allocate or lock.
+disallowed-types = [
+  { path = "std::sync::Mutex", reason = "no locks on a shard thread" },
+  { path = "std::sync::RwLock", reason = "no locks on a shard thread" },
+  { path = "std::sync::Condvar", reason = "no locks on a shard thread" },
+  { path = "std::sync::Barrier", reason = "no locks on a shard thread" },
+  { path = "std::sync::mpsc::Sender", reason = "use the preallocated lock-free queues" },
+  { path = "std::sync::mpsc::Receiver", reason = "use the preallocated lock-free queues" },
+  { path = "std::rc::Rc", reason = "no shared ownership in the tick" },
+  { path = "std::string::String", reason = "no heap strings in the tick" },
+  { path = "std::collections::HashMap", reason = "allocates; use fixed arrays indexed by slot" },
+  { path = "std::collections::VecDeque", reason = "growable; use a fixed ring" },
+  { path = "std::collections::BTreeMap", reason = "allocates" },
+]
+disallowed-methods = [
+  { path = "std::vec::Vec::push", reason = "may allocate" },
+  { path = "std::vec::Vec::with_capacity", reason = "allocates" },
+  { path = "std::boxed::Box::new", reason = "allocates" },
+]
+disallowed-macros = [
+  { path = "std::vec", reason = "allocates" },
+  { path = "std::format", reason = "allocates" },
+  { path = "std::println", reason = "locks stdout and allocates" },
+  { path = "std::eprintln", reason = "locks stderr and allocates" },
+  { path = "std::dbg", reason = "locks stderr" },
+]

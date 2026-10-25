@@ -1,0 +1,5 @@
+# web-sys still gates the WebTransport bindings behind this cfg (web-sys 0.3.105).
+# NOTE: a RUSTFLAGS environment variable *replaces* these flags, so CI must not set one.
+[target.wasm32-unknown-unknown]
+rustflags = ["--cfg=web_sys_unstable_apis"]
+runner = "wasm-bindgen-test-runner"

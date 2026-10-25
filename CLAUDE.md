@@ -10,6 +10,23 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
 - `docs/DESIGN.md` is the mode: the rules at League's numbers, in our own names.
 - `docs/ROADMAP.md` is the phases.
 
+## Commands
+
+- `scripts/ci.sh`: everything CI runs (`EL_E2E=1` adds the browser tests).
+- `cargo test --workspace --release`: all native tests (el-client is a no-op natively; release
+  because the simulation-heavy tests are slow unoptimised).
+- `cargo clippy --workspace --all-targets -- -D warnings`, and for the client
+  `cargo clippy -p el-client --target wasm32-unknown-unknown [--features webgpu] -- -D warnings`.
+- `scripts/build-web.sh [webgl2] [webgpu]`: the browser build into `web/dist/` (needs
+  wasm-bindgen-cli 0.2.128).
+- `cargo run -p el-server --release`, then open http://127.0.0.1:8080 (`--mode echo` is the
+  transport smoke test).
+- `scripts/e2e.sh spike [webgl2]`: Playwright against a real server.
+- `cargo test -p el-sim --test map -- --ignored --nocapture` prints the Causeway as text.
+- Never set `RUSTFLAGS` (it would drop the `web_sys_unstable_apis` cfg from `.cargo/config.toml`).
+- Don't `pkill -f el-server` from a shell whose own command line names it (it kills the shell):
+  `pkill -x el-server`.
+
 ## Rules (non-negotiable)
 
 - **The match tick does not allocate or lock** (the sim step, the input drain, replication, the

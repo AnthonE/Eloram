@@ -1,0 +1,30 @@
+[package]
+name = "el-sim"
+description = "Eloram's match simulation: no_std, an allocation-free deterministic tick, shared by server and client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[features]
+# Native crates enable this so glam uses the same scalar math as the (non-SIMD) wasm client.
+deterministic = ["glam/scalar-math"]
+
+[dependencies]
+el-proto.workspace = true
+glam.workspace = true
+libm.workspace = true
+
+[dev-dependencies]
+el-alloc.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+criterion.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test.workspace = true
+
+[lints]
+workspace = true

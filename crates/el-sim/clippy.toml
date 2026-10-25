@@ -1,0 +1,20 @@
+# Hot-path rules for the simulation core. Storage is sized once at construction
+# (src/storage.rs is the only allocation site, explicitly allowed there).
+disallowed-types = [
+  { path = "alloc::string::String", reason = "no heap strings in the simulation" },
+  { path = "alloc::rc::Rc", reason = "no shared ownership in the tick" },
+  { path = "alloc::sync::Arc", reason = "no shared ownership in the tick" },
+  { path = "alloc::collections::VecDeque", reason = "growable; use a fixed ring" },
+  { path = "alloc::collections::BTreeMap", reason = "allocates" },
+  { path = "alloc::collections::BinaryHeap", reason = "allocates" },
+  { path = "alloc::vec::Vec", reason = "growable; use Box<[T]> sized at construction (storage.rs)" },
+]
+disallowed-methods = [
+  { path = "alloc::boxed::Box::new", reason = "allocates" },
+  { path = "alloc::vec::Vec::push", reason = "may allocate" },
+  { path = "alloc::vec::Vec::with_capacity", reason = "allocates" },
+]
+disallowed-macros = [
+  { path = "alloc::vec", reason = "allocates" },
+  { path = "alloc::format", reason = "allocates" },
+]

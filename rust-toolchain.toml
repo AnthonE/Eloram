@@ -1,0 +1,6 @@
+[toolchain]
+# Bevy 0.19.1 needs >= 1.95; pinned so every machine and CI builds with the same compiler.
+channel = "1.98.1"
+components = ["clippy", "rustfmt"]
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"

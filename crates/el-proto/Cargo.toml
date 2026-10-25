@@ -1,0 +1,19 @@
+[package]
+name = "el-proto"
+description = "Eloram wire protocol: no_std, no alloc, bit-packed, fits one QUIC datagram"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+glam.workspace = true
+libm.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

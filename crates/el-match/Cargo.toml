@@ -1,0 +1,22 @@
+[package]
+name = "el-match"
+description = "Eloram's match runtime: shard threads stepping matches at 30 Hz (no tokio, no locks, no allocations after startup)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+el-proto.workspace = true
+el-sim = { workspace = true, features = ["deterministic"] }
+crossbeam-queue.workspace = true
+glam.workspace = true
+rtrb.workspace = true
+
+[dev-dependencies]
+el-alloc.workspace = true
+
+[lints]
+workspace = true

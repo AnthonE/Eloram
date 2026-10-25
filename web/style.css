@@ -1,0 +1,34 @@
+:root {
+  --ink: #e9eef5;
+  --dim: #8c99ab;
+  --dawn: #4d9df2;
+  --dusk: #f25a40;
+  --panel: rgba(10, 14, 22, 0.88);
+  --line: rgba(233, 238, 245, 0.18);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #05070c; color: var(--ink); overflow: hidden;
+  font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+canvas#el { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+.hidden { display: none !important; }
+
+#boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 14px; background: radial-gradient(circle at 50% 40%, #121a2a, #05070c 70%);
+  transition: opacity 0.6s ease; z-index: 10; }
+#boot.fading { opacity: 0; pointer-events: none; }
+#boot .title { font-size: 44px; letter-spacing: 0.4em; font-weight: 700;
+  background: linear-gradient(90deg, var(--dawn), var(--ink), var(--dusk)); -webkit-background-clip: text;
+  background-clip: text; color: transparent; }
+#boot .sub { color: var(--dim); letter-spacing: 0.08em; }
+.boot-meter { width: 280px; height: 3px; background: var(--line); overflow: hidden; }
+#boot-fill { height: 100%; width: 0; background: var(--ink); transition: width 0.2s; }
+#boot-fill.unknown { width: 30%; animation: sweep 1.2s ease-in-out infinite; }
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(330%); } }
+.boot-error { max-width: 640px; padding: 14px 18px; background: var(--panel); border: 1px solid var(--line); }
+.boot-error pre { white-space: pre-wrap; color: var(--dim); margin: 0 0 12px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+button { font: inherit; letter-spacing: 0.08em; color: var(--ink); background: transparent;
+  border: 1px solid var(--line); padding: 8px 14px; cursor: pointer; }
+button.primary { border-color: var(--ink); }
+button:hover { background: rgba(233, 238, 245, 0.08); }

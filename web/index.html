@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eloram</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <!-- Where the game server is (config.js: empty here, the server that serves the page), then the
+       boot watchdog (boot.js). No inline script or handler anywhere on the page: it also runs
+       under the store's `script-src 'self'`. -->
+  <script src="config.js"></script>
+  <script src="boot.js"></script>
+</head>
+<body>
+  <canvas id="el" tabindex="0"></canvas>
+  <div id="boot">
+    <div class="title">ELORAM</div>
+    <div class="sub" id="boot-status">loading…</div>
+    <div class="boot-meter"><div id="boot-fill" class="unknown"></div></div>
+    <div id="boot-error" class="boot-error hidden">
+      <pre id="boot-why"></pre>
+      <div class="row">
+        <button id="boot-reload" type="button" class="primary">RELOAD</button>
+        <button id="boot-webgl2" type="button">TRY WEBGL 2</button>
+        <button id="boot-copy" type="button">COPY DETAILS</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="loader.js"></script>
+</body>
+</html>

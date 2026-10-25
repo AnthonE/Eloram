@@ -1,0 +1,12 @@
+[package]
+name = "el-alloc"
+description = "Counting global allocator: proves the match tick never allocates and counts violations in production"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true

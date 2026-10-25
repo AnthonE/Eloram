@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: fmt, clippy, tests, no-alloc, determinism
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rust-toolchain.toml pins the compiler, clippy, rustfmt and the wasm32 target.
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy (hot-path bans are errors)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Tests, including the zero-allocation and determinism proofs (release for speed)
+        run: cargo test --workspace --release
+
+  wasm:
+    name: browser client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: Install wasm-bindgen-cli (must match the crate)
+        run: cargo install wasm-bindgen-cli --version 0.2.128 --locked
+      - name: Clippy (wasm client)
+        run: cargo clippy -p el-client --target wasm32-unknown-unknown -- -D warnings
+      - name: Clippy (wasm client, WebGPU build)
+        run: cargo clippy -p el-client --target wasm32-unknown-unknown --features webgpu -- -D warnings
+      - name: Build the web client
+        run: ./scripts/build-web.sh webgl2
