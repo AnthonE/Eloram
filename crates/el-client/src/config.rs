@@ -27,6 +27,8 @@ pub struct LaunchConfig {
     /// Cast with an indicator (`?indicators=1`, remembered): a held key shows the ability's reach,
     /// and letting go casts. Without it, a key casts at once (quick cast).
     pub indicators: bool,
+    /// League's WASD layout (`?keys=wasd`, remembered): the keys steer, the mouse and Shift cast.
+    pub wasd: bool,
 }
 
 fn get(obj: &JsValue, key: &str) -> JsValue {
@@ -61,6 +63,7 @@ impl LaunchConfig {
                 .and_then(|h| decode_hex(&h))
                 .and_then(|b| b.try_into().ok()),
             indicators: flag("indicators"),
+            wasd: flag("wasd"),
         }
     }
 }

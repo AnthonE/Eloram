@@ -33,6 +33,27 @@ use crate::orders::Orders;
 pub const FEED: usize = 256;
 /// The most commands one poll makes; a client further behind than this (a stalled page) jumps.
 const CATCH_UP: u32 = 60;
+/// The most packets one poll sends: enough to carry every command it made.
+pub const MAX_PACKETS: usize = (CATCH_UP as usize).div_ceil(MAX_CMDS) + 1;
+
+/// What one poll sends: one packet, or on a slow frame as many as carry every command it made
+/// (the server stands in for a missing command only a few ticks, so a command never sent is a
+/// step the prediction took and the server didn't).
+#[derive(Clone, Copy, Debug)]
+pub struct Packets {
+    list: [InputPacket; MAX_PACKETS],
+    n: usize,
+}
+
+impl Packets {
+    pub fn iter(&self) -> impl Iterator<Item = &InputPacket> {
+        self.list[..self.n].iter()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.n == 0
+    }
+}
 /// The own champion's predicted positions kept for drawing, by tick.
 const OWN_KEPT: usize = 16;
 /// How fast a correction of the own champion is drawn away (s).
@@ -510,7 +531,7 @@ impl Client {
         now: f64,
         view: [u32; 2],
         brain: &mut dyn FnMut(&Match, u32, &mut SeatInput),
-    ) -> Option<InputPacket> {
+    ) -> Option<Packets> {
         if !self.started || !self.clock.synced() {
             return None;
         }
@@ -522,6 +543,12 @@ impl Client {
             self.orders.restamp(self.unsent, self.next_cmd);
             self.reseed(now, false);
         }
+        // Orders given since the last poll are the player's now: they go for the newest tick this
+        // poll makes, not its oldest (a slow frame's batch starts a frame ago, in the server's past).
+        if target >= self.next_cmd {
+            self.orders.restamp(self.unsent, target);
+        }
+        let first = self.next_cmd;
         while self.next_cmd <= target {
             let k = self.next_cmd;
             let mut si = SeatInput::default();
@@ -535,20 +562,43 @@ impl Client {
         }
         let newest = self.next_cmd.checked_sub(1)?;
         let (ack_stream, ack_seq, ack_bits) = self.acks.ack();
-        let mut p =
-            InputPacket { ack_stream, ack_seq, ack_bits, client_time_ms: ms(now), ..InputPacket::default() };
-        for i in 0..MAX_CMDS {
-            let Some(c) = newest.checked_sub(i as u32).and_then(|t| self.inputs.get(t)) else { break };
-            p.cmds[i] = c;
-            p.n_cmds += 1;
+        let mut out = Packets { list: [InputPacket::default(); MAX_PACKETS], n: 0 };
+        // Windows of the newest commands, back until every command this poll made is in one. The
+        // newest goes first: it carries the orders, and is the redundancy that rides out a lost
+        // packet; if a sender can't take them all, it is the oldest commands that wait.
+        let made = self.next_cmd - first;
+        let windows = (made.div_ceil(MAX_CMDS as u32) as usize).clamp(1, MAX_PACKETS);
+        for w in 0..windows {
+            let end = newest.saturating_sub((w * MAX_CMDS) as u32);
+            let mut p = InputPacket {
+                ack_stream,
+                ack_seq,
+                ack_bits,
+                client_time_ms: ms(now),
+                ..InputPacket::default()
+            };
+            for i in 0..MAX_CMDS {
+                let Some(c) = end.checked_sub(i as u32).and_then(|t| self.inputs.get(t)) else { break };
+                p.cmds[i] = c;
+                p.n_cmds += 1;
+            }
+            if p.n_cmds == 0 {
+                continue;
+            }
+            // Orders ride the newest window only: a packet's orders are stamped no later than its
+            // newest command, so an older window would apply them early.
+            if w == 0 {
+                self.orders.fill(&mut p);
+            }
+            out.list[out.n] = p;
+            out.n += 1;
         }
-        if p.n_cmds == 0 {
+        if out.n == 0 {
             return None;
         }
-        self.orders.fill(&mut p);
         self.unsent = self.orders.next_seq;
-        self.stats.packets += 1;
-        Some(p)
+        self.stats.packets += out.n as u64;
+        Some(out)
     }
 
     // -----------------------------------------------------------------------------------------

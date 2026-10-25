@@ -25,7 +25,7 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `cargo run -p el-server --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
 - `scripts/e2e.sh spike|match|watch|login [webgl2]`: Playwright against a real server (`match`:
   queue, champion select (a reroll, the bench, ready), the headliner, augment, shop, Blink, a walk
-  predicted exactly, the fog; `watch`: an agent's match watched live a minute behind, then
+  predicted exactly, the fog; and `?keys=wasd`'s keys walking the champion; `watch`: an agent's match watched live a minute behind, then
   replayed; `login`: a stub wallet signing through `el-auth`'s `sign` example, `/online.json`, the
   resume token; screenshots in `e2e/artifacts/`). `scripts/e2e.sh` serves the `web/dist/` already
   built: rebuild it first. A test or the console drives the champion through `window.__elInbox`

@@ -186,7 +186,7 @@ impl Clock {
         let h = f64::from(health);
         let low = f64::from(lowest);
         if h < TARGET_HEALTH {
-            self.lead += 0.1 * (TARGET_HEALTH - h);
+            self.lead += 0.3 * (TARGET_HEALTH - h);
         } else if low > TARGET_HEALTH {
             self.lead -= 0.02 * (low - TARGET_HEALTH);
         }

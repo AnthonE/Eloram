@@ -6,7 +6,7 @@ mod common;
 
 use std::collections::BTreeMap;
 
-use common::{BAD, CLEAN, Rig, bot_brain, quantile, walker};
+use common::{BAD, Brain, CLEAN, Rig, bot_brain, quantile, walker};
 use el_client_core::Cause;
 use el_sim::game::Intent;
 use el_sim::units::SEATS;
@@ -93,8 +93,14 @@ fn a_click_moves_the_prediction_the_next_tick() {
     let from = p.client.pred.units[2].pos;
     let to = el_sim::map::for_team(0, glam::Vec2::new(3_000.0, el_sim::map::MID_Y));
     p.client.order(el_proto::Order::Move { to }).unwrap();
-    // The next frame makes the next command, and steps the prediction through it.
-    rig.run(1.0 / 60.0 + 0.001);
+    // The next frame that makes a command (a frame is half a tick: one or two of them) steps the
+    // prediction through it.
+    for _ in 0..3 {
+        if rig.players[0].client.next_cmd() > at {
+            break;
+        }
+        rig.run(1.0 / 60.0 + 0.001);
+    }
     let p = &rig.players[0];
     assert!(p.client.next_cmd() > at);
     assert!(
@@ -132,6 +138,52 @@ fn bots_play_a_match_through_the_wire() {
     }
     orders_applied_once(&rig);
     assert!(rig.players.iter().all(|p| p.seat < SEATS));
+}
+
+/// WASD: a steer held for three seconds, then let go, one way and the other.
+fn steerer() -> Brain {
+    Box::new(|_, _, k, out| {
+        out.steer = match (k / 90) % 4 {
+            0 => 1,
+            2 => 5,
+            _ => 0,
+        }
+    })
+}
+
+#[test]
+fn steering_is_predicted_exactly_over_a_bad_link() {
+    let mut rig = Rig::new(12, vec![(1, BAD, steerer())]);
+    rig.run(60.0);
+    rig.settle(3.0);
+    report(&rig);
+    let (n, _, p99, _) = by_cause(&rig, 0)[&Cause::Walking];
+    assert!(n > 1_000, "{n} walking corrections");
+    assert!(p99 < 1.0, "steering mispredicted, p99 {p99:.2} units");
+}
+
+#[test]
+fn steering_is_predicted_exactly_at_a_frame_a_second() {
+    // A frame a second makes thirty commands at once: every one of them goes, in as many packets
+    // as it takes, or the server stands in for the rest and the prediction walks where it didn't.
+    let mut rig = Rig::new(13, vec![(6, CLEAN, steerer())]);
+    rig.players[0].period = 1.0;
+    let home = rig.m().units[6].pos;
+    let mut furthest: f32 = 0.0;
+    for _ in 0..60 {
+        rig.run(1.0);
+        furthest = furthest.max(rig.m().units[6].pos.distance(home));
+    }
+    report(&rig);
+    let p = &rig.players[0];
+    assert!(furthest > 500.0, "it walked: {furthest:.0} units out at most");
+    // While its clock first runs out ahead (a second, at this rate) the server stands in for what
+    // came late; from the gates' opening on, every step is the server's.
+    let late = p.corrections.iter().filter(|c| c.tick > 15 * 30).map(|c| c.error).fold(0.0, f32::max);
+    assert!(late < 1.0, "steering mispredicted by {late:.2} units after the start");
+    let walking = p.corrections.iter().filter(|c| c.cause == Cause::Walking).count();
+    assert!(walking > 30, "{walking} walking corrections");
+    assert_eq!(p.client.stats.errors, 0);
 }
 
 #[test]

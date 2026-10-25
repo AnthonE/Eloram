@@ -374,10 +374,12 @@ fn send(net: NonSend<NetState>, mut session: ResMut<Session>, mut controls: ResM
     }
     let view = pos_code(controls.view);
     let steer = controls.steer;
-    if let Some(p) = c.poll(now_s(), view, &mut |_, _, out| out.steer = steer) {
-        let mut buf = [0u8; 256];
-        if let Some(n) = p.encode(&mut buf) {
-            t.send_datagram(&buf[..n]);
+    if let Some(packets) = c.poll(now_s(), view, &mut |_, _, out| out.steer = steer) {
+        for p in packets.iter() {
+            let mut buf = [0u8; 256];
+            if let Some(n) = p.encode(&mut buf) {
+                t.send_datagram(&buf[..n]);
+            }
         }
     }
 }

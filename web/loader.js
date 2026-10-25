@@ -63,6 +63,16 @@ function indicatorsSetting() {
   }
 }
 
+function keysSetting() {
+  const asked = params.get("keys");
+  try {
+    if (asked === "wasd" || asked === "league") localStorage.setItem("el.keys", asked);
+    return localStorage.getItem("el.keys") || "league";
+  } catch (_) {
+    return asked || "league";
+  }
+}
+
 async function main() {
   const config = {
     echo: params.get("mode") === "echo",
@@ -75,6 +85,8 @@ async function main() {
     // Cast with an indicator: hold an ability's key to see its reach, let go to cast
     // (`?indicators=1`; `?indicators=0` back to quick cast). Remembered for the next visit.
     indicators: indicatorsSetting(),
+    // League's WASD layout (`?keys=wasd`; `?keys=league` back to its default). Remembered.
+    wasd: keysSetting() === "wasd",
   };
   if (config.signIn) {
     try {

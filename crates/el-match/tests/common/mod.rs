@@ -303,7 +303,7 @@ impl Rig {
                     let o = p.client.orders.get(seq).expect("just given");
                     p.given.push((seq, o.tick));
                 }
-                if let Some(packet) = packet {
+                for packet in packet.iter().flat_map(|ps| ps.iter()) {
                     let mut b = [0u8; 256];
                     let n = packet.encode(&mut b).expect("a packet fits");
                     p.up_bytes += n as u64;

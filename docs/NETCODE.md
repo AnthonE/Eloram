@@ -121,7 +121,11 @@ standby takes a room over on the old clock's timeline. Riot built the same thing
 
 - **The command** rides every tick, as Before Colony's does: a WASD direction for those who steer,
   held keys, and the camera's centre (used for priority only, never for what you're shown). Each
-  input packet repeats the last four.
+  input packet repeats the last four. A slow frame that makes more than four sends as many packets
+  as carry them all, the newest first (`Client::poll`; the page raises the browser's datagram
+  high-water mark to fit them), since a command never sent is a step the prediction took and the
+  server didn't. The orders given in a frame are stamped for the newest tick it makes, not its
+  oldest, which on a slow frame is already the server's past.
 - **Orders** are what a MOBA player gives: move, attack-move, attack a unit, cast a slot (pressed
   and released, at a point, a unit or a direction), stop, hold, level a skill, pick an augment,
   reroll one, buy, sell, ping. Each carries a sequence number and repeats in every packet until

@@ -294,6 +294,8 @@ fn match_status(
     status.set("champion", ch.def().name);
     status.set("headliner", c.pred.headliner().name);
     status.set("aiming", controls.aiming.map_or(-1, i32::from));
+    status.set("keys", if controls.wasd { "wasd" } else { "league" });
+    status.set("steer", u32::from(controls.steer));
     status.set("started", c.started());
     status.set("tick", c.world.tick);
     status.set("pred_tick", c.pred.tick);
@@ -336,6 +338,8 @@ fn match_status(
     status.set("depth", u32::from(st.depth));
     status.set("missed", u32::from(st.missed));
     status.set("match_rtt_ms", c.clock.rtt * 1_000.0);
+    status.set("lead", c.clock.lead);
+    status.set("packets", c.stats.packets as f64);
     status.set("orders_given", c.orders.given as f64);
     status.set("orders_unacked", c.orders.outstanding() as u32);
     status.set("corrections", corrections.0 as f64);

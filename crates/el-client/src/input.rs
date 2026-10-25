@@ -1,10 +1,13 @@
-//! The mouse and keys, as a MOBA player expects them (`docs/DESIGN.md`, "Controls"): right click
-//! to move, or to attack what's under the cursor; A then a click to attack-move; Q, W, E, R and the
-//! summoner spells D and F cast at once at the cursor (quick cast), or with indicators on
-//! (`?indicators=1`) show their reach while held and cast when let go (Esc or a right click calls it
-//! off); Ctrl with Q, W, E or R levels it; S stops, H holds; 1, 2 and 3 take an augment card, Shift
-//! with one rerolls it; P opens the shop where it may be used; Tab shows the scoreboard. Each
-//! becomes an order for the next command.
+//! The mouse and keys, as a MOBA player expects them (`docs/DESIGN.md`, "Controls"). League's
+//! default: right click to move, or to attack what's under the cursor; A then a click to
+//! attack-move; Q, W, E, R and the summoner spells D and F cast at once at the cursor (quick cast),
+//! or with indicators on (`?indicators=1`) show their reach while held and cast when let go (Esc or
+//! a right click calls it off); Ctrl with an ability's key levels it; S stops, H holds; 1, 2 and 3
+//! take an augment card, Shift with one rerolls it. League's WASD (`?keys=wasd`): W, A, S and D
+//! steer; left click attacks what's under the cursor; the abilities are right click, Shift, E and
+//! R, the summoner spells Q and F; C (or Esc) calls an aimed cast off; Ctrl with a number rerolls
+//! a card. Either way P opens the shop where it may be used and Tab shows the scoreboard. Each
+//! becomes an order (or the steer) for the next command.
 
 use bevy::prelude::*;
 use el_proto::order::slot;
@@ -41,10 +44,76 @@ pub struct Controls {
     pub marker: Option<(Vec2, f64, bool)>,
     /// Where the camera looks (the server sends what's near it first).
     pub view: Vec2,
-    /// WASD, if a page ever binds it (League's keys don't: 0).
+    /// WASD's steer (0 none, 1 to 8 the eight directions, `el_sim::steer_dir`).
     pub steer: u8,
     pub shop_open: bool,
     pub scoreboard: bool,
+    /// The keys are League's WASD layout (`?keys=wasd`), not its default.
+    pub wasd: bool,
+}
+
+/// A key or a mouse button.
+#[derive(Clone, Copy)]
+enum Press {
+    Key(KeyCode),
+    Mouse(MouseButton),
+}
+
+impl Press {
+    fn just_pressed(self, keys: &ButtonInput<KeyCode>, mouse: &ButtonInput<MouseButton>) -> bool {
+        match self {
+            Press::Key(k) => keys.just_pressed(k),
+            Press::Mouse(b) => mouse.just_pressed(b),
+        }
+    }
+
+    fn just_released(self, keys: &ButtonInput<KeyCode>, mouse: &ButtonInput<MouseButton>) -> bool {
+        match self {
+            Press::Key(k) => keys.just_released(k),
+            Press::Mouse(b) => mouse.just_released(b),
+        }
+    }
+}
+
+/// What casts each slot (Q, W, E, R, D, F), in League's default layout and in its WASD one.
+const CAST: [(Press, u8); 6] = [
+    (Press::Key(KeyCode::KeyQ), slot::Q),
+    (Press::Key(KeyCode::KeyW), slot::W),
+    (Press::Key(KeyCode::KeyE), slot::E),
+    (Press::Key(KeyCode::KeyR), slot::R),
+    (Press::Key(KeyCode::KeyD), slot::D),
+    (Press::Key(KeyCode::KeyF), slot::F),
+];
+const CAST_WASD: [(Press, u8); 6] = [
+    (Press::Mouse(MouseButton::Right), slot::Q),
+    (Press::Key(KeyCode::ShiftLeft), slot::W),
+    (Press::Key(KeyCode::KeyE), slot::E),
+    (Press::Key(KeyCode::KeyR), slot::R),
+    (Press::Key(KeyCode::KeyQ), slot::D),
+    (Press::Key(KeyCode::KeyF), slot::F),
+];
+
+/// Each slot's key as the HUD names it, by layout.
+pub fn key_names(wasd: bool) -> [&'static str; 6] {
+    if wasd { ["RMB", "Shift", "E", "R", "Q", "F"] } else { ["Q", "W", "E", "R", "D", "F"] }
+}
+
+/// The steer W, A, S and D held make: the map's +y is up the screen and +x to the right, and
+/// `el_sim::steer_dir` counts from +x counter-clockwise by eighths.
+fn steer(keys: &ButtonInput<KeyCode>) -> u8 {
+    let x = i8::from(keys.pressed(KeyCode::KeyD)) - i8::from(keys.pressed(KeyCode::KeyA));
+    let y = i8::from(keys.pressed(KeyCode::KeyW)) - i8::from(keys.pressed(KeyCode::KeyS));
+    match (x, y) {
+        (1, 0) => 1,
+        (1, 1) => 2,
+        (0, 1) => 3,
+        (-1, 1) => 4,
+        (-1, 0) => 5,
+        (-1, -1) => 6,
+        (0, -1) => 7,
+        (1, -1) => 8,
+        _ => 0,
+    }
 }
 
 pub struct InputPlugin;
@@ -55,15 +124,6 @@ impl Plugin for InputPlugin {
             .add_systems(Update, read.after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send));
     }
 }
-
-const CAST_KEYS: [(KeyCode, u8); 6] = [
-    (KeyCode::KeyQ, slot::Q),
-    (KeyCode::KeyW, slot::W),
-    (KeyCode::KeyE, slot::E),
-    (KeyCode::KeyR, slot::R),
-    (KeyCode::KeyD, slot::D),
-    (KeyCode::KeyF, slot::F),
-];
 
 /// How near the cursor (game units, past a unit's edge) a unit counts as under it.
 const PICK: f32 = 60.0;
@@ -120,11 +180,15 @@ fn read(
         .and_then(|ray| ray.plane_intersection_point(Vec3::ZERO, InfinitePlane3d::new(Vec3::Y)))
         .map(map_point);
     c.scoreboard = keys.pressed(KeyCode::Tab);
+    c.wasd = cfg.0.wasd;
     let Some(client) = session.client.as_ref().filter(|_| session.phase == Phase::Playing) else {
         c.hovered = None;
         c.aiming = None;
+        c.steer = 0;
         return;
     };
+    let wasd = c.wasd;
+    c.steer = if wasd { steer(&keys) } else { 0 };
     let seat = client.seat;
     let team = client.team;
     let me = &client.pred;
@@ -148,38 +212,53 @@ fn read(
     let unit_ref =
         |i: usize| UnitRef { slot: i as u8, generation: drawn.units[i].map_or(0, |d| d.generation) };
     let now = crate::net::now_s();
-    if keys.just_pressed(KeyCode::Escape) {
+    let cancel = if wasd { KeyCode::KeyC } else { KeyCode::Escape };
+    if keys.just_pressed(KeyCode::Escape) || keys.just_pressed(cancel) {
         c.armed = None;
         c.aiming = None;
     }
-    if keys.just_pressed(KeyCode::KeyA) {
-        c.armed = Some(Armed::AttackMove);
-    }
-    if mouse.just_pressed(MouseButton::Right) && !over_ui {
-        c.armed = None;
-        c.aiming = None;
-        if let Some(at) = c.cursor {
-            match c.hovered.filter(|&i| drawn.units[i].is_some_and(|d| d.team != team)) {
-                Some(i) => c.pending.push(Order::Attack { unit: unit_ref(i) }),
-                None => {
-                    c.pending.push(Order::Move { to: at });
-                    c.marker = Some((at, now, false));
+    let enemy_hovered = c.hovered.filter(|&i| drawn.units[i].is_some_and(|d| d.team != team));
+    if wasd {
+        // Left click attacks what's under the cursor; walking is the keys'.
+        if mouse.just_pressed(MouseButton::Left)
+            && !over_ui
+            && let Some(i) = enemy_hovered
+        {
+            c.pending.push(Order::Attack { unit: unit_ref(i) });
+        }
+    } else {
+        if keys.just_pressed(KeyCode::KeyA) {
+            c.armed = Some(Armed::AttackMove);
+        }
+        if mouse.just_pressed(MouseButton::Right) && !over_ui {
+            c.armed = None;
+            c.aiming = None;
+            if let Some(at) = c.cursor {
+                match enemy_hovered {
+                    Some(i) => c.pending.push(Order::Attack { unit: unit_ref(i) }),
+                    None => {
+                        c.pending.push(Order::Move { to: at });
+                        c.marker = Some((at, now, false));
+                    }
                 }
             }
         }
-    }
-    if mouse.just_pressed(MouseButton::Left) && !over_ui && c.armed == Some(Armed::AttackMove) {
-        c.armed = None;
-        if let Some(at) = c.cursor {
-            c.pending.push(Order::AttackMove { to: at });
-            c.marker = Some((at, now, true));
+        if mouse.just_pressed(MouseButton::Left) && !over_ui && c.armed == Some(Armed::AttackMove) {
+            c.armed = None;
+            if let Some(at) = c.cursor {
+                c.pending.push(Order::AttackMove { to: at });
+                c.marker = Some((at, now, true));
+            }
         }
     }
     let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
     let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
     let indicators = cfg.0.indicators;
-    for (key, s) in CAST_KEYS {
-        if keys.just_pressed(key) {
+    for (press, s) in if wasd { CAST_WASD } else { CAST } {
+        if matches!(press, Press::Mouse(_)) && over_ui {
+            continue;
+        }
+        if press.just_pressed(&keys, &mouse) {
             if ctrl {
                 if s <= slot::R {
                     c.pending.push(Order::LevelSkill { slot: s });
@@ -196,22 +275,24 @@ fn read(
                 c.pending.push(Order::Cast { slot: s, aim });
             }
         }
-        if c.aiming == Some(s) && keys.just_released(key) {
+        if c.aiming == Some(s) && press.just_released(&keys, &mouse) {
             c.aiming = None;
             if let Some(aim) = aim_for(&c, &drawn, me, seat, team, s) {
                 c.pending.push(Order::Cast { slot: s, aim });
             }
         }
     }
-    if keys.just_pressed(KeyCode::KeyS) {
+    if !wasd && keys.just_pressed(KeyCode::KeyS) {
         c.pending.push(Order::Stop);
     }
     if keys.just_pressed(KeyCode::KeyH) {
         c.pending.push(Order::Hold);
     }
+    // A card's reroll: Shift with its number, or Ctrl where Shift casts.
+    let reroll = if wasd { ctrl } else { shift };
     for (key, card) in [(KeyCode::Digit1, 0u8), (KeyCode::Digit2, 1), (KeyCode::Digit3, 2)] {
         if keys.just_pressed(key) && me.champs[seat].screen.open {
-            c.pending.push(if shift { Order::Reroll { card } } else { Order::PickAugment { card } });
+            c.pending.push(if reroll { Order::Reroll { card } } else { Order::PickAugment { card } });
         }
     }
     if keys.just_pressed(KeyCode::KeyP) {

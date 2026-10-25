@@ -10,7 +10,7 @@ use std::rc::Rc;
 
 use futures::StreamExt;
 use futures::channel::mpsc;
-use web_transport_wasm::{ClientBuilder, CongestionControl, Session};
+use web_transport_wasm::Session;
 
 /// Received datagrams with their arrival times (s).
 type Inbox = Rc<RefCell<VecDeque<(Vec<u8>, f64)>>>;
@@ -37,13 +37,23 @@ impl Transport {
     /// Connects to `url`, pinning the server's self-signed certificate by SHA-256 when given.
     pub async fn connect(url: &str, cert_hash: Option<Vec<u8>>) -> Result<Transport, String> {
         let url = url::Url::parse(url).map_err(|e| format!("bad url {url}: {e}"))?;
-        let builder =
-            ClientBuilder::new().with_unreliable(true).with_congestion_control(CongestionControl::LowLatency);
-        let client = match cert_hash {
-            Some(hash) => builder.with_server_certificate_hashes(vec![hash]),
-            None => builder.with_system_roots(),
-        };
-        let session = client.connect(url).await.map_err(|e| format!("connect: {e}"))?;
+        // The browser's WebTransport, built here (with the options the crate's `ClientBuilder` sets)
+        // so its datagram queue can hold a slow frame's burst of input packets (`Client::poll`): at
+        // the browser's default high-water mark it refuses all but the first of them.
+        let options = web_sys::WebTransportOptions::new();
+        options.set_require_unreliable(true);
+        options.set_congestion_control(web_sys::WebTransportCongestionControl::LowLatency);
+        if let Some(hash) = cert_hash {
+            let entry = web_sys::WebTransportHash::new();
+            entry.set_algorithm("sha-256");
+            entry.set_value_u8_array(&js_sys::Uint8Array::new_from_slice(&hash));
+            options.set_server_certificate_hashes(&[entry]);
+        }
+        let inner = web_sys::WebTransport::new_with_options(url.as_str(), &options)
+            .map_err(|e| format!("connect: {e:?}"))?;
+        wasm_bindgen_futures::JsFuture::from(inner.ready()).await.map_err(|e| format!("connect: {e:?}"))?;
+        inner.datagrams().set_outgoing_high_water_mark(el_client_core::client::MAX_PACKETS as f64);
+        let session = Session::new(inner, url);
         let (mut send, mut recv) =
             session.open_bi().await.map_err(|e| format!("open control stream: {e}"))?;
 

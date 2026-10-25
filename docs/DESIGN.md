@@ -145,8 +145,11 @@ League's defaults, because that is what players' hands know:
   no actives yet, so the number keys are free). **P** the shop, **Tab** the scoreboard.
 - **Y** locks the camera on your champion (locked to start) or frees it; free, it pans at the
   screen's edge and with the arrows, and **Space** held brings it back. The wheel zooms a little.
-- **WASD** movement as an option (League added it in 2025): the wire carries it (`InputCmd`'s
-  steer), the page doesn't bind it yet.
+- **WASD** as an option (`?keys=wasd`, remembered), League's own layout for it (2025): **W, A, S,
+  D** move; left click attacks what's under the cursor; the abilities are right click, **Shift**,
+  **E** and **R**; the summoner spells **Q** and **F**; **C** calls an aimed cast off; **Ctrl** with
+  a number rerolls an augment card. The steer rides each tick's command (`InputCmd`), predicted like
+  walking.
 
 ## Sources
 
@@ -157,6 +160,8 @@ League's defaults, because that is what players' hands know:
 - Riot: [Bringing Mayhem to ARAM](https://www.leagueoflegends.com/en-us/news/dev/dev-bringing-mayhem-to-aram/) (2025),
   [Augmentmaxxing ARAM: Mayhem](https://www.leagueoflegends.com/en-us/news/dev/dev-augmentmaxxing-aram-mayhem/) (2026),
   [Patch 26.3 notes](https://www.leagueoflegends.com/en-us/news/game-updates/patch-26-3-notes/),
-  [the support page](https://support.riotgames.com/league-of-legends/events/league-of-legends-aram-mayhem-game-mode).
+  [the support page](https://support.riotgames.com/league-of-legends/events/league-of-legends-aram-mayhem-game-mode),
+  [the keyboard (WASD) input FAQ](https://support.riotgames.com/league-of-legends/gameplay/league-of-legends-keyboard-wasd-input-faq)
+  and the wiki's [Controls and Hotkeys](https://wiki.leagueoflegends.com/en-us/Hotkeys) for WASD's layout.
 - Unsettled in the sources, so ours to choose: Mayhem's starting gold since February 2026, and
   whether the first screen and level 3 are one screen or two (here they are one).

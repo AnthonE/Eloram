@@ -105,3 +105,38 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   expect(status.game.matches).toBe(1);
   expect(status.hot_path_allocations).toBe(0);
 });
+
+// League's WASD layout (`?keys=wasd`): a held key steers the champion, and it stops when the key
+// comes up. (Exactness is the netcode tests': at this page's frame or so a second, the oldest
+// commands of a long frame can reach the server after their tick, which then repeats the last
+// steer a few ticks, so the stop is a few ticks long here.)
+test("WASD: the keys walk the champion", async ({ page }, info) => {
+  const logs = collectConsole(page);
+  await page.goto(`/?gfx=${info.project.name}&name=Walker&keys=wasd`);
+  let s: Record<string, any>;
+  try {
+    s = await until(page, "champion select", (s) => s.phase === "selecting", 150_000);
+    await push(page, { t: "ready" });
+    // The base's gates hold champions in for the first 15 s.
+    s = await until(page, "the gates open", (s) => s.started === true && s.tick > 15 * 30 + 30, 120_000);
+  } catch (e) {
+    console.log(logs.slice(-40).join("\n"));
+    throw e;
+  }
+  expect(s.keys).toBe("wasd");
+  const before = s.x;
+  // Down the lane: D for Dawn, A for Dusk.
+  const key = s.team === 0 ? "d" : "a";
+  await page.click("canvas");
+  await page.keyboard.down(key);
+  s = await until(page, "steering", (s) => s.steer === (s.team === 0 ? 1 : 5));
+  s = await until(page, "the walk", (s) => Math.abs(s.x - before) > 400, 60_000);
+  await page.keyboard.up(key);
+  s = await until(page, "the stop", (s) => s.steer === 0);
+  const stopped = s.x;
+  await page.waitForTimeout(3_000);
+  s = await el(page);
+  // Held, three seconds would have been about a thousand units.
+  expect(Math.abs(s.x - stopped)).toBeLessThan(150);
+  expect(s.steer).toBe(0);
+});

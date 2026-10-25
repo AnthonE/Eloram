@@ -13,5 +13,5 @@ pub mod lobby;
 pub mod missiles;
 pub mod orders;
 
-pub use client::{Cause, Client, Correction, Stats, Taken};
+pub use client::{Cause, Client, Correction, Packets, Stats, Taken};
 pub use clock::Clock;

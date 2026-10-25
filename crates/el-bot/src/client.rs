@@ -205,10 +205,12 @@ impl BotClient {
         if let Some(c) = &mut self.client {
             let seat = c.seat;
             let view = pos_code(c.pred.units[seat].pos);
-            if let Some(p) = c.poll(now, view, &mut |m, k, out| brain(m, seat, k, out)) {
-                let mut buf = [0u8; 256];
-                if let Some(n) = p.encode(&mut buf) {
-                    self.conn.send_datagram(&buf[..n])?;
+            if let Some(packets) = c.poll(now, view, &mut |m, k, out| brain(m, seat, k, out)) {
+                for p in packets.iter() {
+                    let mut buf = [0u8; 256];
+                    if let Some(n) = p.encode(&mut buf) {
+                        self.conn.send_datagram(&buf[..n])?;
+                    }
                 }
             }
         }
