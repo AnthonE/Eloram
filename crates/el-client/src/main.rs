@@ -15,6 +15,8 @@ mod hud;
 #[cfg(target_arch = "wasm32")]
 mod input;
 #[cfg(target_arch = "wasm32")]
+mod models;
+#[cfg(target_arch = "wasm32")]
 mod net;
 #[cfg(target_arch = "wasm32")]
 mod session;

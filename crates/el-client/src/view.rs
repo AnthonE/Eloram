@@ -73,6 +73,8 @@ const _: () = assert!(CHAMPION.len() == el_sim::content::champions::CHAMPIONS.le
 #[derive(Resource)]
 struct Kit {
     bodies: [Handle<Mesh>; Kind::COUNT],
+    /// The champions' figures, a role each (`models`), in `Role`'s order.
+    figures: [Handle<Mesh>; 6],
     team: [[Handle<StandardMaterial>; 2]; Kind::COUNT],
     champion: [Handle<StandardMaterial>; 20],
     ring: [Handle<StandardMaterial>; 2],
@@ -293,6 +295,9 @@ fn setup_pools(
         meshes.add(Sphere::new(2.4)),
         meshes.add(Cylinder::new(0.8, 2.0)),
     ];
+    use el_sim::content::Role;
+    let figures = [Role::Marksman, Role::Mage, Role::Tank, Role::Fighter, Role::Assassin, Role::Enchanter]
+        .map(|r| meshes.add(crate::models::figure(r)));
     let team = std::array::from_fn(|k| {
         let glow = if matches!(Kind::from_u8(k as u8), Kind::Nexus | Kind::Inhibitor) { 0.5 } else { 0.08 };
         [mat(TEAM[0], glow), mat(TEAM[1], glow)]
@@ -390,7 +395,7 @@ fn setup_pools(
             RelicView(k),
         ));
     }
-    commands.insert_resource(Kit { bodies, team, champion, ring, fill, missile });
+    commands.insert_resource(Kit { bodies, figures, team, champion, ring, fill, missile });
 }
 
 #[allow(clippy::type_complexity)]
@@ -467,13 +472,18 @@ fn draw_units(
         let (w, h) = bar_of(kind);
         if uv.shown != Some((kind, team, def)) {
             uv.shown = Some((kind, team, def));
-            if let Ok((_, mut mesh, mut m)) = parts.get_mut(uv.body) {
-                mesh.0 = kit.bodies[kind as usize].clone();
-                m.0 = if kind == Kind::Champion {
-                    kit.champion[usize::from(def) % kit.champion.len()].clone()
+            if let Ok((mut t, mut mesh, mut m)) = parts.get_mut(uv.body) {
+                if kind == Kind::Champion {
+                    let d = &el_sim::content::champions::CHAMPIONS[usize::from(def) % kit.champion.len()];
+                    mesh.0 = kit.figures[d.role as usize].clone();
+                    m.0 = kit.champion[usize::from(def) % kit.champion.len()].clone();
+                    // The figures are made at a radius of 65: a bigger champion stands bigger.
+                    t.scale = Vec3::splat(d.radius / 65.0);
                 } else {
-                    kit.team[kind as usize][usize::from(team.min(1))].clone()
-                };
+                    mesh.0 = kit.bodies[kind as usize].clone();
+                    m.0 = kit.team[kind as usize][usize::from(team.min(1))].clone();
+                    t.scale = Vec3::ONE;
+                }
             }
             if let Ok((mut t, _, mut m)) = parts.get_mut(uv.ring) {
                 m.0 = kit.ring[usize::from(team.min(1))].clone();
@@ -497,7 +507,8 @@ fn draw_units(
         }
         if let Ok((mut t, _, _)) = parts.get_mut(uv.body) {
             let lift = match kind {
-                Kind::Champion => 0.95,
+                // A figure stands on its feet.
+                Kind::Champion => 0.0,
                 Kind::Melee => 0.28,
                 Kind::Caster => 0.34,
                 Kind::Siege => 0.32,
