@@ -24,6 +24,9 @@ pub struct LaunchConfig {
     /// sign-in left (`localStorage["el.resume"]`, never logged).
     pub sign_in: bool,
     pub resume: Option<[u8; el_proto::auth::TOKEN_BYTES]>,
+    /// Cast with an indicator (`?indicators=1`, remembered): a held key shows the ability's reach,
+    /// and letting go casts. Without it, a key casts at once (quick cast).
+    pub indicators: bool,
 }
 
 fn get(obj: &JsValue, key: &str) -> JsValue {
@@ -57,6 +60,7 @@ impl LaunchConfig {
                 .as_string()
                 .and_then(|h| decode_hex(&h))
                 .and_then(|b| b.try_into().ok()),
+            indicators: flag("indicators"),
         }
     }
 }

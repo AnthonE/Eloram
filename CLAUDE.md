@@ -29,7 +29,7 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   replayed; `login`: a stub wallet signing through `el-auth`'s `sign` example, `/online.json`, the
   resume token; screenshots in `e2e/artifacts/`). `scripts/e2e.sh` serves the `web/dist/` already
   built: rebuild it first. A test or the console drives the champion through `window.__elInbox`
-  (`{t:"move",x,y}`, `cast`, `buy`, `pick`, `level`, `champ_reroll`, `champ_swap`, `ready`...:
+  (`{t:"move",x,y}`, `cast`, `buy`, `pick`, `level`, `champ_reroll`, `champ_swap`, `ready`, `aim`...:
   `el-client/src/dev_hooks.rs`) and reads `window.__el`. Headless Chromium draws with
   SwiftShader at about a frame a second: its pictures are right, its frame rates mean nothing.
 - `cargo test -p el-sim --test map -- --ignored --nocapture` prints the Causeway as text.

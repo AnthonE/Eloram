@@ -137,7 +137,10 @@ League's defaults, because that is what players' hands know:
 - **Right click** to move, or to attack what's under the cursor. **A** then click to attack-move.
   **S** stops, **H** holds.
 - **Q, W, E, R** cast; **D, F** are the summoner spells. Smart cast by default (cast where the cursor
-  is on the press), with indicators on a setting. **Ctrl** with an ability's key levels it.
+  is on the press). With indicators on (`?indicators=1`, remembered; League's "quick cast with
+  indicator"), a held key shows the ability's range and its shape where it would land (a
+  skillshot's lane, an area's circle kept in range, a dash's path, a blink's landing) and letting go
+  casts; **Esc** or a right click calls it off. **Ctrl** with an ability's key levels it.
 - **1, 2, 3** take an augment card while a screen is open, **Shift** with one rerolls it (items have
   no actives yet, so the number keys are free). **P** the shop, **Tab** the scoreboard.
 - **Y** locks the camera on your champion (locked to start) or frees it; free, it pans at the

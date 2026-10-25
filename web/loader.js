@@ -53,6 +53,16 @@ window.elHideBoot = () => {
   setTimeout(() => boot.classList.add("hidden"), 650);
 };
 
+function indicatorsSetting() {
+  const asked = params.get("indicators");
+  try {
+    if (asked === "1" || asked === "0") localStorage.setItem("el.indicators", asked);
+    return localStorage.getItem("el.indicators") === "1";
+  } catch (_) {
+    return asked === "1";
+  }
+}
+
 async function main() {
   const config = {
     echo: params.get("mode") === "echo",
@@ -62,6 +72,9 @@ async function main() {
     // Sign in with the browser's wallet (`?signin=1`): back on the resume token from the last
     // sign-in while it's good, so the wallet isn't asked every time.
     signIn: params.get("signin") === "1",
+    // Cast with an indicator: hold an ability's key to see its reach, let go to cast
+    // (`?indicators=1`; `?indicators=0` back to quick cast). Remembered for the next visit.
+    indicators: indicatorsSetting(),
   };
   if (config.signIn) {
     try {

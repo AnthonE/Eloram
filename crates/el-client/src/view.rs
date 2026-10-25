@@ -670,4 +670,50 @@ fn draw_gizmos(mut gizmos: Gizmos, session: Res<Session>, controls: Res<Controls
             Color::srgba(1.0, 0.35, 0.3, 0.8),
         );
     }
+    if let (Some(c), Some(s)) = (session.client.as_ref(), controls.aiming) {
+        indicator(&mut gizmos, c, s, controls.cursor, now);
+    }
+}
+
+/// Ability `s`'s reach while its key is held: its range around the champion, and its shape where
+/// it would land (a skillshot's lane, an area's circle at the cursor kept in range, a dash's path).
+fn indicator(gizmos: &mut Gizmos, c: &el_client_core::Client, s: u8, cursor: Option<Vec2>, now: f64) {
+    use el_sim::content::{Effect, Target};
+    let reach = Color::srgba(0.55, 0.8, 1.0, 0.75);
+    let shape = Color::srgba(1.0, 0.85, 0.35, 0.95);
+    let me = c.own_pos(now);
+    let own = c.pred.units[c.seat].radius;
+    let def = el_sim::content::champions::ability(c.pred.champs[c.seat].def, s);
+    if def.range > 0.0 {
+        ring(gizmos, me, def.range, reach);
+    }
+    let aim = cursor.unwrap_or(me);
+    let dir = (aim - me).normalize_or(Vec2::X);
+    let within = if aim.distance(me) > def.range { me + dir * def.range } else { aim };
+    match def.effect {
+        Effect::Line { width, .. } => {
+            let end = me + dir * def.range;
+            let side = dir.perp() * (width * 0.5);
+            for (a, b) in [(me + side, end + side), (me - side, end - side), (end + side, end - side)] {
+                gizmos.line(world(a, 0.08), world(b, 0.08), shape);
+            }
+        }
+        Effect::Area { radius, .. } | Effect::Zone { radius, .. } => {
+            ring(gizmos, if def.target == Target::Caster { me } else { within }, radius, shape);
+        }
+        Effect::Dash { radius, .. } => {
+            gizmos.line(world(me, 0.08), world(within, 0.08), shape);
+            ring(gizmos, within, radius.max(own), shape);
+        }
+        Effect::Blink { radius, .. } => ring(gizmos, within, radius.max(own), shape),
+        Effect::OnSelf { .. } => ring(gizmos, me, own * 1.6, shape),
+        // A spell at a unit: the ring on what's under the cursor says which.
+        Effect::Homing { .. } | Effect::Strike { .. } => {}
+    }
+}
+
+/// A circle on the floor, `r` game units about `at`.
+fn ring(gizmos: &mut Gizmos, at: Vec2, r: f32, color: Color) {
+    let flat = Quat::from_rotation_arc(Vec3::Z, Vec3::Y);
+    gizmos.circle(Isometry3d::new(world(at, 0.08), flat), r * S, color);
 }

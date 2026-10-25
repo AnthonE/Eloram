@@ -73,6 +73,12 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   // A skill point into Q; Blink (D) down the lane.
   await push(page, { t: "level", slot: 0 });
   s = await until(page, "Q levelled", (s) => s.ranks.startsWith("1,"));
+  // Q's indicator, as if its key were held with indicators on: its range and its shape.
+  await push(page, { t: "aim", slot: 0 });
+  s = await until(page, "Q's indicator", (s) => s.aiming === 0);
+  await page.screenshot({ path: `${shots}-aim.png` });
+  await push(page, { t: "aim", slot: null });
+  s = await until(page, "the key let go", (s) => s.aiming === -1);
   const ahead = (x: number) => (s.team === 0 ? x : 15360 - x);
   const before = s.x;
   await push(page, { t: "cast", slot: 4, x: ahead(3000), y: 1920 });

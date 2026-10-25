@@ -58,8 +58,8 @@ experience, gold, items, the kill feed, a minimap, the augment cards, the shop, 
 Chromium (queue, augment, shop, a skill, Blink, a walk with no correction at all, the enemy seen
 only once the waves meet).
 
-Not yet: champion art (they're capsules in their colours), cast indicators, WASD bound on the
-page (the champion select and five more champions came with Phase 5). Not measured: the frame
+Not yet: champion art (they're capsules in their colours), WASD bound on the page (the champion
+select, five more champions and cast indicators came with Phase 5). Not measured: the frame
 rate on a real GPU (headless Chromium here draws in software, about a frame a second at 960×540).
 
 ## 5. Mayhem, the record, spectating, Elo Pros

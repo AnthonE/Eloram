@@ -131,6 +131,10 @@ enum Cmd {
         champ: u8,
     },
     Ready,
+    /// An ability's indicator shown, as if its key were held (`slot: null` lets go without casting).
+    Aim {
+        slot: Option<u8>,
+    },
 }
 
 pub struct InboxPlugin;
@@ -210,6 +214,10 @@ fn inbox(
                 controls.lobby.push(ToServer::Ready);
                 continue;
             }
+            Cmd::Aim { slot } => {
+                controls.aiming = slot.filter(|&s| s < 6);
+                continue;
+            }
         };
         controls.pending.push(order);
     }
@@ -218,6 +226,7 @@ fn inbox(
 /// The match, for `window.__el`.
 fn match_status(
     session: Res<crate::session::Session>,
+    controls: Res<crate::input::Controls>,
     drawn: Res<crate::view::Drawn>,
     mut status: ResMut<DevStatus>,
     mut walk_max: Local<f32>,
@@ -284,6 +293,7 @@ fn match_status(
     status.set("team", u32::from(c.team));
     status.set("champion", ch.def().name);
     status.set("headliner", c.pred.headliner().name);
+    status.set("aiming", controls.aiming.map_or(-1, i32::from));
     status.set("started", c.started());
     status.set("tick", c.world.tick);
     status.set("pred_tick", c.pred.tick);
