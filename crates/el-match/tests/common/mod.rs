@@ -143,7 +143,28 @@ pub struct Player {
     pub up_bytes: u64,
     /// Orders this client gave, and the tick each was given for, in order.
     pub given: Vec<(u16, u32)>,
+    /// How well the client knows what its team sees: at each snapshot taken, the units the server's
+    /// team saw at its tick, those the client's newest record (carried on) didn't say exactly, and
+    /// how far off those were (units, summed).
+    pub agree: Agreement,
 }
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Agreement {
+    pub checked: u64,
+    pub wrong: u64,
+    pub unknown: u64,
+    pub off: f64,
+}
+
+impl Agreement {
+    pub fn wrong_share(&self) -> f64 {
+        (self.wrong + self.unknown) as f64 / self.checked.max(1) as f64
+    }
+}
+
+/// What each team's records said at a tick, for the units it saw.
+type Truth = (u32, Vec<[Option<el_proto::unit::QUnit>; 2]>);
 
 /// Called with every datagram as it leaves the server: the shard (at the tick it was made), the
 /// seat, the bytes.
@@ -169,6 +190,8 @@ pub struct Rig {
     /// Heap operations inside the shard's ticks (counted by `el_alloc`, when the test binary
     /// installs its allocator), and the ticks counted.
     pub heap_ops: u64,
+    /// The last few ticks' truth, for [`Agreement`].
+    truth: std::collections::VecDeque<Truth>,
 }
 
 impl Rig {
@@ -197,6 +220,7 @@ impl Rig {
                 sent_bytes: 0,
                 up_bytes: 0,
                 given: Vec::new(),
+                agree: Agreement::default(),
             });
         }
         Rig {
@@ -215,6 +239,7 @@ impl Rig {
             ticks: 0,
             quiet: false,
             heap_ops: 0,
+            truth: Default::default(),
         }
     }
 
@@ -264,6 +289,18 @@ impl Rig {
             let ((), ops) = el_alloc::count(|| shard.tick_at(now_us));
             self.heap_ops += ops;
             self.ticks += 1;
+            let m = &self.shard.matches[0];
+            let seen = (0..el_sim::units::MAX_UNITS)
+                .map(|i| {
+                    std::array::from_fn(|t| {
+                        (m.units[i].alive && m.vision.units[t].get(i)).then(|| m.quantize(i, t as u8))
+                    })
+                })
+                .collect();
+            self.truth.push_back((m.tick, seen));
+            if self.truth.len() > 64 {
+                self.truth.pop_front();
+            }
             while let Ok(b) = self.records.rings[0].pop() {
                 self.record.push(b);
             }
@@ -282,7 +319,12 @@ impl Rig {
         // Server to client; the clients' frames.
         for p in &mut self.players {
             for bytes in p.down.deliver(now) {
-                p.client.on_datagram(&bytes, now).expect("every datagram decodes");
+                let taken = p.client.on_datagram(&bytes, now).expect("every datagram decodes");
+                if let el_client_core::Taken::Taken { tick, .. } = taken
+                    && let Some((_, truth)) = self.truth.iter().find(|(t, _)| *t == tick)
+                {
+                    agree(&mut p.agree, &p.client, truth, tick);
+                }
                 if let Some(c) = p.client.correction.take() {
                     p.corrections.push(c);
                 }
@@ -321,4 +363,29 @@ pub fn quantile(xs: &mut [f32], q: f64) -> f32 {
     }
     xs.sort_by(f32::total_cmp);
     xs[((xs.len() - 1) as f64 * q).round() as usize]
+}
+
+fn agree(a: &mut Agreement, c: &Client, truth: &[[Option<el_proto::unit::QUnit>; 2]], tick: u32) {
+    for (i, t) in truth.iter().enumerate() {
+        let Some(want) = t[usize::from(c.team)] else { continue };
+        if i == c.seat {
+            continue;
+        }
+        a.checked += 1;
+        let track = &c.tracks[i];
+        let Some((at, q)) = track.newest().filter(|_| track.known) else {
+            a.unknown += 1;
+            continue;
+        };
+        let same = if at == tick {
+            q == want
+        } else {
+            at < tick && el_proto::unit::Delta::plan(&want, &q, tick - at).is_some_and(|d| d.is_same())
+        };
+        if !same {
+            a.wrong += 1;
+            let p = el_proto::quant::pos_from_code(q.carried(tick.saturating_sub(at)));
+            a.off += f64::from(p.distance(el_proto::quant::pos_from_code(want.pos)));
+        }
+    }
 }

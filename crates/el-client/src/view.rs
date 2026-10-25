@@ -564,7 +564,18 @@ fn draw_missiles(
     }
 }
 
-/// Spawns a flash for an area that landed, and fades every flash out.
+/// A ping's colour: warnings red, a call to fight orange, the rest the team's own light.
+fn ping_color(kind: u8) -> Color {
+    use el_proto::order::ping;
+    match kind {
+        ping::DANGER | ping::BACK => Color::srgb(0.95, 0.30, 0.25),
+        ping::ATTACK => Color::srgb(0.98, 0.60, 0.20),
+        ping::GONE => Color::srgb(0.98, 0.86, 0.30),
+        _ => Color::srgb(0.55, 0.85, 1.0),
+    }
+}
+
+/// Spawns a flash for an area that landed or a ping, and fades every flash out.
 fn draw_flashes(
     mut commands: Commands,
     mut session: ResMut<Session>,
@@ -576,14 +587,17 @@ fn draw_flashes(
     let now = now_s();
     let mesh = ring.get_or_insert_with(|| meshes.add(Annulus::new(0.9, 1.0))).clone();
     let mut new = Vec::new();
-    session.read_events(now, |e| {
-        if let WireEvent::Area { at, radius, team } = *e {
-            new.push((pos_from_code(at), f32::from(radius), team));
+    session.read_events(now, |e| match *e {
+        WireEvent::Area { at, radius, team } => {
+            new.push((pos_from_code(at), f32::from(radius), TEAM[usize::from(team.min(1))], 0.6));
         }
+        // A teammate's ping: a ring that stays a while, coloured by what it says.
+        WireEvent::Ping { at, kind, .. } => new.push((pos_from_code(at), 150.0, ping_color(kind), 2.5)),
+        _ => {}
     });
-    for (at, radius, team) in new {
+    for (at, radius, color, life) in new {
         let m = materials.add(StandardMaterial {
-            base_color: TEAM[usize::from(team.min(1))].with_alpha(0.9),
+            base_color: color.with_alpha(0.9),
             unlit: true,
             alpha_mode: AlphaMode::Blend,
             ..default()
@@ -593,7 +607,7 @@ fn draw_flashes(
             MeshMaterial3d(m),
             Transform::from_translation(world(at, 0.08))
                 .with_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-            Flash { born: now, life: 0.6, radius: radius * S },
+            Flash { born: now, life, radius: radius * S },
         ));
     }
     for (e, f, mut tf, m) in &mut flashes {

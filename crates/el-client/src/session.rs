@@ -92,8 +92,23 @@ pub struct Session {
     /// Each seat's kills and deaths, as the kill feed told them.
     pub kd: [(u16, u16); SEATS],
     pub feed: Vec<FeedLine>,
+    /// Teammates' pings heard, all told.
+    pub pings: u32,
     /// The client's events read so far.
     feed_read: u64,
+}
+
+/// What a ping says, in words.
+pub fn ping_words(kind: u8) -> &'static str {
+    use el_proto::order::ping;
+    match kind {
+        ping::DANGER => "careful!",
+        ping::COMING => "on my way",
+        ping::GONE => "one's missing",
+        ping::ATTACK => "go in!",
+        ping::BACK => "fall back",
+        _ => "look here",
+    }
 }
 
 impl Session {
@@ -123,6 +138,20 @@ impl Session {
                     lines.push(FeedLine { text, at: now });
                 }
                 WireEvent::Area { .. } | WireEvent::MissileEnd { .. } => area(&e),
+                WireEvent::Ping { seat, kind, .. } => {
+                    self.pings += 1;
+                    let text = format!("{}: {}", self.name(usize::from(seat)), ping_words(kind));
+                    lines.push(FeedLine { text, at: now });
+                    area(&e);
+                }
+                WireEvent::Vote { yes, no, open, passed, .. } => {
+                    let text = match (open, passed) {
+                        (true, _) => format!("Surrender? {} yes, {} no", yes.count_ones(), no.count_ones()),
+                        (false, true) => "Your team surrendered".into(),
+                        (false, false) => "The vote to surrender failed".into(),
+                    };
+                    lines.push(FeedLine { text, at: now });
+                }
                 _ => {}
             }
         }

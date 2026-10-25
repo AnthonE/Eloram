@@ -75,6 +75,22 @@ pub enum Event {
     Outcome {
         winner: u8,
     },
+    /// A seat's ping (`el_proto::order::ping`): where, and the unit it names
+    /// ([`crate::voice::NO_UNIT`]: none). Its team's alone.
+    Ping {
+        seat: u8,
+        kind: u8,
+        at: Vec2,
+        unit: u16,
+    },
+    /// A team's surrender vote, as it stands or as it closed. Its team's alone.
+    Vote {
+        team: u8,
+        yes: u8,
+        no: u8,
+        open: bool,
+        passed: bool,
+    },
 }
 
 impl Default for Event {

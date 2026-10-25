@@ -1,4 +1,5 @@
-//! Orders: what a MOBA player tells their champion. Move, attack, cast, level, pick, buy.
+//! Orders: what a MOBA player tells their champion. Move, attack, cast, level, pick, buy; and
+//! what they tell their team: a ping, a vote to surrender.
 //!
 //! An order is sent with a sequence number, repeated in every input packet until the server has
 //! acked it, and applied by the server exactly once (`docs/NETCODE.md`, "Inputs"). Its positions go
@@ -55,6 +56,23 @@ pub mod slot {
     pub const COUNT: usize = 6;
 }
 
+/// What a ping says ([`Order::Ping`]).
+pub mod ping {
+    /// Look here.
+    pub const LOOK: u8 = 0;
+    /// Careful: danger here.
+    pub const DANGER: u8 = 1;
+    /// On my way.
+    pub const COMING: u8 = 2;
+    /// An enemy is missing from where it was.
+    pub const GONE: u8 = 3;
+    /// Go in: attack this.
+    pub const ATTACK: u8 = 4;
+    /// Fall back.
+    pub const BACK: u8 = 5;
+    pub const COUNT: u8 = 6;
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Order {
     /// Walk to a point, and stand there.
@@ -80,6 +98,10 @@ pub enum Order {
     Buy { item: u8 },
     /// Sell what's in an inventory slot.
     Sell { inv: u8 },
+    /// Tell the team something ([`ping`]) about a place, or a unit the team sees there.
+    Ping { kind: u8, at: Vec2, unit: Option<UnitRef> },
+    /// Vote to surrender (or not): a yes opens a vote when none is.
+    Surrender { yes: bool },
 }
 
 const TAG_BITS: u32 = 4;
@@ -93,6 +115,7 @@ impl Order {
             Order::Cast { slot, aim: Aim::Point(p) } => {
                 Order::Cast { slot, aim: Aim::Point(quantize_pos(p)) }
             }
+            Order::Ping { kind, at, unit } => Order::Ping { kind, at: quantize_pos(at), unit },
             o => o,
         }
     }
@@ -110,6 +133,8 @@ impl Order {
             Order::Reroll { .. } => 8,
             Order::Buy { .. } => 9,
             Order::Sell { .. } => 10,
+            Order::Ping { .. } => 11,
+            Order::Surrender { .. } => 12,
         }
     }
 
@@ -137,6 +162,15 @@ impl Order {
             Order::PickAugment { card } | Order::Reroll { card } => w.write_bits(u32::from(card), 2),
             Order::Buy { item } => w.write_bits(u32::from(item), 6),
             Order::Sell { inv } => w.write_bits(u32::from(inv), 3),
+            Order::Ping { kind, at, unit } => {
+                w.write_bits(u32::from(kind), 3);
+                write_pos(w, at);
+                w.write_bool(unit.is_some());
+                if let Some(u) = unit {
+                    u.write(w);
+                }
+            }
+            Order::Surrender { yes } => w.write_bool(yes),
         }
     }
 
@@ -165,6 +199,16 @@ impl Order {
             8 => Order::Reroll { card: Self::card(r)? },
             9 => Order::Buy { item: r.read_bits(6) as u8 },
             10 => Order::Sell { inv: r.read_bits(3) as u8 },
+            11 => {
+                let kind = r.read_bits(3) as u8;
+                if kind >= ping::COUNT {
+                    return Err(DecodeError::Invalid);
+                }
+                let at = read_pos(r);
+                let unit = r.read_bool().then(|| UnitRef::read(r));
+                Order::Ping { kind, at, unit }
+            }
+            12 => Order::Surrender { yes: r.read_bool() },
             _ => return Err(DecodeError::Invalid),
         };
         if r.overflowed() { Err(DecodeError::Truncated) } else { Ok(o) }
@@ -192,6 +236,8 @@ impl Order {
                 Order::LevelSkill { .. } | Order::PickAugment { .. } | Order::Reroll { .. } => 2,
                 Order::Buy { .. } => 6,
                 Order::Sell { .. } => 3,
+                Order::Ping { unit, .. } => 3 + 32 + 1 + if unit.is_some() { UnitRef::BITS } else { 0 },
+                Order::Surrender { .. } => 1,
             }
     }
 }
@@ -200,7 +246,7 @@ impl Order {
 mod tests {
     use super::*;
 
-    fn every() -> [Order; 13] {
+    fn every() -> [Order; 16] {
         let u = UnitRef { slot: 37, generation: 200 };
         let p = Vec2::new(7_123.4, 1_901.2);
         [
@@ -217,6 +263,9 @@ mod tests {
             Order::Reroll { card: 1 },
             Order::Buy { item: 63 },
             Order::Sell { inv: 6 },
+            Order::Ping { kind: ping::DANGER, at: p, unit: None },
+            Order::Ping { kind: ping::BACK, at: p, unit: Some(u) },
+            Order::Surrender { yes: true },
         ]
     }
 

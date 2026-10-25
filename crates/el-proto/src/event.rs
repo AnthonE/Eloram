@@ -6,7 +6,29 @@
 use crate::quant::{POS_X_BITS, POS_Y_BITS};
 use crate::{BitReader, BitWriter, DecodeError};
 
-const KIND_BITS: u32 = 4;
+const KIND_BITS: u32 = 5;
+/// An event's tick (when a unit left sight, where a missile was): how many ticks before its
+/// snapshot's, in [`AGE_BITS`] after a bit, or else whole.
+const AGE_BITS: u32 = 5;
+
+fn tick_bits(t: u32, now: u32) -> u32 {
+    1 + if now.wrapping_sub(t) < 1 << AGE_BITS { AGE_BITS } else { 32 }
+}
+
+fn write_tick(w: &mut BitWriter<'_>, t: u32, now: u32) {
+    let age = now.wrapping_sub(t);
+    let short = age < 1 << AGE_BITS;
+    w.write_bool(short);
+    if short {
+        w.write_bits(age, AGE_BITS);
+    } else {
+        w.write_u32(t);
+    }
+}
+
+fn read_tick(r: &mut BitReader<'_>, now: u32) -> u32 {
+    if r.read_bool() { now.wrapping_sub(r.read_bits(AGE_BITS)) } else { r.read_u32() }
+}
 /// Events a list carries at most.
 pub const MAX_LIST: usize = 63;
 const COUNT_BITS: u32 = 6;
@@ -72,6 +94,22 @@ pub enum WireEvent {
     Outcome {
         winner: u8,
     },
+    /// A teammate's ping ([`crate::order::ping`]): where, and the unit it names (255: none).
+    Ping {
+        seat: u8,
+        kind: u8,
+        at: [u32; 2],
+        unit: u8,
+    },
+    /// The team's surrender vote as it stands: who said yes and who no (a bit a seat of the team,
+    /// in seat order), whether it's still open, and whether it passed.
+    Vote {
+        team: u8,
+        yes: u8,
+        no: u8,
+        open: bool,
+        passed: bool,
+    },
     // Unreliable.
     Damage {
         target: u8,
@@ -130,17 +168,21 @@ impl WireEvent {
             WireEvent::Attack { .. } => 12,
             WireEvent::Area { .. } => 13,
             WireEvent::Blink { .. } => 14,
-            WireEvent::Nothing => 15,
+            WireEvent::Ping { .. } => 15,
+            WireEvent::Vote { .. } => 16,
+            WireEvent::Nothing => 31,
         }
     }
 
-    /// Bits [`write`](Self::write) takes.
-    pub fn bits(&self) -> usize {
+    /// Bits [`write`](Self::write) takes in a snapshot of tick `now`.
+    pub fn bits(&self, now: u32) -> usize {
         let pos = POS_X_BITS + POS_Y_BITS;
         (KIND_BITS
-            + match self {
-                WireEvent::Leave { .. } => 8 + 8 + 32,
-                WireEvent::MissileSpawn { .. } => 9 + 8 + 1 + 12 + 8 + pos + 32 + 8 + 10 + 12 + 13 + 8,
+            + match *self {
+                WireEvent::Leave { tick, .. } => 8 + 8 + tick_bits(tick, now),
+                WireEvent::MissileSpawn { t0, .. } => {
+                    9 + 8 + 1 + 12 + 8 + pos + tick_bits(t0, now) + 8 + 10 + 12 + 13 + 8
+                }
                 WireEvent::MissileEnd { .. } => 9 + 8 + pos,
                 WireEvent::Cast { .. } => 8 + 3 + pos,
                 WireEvent::Death { .. } => 16,
@@ -154,11 +196,14 @@ impl WireEvent {
                 WireEvent::Attack { .. } => 16,
                 WireEvent::Area { .. } => pos + 11 + 1,
                 WireEvent::Blink { .. } => 8 + pos,
+                WireEvent::Ping { .. } => 4 + 3 + pos + 8,
+                WireEvent::Vote { .. } => 1 + 5 + 5 + 2,
                 WireEvent::Nothing => 0,
             }) as usize
     }
 
-    pub fn write(&self, w: &mut BitWriter<'_>) {
+    /// Writes it in a snapshot of tick `now`.
+    pub fn write(&self, w: &mut BitWriter<'_>, now: u32) {
         let pos = |w: &mut BitWriter<'_>, p: [u32; 2]| {
             w.write_bits(p[0], POS_X_BITS);
             w.write_bits(p[1], POS_Y_BITS);
@@ -168,7 +213,7 @@ impl WireEvent {
             WireEvent::Leave { slot, generation, tick } => {
                 w.write_u8(slot);
                 w.write_u8(generation);
-                w.write_u32(tick);
+                write_tick(w, tick, now);
             }
             WireEvent::MissileSpawn {
                 id,
@@ -190,7 +235,7 @@ impl WireEvent {
                 w.write_bits(u32::from(source), 12);
                 w.write_u8(owner);
                 pos(w, origin);
-                w.write_u32(t0);
+                write_tick(w, t0, now);
                 w.write_u8(target);
                 w.write_bits(dir, 10);
                 w.write_bits(u32::from(speed).min(4_095), 12);
@@ -248,14 +293,28 @@ impl WireEvent {
                 w.write_u8(unit);
                 pos(w, to);
             }
+            WireEvent::Ping { seat, kind, at, unit } => {
+                w.write_bits(u32::from(seat), 4);
+                w.write_bits(u32::from(kind), 3);
+                pos(w, at);
+                w.write_u8(unit);
+            }
+            WireEvent::Vote { team, yes, no, open, passed } => {
+                w.write_bits(u32::from(team), 1);
+                w.write_bits(u32::from(yes), 5);
+                w.write_bits(u32::from(no), 5);
+                w.write_bool(open);
+                w.write_bool(passed);
+            }
             WireEvent::Nothing => {}
         }
     }
 
-    pub fn read(r: &mut BitReader<'_>) -> Result<Self, DecodeError> {
+    /// Reads one from a snapshot of tick `now`.
+    pub fn read(r: &mut BitReader<'_>, now: u32) -> Result<Self, DecodeError> {
         let pos = |r: &mut BitReader<'_>| [r.read_bits(POS_X_BITS), r.read_bits(POS_Y_BITS)];
         let e = match r.read_bits(KIND_BITS) {
-            0 => WireEvent::Leave { slot: r.read_u8(), generation: r.read_u8(), tick: r.read_u32() },
+            0 => WireEvent::Leave { slot: r.read_u8(), generation: r.read_u8(), tick: read_tick(r, now) },
             1 => WireEvent::MissileSpawn {
                 id: r.read_bits(9) as u16,
                 generation: r.read_u8(),
@@ -263,7 +322,7 @@ impl WireEvent {
                 source: r.read_bits(12) as u16,
                 owner: r.read_u8(),
                 origin: pos(r),
-                t0: r.read_u32(),
+                t0: read_tick(r, now),
                 target: r.read_u8(),
                 dir: r.read_bits(10),
                 speed: r.read_bits(12) as u16,
@@ -285,39 +344,54 @@ impl WireEvent {
             12 => WireEvent::Attack { unit: r.read_u8(), target: r.read_u8() },
             13 => WireEvent::Area { at: pos(r), radius: r.read_bits(11) as u16, team: r.read_bits(1) as u8 },
             14 => WireEvent::Blink { unit: r.read_u8(), to: pos(r) },
+            15 => WireEvent::Ping {
+                seat: r.read_bits(4) as u8,
+                kind: r.read_bits(3) as u8,
+                at: pos(r),
+                unit: r.read_u8(),
+            },
+            16 => WireEvent::Vote {
+                team: r.read_bits(1) as u8,
+                yes: r.read_bits(5) as u8,
+                no: r.read_bits(5) as u8,
+                open: r.read_bool(),
+                passed: r.read_bool(),
+            },
             _ => WireEvent::Nothing,
         };
         if r.overflowed() { Err(DecodeError::Truncated) } else { Ok(e) }
     }
 }
 
-/// Writes a list of events: their count, then each (a reliable list first writes its first id).
-pub fn write_list(w: &mut BitWriter<'_>, first_id: Option<u16>, events: &[WireEvent]) {
+/// Writes a list of events in a snapshot of tick `now`: their count, then each (a reliable list
+/// first writes its first id).
+pub fn write_list(w: &mut BitWriter<'_>, now: u32, first_id: Option<u16>, events: &[WireEvent]) {
     let n = events.len().min(MAX_LIST);
     w.write_bits(n as u32, COUNT_BITS);
     if let Some(id) = first_id {
         w.write_u16(id);
     }
     for e in &events[..n] {
-        e.write(w);
+        e.write(w, now);
     }
 }
 
 /// Bits [`write_list`] takes for these events.
-pub fn list_bits(reliable: bool, events: &[WireEvent]) -> usize {
-    COUNT_BITS as usize + if reliable { 16 } else { 0 } + events.iter().map(WireEvent::bits).sum::<usize>()
+pub fn list_bits(now: u32, reliable: bool, events: &[WireEvent]) -> usize {
+    COUNT_BITS as usize + if reliable { 16 } else { 0 } + events.iter().map(|e| e.bits(now)).sum::<usize>()
 }
 
 /// Reads a list into `out`: the first id (reliable lists) and how many.
 pub fn read_list(
     r: &mut BitReader<'_>,
+    now: u32,
     reliable: bool,
     out: &mut [WireEvent; MAX_LIST],
 ) -> Result<(u16, usize), DecodeError> {
     let n = r.read_bits(COUNT_BITS) as usize;
     let first = if reliable { r.read_u16() } else { 0 };
     for e in out.iter_mut().take(n) {
-        *e = WireEvent::read(r)?;
+        *e = WireEvent::read(r, now)?;
     }
     if r.overflowed() { Err(DecodeError::Truncated) } else { Ok((first, n)) }
 }
@@ -326,10 +400,15 @@ pub fn read_list(
 mod tests {
     use super::*;
 
+    const NOW: u32 = 1_234_567;
+
     #[test]
     fn every_event_round_trips_and_says_its_size() {
         let all = [
             WireEvent::Leave { slot: 40, generation: 3, tick: 99_999 },
+            WireEvent::Leave { slot: 41, generation: 3, tick: NOW - 31 },
+            WireEvent::Leave { slot: 42, generation: 3, tick: NOW - 32 },
+            WireEvent::Leave { slot: 43, generation: 3, tick: NOW + 1 },
             WireEvent::MissileSpawn {
                 id: 511,
                 generation: 200,
@@ -337,7 +416,7 @@ mod tests {
                 source: 0x123,
                 owner: 255,
                 origin: [70_000, 20_000],
-                t0: 1_234_567,
+                t0: NOW - 2,
                 target: 255,
                 dir: 700,
                 speed: 2_000,
@@ -357,20 +436,22 @@ mod tests {
             WireEvent::Attack { unit: 30, target: 2 },
             WireEvent::Area { at: [100, 200], radius: 350, team: 0 },
             WireEvent::Blink { unit: 4, to: [1, 2] },
+            WireEvent::Ping { seat: 9, kind: 5, at: [3, 4], unit: 255 },
+            WireEvent::Vote { team: 1, yes: 0b10110, no: 0b00001, open: true, passed: false },
         ];
         for e in all {
             let mut buf = [0u8; 64];
             let mut w = BitWriter::new(&mut buf);
-            e.write(&mut w);
-            assert_eq!(w.bits_written(), e.bits(), "{e:?}");
-            assert_eq!(WireEvent::read(&mut BitReader::new(&buf)).unwrap(), e);
+            e.write(&mut w, NOW);
+            assert_eq!(w.bits_written(), e.bits(NOW), "{e:?}");
+            assert_eq!(WireEvent::read(&mut BitReader::new(&buf), NOW).unwrap(), e);
         }
         let mut buf = [0u8; 512];
         let mut w = BitWriter::new(&mut buf);
-        write_list(&mut w, Some(65_530), &all);
-        assert_eq!(w.bits_written(), list_bits(true, &all));
+        write_list(&mut w, NOW, Some(65_530), &all);
+        assert_eq!(w.bits_written(), list_bits(NOW, true, &all));
         let mut out = [WireEvent::Nothing; MAX_LIST];
-        let (first, n) = read_list(&mut BitReader::new(&buf), true, &mut out).unwrap();
+        let (first, n) = read_list(&mut BitReader::new(&buf), NOW, true, &mut out).unwrap();
         assert_eq!((first, n), (65_530, all.len()));
         assert_eq!(&out[..n], &all);
     }

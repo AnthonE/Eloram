@@ -153,6 +153,13 @@ impl Oracle {
                         })
                 }
                 WireEvent::Relic { unit, .. } => !ok_unit(self, unit),
+                // A teammate's word, naming what the team sees.
+                WireEvent::Ping { seat, unit, .. } => {
+                    usize::from(seat) >= SEATS
+                        || team_of_seat(usize::from(seat)) != team
+                        || !ok_unit(self, unit)
+                }
+                WireEvent::Vote { team: voters, .. } => voters != team,
                 WireEvent::Leave { .. }
                 | WireEvent::MissileEnd { .. }
                 | WireEvent::Outcome { .. }

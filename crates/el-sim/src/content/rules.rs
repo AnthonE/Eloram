@@ -22,6 +22,16 @@ pub const FALLOFF_MAX: f32 = 0.85;
 pub const FALLOFF_MIN: f32 = 0.70;
 /// Who counts for an assist: champions who hurt the victim this recently.
 pub const ASSIST_SECS: f32 = 10.0;
+/// A vote to surrender may open from this second; it stays open this long; it passes with this
+/// share of the team's players (four of five; bots don't vote); after one fails, the team waits
+/// this long for the next.
+pub const SURRENDER_FROM: f32 = 8.0 * 60.0;
+pub const SURRENDER_VOTE: f32 = 60.0;
+pub const SURRENDER_SHARE: (u32, u32) = (4, 5);
+pub const SURRENDER_AGAIN: f32 = 3.0 * 60.0;
+/// Pings: this many at once, then one every this many seconds.
+pub const PING_BURST: u32 = 5;
+pub const PING_EVERY: f32 = 1.0;
 
 /// Seconds dead at `level`: 11 at level 3, to 40 at 18.
 pub fn death_secs(level: u8) -> f32 {

@@ -46,9 +46,33 @@ fn report(rig: &Rig) {
             p.client.clock.lead,
             s.missed,
         );
+        let a = &p.agree;
+        println!(
+            "  what the team sees: {} of {} units not as the server had them at the snapshot's tick ({:.2}%, {} unknown), {:.2} units off on average",
+            a.wrong + a.unknown,
+            a.checked,
+            100.0 * a.wrong_share(),
+            a.unknown,
+            a.off / a.wrong.max(1) as f64,
+        );
         for (cause, (n, p50, p99, max)) in by_cause(rig, k) {
             println!("  {cause:?}: {n} corrections, p50 {p50:.2}, p99 {p99:.2}, max {max:.1}");
         }
+    }
+}
+
+/// A record goes once (and once more), and again only if it's lost: the client still knows what
+/// its team sees as the server had it, all but a few times in a thousand over 5% loss.
+fn told_as_seen(rig: &Rig) {
+    for p in &rig.players {
+        assert!(p.agree.checked > 10_000, "seat {}: {} checked", p.seat, p.agree.checked);
+        let share = p.agree.wrong_share();
+        assert!(
+            share < 0.005,
+            "seat {}: {:.2}% of what it sees not as the server had it",
+            p.seat,
+            100.0 * share
+        );
     }
 }
 
@@ -82,6 +106,7 @@ fn walking_is_predicted_exactly_over_a_bad_link() {
         assert!((0.08..0.16).contains(&p.client.clock.rtt), "rtt {:.3}", p.client.clock.rtt);
     }
     orders_applied_once(&rig);
+    told_as_seen(&rig);
 }
 
 #[test]
@@ -131,12 +156,15 @@ fn bots_play_a_match_through_the_wire() {
         assert_eq!((s.errors, s.no_baseline), (0, 0), "seat {}", p.seat);
         assert!(p.given.len() > 100, "seat {} gave {} orders", p.seat, p.given.len());
         let kbps = p.sent_bytes as f64 / rig.now / 1_000.0;
-        assert!(kbps < 30.0, "seat {}: {kbps:.1} KB/s down", p.seat);
+        assert!(kbps < 6.0, "seat {}: {kbps:.1} KB/s down", p.seat);
+        let up = p.up_bytes as f64 / rig.now / 1_000.0;
+        assert!(up < 1.5, "seat {}: {up:.1} KB/s up", p.seat);
         assert!(p.max_datagram <= el_proto::MAX_DATAGRAM);
         let c = &m.champs[p.seat];
         assert!(c.level > 3, "seat {} grew past the start: level {}", p.seat, c.level);
     }
     orders_applied_once(&rig);
+    told_as_seen(&rig);
     assert!(rig.players.iter().all(|p| p.seat < SEATS));
 }
 
@@ -200,4 +228,79 @@ fn a_page_drawing_twice_a_second_still_plays() {
     assert_eq!((p.client.stats.errors, p.client.stats.no_baseline), (0, 0));
     assert!(p.given.len() > 20, "{} orders", p.given.len());
     orders_applied_once(&rig);
+}
+
+#[test]
+fn an_outage_is_ridden_out() {
+    // Three seconds with nothing through either way: nothing acked, every datagram lost. After it,
+    // what was lost goes again and the client knows its team's view as before.
+    let outage = common::LinkSpec { outage: Some((40.0, 43.0)), ..BAD };
+    let mut rig = Rig::new(21, vec![(3, outage, bot_brain())]);
+    rig.run(40.0);
+    let before = rig.players[0].agree;
+    rig.run(10.0);
+    rig.players[0].agree = common::Agreement::default();
+    rig.run(30.0);
+    rig.settle(5.0);
+    report(&rig);
+    let p = &rig.players[0];
+    assert_eq!((p.client.stats.errors, p.client.stats.no_baseline), (0, 0));
+    assert!(before.checked > 10_000);
+    told_as_seen(&rig);
+    orders_applied_once(&rig);
+}
+
+#[test]
+fn a_ping_reaches_the_team_alone_and_a_vote_ends_the_match() {
+    use el_proto::event::WireEvent;
+    use el_proto::order::ping;
+    use el_sim::content::rules;
+    use el_sim::ticks;
+    let from = ticks(rules::SURRENDER_FROM);
+    // Seat 0 pings once, and opens a vote at 8:00; seat 1, its teammate, says yes when it sees one
+    // open; seat 5 is the enemy's.
+    let opener: Brain = Box::new(move |_, _, k, out| {
+        if k == 150 {
+            out.push(el_proto::Order::Ping {
+                kind: ping::COMING,
+                at: glam::Vec2::new(3_000.0, 1_900.0),
+                unit: None,
+            });
+        }
+        if k == from + 30 {
+            out.push(el_proto::Order::Surrender { yes: true });
+        }
+    });
+    let mut voted = false;
+    let follower: Brain = Box::new(move |m, _, _, out| {
+        if m.surrender[0].open() && !voted {
+            voted = true;
+            out.push(el_proto::Order::Surrender { yes: true });
+        }
+    });
+    let mut rig =
+        Rig::new(3, vec![(0, BAD, opener), (1, BAD, follower), (5, BAD, Box::new(|_, _, _, _| {}))]);
+    rig.run(10.0);
+    let pings = |k: usize| {
+        let c = &rig.players[k].client;
+        c.feed[..(c.feed_n as usize).min(c.feed.len())]
+            .iter()
+            .filter(|(_, e)| matches!(e, WireEvent::Ping { seat: 0, kind: ping::COMING, .. }))
+            .count()
+    };
+    assert_eq!((pings(0), pings(1), pings(2)), (1, 1, 0), "the team's, once each, and not the enemy's");
+    rig.run_until(f64::from(from) / 30.0 + 10.0, |r| r.m().outcome.is_some());
+    assert_eq!(rig.m().outcome, Some(el_sim::map::DUSK), "two players of two said yes");
+    rig.run(1.0);
+    for p in &rig.players {
+        assert!(p.client.over, "seat {} was told", p.seat);
+    }
+    // The record holds the votes and who could vote: it replays to the same end.
+    let mut referee = el_sim::record::Referee::new(common::map());
+    for f in el_sim::record::Frames::new(&rig.record) {
+        referee.take(&f).expect("the replay keeps to the record");
+    }
+    referee.flush();
+    assert_eq!(referee.m.hash(), rig.m().hash());
+    assert_eq!(referee.m.outcome, Some(el_sim::map::DUSK));
 }

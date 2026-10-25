@@ -14,6 +14,12 @@ impl Match {
     /// Unit `i`'s record as `team` may have it: what it's attacking is named only if `team` sees
     /// that too.
     pub fn quantize(&self, i: usize, team: u8) -> QUnit {
+        self.quantize_teams(i)[usize::from(team)]
+    }
+
+    /// Unit `i`'s record as each team may have it, worked out once: the two differ only in what
+    /// it's attacking.
+    pub fn quantize_teams(&self, i: usize) -> [QUnit; 2] {
         let now = self.tick;
         let u = &self.units[i];
         let max = u.stats.max_hp.max(1.0);
@@ -49,11 +55,8 @@ impl Match {
         } else {
             (0, 0)
         };
-        let target = self
-            .live(u.target)
-            .filter(|&t| self.vision.units[usize::from(team)].get(t))
-            .map_or(unit::NO_TARGET, |t| t as u8);
-        QUnit {
+        let target = self.live(u.target);
+        let q = QUnit {
             slot: i as u8,
             generation: u.generation as u8,
             kind: u.kind as u8,
@@ -71,9 +74,15 @@ impl Match {
             level,
             flags: f,
             cast,
-            target,
+            target: unit::NO_TARGET,
             corner: u.path.corner().map(pos_code),
-        }
+        };
+        let seen = |team: usize| {
+            let target =
+                target.filter(|&t| self.vision.units[team].get(t)).map_or(unit::NO_TARGET, |t| t as u8);
+            QUnit { target, ..q }
+        };
+        [seen(0), seen(1)]
     }
 
     /// The client's model takes a record: the unit as the server says it is (seen by the team now).

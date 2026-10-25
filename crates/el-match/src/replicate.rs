@@ -1,20 +1,24 @@
 //! What each seat is sent each tick (`docs/NETCODE.md`, "The wire" and "Fog is the server's").
 //!
 //! Each unit's record is quantized once a tick a team ([`MatchNet::record`]) and kept [`KEPT`]
-//! ticks, so a seat's records are deltas against the last one it acked. A seat is sent only its
-//! team's view: allies, and what the team sees; when it stops seeing a unit, a `Leave`. Events go
-//! through a team rule each, written out case by case: there is no catch-all arm, so a new event
-//! can't reach anyone until someone decides who may know it.
+//! ticks, so a seat's records are deltas against the last one it acked, which the seat keeps however
+//! old. A record goes once: it is sent again only if what it says changes, or the datagram that
+//! carried it is known lost (the client acks a newer one and not it: it takes nothing older than
+//! what it has), or no ack came for [`KEPT`] ticks. A seat is sent only its team's view: allies,
+//! and what the team sees; when it stops seeing a unit, a `Leave`. Events go through a team rule
+//! each, written out case by case: there is no catch-all arm, so a new event can't reach anyone
+//! until someone decides who may know it.
 
 use el_proto::event::{self, MAX_LIST, WireEvent};
 use el_proto::quant::{facing_code, pos_code};
 use el_proto::snapshot::{SnapshotHeader, snap_flags};
-use el_proto::unit::{Delta, KEPT, QUnit};
+use el_proto::unit::{BACK_MAX, Delta, KEPT, QUnit};
 use el_proto::{BitWriter, ack};
 use el_sim::events::Event;
 use el_sim::game::Match;
 use el_sim::map::Map;
 use el_sim::missile::MAX_MISSILES;
+use el_sim::own::{OWN_BASELINES, OwnState, OwnWidths, own_widths};
 use el_sim::storage::boxed;
 use el_sim::units::{Kind, MAX_UNITS, SEATS, team_of_seat};
 
@@ -33,6 +37,7 @@ pub const HIDDEN: u8 = u8::MAX;
 /// A match's units' records for the last [`KEPT`] ticks, as each team has them.
 pub struct MatchNet {
     history: Box<[[QUnit; 2]]>,
+    own_widths: OwnWidths,
 }
 
 impl Default for MatchNet {
@@ -43,15 +48,19 @@ impl Default for MatchNet {
 
 impl MatchNet {
     pub fn new() -> Self {
-        Self { history: boxed(KEPT * MAX_UNITS, [QUnit::default(); 2]) }
+        Self { history: boxed(KEPT * MAX_UNITS, [QUnit::default(); 2]), own_widths: own_widths() }
     }
 
-    /// Quantizes every live unit for both teams, once, after the tick.
-    pub fn record(&mut self, m: &Match) {
+    /// Quantizes every live unit for both teams, once, after the tick (nothing, when no seat is
+    /// sent to: a match of bots).
+    pub fn record(&mut self, m: &Match, any: bool) {
+        if !any {
+            return;
+        }
         let base = (m.tick as usize % KEPT) * MAX_UNITS;
         for i in 0..MAX_UNITS {
             if m.units[i].alive {
-                self.history[base + i] = [m.quantize(i, 0), m.quantize(i, 1)];
+                self.history[base + i] = m.quantize_teams(i);
             }
         }
     }
@@ -61,12 +70,24 @@ impl MatchNet {
     }
 }
 
+/// What a client has of a unit's record.
+enum Told {
+    /// Not all it says now: it goes.
+    No,
+    /// All of it, in one datagram not yet acked: it goes once more.
+    Once,
+    /// All of it, acked or sent twice and not known lost.
+    Yes,
+}
+
 #[derive(Clone, Copy, Default)]
 struct Sent {
     seq: u32,
     tick: u32,
     slots: [u64; 4],
     events_end: u16,
+    /// It carried the own champion.
+    own: bool,
     valid: bool,
 }
 
@@ -75,10 +96,23 @@ pub struct Replica {
     pub stream: u8,
     seq: u32,
     sent: [Sent; SENT],
-    /// For each unit, the tick of the newest record of it the client acked (0: none).
+    /// One past the newest datagram acked: a packet's acks of older ones were all in the packets
+    /// before it (the client takes nothing older than what it has).
+    acked: u32,
+    /// The own champion's states sent of late, by tick (0: none), and the newest the client acked.
+    own_sent: [(u32, OwnState); OWN_BASELINES],
+    own_base: (u32, OwnState),
+    /// For each unit, the newest record of it the client acked, and its tick (0: none).
+    base: [QUnit; MAX_UNITS],
     base_tick: [u32; MAX_UNITS],
-    /// And of the newest sent.
+    /// Records of it sent since that one, at most (what the client may have taken since: it keeps
+    /// the newest [`KEPT`]).
+    since: [u8; MAX_UNITS],
+    /// The tick of the newest record of it sent; whether that one is known lost; and whether it
+    /// has gone only once with what it says (it goes twice, so one datagram lost costs nothing).
     last_sent: [u32; MAX_UNITS],
+    lost: [u64; 4],
+    single: [u64; 4],
     priority: [f32; MAX_UNITS],
     /// Units the client has been told of, and which life.
     told: [u64; 4],
@@ -99,8 +133,15 @@ impl Default for Replica {
             stream: 0,
             seq: 0,
             sent: [Sent::default(); SENT],
+            acked: 0,
+            own_sent: [(0, OwnState::default()); OWN_BASELINES],
+            own_base: (0, OwnState::default()),
+            base: [QUnit::default(); MAX_UNITS],
             base_tick: [0; MAX_UNITS],
+            since: [0; MAX_UNITS],
             last_sent: [0; MAX_UNITS],
+            lost: [0; 4],
+            single: [0; 4],
             priority: [0.0; MAX_UNITS],
             told: [0; 4],
             told_gen: [0; MAX_UNITS],
@@ -118,6 +159,17 @@ impl Default for Replica {
 
 fn bit(words: &[u64], i: usize) -> bool {
     words[i / 64] & (1 << (i % 64)) != 0
+}
+
+/// Calls `f` with every bit set in `words`.
+fn for_each(words: &[u64], mut f: impl FnMut(usize)) {
+    for (w, &word) in words.iter().enumerate() {
+        let mut bits = word;
+        while bits != 0 {
+            f(w * 64 + bits.trailing_zeros() as usize);
+            bits &= bits - 1;
+        }
+    }
 }
 
 fn set(words: &mut [u64], i: usize, on: bool) {
@@ -140,36 +192,59 @@ impl Replica {
     }
 
     /// What an input packet acks: the stream, the newest datagram taken and the 32 before it.
-    pub fn on_ack(&mut self, stream: u8, seq16: u16, bits: u32) {
+    /// `now` is the match's tick, `net` its records, `team` the seat's.
+    pub fn on_ack(&mut self, net: &MatchNet, team: u8, now: u32, stream: u8, seq16: u16, bits: u32) {
         if stream != self.stream || self.seq == 0 {
             return;
         }
         let newest = ack::expand(seq16, self.seq - 1);
-        if newest >= self.seq {
+        if newest >= self.seq || newest < self.acked {
             return;
         }
-        self.apply_ack(newest);
+        self.apply_ack(net, team, now, newest);
         for k in 0..32 {
-            if bits & (1 << k) != 0 && newest > k {
-                self.apply_ack(newest - 1 - k);
+            if bits & (1 << k) != 0 && newest > k && newest - 1 - k >= self.acked {
+                self.apply_ack(net, team, now, newest - 1 - k);
             }
+        }
+        self.acked = newest + 1;
+        // What is older than the newest taken and wasn't taken never will be: the client takes
+        // nothing older than what it has. What it said goes again, if nothing newer has.
+        for k in 0..SENT {
+            let e = self.sent[k];
+            if !e.valid || e.seq >= newest {
+                continue;
+            }
+            for_each(&e.slots, |i| {
+                if self.last_sent[i] == e.tick {
+                    set(&mut self.lost, i, true);
+                }
+            });
+            self.sent[k].valid = false;
         }
     }
 
-    fn apply_ack(&mut self, s: u32) {
+    fn apply_ack(&mut self, net: &MatchNet, team: u8, now: u32, s: u32) {
         let e = self.sent[s as usize % SENT];
         if !e.valid || e.seq != s {
             return;
         }
-        for (w, &word) in e.slots.iter().enumerate() {
-            let mut bits = word;
-            while bits != 0 {
-                let i = w * 64 + bits.trailing_zeros() as usize;
-                bits &= bits - 1;
+        // (A record older than the match's history can't be a baseline: the seat would need to have
+        // kept it as it went.)
+        if now - e.tick < KEPT as u32 {
+            for_each(&e.slots, |i| {
                 if e.tick > self.base_tick[i] {
+                    self.base[i] = *net.get(e.tick, i, team);
                     self.base_tick[i] = e.tick;
+                    // Sent since: none if it was the newest, and never more than one a tick.
+                    let after = if self.last_sent[i] == e.tick { 0 } else { now - e.tick };
+                    self.since[i] = self.since[i].min(after.min(u32::from(u8::MAX)) as u8);
                 }
-            }
+            });
+        }
+        let own = &self.own_sent[e.tick as usize % OWN_BASELINES];
+        if e.own && own.0 == e.tick && e.tick > self.own_base.0 {
+            self.own_base = *own;
         }
         if (e.events_end.wrapping_sub(self.out_first) as i16) > 0 {
             self.out_first = e.events_end;
@@ -203,16 +278,14 @@ impl Replica {
         let seen = &m.vision.units[t];
         let sees = |i: u16| usize::from(i) < MAX_UNITS && seen.get(usize::from(i));
         // Units it can no longer see, or that died, or whose slot is someone else's now.
-        for i in 0..MAX_UNITS {
-            if !bit(&self.told, i) {
-                continue;
-            }
+        let told = self.told;
+        for_each(&told, |i| {
             let u = &m.units[i];
             if !u.alive || u.generation as u8 != self.told_gen[i] || !seen.get(i) {
                 self.queue(WireEvent::Leave { slot: i as u8, generation: self.told_gen[i], tick: now });
                 set(&mut self.told, i, false);
             }
-        }
+        });
         let shown = |i: u16, sees: &dyn Fn(u16) -> bool| {
             if usize::from(i) < SEATS || sees(i) { i as u8 } else { HIDDEN }
         };
@@ -276,16 +349,29 @@ impl Replica {
                     }
                 }
                 Event::Outcome { winner } => self.queue(WireEvent::Outcome { winner }),
+                // A team's word is the team's: its pings (naming a unit only while it's seen) and its
+                // vote.
+                Event::Ping { seat, kind, at, unit } => {
+                    if team_of_seat(usize::from(seat)) == team {
+                        let unit = if sees(unit) { unit as u8 } else { HIDDEN };
+                        self.queue(WireEvent::Ping { seat, kind, at: pos_code(at), unit });
+                    }
+                }
+                Event::Vote { team: voters, yes, no, open, passed } => {
+                    if voters == team {
+                        self.queue(WireEvent::Vote { team: voters, yes, no, open, passed });
+                    }
+                }
                 // Missiles are told below, from what the team sees of each.
                 Event::MissileSpawn { .. } | Event::MissileEnd { .. } => {}
             }
         }
         // Missiles: told when the team first sees one (where it is then: a missile from a caster it
         // can't see names no caster), and told when it ends.
-        let seen_m = &m.vision.missiles[t];
-        for i in 0..MAX_MISSILES {
+        let missiles = self.missiles;
+        for_each(&missiles, |i| {
             let ms = &m.missiles[i];
-            if bit(&self.missiles, i) && (!ms.alive || ms.generation != self.missile_gen[i]) {
+            if !ms.alive || ms.generation != self.missile_gen[i] {
                 self.queue(WireEvent::MissileEnd {
                     id: i as u16,
                     generation: self.missile_gen[i],
@@ -293,7 +379,10 @@ impl Replica {
                 });
                 set(&mut self.missiles, i, false);
             }
-            if ms.alive && !bit(&self.missiles, i) && seen_m.get(i) {
+        });
+        for i in m.vision.missiles[t].iter() {
+            let ms = &m.missiles[i];
+            if ms.alive && !bit(&self.missiles, i) {
                 let owner = usize::from(ms.owner.idx);
                 let owner = if owner < MAX_UNITS && seen.get(owner) { owner as u8 } else { HIDDEN };
                 let target = usize::from(ms.target.idx);
@@ -340,9 +429,10 @@ impl Replica {
         let eye = if me.alive { me.pos } else { el_proto::quant::pos_from_code(s.view()) };
         // Candidates: what the team sees (but the seat's own champion), with news to tell.
         let mut cand = [(0u32, 0u8); MAX_UNITS];
+        let mut repeat = [0u64; 4];
         let mut n = 0;
-        for i in 0..MAX_UNITS {
-            if i == seat || !m.units[i].alive || !seen.get(i) {
+        for i in seen.iter() {
+            if i == seat || !m.units[i].alive {
                 continue;
             }
             let u = &m.units[i];
@@ -354,13 +444,14 @@ impl Replica {
             };
             let d = el_sim::math::distance(u.pos, eye);
             self.priority[i] += weight / (1.0 + d / 800.0);
-            if bit(&self.told, i)
-                && self.last_sent[i] <= self.base_tick[i]
-                && self.plan(net, i, team, now).is_some_and(|d| d.is_same())
-            {
-                // Nothing the client hasn't acked: nothing to say.
-                self.priority[i] = 0.0;
-                continue;
+            match self.told(net, i, team, now) {
+                Told::Yes => {
+                    // Nothing the client hasn't been told: nothing to say.
+                    self.priority[i] = 0.0;
+                    continue;
+                }
+                Told::Once => set(&mut repeat, i, true),
+                Told::No => {}
             }
             cand[n] = ((self.priority[i] * 1_000.0) as u32, i as u8);
             n += 1;
@@ -396,43 +487,47 @@ impl Replica {
             .write(&mut w);
             let mut events_end = self.out_first;
             if part == 0 {
-                m.write_own(seat, &mut w);
+                let own = m.own_state(seat);
+                let (b, base) = (self.own_base.0, &self.own_base.1);
+                let base = (b != 0 && now - b < OWN_BASELINES as u32).then_some((now - b, base));
+                own.write(&mut w, base, &net.own_widths);
+                self.own_sent[now as usize % OWN_BASELINES] = (now, own);
                 // Reliable events, oldest first, as many as fit in half of what's left.
                 let mut list = [WireEvent::Nothing; MAX_LIST];
                 let pending = usize::from(self.out_next.wrapping_sub(self.out_first)).min(MAX_LIST);
                 let room = w.bits_remaining() / 2;
                 let mut k = 0;
-                let mut bits = event::list_bits(true, &[]);
+                let mut bits = event::list_bits(now, true, &[]);
                 while k < pending {
                     let e = self.out[usize::from(self.out_first.wrapping_add(k as u16)) % OUTBOX];
-                    if bits + e.bits() > room {
+                    if bits + e.bits(now) > room {
                         break;
                     }
-                    bits += e.bits();
+                    bits += e.bits(now);
                     list[k] = e;
                     k += 1;
                 }
-                event::write_list(&mut w, Some(self.out_first), &list[..k]);
+                event::write_list(&mut w, now, Some(self.out_first), &list[..k]);
                 events_end = self.out_first.wrapping_add(k as u16);
                 // This tick's other events, while they fit in a quarter.
                 let room = w.bits_remaining() / 4;
                 let mut k = 0;
-                let mut bits = event::list_bits(false, &[]);
-                while k < self.n_once && bits + self.once[k].bits() <= room {
-                    bits += self.once[k].bits();
+                let mut bits = event::list_bits(now, false, &[]);
+                while k < self.n_once && bits + self.once[k].bits(now) <= room {
+                    bits += self.once[k].bits(now);
                     k += 1;
                 }
-                event::write_list(&mut w, None, &self.once[..k]);
+                event::write_list(&mut w, now, None, &self.once[..k]);
             } else {
-                event::write_list(&mut w, Some(self.out_first), &[]);
-                event::write_list(&mut w, None, &[]);
+                event::write_list(&mut w, now, Some(self.out_first), &[]);
+                event::write_list(&mut w, now, None, &[]);
             }
             // Units, most pressing first, while they fit (a bit kept for the list's end).
             let mut slots = [0u64; 4];
             while next < cand.len() {
                 let i = usize::from(cand[next].1);
                 let q = net.get(now, i, team);
-                let plan = self.plan(net, i, team, now);
+                let plan = self.plan(q, i, now);
                 let bits = plan.map_or(q.whole_bits(), |d| d.bits());
                 if w.bits_remaining() < bits + 2 {
                     break;
@@ -454,20 +549,22 @@ impl Replica {
                 Metrics::add(&metrics.record_bits, bits as u64);
                 set(&mut slots, i, true);
                 set(&mut self.told, i, true);
+                set(&mut self.lost, i, false);
+                set(&mut self.single, i, !bit(&repeat, i));
                 self.told_gen[i] = q.generation;
                 self.last_sent[i] = now;
+                self.since[i] = self.since[i].saturating_add(1);
                 self.priority[i] = 0.0;
                 next += 1;
             }
             w.write_bool(false);
-            if w.overflowed() {
-                return;
-            }
             let bytes = w.bytes_written();
+            // Kept as sent whatever becomes of it: one that never leaves is lost like any other, so
+            // what it held goes again.
             self.sent[self.seq as usize % SENT] =
-                Sent { seq: self.seq, tick: now, slots, events_end, valid: true };
+                Sent { seq: self.seq, tick: now, slots, events_end, own: part == 0, valid: true };
             self.seq += 1;
-            if out.slots() < bytes + 2 {
+            if w.overflowed() || out.slots() < bytes + 2 {
                 Metrics::add(&metrics.out_drops, 1);
                 return;
             }
@@ -479,12 +576,41 @@ impl Replica {
         }
     }
 
-    /// Unit `i`'s record now as a delta against the newest the client acked, if one may be.
-    fn plan(&self, net: &MatchNet, i: usize, team: u8, now: u32) -> Option<Delta> {
-        let b = self.base_tick[i];
-        if b == 0 || b >= now || now - b >= KEPT as u32 {
+    /// Unit `i`'s record now, `q`, as a delta against the newest the client acked, if one may be:
+    /// one the client still keeps.
+    fn plan(&self, q: &QUnit, i: usize, now: u32) -> Option<Delta> {
+        if !self.has_base(i, now) {
             return None;
         }
-        Delta::plan(net.get(now, i, team), net.get(b, i, team), now - b)
+        Delta::plan(q, &self.base[i], now - self.base_tick[i])
+    }
+
+    /// Whether unit `i`'s acked record may be a baseline now.
+    fn has_base(&self, i: usize, now: u32) -> bool {
+        let b = self.base_tick[i];
+        b != 0 && b < now && now - b <= BACK_MAX && usize::from(self.since[i]) < KEPT
+    }
+
+    /// What the client has (or soon will have) of what unit `i`'s record says now.
+    fn told(&self, net: &MatchNet, i: usize, team: u8, now: u32) -> Told {
+        if !bit(&self.told, i) || bit(&self.lost, i) {
+            return Told::No;
+        }
+        let q = net.get(now, i, team);
+        let sent = self.last_sent[i];
+        if sent > self.base_tick[i] {
+            let back = now - sent;
+            if !(1..KEPT as u32).contains(&back) || !q.adds_nothing_to(net.get(sent, i, team), back) {
+                Told::No
+            } else if bit(&self.single, i) {
+                Told::Once
+            } else {
+                Told::Yes
+            }
+        } else if self.has_base(i, now) && q.adds_nothing_to(&self.base[i], now - self.base_tick[i]) {
+            Told::Yes
+        } else {
+            Told::No
+        }
     }
 }

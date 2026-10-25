@@ -1,9 +1,10 @@
 //! What the player reads: champion select before a match (their champion, their team's, the bench,
 //! a reroll, ready); then their abilities and cooldowns, health, mana, level, gold and items at the
 //! bottom; the clock and the kills at the top; the kill feed; the minimap; the augment cards while
-//! a screen is open and the shop may be used; the shop (P); the scoreboard (Tab); and the line in
-//! the middle that says what's happening (the queue, a respawn, the result). All of it read from the
-//! prediction, so it moves when the player does.
+//! a screen is open and the shop may be used; the shop (P); the scoreboard (Tab), with a button to
+//! open a vote to surrender from 8:00; the vote while it's open; and the line in the middle that
+//! says what's happening (the queue, a respawn, the result). All of it read from the prediction, so
+//! it moves when the player does.
 
 use bevy::prelude::*;
 use el_client_core::lobby::ToServer;
@@ -46,6 +47,10 @@ enum Label {
     SelectReroll,
     SelectReady,
     Bench(usize),
+    Vote,
+    VoteYes,
+    VoteNo,
+    Surrender,
 }
 
 /// A bar's fill.
@@ -65,6 +70,10 @@ enum Panel {
     Shop,
     Score,
     Select,
+    /// The team's vote to surrender, while it's open.
+    Vote,
+    /// The button that opens one, with the scoreboard, from the time one may.
+    Surrender,
 }
 
 /// What pressing a button does.
@@ -78,6 +87,8 @@ enum Act {
     Swap(usize),
     RerollChampion,
     Ready,
+    /// A vote to surrender: yes (which opens one when none is) or no.
+    Vote(bool),
 }
 
 /// A place on the bench in champion select, shown while the bench reaches it.
@@ -495,6 +506,49 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>) {
             Panel::Select,
         ))
         .add_child(body);
+    // The vote to surrender, and the button that opens one.
+    let title = commands.spawn((text("", 15.0, GOLD), Label::Vote)).id();
+    let yes = button(&mut commands, Act::Vote(true), Label::VoteYes, 90.0);
+    let no = button(&mut commands, Act::Vote(false), Label::VoteNo, 90.0);
+    let body = commands
+        .spawn((
+            Node {
+                column_gap: px(10),
+                align_items: AlignItems::Center,
+                padding: UiRect::all(px(10)),
+                ..default()
+            },
+            BackgroundColor(PANEL),
+        ))
+        .add_children(&[title, yes, no])
+        .id();
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                top: percent(9),
+                width: percent(100),
+                justify_content: JustifyContent::Center,
+                display: Display::None,
+                ..default()
+            },
+            Panel::Vote,
+        ))
+        .add_child(body);
+    let open = button(&mut commands, Act::Vote(true), Label::Surrender, 140.0);
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                top: percent(14),
+                width: percent(100),
+                justify_content: JustifyContent::Center,
+                display: Display::None,
+                ..default()
+            },
+            Panel::Surrender,
+        ))
+        .add_child(open);
 }
 
 /// Champion `c`'s name, or a dash if there's none to show.
@@ -735,6 +789,21 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                 let mark = if gold >= it.cost as f32 { "" } else { " (short)" };
                 format!("{}  {}{mark}", it.name, it.cost)
             }
+            (Label::Vote, Some(c)) => {
+                let v = &c.world.surrender[usize::from(c.team)];
+                let mine = 1u8 << (c.seat % el_sim::units::TEAM_SIZE);
+                let said = if v.yes & mine != 0 {
+                    "   (you: yes)"
+                } else if v.no & mine != 0 {
+                    "   (you: no)"
+                } else {
+                    ""
+                };
+                format!("Surrender?  {} yes, {} no{said}", v.yes.count_ones(), v.no.count_ones())
+            }
+            (Label::VoteYes, _) => "Yes".into(),
+            (Label::VoteNo, _) => "No".into(),
+            (Label::Surrender, _) => "Surrender".into(),
             (Label::Score, Some(c)) => {
                 let h = c.pred.headliner();
                 let mut out = format!("{}: {}\n\n", h.name, h.blurb);
@@ -804,6 +873,12 @@ fn panels(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Panel, 
             (Panel::Cards, Some(c)) => c.pred.champs[c.seat].screen.open && c.pred.in_shop(c.seat),
             (Panel::Shop, Some(c)) => controls.shop_open && c.pred.in_shop(c.seat),
             (Panel::Score, Some(_)) => controls.scoreboard,
+            (Panel::Vote, Some(c)) => c.world.surrender[usize::from(c.team)].open(),
+            (Panel::Surrender, Some(c)) => {
+                controls.scoreboard
+                    && c.world.tick >= el_sim::ticks(rules::SURRENDER_FROM)
+                    && !c.world.surrender[usize::from(c.team)].open()
+            }
             _ => false,
         };
         let want = if show { Display::Flex } else { Display::None };
@@ -867,6 +942,7 @@ fn press(
             Act::Reroll(card) => Order::Reroll { card },
             Act::Buy(item) => Order::Buy { item },
             Act::Sell(inv) => Order::Sell { inv },
+            Act::Vote(yes) => Order::Surrender { yes },
             Act::Swap(k) => {
                 if let Some(&champ) = session.select.as_ref().and_then(|s| s.bench.get(k)) {
                     controls.lobby.push(ToServer::Swap { champ });

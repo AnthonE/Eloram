@@ -218,10 +218,21 @@ fn read(
         c.aiming = None;
     }
     let enemy_hovered = c.hovered.filter(|&i| drawn.units[i].is_some_and(|d| d.team != team));
+    // A ping: G or Alt with a left click says "look here", Ctrl with one "careful", on the unit
+    // under the cursor if there is one. The click is the ping's alone.
+    let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
+    let alt = keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight, KeyCode::KeyG]);
+    let pinged = (alt || ctrl) && mouse.just_pressed(MouseButton::Left) && !over_ui;
+    if pinged && let Some(at) = c.cursor {
+        let kind = if ctrl { el_proto::order::ping::DANGER } else { el_proto::order::ping::LOOK };
+        let unit = c.hovered.map(unit_ref);
+        c.pending.push(Order::Ping { kind, at, unit });
+    }
     if wasd {
         // Left click attacks what's under the cursor; walking is the keys'.
         if mouse.just_pressed(MouseButton::Left)
             && !over_ui
+            && !pinged
             && let Some(i) = enemy_hovered
         {
             c.pending.push(Order::Attack { unit: unit_ref(i) });
@@ -243,7 +254,8 @@ fn read(
                 }
             }
         }
-        if mouse.just_pressed(MouseButton::Left) && !over_ui && c.armed == Some(Armed::AttackMove) {
+        if mouse.just_pressed(MouseButton::Left) && !over_ui && !pinged && c.armed == Some(Armed::AttackMove)
+        {
             c.armed = None;
             if let Some(at) = c.cursor {
                 c.pending.push(Order::AttackMove { to: at });
@@ -251,7 +263,6 @@ fn read(
             }
         }
     }
-    let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
     let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
     let indicators = cfg.0.indicators;
     for (press, s) in if wasd { CAST_WASD } else { CAST } {
