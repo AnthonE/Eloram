@@ -1,6 +1,8 @@
 //! The record (`.elr`): a match as what it was given, tick by tick (`docs/NETCODE.md`, "The
 //! record"). Its seed and champions, then every tick's applied input for all ten seats (bots' and
-//! people's alike), and the state's hash every [`HASH_EVERY`] ticks. Stepping a fresh match through
+//! people's alike), each augment screen's key as the screen opens (drawn from a secret the server
+//! keeps, so a record says no offer before its time), and the state's hash every [`HASH_EVERY`]
+//! ticks. Stepping a fresh match through
 //! it gives the match again, to the bit: that is a replay, a spectator's feed, and the referee's
 //! check, which fails at the first hash that differs.
 //!
@@ -32,6 +34,7 @@ pub mod kind {
     pub const HASH: u8 = 3;
     pub const OUTCOME: u8 = 4;
     pub const SEAT: u8 = 5;
+    pub const KEY: u8 = 6;
 }
 
 /// What a record is of.
@@ -74,6 +77,14 @@ pub enum Frame {
         tick: u32,
         seat: u8,
         joined: bool,
+    },
+    /// The key `seat`'s augment offers on `screen` came from, drawn from the server's secret as the
+    /// screen opened at `tick` (written after that tick's step; a referee takes it before).
+    Key {
+        tick: u32,
+        seat: u8,
+        screen: u8,
+        key: u32,
     },
 }
 
@@ -160,6 +171,15 @@ pub fn write_seat(out: &mut [u8], tick: u32, seat: u8, joined: bool) -> usize {
     })
 }
 
+pub fn write_key(out: &mut [u8], tick: u32, seat: u8, screen: u8, key: u32) -> usize {
+    frame(out, kind::KEY, |w| {
+        w.write_u32(tick);
+        w.write_u8(seat);
+        w.write_u8(screen);
+        w.write_u32(key);
+    })
+}
+
 /// Reads the frame at the start of `bytes`: it and its length, `Ok(None)` if `bytes` holds only
 /// part of one (a live record cut mid-frame).
 pub fn read_frame(bytes: &[u8]) -> Result<Option<(Frame, usize)>, DecodeError> {
@@ -208,6 +228,9 @@ pub fn read_frame(bytes: &[u8]) -> Result<Option<(Frame, usize)>, DecodeError> {
         kind::HASH => Frame::Hash { tick: r.read_u32(), hash: read_u64(&mut r) },
         kind::OUTCOME => Frame::Outcome { tick: r.read_u32(), winner: r.read_u8() },
         kind::SEAT => Frame::Seat { tick: r.read_u32(), seat: r.read_u8(), joined: r.read_bool() },
+        kind::KEY => {
+            Frame::Key { tick: r.read_u32(), seat: r.read_u8(), screen: r.read_u8(), key: r.read_u32() }
+        }
         _ => return Err(DecodeError::WrongKind),
     };
     if r.overflowed() {
@@ -272,6 +295,10 @@ pub enum Divergence {
 
 /// Steps a match through a record, frame by frame, and checks every hash on the way: a replay,
 /// a spectator's feed, and the referee are all this.
+///
+/// A tick is stepped once its frames are all in: the keys a tick drew are written after its step,
+/// so a tick's inputs wait until the next frame that isn't a key ([`Referee::flush`] steps the
+/// last one at a record's end).
 pub struct Referee {
     pub m: Match,
     scratch: PathScratch,
@@ -279,6 +306,8 @@ pub struct Referee {
     pub checked: u32,
     pub outcome: Option<(u32, u8)>,
     started: bool,
+    /// The tick read and not yet stepped.
+    pending: Option<[SeatInput; SEATS]>,
 }
 
 impl Referee {
@@ -290,11 +319,22 @@ impl Referee {
             checked: 0,
             outcome: None,
             started: false,
+            pending: None,
+        }
+    }
+
+    /// Steps the tick read and waiting, if one is.
+    pub fn flush(&mut self) {
+        if let Some(inputs) = self.pending.take() {
+            self.m.step(&inputs, &mut self.scratch);
         }
     }
 
     /// Takes the next frame.
     pub fn take(&mut self, f: &Frame) -> Result<(), Divergence> {
+        if !matches!(f, Frame::Key { .. }) {
+            self.flush();
+        }
         match *f {
             Frame::Header(h) => {
                 if h.protocol != el_proto::PROTOCOL_VERSION || h.content != CONTENT_VERSION {
@@ -304,13 +344,20 @@ impl Referee {
                 self.checked = 0;
                 self.outcome = None;
                 self.started = true;
+                self.pending = None;
             }
             _ if !self.started => return Err(Divergence::NoHeader),
             Frame::Tick { tick, ref inputs } => {
                 if tick != self.m.tick {
                     return Err(Divergence::Gap { expected: self.m.tick, got: tick });
                 }
-                self.m.step(inputs, &mut self.scratch);
+                self.pending = Some(*inputs);
+            }
+            Frame::Key { tick, seat, screen, key } => {
+                if self.pending.is_none() || tick != self.m.tick {
+                    return Err(Divergence::Gap { expected: self.m.tick, got: tick });
+                }
+                self.m.give_offer_key(seat, screen, key);
             }
             Frame::Hash { tick, hash } => {
                 if tick != self.m.tick {
@@ -370,6 +417,9 @@ mod tests {
         assert_eq!(read_frame(&buf[..n]).unwrap(), Some((Frame::Outcome { tick: 99, winner: 1 }, n)));
         let n = write_seat(&mut buf, 7, 9, true);
         assert_eq!(read_frame(&buf[..n]).unwrap(), Some((Frame::Seat { tick: 7, seat: 9, joined: true }, n)));
+        let n = write_key(&mut buf, 8, 4, 2, 0xFEED_F00D);
+        let key = Frame::Key { tick: 8, seat: 4, screen: 2, key: 0xFEED_F00D };
+        assert_eq!(read_frame(&buf[..n]).unwrap(), Some((key, n)));
         // An idle tick: the prefix, the tick and a bit a seat.
         assert_eq!(write_tick(&mut buf, 5, &[SeatInput::default(); SEATS]), 9);
     }

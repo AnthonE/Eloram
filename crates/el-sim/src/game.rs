@@ -259,6 +259,16 @@ pub struct Match {
     pub aug_tiers: [u8; 4],
     /// The match's headliner (an index into `HEADLINERS`), drawn from the seed.
     pub headliner: u8,
+    /// The server's secret for augment offers: with it, each screen's offers come from a key that
+    /// no client or record is told until the screen opens (`docs/NETCODE.md`, "Fog"). Without it,
+    /// keys come from the record, or else from the seed. Never hashed, never in a record's header.
+    pub offer_secret: Option<u64>,
+    /// Each seat's key for each augment screen, once known: a bit a screen in `offer_known`.
+    pub(crate) offer_keys: [[u32; 4]; SEATS],
+    pub(crate) offer_known: [u8; SEATS],
+    /// The keys this tick drew from the secret, for the record: seat, screen, key.
+    pub(crate) keys_drawn: [(u8, u8, u32); 2 * SEATS],
+    pub(crate) keys_drawn_n: u8,
     pub events: FixedVec<Event>,
     pub events_dropped: u32,
     /// The team that won, once a nexus falls.
@@ -321,6 +331,11 @@ impl Match {
             },
             aug_tiers: [0; 4],
             headliner: 0,
+            offer_secret: None,
+            offer_keys: [[0; 4]; SEATS],
+            offer_known: [0; SEATS],
+            keys_drawn: [(0, 0, 0); 2 * SEATS],
+            keys_drawn_n: 0,
             events: FixedVec::new(MAX_EVENTS, Event::default()),
             events_dropped: 0,
             outcome: None,
@@ -377,6 +392,10 @@ impl Match {
         }
         self.aug_tiers = tiers_for(seed);
         self.headliner = headliner_for(seed);
+        self.offer_secret = None;
+        self.offer_keys = [[0; 4]; SEATS];
+        self.offer_known = [0; SEATS];
+        self.keys_drawn_n = 0;
         for seat in 0..SEATS {
             self.spawn_champion(seat);
             self.recompute_mods(seat);
@@ -551,6 +570,7 @@ impl Match {
         mark: &mut impl FnMut(Phase),
     ) {
         self.events.clear();
+        self.keys_drawn_n = 0;
         self.path_budget = PATH_BUDGET;
         if self.outcome.is_some() {
             self.tick += 1;

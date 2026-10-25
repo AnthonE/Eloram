@@ -108,12 +108,15 @@ impl Shard {
 
     fn control(&mut self, c: Control) {
         match c {
-            Control::Start { m, seed, picks, humans } => {
+            Control::Start { m, seed, picks, humans, secret } => {
                 let m = usize::from(m);
                 if m >= self.cfg.matches {
                     return;
                 }
                 self.matches[m].reset(seed, picks);
+                if secret != 0 {
+                    self.matches[m].set_offer_secret(secret);
+                }
                 let n = record::write_header(&mut self.frame, &record::Header::new(seed, picks));
                 self.record(m, n);
                 for seat in 0..SEATS {
@@ -187,6 +190,12 @@ impl Shard {
         let n = record::write_tick(&mut self.frame, next, &inputs);
         self.record(mi, n);
         self.matches[mi].step(&inputs, &mut self.scratch);
+        // The augment keys the tick drew: after its step, the first anyone else hears of them.
+        for k in 0..self.matches[mi].keys_drawn().len() {
+            let (seat, screen, key) = self.matches[mi].keys_drawn()[k];
+            let n = record::write_key(&mut self.frame, next, seat, screen, key);
+            self.record(mi, n);
+        }
         if self.matches[mi].tick.is_multiple_of(record::HASH_EVERY) {
             let m = &self.matches[mi];
             let n = record::write_hash(&mut self.frame, m.tick, m.hash());

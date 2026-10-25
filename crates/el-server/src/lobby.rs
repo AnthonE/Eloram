@@ -456,7 +456,10 @@ impl Lobby {
         let picks = select.picks;
         let shared = self.game.shards[shard].shared.clone();
         let humans = players.iter().fold(0u16, |mask, (seat, _)| mask | 1 << seat);
-        let _ = shared.control.push(Control::Start { m, seed, picks, humans });
+        // The augment offers' secret: from the system's randomness, never in the record's header
+        // or told to anyone (the record gets each screen's key as it opens).
+        let secret = getrandom::u64().unwrap_or(seed.rotate_left(29) ^ 0x5EC2_E7C0_FFEE_D00D) | 1;
+        let _ = shared.control.push(Control::Start { m, seed, picks, humans, secret });
         let mut sessions = Vec::new();
         for (seat, p) in players {
             let g = u32::from(m) * SEATS as u32 + u32::from(seat);

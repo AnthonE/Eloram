@@ -79,6 +79,7 @@ fn verify(map: &'static Map, path: &Path) -> anyhow::Result<()> {
     if let Some((at, e)) = frames.error {
         anyhow::bail!("{}: a frame at byte {at} doesn't read ({e})", path.display());
     }
+    r.flush();
     let outcome = r.outcome.map_or("unfinished".to_string(), |(t, w)| format!("team {w} won at tick {t}"));
     println!(
         "{}: ok, {} ticks, {} hashes, {outcome}, re-stepped in {:.2} s",
@@ -118,6 +119,11 @@ fn dump(path: &Path, all: bool) -> anyhow::Result<()> {
                     "tick {tick}: seat {seat} {}",
                     if joined { "taken by a player" } else { "left to a bot" }
                 )
+            }
+            Frame::Key { tick, seat, screen, key } => {
+                if all {
+                    println!("tick {tick}: seat {seat}'s augment screen {screen}, key {key:08x}");
+                }
             }
         }
     }

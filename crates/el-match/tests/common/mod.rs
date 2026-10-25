@@ -178,7 +178,9 @@ impl Rig {
         let (shard, shared, leases, egress, records) =
             build(ShardConfig { matches: 1, map: map(), hot_guard: None });
         let mask = humans.iter().fold(0u16, |m, (s, _, _)| m | 1 << s);
-        shared.control.push(Control::Start { m: 0, seed, picks: picks(seed), humans: mask }).unwrap();
+        // A secret for the offers, as the live server's matches have.
+        let secret = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
+        shared.control.push(Control::Start { m: 0, seed, picks: picks(seed), humans: mask, secret }).unwrap();
         let mut players = Vec::new();
         for (seat, spec, brain) in humans {
             shared.control.push(Control::Seat { m: 0, seat: seat as u8, max_datagram: 1_100 }).unwrap();

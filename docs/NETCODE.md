@@ -176,9 +176,12 @@ standby takes a room over on the old clock's timeline. Riot built the same thing
   only what it decides for everyone: the augment screens' tiers and the headliner
   (`ToClient::Match`; `Match::told` builds the client's copies). A seat's own offers come in its
   own section. Champion select shows a team its own champions and bench only.
-- Still open: the record's header carries the seed, so someone watching a minute behind can work
-  out every seat's offers for the rest of the match. The fix is to write each screen's offers into
-  the record as they are drawn, instead of the seed's part in them.
+- **Nor does the record give offers before their time.** A live match draws its offers from a
+  secret the server keeps (`Control::Start`'s, from the system's randomness), not from the seed in
+  the record's header. The record gets each screen's key in a frame as the screen opens, so a
+  watcher a minute behind learns an offer a minute after its player did, and the header alone
+  replays to other offers (`el-match/tests/record.rs`). A match without a secret (the tests', a
+  record from before) draws from the seed as it always did.
 
 ### The wire
 
@@ -195,7 +198,9 @@ Before Colony's, sized for a match:
 
 - Each match writes one file (`el_sim::record`, `.elr`): its seed, champions, protocol and content
   version, then each tick's *applied* inputs for all ten seats (the bots' too), everything from
-  outside (a seat taken or left), and a state hash every 30 ticks. The shard thread writes the
+  outside (a seat taken or left, an augment screen's key as it opens), and a state hash every 30
+  ticks. A referee steps a tick once its frames are in (the keys come after the step that drew
+  them, so a tick waits for the next frame that isn't one). The shard thread writes the
   frames into a ring a match without allocating; a recorder thread a shard keeps them
   (`el-server/src/records.rs`; `--records dir` writes them out). Measured: 25 KB a match a minute
   with two people and eight bots, about 500 KB for twenty minutes.

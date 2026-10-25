@@ -152,7 +152,7 @@ impl Match {
         let screen = usize::from(c.screens_done);
         let tier = self.aug_tiers[screen.min(3)];
         let taken = |a: u8| c.augments().contains(&a) || (c.screen.open && c.screen.offers.contains(&a));
-        let key = (self.seed as u32) ^ (self.seed >> 32) as u32 ^ (seat as u32).wrapping_mul(0x9E37_79B9);
+        let key = self.offer_key(seat, screen.min(3));
         let n = AUGMENTS.len();
         let start = math::hash32(key, (screen as u32) << 8 | (card as u32) << 4 | salt) as usize % n;
         let fits =
@@ -168,6 +168,51 @@ impl Match {
         (start % n) as u8
     }
 
+    /// The key `seat`'s offers on `screen` are drawn from: known (drawn from the server's secret, or
+    /// read from the record), or else the seed's.
+    fn offer_key(&self, seat: usize, screen: usize) -> u32 {
+        if self.offer_known[seat] & (1 << screen) != 0 {
+            return self.offer_keys[seat][screen];
+        }
+        (self.seed as u32) ^ (self.seed >> 32) as u32 ^ (seat as u32).wrapping_mul(0x9E37_79B9)
+    }
+
+    /// As `seat`'s `screen` opens: with the server's secret, its key is drawn now, and noted for
+    /// the record, which is the first anyone else hears of it.
+    fn settle_offer_key(&mut self, seat: usize, screen: usize) {
+        let Some(secret) = self.offer_secret else { return };
+        if self.offer_known[seat] & (1 << screen) != 0 {
+            return;
+        }
+        let key = math::hash32(secret as u32 ^ (secret >> 32) as u32, (seat as u32) << 8 | screen as u32);
+        self.offer_keys[seat][screen] = key;
+        self.offer_known[seat] |= 1 << screen;
+        let n = usize::from(self.keys_drawn_n);
+        if n < self.keys_drawn.len() {
+            self.keys_drawn[n] = (seat as u8, screen as u8, key);
+            self.keys_drawn_n += 1;
+        }
+    }
+
+    /// The server's secret for this match's augment offers (set after `reset`).
+    pub fn set_offer_secret(&mut self, secret: u64) {
+        self.offer_secret = Some(secret);
+    }
+
+    /// A key the record gives: `seat`'s offers on `screen` are drawn from `key`.
+    pub fn give_offer_key(&mut self, seat: u8, screen: u8, key: u32) {
+        let (seat, screen) = (usize::from(seat), usize::from(screen));
+        if seat < SEATS && screen < 4 {
+            self.offer_keys[seat][screen] = key;
+            self.offer_known[seat] |= 1 << screen;
+        }
+    }
+
+    /// The keys the last tick drew from the secret: seat, screen, key.
+    pub fn keys_drawn(&self) -> &[(u8, u8, u32)] {
+        &self.keys_drawn[..usize::from(self.keys_drawn_n)]
+    }
+
     fn open_screen(&mut self, seat: usize) {
         let c = self.champs[seat];
         if c.screen.open
@@ -176,6 +221,7 @@ impl Match {
         {
             return;
         }
+        self.settle_offer_key(seat, usize::from(c.screens_done));
         self.champs[seat].screen = crate::game::Screen {
             open: true,
             tier: self.aug_tiers[usize::from(c.screens_done)],

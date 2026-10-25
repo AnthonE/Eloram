@@ -15,7 +15,27 @@ fn replay(bytes: &[u8]) -> Result<Referee, Divergence> {
         r.take(&f)?;
     }
     assert_eq!(frames.error, None, "every frame reads");
+    r.flush();
     Ok(r)
+}
+
+/// The record written back frame by frame, each changed (or dropped, `None`) by `edit`.
+fn rewrite(bytes: &[u8], mut edit: impl FnMut(Frame) -> Option<Frame>) -> Vec<u8> {
+    let mut out = Vec::new();
+    let mut buf = [0u8; record::MAX_FRAME];
+    for f in Frames::new(bytes) {
+        let Some(f) = edit(f) else { continue };
+        let n = match f {
+            Frame::Tick { tick, inputs } => record::write_tick(&mut buf, tick, &inputs),
+            Frame::Header(h) => record::write_header(&mut buf, &h),
+            Frame::Hash { tick, hash } => record::write_hash(&mut buf, tick, hash),
+            Frame::Outcome { tick, winner } => record::write_outcome(&mut buf, tick, winner),
+            Frame::Seat { tick, seat, joined } => record::write_seat(&mut buf, tick, seat, joined),
+            Frame::Key { tick, seat, screen, key } => record::write_key(&mut buf, tick, seat, screen, key),
+        };
+        out.extend_from_slice(&buf[..n]);
+    }
+    out
 }
 
 #[test]
@@ -40,37 +60,55 @@ fn a_match_replays_from_its_record_to_every_hash() {
     assert_eq!(seats, 2);
 }
 
+/// A live match draws its augment offers from the server's secret: the record gives each screen's
+/// key only as the screen opens, it replays with them, and without them (all a watcher could take
+/// from the header) the offers come out otherwise and the replay goes astray.
+#[test]
+fn augment_offers_come_from_keys_the_record_gives_as_their_screens_open() {
+    let mut rig = Rig::new(21, vec![(1, BAD, bot_brain())]);
+    rig.run(300.0);
+    let bytes = rig.record.clone();
+    let keys: Vec<(u32, u8, u8)> = Frames::new(&bytes)
+        .filter_map(|f| match f {
+            Frame::Key { tick, seat, screen, .. } => Some((tick, seat, screen)),
+            _ => None,
+        })
+        .collect();
+    let first: Vec<_> = keys.iter().filter(|k| k.2 == 0).collect();
+    assert_eq!(first.len(), 10, "every seat's first screen: {keys:?}");
+    assert!(first.iter().all(|k| k.0 == 0), "the first screens open at the first tick: {keys:?}");
+    assert!(keys.iter().any(|k| k.2 == 1 && k.0 > 0), "a level 7 screen later, its key with it: {keys:?}");
+    let r = replay(&bytes).expect("with its keys, the record replays");
+    assert_eq!(r.m.hash(), rig.m().hash());
+    let stripped = rewrite(&bytes, |f| (!matches!(f, Frame::Key { .. })).then_some(f));
+    match replay(&stripped) {
+        Err(Divergence::Hash { tick, .. }) => assert!(tick <= 2 * record::HASH_EVERY, "astray by {tick}"),
+        other => panic!("the header alone gave the offers: {:?}", other.map(|r| r.checked)),
+    }
+}
+
 #[test]
 fn one_order_changed_is_caught_at_the_next_hash() {
     let mut rig = Rig::new(3, vec![(2, BAD, walker(5))]);
     rig.run(60.0);
     let bytes = rig.record.clone();
     // The walker's first move order, taken somewhere else.
-    let mut out = Vec::new();
     let mut changed_at = None;
-    let mut buf = [0u8; record::MAX_FRAME];
-    for f in Frames::new(&bytes) {
-        let n = match f {
-            Frame::Tick { tick, mut inputs }
-                if changed_at.is_none()
-                    && inputs[2].orders().iter().any(|o| matches!(o, el_proto::Order::Move { .. })) =>
-            {
-                for o in &mut inputs[2].orders[..usize::from(inputs[2].n)] {
-                    if let el_proto::Order::Move { to } = o {
-                        to.x += 300.0;
-                    }
+    let out = rewrite(&bytes, |f| match f {
+        Frame::Tick { tick, mut inputs }
+            if changed_at.is_none()
+                && inputs[2].orders().iter().any(|o| matches!(o, el_proto::Order::Move { .. })) =>
+        {
+            for o in &mut inputs[2].orders[..usize::from(inputs[2].n)] {
+                if let el_proto::Order::Move { to } = o {
+                    to.x += 300.0;
                 }
-                changed_at = Some(tick);
-                record::write_tick(&mut buf, tick, &inputs)
             }
-            Frame::Tick { tick, inputs } => record::write_tick(&mut buf, tick, &inputs),
-            Frame::Header(h) => record::write_header(&mut buf, &h),
-            Frame::Hash { tick, hash } => record::write_hash(&mut buf, tick, hash),
-            Frame::Outcome { tick, winner } => record::write_outcome(&mut buf, tick, winner),
-            Frame::Seat { tick, seat, joined } => record::write_seat(&mut buf, tick, seat, joined),
-        };
-        out.extend_from_slice(&buf[..n]);
-    }
+            changed_at = Some(tick);
+            Some(Frame::Tick { tick, inputs })
+        }
+        f => Some(f),
+    });
     assert_eq!(out.len(), bytes.len(), "written back the same, but for one order");
     let at = changed_at.expect("the walker moved");
     match replay(&out) {
