@@ -17,7 +17,7 @@ use crate::units::{FIRST_MINION, MAX_UNITS, SEATS, structure, structure_slot, te
 pub const THINK_EVERY: u32 = 6;
 /// How far a bot looks for an enemy champion to fight.
 const ENGAGE: f32 = 1_100.0;
-/// Under this share of health, it goes home.
+/// Under this share of health, it backs off to heal (`think`).
 const RETREAT: f32 = 0.25;
 
 /// What each champion builds, in order (items' indices), by its role: its big items, one of each.
@@ -95,10 +95,28 @@ pub fn think(m: &Match, seat: usize, out: &mut SeatInput) {
         return;
     }
     let me = &m.units[seat];
-    let home = map::for_team(team, map::PLATFORM.0);
+    let forward = if team == map::DAWN { 1.0 } else { -1.0 };
+    // Our foremost turret standing: where a hurt bot waits, and where the others wait for a wave.
+    let turret = {
+        let k = if m.units[structure_slot(team, structure::OUTER)].alive {
+            structure::OUTER
+        } else {
+            structure::INHIB_TURRET
+        };
+        m.units[structure_slot(team, k)].pos
+    };
     if me.hp < me.stats.max_hp * RETREAT {
-        if math::distance(me.pos, home) > map::PLATFORM.1 {
-            out.push(Order::Move { to: home }.quantized());
+        // Nothing heals at the fountain in ARAM: a relic on our side if one is up, else behind our
+        // turret, out of the fight but near enough to share the wave's experience.
+        let side = usize::from(team) * 2;
+        let relic = m.relics[side..side + 2]
+            .iter()
+            .filter(|r| r.up)
+            .map(|r| r.pos)
+            .min_by(|a, b| math::distance(me.pos, *a).total_cmp(&math::distance(me.pos, *b)));
+        let to = m.map.snap(relic.unwrap_or(turret - Vec2::new(forward * 450.0, 0.0)));
+        if math::distance(me.pos, to) > 100.0 {
+            out.push(Order::Move { to }.quantized());
         }
         return;
     }
@@ -121,21 +139,13 @@ pub fn think(m: &Match, seat: usize, out: &mut SeatInput) {
         }
     }
     // No fight: behind the wave's front, or at the turret waiting for one.
-    let forward = if team == map::DAWN { 1.0 } else { -1.0 };
     let front = (FIRST_MINION..MAX_UNITS)
         .filter(|&i| m.units[i].alive && m.units[i].team == team)
         .map(|i| m.units[i].pos)
         .max_by(|a, b| (a.x * forward).total_cmp(&(b.x * forward)));
     let post = match front {
         Some(p) => p - Vec2::new(forward * 250.0, 0.0),
-        None => {
-            let k = if m.units[structure_slot(team, structure::OUTER)].alive {
-                structure::OUTER
-            } else {
-                structure::INHIB_TURRET
-            };
-            m.units[structure_slot(team, k)].pos - Vec2::new(forward * 200.0, 0.0)
-        }
+        None => turret - Vec2::new(forward * 200.0, 0.0),
     };
     let jitter = Vec2::new(0.0, (seat % 5) as f32 * 90.0 - 180.0);
     let to = m.map.snap(post + jitter);
