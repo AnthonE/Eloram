@@ -29,6 +29,11 @@ pub fn picks(seed: u64) -> [u8; SEATS] {
     std::array::from_fn(|s| ((seed as usize + s * 3) % el_sim::content::champions::CHAMPIONS.len()) as u8)
 }
 
+/// A client for `seat` of the match of `seed`, told what the lobby tells a player (not the seed).
+pub fn client(seat: usize, seed: u64) -> Client {
+    Client::new(map(), seat, picks(seed), el_sim::game::tiers_for(seed), el_sim::game::headliner_for(seed))
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct LinkSpec {
     /// One way, s.
@@ -179,7 +184,7 @@ impl Rig {
             shared.control.push(Control::Seat { m: 0, seat: seat as u8, max_datagram: 1_100 }).unwrap();
             players.push(Player {
                 seat,
-                client: Client::new(map(), seat, seed, picks(seed)),
+                client: client(seat, seed),
                 up: Link::new(seed.wrapping_mul(31) + seat as u64, spec),
                 down: Link::new(seed.wrapping_mul(17) + seat as u64 + 1_000, spec),
                 brain,

@@ -172,6 +172,13 @@ standby takes a room over on the old clock's timeline. Riot built the same thing
   server enforces.
 - A test decodes every datagram every client gets and fails if any record or event names an enemy
   the server's vision didn't show that team on that tick.
+- **The seed stays on the server.** Every seat's augment offers follow from it, so a player is told
+  only what it decides for everyone: the augment screens' tiers and the headliner
+  (`ToClient::Match`; `Match::told` builds the client's copies). A seat's own offers come in its
+  own section. Champion select shows a team its own champions and bench only.
+- Still open: the record's header carries the seed, so someone watching a minute behind can work
+  out every seat's offers for the rest of the match. The fix is to write each screen's offers into
+  the record as they are drawn, instead of the seed's part in them.
 
 ### The wire
 

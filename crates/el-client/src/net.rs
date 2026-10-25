@@ -314,11 +314,11 @@ fn talk(
                     session.phase = Phase::Selecting;
                 }
                 Ok(m @ ToClient::Match { .. }) => {
-                    if let (Some(seed), Some(picks), ToClient::Match { seat, roster, .. }) =
-                        (m.seed(), m.picks(), &m)
+                    if let (Some(picks), ToClient::Match { seat, tiers, headliner, roster, .. }) =
+                        (m.picks(), &m)
                     {
                         let seat = usize::from(*seat).min(el_sim::units::SEATS - 1);
-                        session.client = Some(Box::new(Client::new(map.0, seat, seed, picks)));
+                        session.client = Some(Box::new(Client::new(map.0, seat, picks, *tiers, *headliner)));
                         session.roster = roster.clone();
                         session.winner = None;
                         session.kd = Default::default();

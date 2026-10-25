@@ -43,22 +43,15 @@ pub enum ToClient {
     /// other team's [`UNSEEN`]); your team's bench; your rerolls left; the seconds left; and who
     /// sits where. Sent again whenever any of it changes.
     Select { seat: u8, picks: Vec<u8>, bench: Vec<u8>, rerolls: u8, ends_in: u32, roster: Vec<Player> },
-    /// Seated: the match's seed (a decimal string: a page's numbers stop at 2^53), every seat's
-    /// champion and who plays it. Snapshots follow as datagrams.
-    Match { seat: u8, seed: String, picks: Vec<u8>, roster: Vec<Player> },
+    /// Seated: every seat's champion, the augment screens' tiers and the headliner (all a client
+    /// needs of the match's seed, which stays on the server: every seat's augment offers follow
+    /// from it), and who plays where. Snapshots follow as datagrams.
+    Match { seat: u8, picks: Vec<u8>, tiers: [u8; 4], headliner: u8, roster: Vec<Player> },
     /// The match is over; `winner` is the team whose nexus stands.
     Over { winner: u8 },
 }
 
 impl ToClient {
-    /// The match's seed, if this seats the client.
-    pub fn seed(&self) -> Option<u64> {
-        match self {
-            ToClient::Match { seed, .. } => seed.parse().ok(),
-            _ => None,
-        }
-    }
-
     /// Every seat's champion, if this seats the client (and there are ten of them).
     pub fn picks(&self) -> Option<[u8; el_sim::units::SEATS]> {
         match self {
@@ -77,14 +70,16 @@ mod tests {
         assert_eq!(serde_json::from_str::<ToServer>(r#"{"t":"queue"}"#).unwrap(), ToServer::Queue);
         let m = ToClient::Match {
             seat: 3,
-            seed: u64::MAX.to_string(),
             picks: (0..10).collect(),
+            tiers: [0, 1, 2, 1],
+            headliner: 4,
             roster: vec![Player { name: "Ash".into(), agent: false, bot: false }],
         };
         let text = serde_json::to_string(&m).unwrap();
-        assert!(text.starts_with(r#"{"t":"match","seat":3,"seed":"18446744073709551615""#), "{text}");
+        assert!(text.starts_with(r#"{"t":"match","seat":3,"picks":[0,1,2"#), "{text}");
+        assert!(!text.contains("seed"), "the seed stays on the server: {text}");
         let back: ToClient = serde_json::from_str(&text).unwrap();
-        assert_eq!(back.seed(), Some(u64::MAX));
+        assert_eq!(back, m);
         assert_eq!(back.picks().map(|p| p[9]), Some(9));
         for (json, msg) in [
             (r#"{"t":"reroll"}"#, ToServer::Reroll),

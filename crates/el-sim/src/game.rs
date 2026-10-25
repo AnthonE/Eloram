@@ -277,6 +277,26 @@ impl Match {
 /// A* searches a match may run in one tick (the rest of who wants one walks straight a tick more).
 pub const PATH_BUDGET: u8 = 16;
 
+/// The augment screens' tiers for `seed`, the same for everyone: the first two never both Silver.
+/// What a player is told of the seed (with the headliner); the seed itself stays on the server,
+/// since every seat's offers follow from it.
+pub fn tiers_for(seed: u64) -> [u8; 4] {
+    let mut tiers = [0u8; 4];
+    for (s, t) in tiers.iter_mut().enumerate() {
+        *t = (math::hash32(seed as u32 ^ (seed >> 32) as u32, 0xA0 + s as u32) % 3) as u8;
+    }
+    if tiers[0] == 0 && tiers[1] == 0 {
+        tiers[1] = 1;
+    }
+    tiers
+}
+
+/// The headliner for `seed` (an index into `HEADLINERS`).
+pub fn headliner_for(seed: u64) -> u8 {
+    let n = crate::content::headliners::HEADLINERS.len() as u32;
+    (math::hash32(seed as u32 ^ (seed >> 32) as u32, 0x4EAD) % n) as u8
+}
+
 impl Match {
     /// A new match: `picks` is each seat's champion (an index into `CHAMPIONS`).
     pub fn new(map: &'static Map, seed: u64, picks: [u8; SEATS]) -> Match {
@@ -307,6 +327,20 @@ impl Match {
             path_budget: PATH_BUDGET,
         };
         m.reset(seed, picks);
+        m
+    }
+
+    /// A player's copy of a match: what it was told of it (the picks, the screens' tiers, the
+    /// headliner), without the seed. Its own seat's augment offers come with its snapshots.
+    pub fn told(map: &'static Map, picks: [u8; SEATS], tiers: [u8; 4], headliner: u8) -> Match {
+        let mut m = Match::new(map, 0, picks);
+        m.aug_tiers = tiers.map(|t| t.min(2));
+        m.set_headliner(headliner);
+        for seat in 0..SEATS {
+            let u = &mut m.units[seat];
+            u.hp = u.stats.max_hp;
+            u.mana = u.stats.max_mana;
+        }
         m
     }
 
@@ -341,15 +375,8 @@ impl Match {
             self.relics[k] =
                 Relic { pos: map::for_team(team, dawn), up: false, next: ticks(first), beam_at: 0 };
         }
-        // The augment screens' tiers: drawn from the seed, the first two never both Silver.
-        for (s, t) in self.aug_tiers.iter_mut().enumerate() {
-            *t = (math::hash32(seed as u32 ^ (seed >> 32) as u32, 0xA0 + s as u32) % 3) as u8;
-        }
-        if self.aug_tiers[0] == 0 && self.aug_tiers[1] == 0 {
-            self.aug_tiers[1] = 1;
-        }
-        let n = crate::content::headliners::HEADLINERS.len() as u32;
-        self.headliner = (math::hash32(seed as u32 ^ (seed >> 32) as u32, 0x4EAD) % n) as u8;
+        self.aug_tiers = tiers_for(seed);
+        self.headliner = headliner_for(seed);
         for seat in 0..SEATS {
             self.spawn_champion(seat);
             self.recompute_mods(seat);

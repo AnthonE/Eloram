@@ -148,13 +148,11 @@ impl BotClient {
         match f {
             Incoming::Lobby(bytes) => match serde_json::from_slice::<ToClient>(&bytes)? {
                 m @ ToClient::Match { .. } => {
-                    let (seed, picks) = (m.seed(), m.picks());
-                    let ToClient::Match { seat, roster, .. } = m else { unreachable!() };
-                    let (Some(seed), Some(picks)) = (seed, picks) else {
-                        anyhow::bail!("a match without its seed or picks")
-                    };
+                    let picks = m.picks();
+                    let ToClient::Match { seat, tiers, headliner, roster, .. } = m else { unreachable!() };
+                    let Some(picks) = picks else { anyhow::bail!("a match without ten picks") };
                     anyhow::ensure!(usize::from(seat) < el_sim::units::SEATS, "seat {seat}");
-                    self.client = Some(Client::new(map(), usize::from(seat), seed, picks));
+                    self.client = Some(Client::new(map(), usize::from(seat), picks, tiers, headliner));
                     self.roster = roster;
                 }
                 ToClient::Over { winner } => self.over = Some(winner),

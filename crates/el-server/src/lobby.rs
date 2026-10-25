@@ -465,10 +465,13 @@ impl Lobby {
                 continue;
             };
             let _ = shared.control.push(Control::Seat { m, seat, max_datagram: p.max_datagram });
+            // What a player is told of the match: never the seed, from which every seat's
+            // augment offers follow.
             let msg = ToClient::Match {
                 seat,
-                seed: seed.to_string(),
                 picks: picks.to_vec(),
+                tiers: el_sim::game::tiers_for(seed),
+                headliner: el_sim::game::headliner_for(seed),
                 roster: roster.clone(),
             };
             let seating = Seating { shard, m, seat, g, msg, lease, shared: shared.clone() };

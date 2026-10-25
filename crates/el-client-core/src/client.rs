@@ -140,9 +140,10 @@ fn ms(now: f64) -> u16 {
 }
 
 impl Client {
-    /// A client for `seat` of the match of `seed` and `picks` (the lobby says them).
-    pub fn new(map: &'static Map, seat: usize, seed: u64, picks: [u8; SEATS]) -> Self {
-        let mut world = Match::new(map, seed, picks);
+    /// A client for `seat` of the match the lobby told of: its `picks`, its augment screens'
+    /// `tiers` and its `headliner` (never its seed, which would give away every seat's offers).
+    pub fn new(map: &'static Map, seat: usize, picks: [u8; SEATS], tiers: [u8; 4], headliner: u8) -> Self {
+        let mut world = Match::told(map, picks, tiers, headliner);
         // What the team knows at the start: its structures and the enemy's (always seen), and
         // nothing that moves until the server says where.
         for i in (0..SEATS).chain(FIRST_MINION..MAX_UNITS) {
@@ -154,7 +155,7 @@ impl Client {
                 world.vision.units[usize::from(team)].set(i, true);
             }
         }
-        let pred = Match::new(map, seed, picks);
+        let pred = Match::told(map, picks, tiers, headliner);
         Self {
             seat,
             team,

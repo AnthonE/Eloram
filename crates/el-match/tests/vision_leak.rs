@@ -173,7 +173,7 @@ fn a_team_is_sent_only_what_it_sees() {
     let mut rig = Rig::new(seed, vec![(2, BAD, bot_brain()), (7, BAD, bot_brain())]);
     let oracle = Rc::new(RefCell::new(Oracle::default()));
     for seat in [2, 7] {
-        let spy = Client::new(common::map(), seat, seed, common::picks(seed));
+        let spy = common::client(seat, seed);
         oracle.borrow_mut().spies.insert(seat, (spy, 0, 0));
     }
     let o = oracle.clone();
