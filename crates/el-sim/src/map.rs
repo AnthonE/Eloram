@@ -173,6 +173,33 @@ pub struct Map {
     /// For each brush, its cells in a vision grid.
     brush_masks: Box<[[u64; VIS_WORDS * VIS_H]]>,
     brushes: usize,
+    /// Every navigation cell's walking distance (tenths of a cell; [`FAR`] where it can't be
+    /// reached) from each of [`landmarks`]. The first two are the nexus fronts, what each team's
+    /// minions march down; all of them bound A*'s estimate from below (the ALT heuristic).
+    fields: Box<[Box<[u16]>]>,
+}
+
+/// The landmarks A* measures from: Dusk's nexus front (Dawn's minions march to it), Dawn's, the
+/// two platforms, and the lane's middle.
+pub fn landmarks() -> [Vec2; 5] {
+    [
+        march_goal(DAWN),
+        march_goal(DUSK),
+        for_team(DAWN, PLATFORM.0),
+        for_team(DUSK, PLATFORM.0),
+        Vec2::new(MAP_W * 0.5, MID_Y),
+    ]
+}
+
+/// How many landmark fields there are.
+pub const LANDMARKS: usize = 5;
+
+/// No way to the goal from here.
+pub const FAR: u16 = u16::MAX;
+
+/// Where a team's minions march to: in front of the enemy's nexus.
+pub fn march_goal(team: u8) -> Vec2 {
+    for_team(1 - team, Vec2::new(NEXUS.0.x + 450.0, MID_Y))
 }
 
 /// Is `p` on the floor (the lane, the bases, the platforms), `margin` inside its edge?
@@ -239,9 +266,114 @@ impl Map {
             windows: boxed(VIS_W * VIS_H * SIGHT.len() * WINDOW, 0u32),
             brush_masks,
             brushes: brushes.len(),
+            fields: boxed(LANDMARKS, boxed(0, 0u16)),
         };
         map.build_windows();
+        for (k, at) in landmarks().into_iter().enumerate() {
+            map.fields[k] = map.field_from(at);
+        }
         map
+    }
+
+    /// Dijkstra from `at` over the navigation grid (8 ways, no squeezing past corners, the costs
+    /// A* uses): every cell's walking distance from it.
+    #[allow(clippy::disallowed_types, clippy::disallowed_methods)]
+    fn field_from(&self, at: Vec2) -> Box<[u16]> {
+        extern crate alloc;
+        use alloc::collections::BinaryHeap;
+        use core::cmp::Reverse;
+        let mut field = boxed(NAV_W * NAV_H, FAR);
+        let walk = |i: usize| self.walk[i / 64] & (1 << (i % 64)) != 0;
+        let (gx, gy) = Map::cell(at);
+        let Some((gx, gy)) = self.nearest_walkable(gx, gy, 8) else { return field };
+        let mut heap = BinaryHeap::new();
+        field[gy * NAV_W + gx] = 0;
+        heap.push(Reverse((0u32, (gy * NAV_W + gx) as u32)));
+        while let Some(Reverse((d, c))) = heap.pop() {
+            let c = c as usize;
+            if u32::from(field[c]) < d {
+                continue;
+            }
+            let (cx, cy) = ((c % NAV_W) as i32, (c / NAV_W) as i32);
+            for (dx, dy) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)] {
+                let (nx, ny) = (cx + dx, cy + dy);
+                if nx < 0 || ny < 0 || nx >= NAV_W as i32 || ny >= NAV_H as i32 {
+                    continue;
+                }
+                let n = ny as usize * NAV_W + nx as usize;
+                if !walk(n) {
+                    continue;
+                }
+                let diagonal = dx != 0 && dy != 0;
+                if diagonal
+                    && (!walk(cy as usize * NAV_W + nx as usize) || !walk(ny as usize * NAV_W + cx as usize))
+                {
+                    continue;
+                }
+                let nd = d + if diagonal { 14 } else { 10 };
+                if nd < u32::from(field[n]) {
+                    field[n] = nd.min(u32::from(FAR) - 1) as u16;
+                    heap.push(Reverse((nd, n as u32)));
+                }
+            }
+        }
+        field
+    }
+
+    /// Each landmark's distance to navigation cell `cell`.
+    #[inline]
+    pub fn landmark_dists(&self, cell: usize) -> [u16; LANDMARKS] {
+        core::array::from_fn(|k| self.fields[k][cell])
+    }
+
+    /// A lower bound on the walk from `cell` to the goal whose landmark distances are `goal`: by
+    /// the triangle inequality, no landmark can be nearer one than the other by more than the walk.
+    #[inline]
+    pub fn alt(&self, cell: usize, goal: &[u16; LANDMARKS]) -> u32 {
+        let mut best = 0u32;
+        for (k, &g) in goal.iter().enumerate() {
+            let d = self.fields[k][cell];
+            if d != FAR && g != FAR {
+                best = best.max(u32::from(d.abs_diff(g)));
+            }
+        }
+        best
+    }
+
+    /// The point a marching minion of `team` at `p` heads for: a few cells down the march field
+    /// (none when it's there, or can't get there).
+    pub fn march_toward(&self, team: u8, p: Vec2) -> Option<Vec2> {
+        let field = &self.fields[usize::from(team)];
+        let (mut x, mut y) = Map::cell(p);
+        if field[y * NAV_W + x] == FAR {
+            let (nx, ny) = self.nearest_walkable(x, y, 4)?;
+            if field[ny * NAV_W + nx] == FAR {
+                return None;
+            }
+            return Some(Map::cell_centre(nx, ny));
+        }
+        if field[y * NAV_W + x] == 0 {
+            return None;
+        }
+        for _ in 0..4 {
+            let here = field[y * NAV_W + x];
+            let mut best = (here, x, y);
+            for (dx, dy) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)] {
+                let (nx, ny) = (x as i32 + dx, y as i32 + dy);
+                if nx < 0 || ny < 0 || nx >= NAV_W as i32 || ny >= NAV_H as i32 {
+                    continue;
+                }
+                let d = field[ny as usize * NAV_W + nx as usize];
+                if d < best.0 {
+                    best = (d, nx as usize, ny as usize);
+                }
+            }
+            if best.0 == here {
+                break;
+            }
+            (x, y) = (best.1, best.2);
+        }
+        Some(Map::cell_centre(x, y))
     }
 
     /// Builds the grids and keeps them for the life of the process: what every match in it

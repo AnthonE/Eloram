@@ -126,3 +126,39 @@ fn paths_go_round_rock_with_few_corners_and_every_leg_is_walkable() {
     assert!(found > 290, "{found} of 300 found");
     assert!(s.expanded / s.searches < 4_000, "{} cells a search", s.expanded / s.searches);
 }
+
+#[test]
+fn every_walkable_cell_is_reachable_from_the_lane() {
+    let m = shared();
+    let mut seen = vec![false; NAV_W * NAV_H];
+    let (sx, sy) = Map::cell(Vec2::new(map::MAP_W_HALF, MID_Y));
+    let mut stack = vec![(sx, sy)];
+    seen[sy * NAV_W + sx] = true;
+    while let Some((x, y)) = stack.pop() {
+        for (dx, dy) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1)] {
+            let (nx, ny) = (x as i32 + dx, y as i32 + dy);
+            if nx < 0 || ny < 0 || nx >= NAV_W as i32 || ny >= NAV_H as i32 {
+                continue;
+            }
+            let (nx, ny) = (nx as usize, ny as usize);
+            if m.walkable_cell(nx, ny) && !seen[ny * NAV_W + nx] {
+                seen[ny * NAV_W + nx] = true;
+                stack.push((nx, ny));
+            }
+        }
+    }
+    let mut stranded = Vec::new();
+    for y in 0..NAV_H {
+        for x in 0..NAV_W {
+            if m.walkable_cell(x, y) && !seen[y * NAV_W + x] {
+                stranded.push(Map::cell_centre(x, y));
+            }
+        }
+    }
+    assert!(
+        stranded.is_empty(),
+        "{} cells cut off, e.g. {:?}",
+        stranded.len(),
+        &stranded[..stranded.len().min(5)]
+    );
+}

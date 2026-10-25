@@ -73,13 +73,15 @@ pub struct PathScratch {
     parent: Box<[u32]>,
     stamp: Box<[u16]>,
     closed: Box<[u16]>,
-    heap: Box<[(u32, u32)]>,
+    heap: Box<[(u32, u32, u32)]>,
     heap_len: usize,
     query: u16,
     trail: Box<[u32]>,
     /// Searches run, and cells expanded, since it was built (for the bench).
     pub searches: u64,
     pub expanded: u64,
+    /// The last search: from, to, cells expanded (for finding a slow one).
+    pub last: (Vec2, Vec2, u32),
 }
 
 impl Default for PathScratch {
@@ -96,12 +98,13 @@ impl PathScratch {
             parent: boxed(n, NONE),
             stamp: boxed(n, 0u16),
             closed: boxed(n, 0u16),
-            heap: boxed(MAX_EXPANSIONS * 8 + 8, (0u32, 0u32)),
+            heap: boxed(MAX_EXPANSIONS * 8 + 8, (0u32, 0u32, 0u32)),
             heap_len: 0,
             query: 0,
             trail: boxed(n.min(4096), 0u32),
             searches: 0,
             expanded: 0,
+            last: (Vec2::ZERO, Vec2::ZERO, 0),
         }
     }
 
@@ -116,12 +119,14 @@ impl PathScratch {
         self.heap_len = 0;
     }
 
-    fn push(&mut self, f: u32, cell: u32) {
+    /// Pushes a cell by its estimate `f`; among equal estimates the one nearer the goal (`h`)
+    /// comes first, so the search runs along the path instead of flooding the band of ties.
+    fn push(&mut self, f: u32, h: u32, cell: u32) {
         if self.heap_len == self.heap.len() {
             return;
         }
         let mut i = self.heap_len;
-        self.heap[i] = (f, cell);
+        self.heap[i] = (f, h, cell);
         self.heap_len += 1;
         while i > 0 {
             let up = (i - 1) / 2;
@@ -133,7 +138,7 @@ impl PathScratch {
         }
     }
 
-    fn pop(&mut self) -> Option<(u32, u32)> {
+    fn pop(&mut self) -> Option<(u32, u32, u32)> {
         if self.heap_len == 0 {
             return None;
         }
@@ -186,14 +191,17 @@ pub fn find(map: &Map, s: &mut PathScratch, from: Vec2, to: Vec2, out: &mut Path
     let q = s.query;
     let start = (sy * NAV_W + sx) as u32;
     let target = (gy * NAV_W + gx) as u32;
+    let lm = map.landmark_dists(target as usize);
+    let estimate = |x: usize, y: usize| octile(x, y, gx, gy).max(map.alt(y * NAV_W + x, &lm));
     s.g[start as usize] = 0;
     s.parent[start as usize] = NONE;
     s.stamp[start as usize] = q;
-    s.push(octile(sx, sy, gx, gy), start);
-    let mut best = (octile(sx, sy, gx, gy), start);
+    let h0 = estimate(sx, sy);
+    s.push(h0, h0, start);
+    let mut best = (h0, start);
     let mut expansions = 0;
     let mut reached = false;
-    while let Some((_, cell)) = s.pop() {
+    while let Some((_, _, cell)) = s.pop() {
         let ci = cell as usize;
         if s.closed[ci] == q {
             continue;
@@ -208,7 +216,7 @@ pub fn find(map: &Map, s: &mut PathScratch, from: Vec2, to: Vec2, out: &mut Path
             break;
         }
         let (cx, cy) = (ci % NAV_W, ci / NAV_W);
-        let h = octile(cx, cy, gx, gy);
+        let h = estimate(cx, cy);
         if (h, cell) < best {
             best = (h, cell);
         }
@@ -235,11 +243,13 @@ pub fn find(map: &Map, s: &mut PathScratch, from: Vec2, to: Vec2, out: &mut Path
                 s.stamp[ni] = q;
                 s.g[ni] = g;
                 s.parent[ni] = cell;
-                s.push(g + octile(nx, ny, gx, gy), ni as u32);
+                let h = estimate(nx, ny);
+                s.push(g + h, h, ni as u32);
             }
         }
     }
     s.expanded += expansions as u64;
+    s.last = (from, to, expansions as u32);
     let end = if reached { target } else { best.1 };
     // Walk the parents back to the start, then pull the route tight from the start's end.
     let mut n = 0;
@@ -251,17 +261,51 @@ pub fn find(map: &Map, s: &mut PathScratch, from: Vec2, to: Vec2, out: &mut Path
     }
     let centre = |cell: u32| Map::cell_centre(cell as usize % NAV_W, cell as usize / NAV_W);
     let last = if reached { goal } else { centre(end) };
-    // trail[n-1] is the start, trail[0] the end. Walk it from the start, keeping the farthest
-    // cell seen straight from the last corner: where the next can't be, the one before is a corner.
+    // trail[n-1] is the start, trail[0] the end. From where the unit is, the farthest cell of the
+    // route it can walk to straight: gallop out along the route until one can't be seen, then
+    // bisect between the last seen and that. A few dozen line checks a path, not one a cell.
+    let point = |k: usize| if k == 0 { last } else { centre(s.trail[k]) };
     let mut at = from;
-    let mut prev = centre(s.trail[n - 1]);
-    for k in (0..n - 1).rev() {
-        let p = if k == 0 { last } else { centre(s.trail[k]) };
-        if !map.walk_clear(at, p) {
-            out.push(prev);
-            at = prev;
+    let mut i = n - 1;
+    while i > 0 {
+        let mut seen = i;
+        let mut step = 1;
+        let mut blocked = None;
+        loop {
+            let j = i.saturating_sub(step);
+            if map.walk_clear(at, point(j)) {
+                seen = j;
+                if j == 0 {
+                    break;
+                }
+                step *= 2;
+            } else {
+                blocked = Some(j);
+                break;
+            }
         }
-        prev = p;
+        if let Some(mut hi) = blocked {
+            // seen > hi: the farthest seen is between them.
+            while seen - hi > 1 {
+                let mid = (seen + hi) / 2;
+                if map.walk_clear(at, point(mid)) {
+                    seen = mid;
+                } else {
+                    hi = mid;
+                }
+            }
+        }
+        if seen == i {
+            // Not even the next cell in a straight line (the unit stands off the grid's route):
+            // take the next cell as it is.
+            seen = i - 1;
+        }
+        if seen == 0 {
+            break;
+        }
+        out.push(point(seen));
+        at = point(seen);
+        i = seen;
     }
     out.push(last);
     out.len > 0
@@ -272,17 +316,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_heap_pops_in_order_and_breaks_ties_by_cell() {
+    fn the_heap_pops_in_order_and_breaks_ties_toward_the_goal() {
         let mut s = PathScratch::new();
         s.begin();
-        for (f, c) in [(5, 9), (3, 4), (5, 2), (1, 7), (3, 1)] {
-            s.push(f, c);
+        for (f, h, c) in [(5, 0, 9), (3, 2, 4), (5, 0, 2), (1, 9, 7), (3, 1, 1)] {
+            s.push(f, h, c);
         }
-        let mut out = [(0, 0); 5];
+        let mut out = [(0, 0, 0); 5];
         for o in &mut out {
             *o = s.pop().unwrap();
         }
-        assert_eq!(out, [(1, 7), (3, 1), (3, 4), (5, 2), (5, 9)]);
+        assert_eq!(out, [(1, 9, 7), (3, 1, 1), (3, 2, 4), (5, 0, 2), (5, 0, 9)]);
         assert_eq!(s.pop(), None);
     }
 }

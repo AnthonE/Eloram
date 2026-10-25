@@ -11,14 +11,29 @@
 
 extern crate alloc;
 
+mod ai;
+pub mod bot;
+mod champ;
+mod combat;
+pub mod content;
+mod economy;
+pub mod events;
+pub mod game;
 pub mod handle;
 pub mod hash;
 pub mod map;
 pub mod math;
+pub mod missile;
 pub mod path;
 pub mod storage;
+pub mod units;
+mod vision;
+mod world;
+pub mod zone;
 
+pub use champ::steer_dir;
 pub use el_proto::{MAP_H, MAP_W, TICK_HZ};
+pub use game::{Match, SeatInput};
 
 /// Seconds in a tick.
 pub const DT: f32 = 1.0 / TICK_HZ as f32;

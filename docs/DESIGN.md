@@ -74,8 +74,13 @@ units, of either team, gets 16% of missing health and mana (Mayhem: 22%).
   what the effects can't say.
 - **Summoner spells**: two a champion. Every champion has Flash. The other is the Mark: a thrown
   snowball that, on a hit, lets you dash to its target.
-- **The pool** starts with five archetypes (a marksman, a mage, a tank, an assassin, an enchanter)
-  and grows.
+- **The pool** starts with five archetypes and grows: Vessa, the Long Watch (a marksman: a piercing
+  bolt, a hobbling shot, a tumble, a shot across the map); Orrin of the Ash Choir (a mage: an ember,
+  a field of ash that lands late, a blink, a starfall); Brakka, the Quarry (a tank: a chain hook, a
+  stone skin, a quake, an upheaval that throws enemies in the air); Kesh, the Quiet Knife (an
+  assassin: twin blades, a shadow step, a crippling slash, an execution that grows with what the
+  target has lost); Liora, the Lantern (an enchanter: a bind, a mend, a shield for an ally, a
+  sanctuary that heals). `el_sim::content::champions` is their numbers.
 
 ## Gold, experience and items
 

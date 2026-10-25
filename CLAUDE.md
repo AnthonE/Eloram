@@ -23,6 +23,11 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   transport smoke test).
 - `scripts/e2e.sh spike [webgl2]`: Playwright against a real server.
 - `cargo test -p el-sim --test map -- --ignored --nocapture` prints the Causeway as text.
+- `cargo run -p el-sim --release --example headless -- [seed]`: ten bots play a whole match, minute
+  by minute; `cargo bench -p el-sim --bench match_tick`: a match's ticks, p50/p99 and by phase.
+- `cargo test -p el-sim --target wasm32-unknown-unknown --release --test determinism`: the golden
+  hashes on wasm32 (no `-q`: the wasm runner refuses it). Native, `cargo test --workspace` turns on
+  `deterministic` (glam's scalar maths) by feature unification; alone, pass `--features deterministic`.
 - Never set `RUSTFLAGS` (it would drop the `web_sys_unstable_apis` cfg from `.cargo/config.toml`).
 - Don't `pkill -f el-server` from a shell whose own command line names it (it kills the shell):
   `pkill -x el-server`.

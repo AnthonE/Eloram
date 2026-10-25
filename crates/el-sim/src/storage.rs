@@ -96,6 +96,15 @@ impl FreeList {
         }
         Self { stack, len: n }
     }
+    /// Every slot free again, in place.
+    pub fn refill(&mut self) {
+        let n = self.stack.len();
+        for (i, s) in self.stack.iter_mut().enumerate() {
+            *s = (n - 1 - i) as u16;
+        }
+        self.len = n;
+    }
+
     pub fn pop(&mut self) -> Option<u16> {
         if self.len == 0 {
             return None;

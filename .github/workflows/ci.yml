@@ -24,7 +24,7 @@ jobs:
         run: cargo test --workspace --release
 
   wasm:
-    name: browser client
+    name: browser client + wasm determinism
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,5 +36,7 @@ jobs:
         run: cargo clippy -p el-client --target wasm32-unknown-unknown -- -D warnings
       - name: Clippy (wasm client, WebGPU build)
         run: cargo clippy -p el-client --target wasm32-unknown-unknown --features webgpu -- -D warnings
+      - name: Determinism on wasm32 (the same golden hashes as native)
+        run: cargo test -p el-sim --target wasm32-unknown-unknown --release --test determinism
       - name: Build the web client
         run: ./scripts/build-web.sh webgl2

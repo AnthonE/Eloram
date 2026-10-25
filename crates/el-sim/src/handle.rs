@@ -16,3 +16,9 @@ impl Handle {
         self.idx == u16::MAX
     }
 }
+
+impl Default for Handle {
+    fn default() -> Self {
+        Handle::NONE
+    }
+}

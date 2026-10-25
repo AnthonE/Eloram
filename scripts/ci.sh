@@ -9,6 +9,7 @@ step "clippy (native)";       cargo clippy --workspace --all-targets -- -D warni
 step "clippy (wasm client)";  cargo clippy -p el-client --target wasm32-unknown-unknown -- -D warnings
 step "clippy (wasm, webgpu)"; cargo clippy -p el-client --target wasm32-unknown-unknown --features webgpu -- -D warnings
 step "tests";                 cargo test --workspace --release
+step "determinism on wasm";   cargo test -p el-sim --target wasm32-unknown-unknown --release --test determinism
 if [ "${EL_E2E:-0}" = "1" ]; then
   step "web build";           ./scripts/build-web.sh webgl2
   step "e2e: transport";      ./scripts/e2e.sh spike webgl2
