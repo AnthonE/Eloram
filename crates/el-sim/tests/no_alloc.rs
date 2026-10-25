@@ -38,6 +38,38 @@ fn a_busy_match_ticks_without_allocating() {
     assert_eq!(total, 0, "heap operations inside the tick: {total}");
 }
 
+/// Every augment on every champion: two matches seat all twenty, each seat given five augments, so
+/// all of them run in a fight, and nothing in them allocates or breaks a number.
+#[test]
+fn every_augment_on_every_champion_ticks_without_allocating() {
+    use el_sim::content::augments::AUGMENTS;
+    use el_sim::content::champions::CHAMPIONS;
+    use el_sim::units::SEATS;
+    for half in 0..2usize {
+        let picks = std::array::from_fn(|s| ((half * SEATS + s) % CHAMPIONS.len()) as u8);
+        let mut m = el_sim::Match::new(common::map(), 31 + half as u64, picks);
+        let mut s = el_sim::path::PathScratch::new();
+        for seat in 0..SEATS {
+            for k in 0..5 {
+                m.grant_augment(seat, ((half * 50 + seat * 5 + k) % AUGMENTS.len()) as u8);
+            }
+        }
+        common::run(&mut m, &mut s, ticks(60.0));
+        let mut total = 0;
+        for _ in 0..3_000 {
+            let ((), n) = el_alloc::count(|| {
+                let inputs = common::bot_inputs(&m);
+                m.step(&inputs, &mut s);
+            });
+            total += n;
+        }
+        assert_eq!(total, 0, "heap operations inside the tick: {total}");
+        for (i, u) in m.units.iter().enumerate().filter(|(_, u)| u.alive) {
+            assert!(u.hp.is_finite() && u.pos.is_finite() && u.stats.move_speed.is_finite(), "unit {i}");
+        }
+    }
+}
+
 #[test]
 fn resetting_a_match_allocates_nothing() {
     let (mut m, mut s) = common::bot_match(5);

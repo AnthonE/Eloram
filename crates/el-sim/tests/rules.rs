@@ -6,17 +6,32 @@
 mod common;
 
 use el_proto::{Aim, Order, UnitRef};
+use el_sim::content::augments::AUGMENTS;
 use el_sim::content::champions::CHAMPIONS;
+use el_sim::content::headliners::HEADLINERS;
+use el_sim::content::rules;
 use el_sim::game::{Screen, SeatInput};
 use el_sim::map::{self, DAWN, DUSK, MID_Y};
 use el_sim::path::PathScratch;
+use el_sim::units::BuffKind;
 use el_sim::units::{SEATS, structure, structure_slot};
 use el_sim::{Match, ticks};
 use glam::Vec2;
 
-/// A match with nobody doing anything yet; seat 0 Dawn's, seat 5 Dusk's.
+/// A match with nobody doing anything yet; seat 0 Dawn's, seat 5 Dusk's. Its headliner is one that
+/// changes no fight (Gold Fever), so no rule here depends on what the seed draws.
 fn quiet(picks: [u8; SEATS]) -> (Match, PathScratch) {
-    (Match::new(common::map(), 1, picks), PathScratch::new())
+    let mut m = Match::new(common::map(), 1, picks);
+    m.set_headliner(headliner("Gold Fever"));
+    (m, PathScratch::new())
+}
+
+fn headliner(name: &str) -> u8 {
+    HEADLINERS.iter().position(|h| h.name == name).expect("a headliner") as u8
+}
+
+fn augment(name: &str) -> u8 {
+    AUGMENTS.iter().position(|a| a.name == name).expect("an augment") as u8
 }
 
 fn idle(m: &mut Match, s: &mut PathScratch, n: u32) {
@@ -267,4 +282,78 @@ fn every_champion_can_cast_every_ability_without_breaking_the_match() {
         let used = m.champs[0].ready.iter().filter(|&&r| r > ticks(16.0)).count();
         assert!(used >= 4, "{} used {used} of its six", CHAMPIONS[usize::from(def)].name);
     }
+}
+
+#[test]
+fn each_headliner_changes_what_it_says() {
+    let (plain, _) = quiet([0; SEATS]);
+    let base = plain.units[0].stats;
+    let with = |name: &str| {
+        let (mut m, _) = quiet([0; SEATS]);
+        m.set_headliner(headliner(name));
+        m.units[0].stats
+    };
+    let s = with("Swift Winds");
+    assert!((s.move_speed - base.move_speed * 1.15).abs() < 0.01, "{} {}", s.move_speed, base.move_speed);
+    assert_eq!(with("Clockwork").haste, base.haste + 40.0);
+    let s = with("Iron Age");
+    assert_eq!((s.max_hp, s.armor, s.mr), (base.max_hp + 500.0, base.armor + 20.0, base.mr + 20.0));
+    let s = with("Sharp Edges");
+    assert_eq!((s.ad, s.ap), (base.ad + 20.0, base.ap + 40.0));
+
+    // Gold Fever: passive gold twice as fast as under any other.
+    let earned = |name: &str| {
+        let (mut m, mut s) = quiet([0; SEATS]);
+        m.set_headliner(headliner(name));
+        m.tick = ticks(rules::PASSIVE_GOLD_FROM);
+        let before = m.champs[0].gold;
+        idle(&mut m, &mut s, ticks(10.0));
+        m.champs[0].gold - before
+    };
+    let (fever, other) = (earned("Gold Fever"), earned("Clockwork"));
+    assert!((fever - 2.0 * other).abs() < 0.5 && other > 30.0, "{fever} against {other}");
+
+    // Short Rest: half the death timer.
+    let dead_for = |name: &str| {
+        let (mut m, mut s) = quiet([0; SEATS]);
+        m.set_headliner(headliner(name));
+        m.tick = ticks(16.0);
+        bench_others(&mut m, &[0]);
+        place(&mut m, 0, map::spawn_point(DUSK, 0));
+        let mut t = 0;
+        while m.units[0].alive {
+            idle(&mut m, &mut s, 1);
+            t += 1;
+            assert!(t < ticks(5.0), "the fountain kills");
+        }
+        m.champs[0].dead_until - m.tick
+    };
+    let (short, full) = (dead_for("Short Rest"), dead_for("Clockwork"));
+    assert!(short.abs_diff(full / 2) <= 1, "{short} ticks against {full}");
+    assert!(full.abs_diff(ticks(rules::death_secs(3))) <= 1);
+}
+
+#[test]
+fn a_cast_augment_answers_a_cast_and_waits_its_cooldown() {
+    let (mut m, mut s) = quiet([0; SEATS]);
+    m.tick = ticks(16.0);
+    bench_others(&mut m, &[0]);
+    place(&mut m, 0, Vec2::new(6_000.0, MID_Y));
+    m.grant_augment(0, augment("Battle Trance"));
+    order(&mut m, &mut s, 0, Order::LevelSkill { slot: 0 });
+    let speed = |m: &Match| m.units[0].buff(BuffKind::AttackSpeed, m.tick);
+    let aim = Aim::Point(Vec2::new(7_000.0, MID_Y));
+    assert_eq!(speed(&m), 0.0);
+    order(&mut m, &mut s, 0, Order::Cast { slot: 0, aim });
+    assert!((speed(&m) - 0.4).abs() < 1e-6, "the cast's buff: {}", speed(&m));
+    // Q is back in 7 s, the augment in 8: the second cast gets nothing, the third does.
+    idle(&mut m, &mut s, ticks(7.1));
+    m.units[0].mana = m.units[0].stats.max_mana;
+    order(&mut m, &mut s, 0, Order::Cast { slot: 0, aim });
+    assert!(m.champs[0].ready[0] > m.tick, "the second cast went off");
+    assert_eq!(speed(&m), 0.0, "the augment is still cooling down");
+    idle(&mut m, &mut s, ticks(7.1));
+    m.units[0].mana = m.units[0].stats.max_mana;
+    order(&mut m, &mut s, 0, Order::Cast { slot: 0, aim });
+    assert!(speed(&m) > 0.0, "and answers again once it's ready");
 }

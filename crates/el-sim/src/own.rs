@@ -50,6 +50,7 @@ impl Match {
             self.vision.missiles[t].copy_from(&from.vision.missiles[t]);
         }
         self.aug_tiers = from.aug_tiers;
+        self.headliner = from.headliner;
         self.events.clear();
         self.events_dropped = 0;
         self.outcome = from.outcome;

@@ -72,15 +72,30 @@ units, of either team, gets 16% of missing health and mana (Mayhem: 22%).
   control (stun, root, slow, silence, airborne), knockbacks, dashes, missiles, areas, zones, reveals,
   cooldown changes. So is every augment and every item. A champion needs code of its own only for
   what the effects can't say.
-- **Summoner spells**: two a champion. Every champion has Flash. The other is the Mark: a thrown
-  snowball that, on a hit, lets you dash to its target.
-- **The pool** starts with five archetypes and grows: Vessa, the Long Watch (a marksman: a piercing
-  bolt, a hobbling shot, a tumble, a shot across the map); Orrin of the Ash Choir (a mage: an ember,
-  a field of ash that lands late, a blink, a starfall); Brakka, the Quarry (a tank: a chain hook, a
-  stone skin, a quake, an upheaval that throws enemies in the air); Kesh, the Quiet Knife (an
-  assassin: twin blades, a shadow step, a crippling slash, an execution that grows with what the
-  target has lost); Liora, the Lantern (an enchanter: a bind, a mend, a shield for an ally, a
-  sanctuary that heals). `el_sim::content::champions` is their numbers.
+- **Summoner spells**: two a champion, the same two for everyone. D is Blink: there at once, a
+  short way. F is Tag: a thrown snowball that, on a hit, lets you dash to its target while the tag
+  lasts.
+- **The pool** is twenty, each dealt once a match across both teams. Marksmen: Vessa, the Long
+  Watch (a piercing bolt, a hobbling shot, a roll, a shot across the map); Marret, the Gunwright (a
+  ricochet, spent brass that slows, a kick back, a salvo). Mages: Orrin of the Ash Choir (an ember,
+  a field of ash that lands late, a blink, a starfall); Seren, the Quiet Star (a lance of dusk, a
+  gravity well, a drift, a skyfall from across the map that shows who it hit); Nimra, the
+  Frostglass (a shard, a field of rime, a cold snap that roots, a whiteout that stuns around her);
+  Torek, the Siege Engine (a shell that lands late, a snare charge, a brace, a bombardment from far
+  off). Tanks: Brakka, the Quarry (a chain hook, a stone skin, a quake, an upheaval); Hollis, the
+  Bell Warden (a toll that stuns, a bronze hide, a peal that pushes, a bell he holds around him);
+  Gorum, the Old Ox (a horn toss, a stamp, a charge, unbroken). Fighters: Talmar, the Tidewarden (a
+  backwash, a riptide around him, a breaker dash, a maelstrom that throws them up); Vire, the Ashen
+  Blade (a sweep, a war cry, a close-in dash, a verdict that silences); Pell, the Hedge Knight (a
+  shield bash, a rally for allies, a spur, a banner charge); Brun, the Smith (a hammerfall, a
+  temper, a bellows blast, an anvil); Sefa, the Wind Dancer (a gale cut, an updraft, a glide, a
+  tempest around her). Assassins: Kesh, the Quiet Knife (twin blades, a shadow step, a cripple, an
+  execution); Sable, the Night Courier (a hex bolt, a shade step that hurts where she lands, a hush,
+  a dark hour). Enchanters: Liora, the Lantern (a bind, a mend, an aegis, a sanctuary); Oda of the
+  Long Road (a road stone, a tether that roots, a hearth for an ally, the long road for the team);
+  Ulla, the Mender (a sap, a bloom that heals, thorns, a verdance over the team); Mira, the
+  Lamplighter (a wick, a glow for allies, a snuff that silences, a bonfire).
+  `el_sim::content::champions` is their numbers.
 
 ## Gold, experience and items
 
@@ -101,7 +116,13 @@ units, of either team, gets 16% of missing health and mana (Mayhem: 22%).
   hit, an ability hit, a cast, taking damage, a kill, every tick, a level.
 - **Combo Breaker**: a champion immobilised for 5 of the last 7 s is cleansed and immune to crowd
   control for 3 s.
-- **A headliner**: one match-wide modifier a game.
+- **A headliner**: one match-wide modifier a game, drawn from the seed and shown as the match
+  starts: everyone faster, 40 haste for all, passive gold twice as fast, death timers halved,
+  500 more health and 20 of each resist, or 20 attack damage and 40 ability power more
+  (`el_sim::content::headliners`).
+- **The pool of augments** is about forty, a third of them a tier: stat changes, and ops on a
+  trigger (an auto that lands, an ability that hits, a cast, a takedown, low health, a pulse).
+  `el_sim::content::augments` is their numbers.
 - **The offers** are drawn from the match's seed, the seat, the screen and the offer's number, so
   they don't depend on the order anything else happened in. A seat's offers are sent to that seat
   only.

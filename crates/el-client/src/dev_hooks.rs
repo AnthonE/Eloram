@@ -217,6 +217,7 @@ fn match_status(
     status.set("seat", s as u32);
     status.set("team", u32::from(c.team));
     status.set("champion", ch.def().name);
+    status.set("headliner", c.pred.headliner().name);
     status.set("started", c.started());
     status.set("tick", c.world.tick);
     status.set("pred_tick", c.pred.tick);

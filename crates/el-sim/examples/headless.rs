@@ -44,6 +44,7 @@ fn main() {
     }
     let spent = started.elapsed();
     println!();
+    println!("headliner: {} ({})", m.headliner().name, m.headliner().blurb);
     match m.outcome {
         Some(w) => {
             println!("{} won at {}:{:02}", ["Dawn", "Dusk"][usize::from(w)], m.tick / 1800, m.tick / 30 % 60)

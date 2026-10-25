@@ -109,6 +109,7 @@ impl Match {
         for &a in c.augments() {
             m.add(&AUGMENTS[usize::from(a)].mods);
         }
+        m.add(&self.headliner().mods);
         self.champs[seat].mods = m;
     }
 
@@ -203,6 +204,17 @@ impl Match {
         self.open_screen(seat);
     }
 
+    /// Gives `seat` augment `a` outright, past its screens (tests and tools; while there is room).
+    pub fn grant_augment(&mut self, seat: usize, a: u8) {
+        let c = &mut self.champs[seat];
+        if usize::from(a) >= AUGMENTS.len() || usize::from(c.n_aug) >= c.augments.len() {
+            return;
+        }
+        c.augments[usize::from(c.n_aug)] = a;
+        c.n_aug += 1;
+        self.recompute_mods(seat);
+    }
+
     pub(crate) fn reroll_augment(&mut self, seat: usize, card: u8) {
         let c = self.champs[seat];
         if !c.screen.open || card > 2 || c.screen.rerolled & (1 << card) != 0 {
@@ -217,9 +229,10 @@ impl Match {
     /// Passive gold, and screens that come due.
     pub(crate) fn economy_tick(&mut self) {
         let paid = self.tick >= ticks(PASSIVE_GOLD_FROM);
+        let rate = PASSIVE_GOLD_PER_SEC * self.headliner().gold;
         for seat in 0..SEATS {
             if paid {
-                self.champs[seat].gold += PASSIVE_GOLD_PER_SEC * crate::DT;
+                self.champs[seat].gold += rate * crate::DT;
             }
             self.open_screen(seat);
         }
@@ -277,6 +290,19 @@ impl Match {
             {
                 self.champs[caster].aug_ready[k] = now + ticks(cd);
                 self.apply_ops(caster, target, ops, 0, false);
+            }
+        }
+    }
+
+    /// `seat` cast one of its four abilities: its augments that answer that.
+    pub(crate) fn cast_triggers(&mut self, seat: usize) {
+        let now = self.tick;
+        for k in 0..usize::from(self.champs[seat].n_aug) {
+            if let Trigger::Cast { cd, ops } = AUGMENTS[usize::from(self.champs[seat].augments[k])].trigger
+                && self.champs[seat].aug_ready[k] <= now
+            {
+                self.champs[seat].aug_ready[k] = now + ticks(cd);
+                self.apply_ops(seat, seat, ops, 0, false);
             }
         }
     }

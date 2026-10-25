@@ -37,6 +37,8 @@ test("a match: queue, augment, shop, walk, cast, fog", async ({ page }, info) =>
   expect(s.gold).toBeGreaterThanOrEqual(1400);
   expect(s.in_shop).toBe(true);
   expect(s.enemy_champions).toBe(0);
+  // The match's headliner, shown as it starts.
+  expect(s.headliner).toBeTruthy();
   await page.screenshot({ path: `${shots}-start.png` });
 
   // The first augment screen is open at the start: take the first card.
@@ -44,7 +46,7 @@ test("a match: queue, augment, shop, walk, cast, fog", async ({ page }, info) =>
   await push(page, { t: "pick", card: 0 });
   s = await until(page, "an augment", (s) => s.augments === 1 && s.screen_open === false);
 
-  // The shop: a Long Blade (350).
+  // The shop: an Iron Knife (350).
   const gold = s.gold;
   await push(page, { t: "shop", open: true });
   await push(page, { t: "buy", item: 0 });
@@ -52,13 +54,13 @@ test("a match: queue, augment, shop, walk, cast, fog", async ({ page }, info) =>
   await page.screenshot({ path: `${shots}-shop.png` });
   await push(page, { t: "shop", open: false });
 
-  // A skill point into Q; Flash (D) down the lane.
+  // A skill point into Q; Blink (D) down the lane.
   await push(page, { t: "level", slot: 0 });
   s = await until(page, "Q levelled", (s) => s.ranks.startsWith("1,"));
   const ahead = (x: number) => (s.team === 0 ? x : 15360 - x);
   const before = s.x;
   await push(page, { t: "cast", slot: 4, x: ahead(3000), y: 1920 });
-  s = await until(page, "Flash on cooldown", (s) => Number(s.cds.split(",")[4]) > 0);
+  s = await until(page, "Blink on cooldown", (s) => Number(s.cds.split(",")[4]) > 0);
   expect(Math.abs(s.x - before)).toBeGreaterThan(200);
 
   // Walk down the lane to the outer turret: predicted exactly.

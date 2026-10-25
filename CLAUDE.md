@@ -23,7 +23,7 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   bots in the other nine seats after 3 s (`EL_FILL`). The server alone: `cargo run -p el-server
   --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
 - `scripts/e2e.sh spike|match|watch|login [webgl2]`: Playwright against a real server (`match`:
-  queue, augment, shop, Flash, a walk predicted exactly, the fog; `watch`: an agent's match watched
+  queue, the headliner, augment, shop, Blink, a walk predicted exactly, the fog; `watch`: an agent's match watched
   live a minute behind, then replayed; `login`: a stub wallet signing through `el-auth`'s `sign`
   example, `/online.json`, the resume token; screenshots in `e2e/artifacts/`). A test or the
   console drives the champion through `window.__elInbox` (`{t:"move",x,y}`, `cast`, `buy`, `pick`,

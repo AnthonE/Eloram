@@ -5,9 +5,9 @@
 use el_proto::{Aim, Order, UnitRef};
 use glam::Vec2;
 
-use crate::content::Target;
 use crate::content::champions::ability;
 use crate::content::items::{self, ITEMS};
+use crate::content::{Role, Target};
 use crate::game::{Match, SeatInput};
 use crate::map;
 use crate::math;
@@ -20,13 +20,13 @@ const ENGAGE: f32 = 1_100.0;
 /// Under this share of health, it goes home.
 const RETREAT: f32 = 0.25;
 
-/// What each champion builds, in order (items' indices): its big items, one of each.
+/// What each champion builds, in order (items' indices), by its role: its big items, one of each.
 fn build(def: u8) -> &'static [u8] {
-    match def {
-        0 => &[11, 8, 12, 6, 10, 13],
-        1 | 4 => &[9, 13, 6, 10, 8, 11],
-        2 => &[10, 13, 6, 12, 8, 11],
-        _ => &[8, 12, 6, 11, 10, 13],
+    match crate::content::champions::CHAMPIONS[usize::from(def)].role {
+        Role::Marksman => &[11, 8, 12, 6, 10, 13],
+        Role::Mage | Role::Enchanter => &[9, 13, 6, 10, 8, 11],
+        Role::Tank => &[10, 13, 6, 12, 8, 11],
+        Role::Fighter | Role::Assassin => &[8, 12, 6, 11, 10, 13],
     }
 }
 

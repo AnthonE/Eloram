@@ -234,9 +234,10 @@ impl Match {
         match v.kind {
             Kind::Champion => {
                 let seat = victim;
+                let respawn = self.headliner().respawn;
                 let c = &mut self.champs[seat];
                 c.deaths += 1;
-                c.dead_until = now + ticks(rules::death_secs(c.level));
+                c.dead_until = now + ticks(rules::death_secs(c.level) * respawn);
                 c.cast = Casting::default();
                 c.dash = Dash::default();
                 let window = ticks(ASSIST_SECS);

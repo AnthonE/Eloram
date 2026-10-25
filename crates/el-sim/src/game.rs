@@ -257,12 +257,21 @@ pub struct Match {
     pub vision: Vision,
     /// Each augment screen's tier, the same for everyone.
     pub aug_tiers: [u8; 4],
+    /// The match's headliner (an index into `HEADLINERS`), drawn from the seed.
+    pub headliner: u8,
     pub events: FixedVec<Event>,
     pub events_dropped: u32,
     /// The team that won, once a nexus falls.
     pub outcome: Option<u8>,
     /// A* searches left this tick.
     pub(crate) path_budget: u8,
+}
+
+impl Match {
+    /// The match's headliner.
+    pub fn headliner(&self) -> &'static crate::content::headliners::HeadlinerDef {
+        &crate::content::headliners::HEADLINERS[usize::from(self.headliner)]
+    }
 }
 
 /// A* searches a match may run in one tick (the rest of who wants one walks straight a tick more).
@@ -291,6 +300,7 @@ impl Match {
                 missiles: [BitSet::new(MAX_MISSILES), BitSet::new(MAX_MISSILES)],
             },
             aug_tiers: [0; 4],
+            headliner: 0,
             events: FixedVec::new(MAX_EVENTS, Event::default()),
             events_dropped: 0,
             outcome: None,
@@ -338,14 +348,27 @@ impl Match {
         if self.aug_tiers[0] == 0 && self.aug_tiers[1] == 0 {
             self.aug_tiers[1] = 1;
         }
+        let n = crate::content::headliners::HEADLINERS.len() as u32;
+        self.headliner = (math::hash32(seed as u32 ^ (seed >> 32) as u32, 0x4EAD) % n) as u8;
         for seat in 0..SEATS {
             self.spawn_champion(seat);
+            self.recompute_mods(seat);
             self.refresh_stats(seat);
             let u = &mut self.units[seat];
             u.hp = u.stats.max_hp;
             u.mana = u.stats.max_mana;
         }
         self.update_vision();
+    }
+
+    /// Makes `k` the match's headliner, every champion's stats with it (tests, and tools that
+    /// want one; a match draws its own from the seed).
+    pub fn set_headliner(&mut self, k: u8) {
+        self.headliner = k.min(crate::content::headliners::HEADLINERS.len() as u8 - 1);
+        for seat in 0..SEATS {
+            self.recompute_mods(seat);
+            self.refresh_stats(seat);
+        }
     }
 
     fn spawn_structures(&mut self, team: u8) {

@@ -9,6 +9,7 @@
 
 pub mod augments;
 pub mod champions;
+pub mod headliners;
 pub mod items;
 pub mod rules;
 
@@ -198,11 +199,36 @@ impl StatMods {
     }
 }
 
+/// What a champion is for: the page names it, and the server's bots build by it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Role {
+    Marksman,
+    Mage,
+    Tank,
+    Fighter,
+    Assassin,
+    Enchanter,
+}
+
+impl Role {
+    pub fn name(self) -> &'static str {
+        match self {
+            Role::Marksman => "marksman",
+            Role::Mage => "mage",
+            Role::Tank => "tank",
+            Role::Fighter => "fighter",
+            Role::Assassin => "assassin",
+            Role::Enchanter => "enchanter",
+        }
+    }
+}
+
 /// A champion: base stats and their growth a level, its attack, and its four abilities.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ChampDef {
     pub name: &'static str,
     pub title: &'static str,
+    pub role: Role,
     pub base: crate::units::Stats,
     /// Added each level past the first.
     pub growth: crate::units::Stats,

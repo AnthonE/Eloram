@@ -45,19 +45,36 @@ pub struct FloorImage(pub Handle<Image>);
 
 /// Each team's colour, and each champion's.
 pub const TEAM: [Color; 2] = [Color::srgb(0.24, 0.55, 0.98), Color::srgb(0.95, 0.32, 0.26)];
-pub const CHAMPION: [Color; 5] = [
+pub const CHAMPION: [Color; 20] = [
     Color::srgb(0.92, 0.76, 0.32),
     Color::srgb(0.62, 0.42, 0.92),
     Color::srgb(0.46, 0.62, 0.40),
     Color::srgb(0.70, 0.18, 0.28),
     Color::srgb(0.30, 0.80, 0.76),
+    Color::srgb(0.77, 0.46, 0.33),
+    Color::srgb(0.16, 0.16, 0.68),
+    Color::srgb(0.43, 0.83, 0.27),
+    Color::srgb(0.62, 0.22, 0.45),
+    Color::srgb(0.27, 0.75, 0.83),
+    Color::srgb(0.68, 0.60, 0.16),
+    Color::srgb(0.57, 0.33, 0.77),
+    Color::srgb(0.16, 0.68, 0.29),
+    Color::srgb(0.83, 0.27, 0.29),
+    Color::srgb(0.22, 0.35, 0.62),
+    Color::srgb(0.62, 0.83, 0.27),
+    Color::srgb(0.68, 0.16, 0.63),
+    Color::srgb(0.33, 0.77, 0.68),
+    Color::srgb(0.68, 0.42, 0.16),
+    Color::srgb(0.39, 0.27, 0.83),
 ];
+
+const _: () = assert!(CHAMPION.len() == el_sim::content::champions::CHAMPIONS.len());
 
 #[derive(Resource)]
 struct Kit {
     bodies: [Handle<Mesh>; Kind::COUNT],
     team: [[Handle<StandardMaterial>; 2]; Kind::COUNT],
-    champion: [Handle<StandardMaterial>; 5],
+    champion: [Handle<StandardMaterial>; 20],
     ring: [Handle<StandardMaterial>; 2],
     fill: [Handle<StandardMaterial>; 3],
     missile: [Handle<StandardMaterial>; 2],

@@ -7,7 +7,7 @@ use glam::Vec2;
 
 use crate::content::Effect;
 use crate::content::Target;
-use crate::content::champions::{FLASH_SLOT, MARK_DASH_SPEED, MARK_SLOT, ability};
+use crate::content::champions::{BLINK_SLOT, MARK_DASH_SPEED, MARK_SLOT, ability};
 use crate::content::rules::{self, COMBO_IMMOBILE, COMBO_IMMUNE, COMBO_WINDOW};
 use crate::events::Event;
 use crate::game::{Casting, Dash, Intent, Match, NO_SLOT, SeatInput};
@@ -134,7 +134,7 @@ impl Match {
         if rank == 0 || c.ready[usize::from(slot)] > now {
             return;
         }
-        if slot < FLASH_SLOT && u.cc.silenced(now) {
+        if slot < BLINK_SLOT && u.cc.silenced(now) {
             return;
         }
         if u.mana < a.cost[usize::from(rank - 1)] {
@@ -193,6 +193,9 @@ impl Match {
         self.champs[seat].ready[usize::from(slot)] = now + ticks(a.cooldown[r] / (1.0 + haste / 100.0));
         self.champs[seat].cast = Casting { slot, left: ticks(a.windup) as u16, at, target, rank };
         self.event(Event::Cast { unit: seat as u16, slot, at });
+        if slot < BLINK_SLOT {
+            self.cast_triggers(seat);
+        }
         if self.champs[seat].cast.left == 0 {
             self.fire_cast(seat);
         }

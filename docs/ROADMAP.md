@@ -55,7 +55,7 @@ flashes, relics, fog from the same sight windows the server uses (`el_client_cor
 against the server's grids), and the HUD in Bevy UI: abilities with their cooldowns, health, mana,
 experience, gold, items, the kill feed, a minimap, the augment cards, the shop, the scoreboard.
 `scripts/dev.sh` serves it with the bots filling in; `scripts/e2e.sh match` plays one in headless
-Chromium (queue, augment, shop, a skill, Flash, a walk with no correction at all, the enemy seen
+Chromium (queue, augment, shop, a skill, Blink, a walk with no correction at all, the enemy seen
 only once the waves meet).
 
 Not yet: champion art (they're capsules in their colours), cast indicators, WASD bound on the

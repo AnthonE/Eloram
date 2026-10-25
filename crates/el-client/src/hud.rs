@@ -21,6 +21,8 @@ const KEYS: [&str; 6] = ["Q", "W", "E", "R", "D", "F"];
 const PANEL: Color = Color::srgba(0.04, 0.05, 0.08, 0.86);
 const TEXT: Color = Color::srgb(0.90, 0.92, 0.95);
 const DIM: Color = Color::srgb(0.55, 0.58, 0.64);
+/// Seconds the headliner stays in the middle of the screen as a match starts.
+const HEADLINER_SHOWN: u32 = 12;
 const GOLD: Color = Color::srgb(0.98, 0.82, 0.36);
 
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
@@ -432,7 +434,8 @@ fn watching(label: Label, w: &crate::watch::Watch) -> String {
             _ => String::new(),
         },
         Label::Score => {
-            let mut out = String::new();
+            let h = m.headliner();
+            let mut out = format!("{}: {}\n\n", h.name, h.blurb);
             for team in 0..2u8 {
                 out.push_str(if team == 0 { "DAWN\n" } else { "\nDUSK\n" });
                 for s in (0..SEATS).filter(|&s| team_of_seat(s) == team) {
@@ -486,6 +489,11 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                     Some(c) if !c.pred.units[c.seat].alive => {
                         let left = c.pred.champs[c.seat].dead_until.saturating_sub(c.pred.tick);
                         format!("Back in {} s", left.div_ceil(TICK_HZ))
+                    }
+                    // The headliner, as the match starts.
+                    Some(c) if c.world.tick < HEADLINER_SHOWN * TICK_HZ => {
+                        let h = c.pred.headliner();
+                        format!("{}\n{}", h.name, h.blurb)
                     }
                     _ => String::new(),
                 },
@@ -567,7 +575,8 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                 format!("{}  {}{mark}", it.name, it.cost)
             }
             (Label::Score, Some(c)) => {
-                let mut out = String::new();
+                let h = c.pred.headliner();
+                let mut out = format!("{}: {}\n\n", h.name, h.blurb);
                 for team in 0..2u8 {
                     out.push_str(if team == 0 { "DAWN\n" } else { "\nDUSK\n" });
                     for s in (0..SEATS).filter(|&s| team_of_seat(s) == team) {

@@ -1,6 +1,6 @@
 //! The lobby: who's waiting, and the matches they're in. Ten in the queue start a match at once;
 //! fewer start one when the first of them has waited `fill_after`, the server's bots taking the
-//! seats no one did. Champions are dealt at random, a team's five all different (ARAM: All Random).
+//! seats no one did. Champions are dealt at random, all ten different (ARAM: All Random).
 //!
 //! It runs on tokio and may lock: it is nowhere near a shard thread, which hears of a match only
 //! through its control queue.
@@ -72,19 +72,18 @@ pub struct Lobby {
     inner: Mutex<Inner>,
 }
 
-/// Each seat's champion for `seed`: each team's five dealt from the whole pool, none twice.
+/// Each seat's champion for `seed`: ten different ones across both teams, dealt from the whole
+/// pool (ARAM: All Random); if the pool is ever smaller than the seats, it is dealt again.
 pub fn deal(seed: u64) -> [u8; SEATS] {
     let mut picks = [0u8; SEATS];
-    for team in 0..2 {
-        let mut rng = Rng::new(seed ^ (0xA5A5 + team as u64));
-        let mut pool: Vec<u8> = (0..CHAMPIONS.len() as u8).collect();
-        for k in 0..SEATS / 2 {
-            if pool.is_empty() {
-                pool = (0..CHAMPIONS.len() as u8).collect();
-            }
-            let i = rng.below(pool.len() as u32) as usize;
-            picks[team * SEATS / 2 + k] = pool.swap_remove(i);
+    let mut rng = Rng::new(seed ^ 0xA5A5);
+    let mut pool: Vec<u8> = Vec::new();
+    for p in picks.iter_mut() {
+        if pool.is_empty() {
+            pool = (0..CHAMPIONS.len() as u8).collect();
         }
+        let i = rng.below(pool.len() as u32) as usize;
+        *p = pool.swap_remove(i);
     }
     picks
 }
@@ -280,15 +279,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn each_team_draws_five_different_champions() {
+    fn a_match_draws_ten_different_champions() {
         for seed in 0..200 {
             let p = deal(seed);
-            for team in p.chunks(SEATS / 2) {
-                let mut t = team.to_vec();
-                t.sort_unstable();
-                t.dedup();
-                assert_eq!(t.len(), team.len().min(CHAMPIONS.len()), "seed {seed}: {p:?}");
-            }
+            let mut all = p.to_vec();
+            all.sort_unstable();
+            all.dedup();
+            assert_eq!(all.len(), SEATS.min(CHAMPIONS.len()), "seed {seed}: {p:?}");
             assert!(p.iter().all(|&c| usize::from(c) < CHAMPIONS.len()));
         }
         assert_ne!(deal(1), deal(2));
