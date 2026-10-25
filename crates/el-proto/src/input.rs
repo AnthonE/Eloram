@@ -22,7 +22,8 @@ pub struct InputCmd {
     /// steps of 45°. A state, never a press: a lost packet can't leave a key down.
     pub steer: u8,
     /// Where the camera looks, as position codes ([`crate::quant::pos_code`]): what the server
-    /// sends first, never what the player is allowed to see.
+    /// sends first, never what the player is allowed to see. A packet carries the newest
+    /// command's only, and every command it carries reads as looking there.
     pub view: [u32; 2],
 }
 
@@ -85,20 +86,13 @@ impl InputPacket {
         w.write_bits(u32::from(self.client_time_ms), 16);
         w.write_u32(newest);
         w.write_bits((n - 1) as u32, 2);
-        let mut prev_view = None;
+        w.write_bits(self.cmds[0].view[0], POS_X_BITS);
+        w.write_bits(self.cmds[0].view[1], POS_Y_BITS);
         for (i, c) in self.cmds().iter().enumerate() {
             if c.tick != newest.wrapping_sub(i as u32) || c.steer > 8 {
                 return None;
             }
             w.write_bits(u32::from(c.steer), 4);
-            if prev_view == Some(c.view) {
-                w.write_bool(true);
-            } else {
-                w.write_bool(false);
-                w.write_bits(c.view[0], POS_X_BITS);
-                w.write_bits(c.view[1], POS_Y_BITS);
-            }
-            prev_view = Some(c.view);
         }
         let orders = self.orders();
         w.write_bits(u32::from(orders.first().map_or(0, |o| o.seq)), 16);
@@ -128,16 +122,11 @@ impl InputPacket {
         };
         let newest = r.read_u32();
         let n = r.read_bits(2) as usize + 1;
-        let mut view = [0u32; 2];
+        let view = [r.read_bits(POS_X_BITS), r.read_bits(POS_Y_BITS)];
         for i in 0..n {
             let steer = r.read_bits(4) as u8;
             if steer > 8 {
                 return Err(DecodeError::Invalid);
-            }
-            // (The first command always carries its view: a "same" bit there means nothing.)
-            let same = r.read_bool();
-            if !same || i == 0 {
-                view = [r.read_bits(POS_X_BITS), r.read_bits(POS_Y_BITS)];
             }
             p.cmds[i] = InputCmd { tick: newest.wrapping_sub(i as u32), steer, view };
         }
@@ -181,7 +170,7 @@ mod tests {
         };
         p.cmds[0] = InputCmd { tick: 1000, steer: 3, view };
         p.cmds[1] = InputCmd { tick: 999, steer: 3, view };
-        p.cmds[2] = InputCmd { tick: 998, steer: 0, view: pos_code(Vec2::new(10.0, 20.0)) };
+        p.cmds[2] = InputCmd { tick: 998, steer: 0, view };
         p.orders[0] = StampedOrder {
             seq: 65_535,
             tick: 990,
@@ -201,7 +190,12 @@ mod tests {
         let p = packet();
         let mut buf = [0u8; 256];
         let n = p.encode(&mut buf).unwrap();
-        assert!(n < 64, "{n} bytes");
+        assert!(n < 48, "{n} bytes");
+        assert_eq!(InputPacket::decode(&buf[..n]).unwrap(), p);
+        // The newest command's view is every command's.
+        let mut q = p;
+        q.cmds[2].view = pos_code(Vec2::new(10.0, 20.0));
+        let n = q.encode(&mut buf).unwrap();
         assert_eq!(InputPacket::decode(&buf[..n]).unwrap(), p);
     }
 

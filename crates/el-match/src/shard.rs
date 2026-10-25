@@ -174,7 +174,8 @@ impl Shard {
                 }
                 self.seats[g].take(&msg.packet, msg.recv_us, next);
                 let p = &msg.packet;
-                self.replicas[g].on_ack(p.ack_stream, p.ack_seq, p.ack_bits);
+                let team = el_sim::units::team_of_seat(seat);
+                self.replicas[g].on_ack(&self.nets[mi], team, next, p.ack_stream, p.ack_seq, p.ack_bits);
             }
         }
         let mut inputs = [SeatInput::default(); SEATS];
@@ -205,7 +206,8 @@ impl Shard {
         self.shared.metrics.sim_hist.record((stepped - started).as_micros() as u64);
         // Replication: each seat a player holds.
         let m = &self.matches[mi];
-        self.nets[mi].record(m);
+        let sent_to = |g: usize| self.seats[g].human && self.replicas[g].has_stream();
+        self.nets[mi].record(m, (mi * SEATS..(mi + 1) * SEATS).any(sent_to));
         for seat in 0..SEATS {
             let g = mi * SEATS + seat;
             if !self.seats[g].human || !self.replicas[g].has_stream() {

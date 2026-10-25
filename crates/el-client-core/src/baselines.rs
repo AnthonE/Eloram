@@ -5,13 +5,15 @@
 use el_proto::unit::{KEPT, QUnit};
 use el_sim::units::MAX_UNITS;
 
-/// A unit's records by tick: the one taken at tick `t` sits at `t % KEPT`. The server takes a
-/// delta only against a record under [`KEPT`] ticks old, so no newer one can have overwritten it.
+/// A unit's newest [`KEPT`] records, however old: the server takes a delta only against one it
+/// knows the client took and of which it sent fewer than [`KEPT`] newer, so no newer one can have
+/// pushed it out. A unit that says nothing new is not sent again, so its baseline can be minutes
+/// old.
 #[derive(Clone, Copy)]
 struct Ring {
     at: [(u32, QUnit); KEPT],
-    /// A bit a place: whether it holds anything.
-    held: u32,
+    /// Records taken, all told: the next goes at `n % KEPT`.
+    n: u32,
 }
 
 /// Every unit's kept records, by slot. They are kept whatever becomes of the unit (out of sight, a
@@ -23,9 +25,7 @@ pub struct Baselines {
 
 impl Default for Baselines {
     fn default() -> Self {
-        Self {
-            slots: vec![Ring { at: [(0, QUnit::default()); KEPT], held: 0 }; MAX_UNITS].into_boxed_slice(),
-        }
+        Self { slots: vec![Ring { at: [(0, QUnit::default()); KEPT], n: 0 }; MAX_UNITS].into_boxed_slice() }
     }
 }
 
@@ -33,23 +33,23 @@ impl Baselines {
     /// Forgets everything (a new stream).
     pub fn clear(&mut self) {
         for r in self.slots.iter_mut() {
-            r.held = 0;
+            r.n = 0;
         }
     }
 
     /// The record of `slot` taken at `tick`, if it's kept.
     pub fn get(&self, slot: u8, tick: u32) -> Option<QUnit> {
         let ring = &self.slots[usize::from(slot)];
-        let k = tick as usize % KEPT;
-        (ring.held & (1 << k) != 0 && ring.at[k].0 == tick).then_some(ring.at[k].1)
+        let held = (ring.n as usize).min(KEPT);
+        ring.at[..held].iter().find(|(t, _)| *t == tick).map(|&(_, q)| q)
     }
 
-    /// Keeps a record taken at `tick` (a datagram's records go in once it's taken whole).
+    /// Keeps a record taken at `tick` (a datagram's records go in once it's taken whole; a unit
+    /// has one record a tick at most).
     pub fn put(&mut self, tick: u32, q: QUnit) {
         let ring = &mut self.slots[usize::from(q.slot)];
-        let k = tick as usize % KEPT;
-        ring.at[k] = (tick, q);
-        ring.held |= 1 << k;
+        ring.at[ring.n as usize % KEPT] = (tick, q);
+        ring.n = ring.n.wrapping_add(1);
     }
 }
 
@@ -58,7 +58,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn keeps_the_newest_of_each_unit() {
+    fn keeps_the_newest_of_each_unit_however_old() {
         let mut b = Baselines::default();
         let q = |slot| QUnit { slot, ..QUnit::default() };
         for t in 0..40 {
@@ -70,6 +70,9 @@ mod tests {
         assert_eq!(b.get(7, 39 - KEPT as u32), None);
         assert_eq!(b.get(200, 5), Some(q(200)));
         assert_eq!(b.get(201, 5), None);
+        // A record taken long ago stays while fewer than KEPT newer came.
+        b.put(9_000, QUnit { flags: 1, ..q(200) });
+        assert_eq!(b.get(200, 5), Some(q(200)));
         b.clear();
         assert_eq!(b.get(7, 39), None);
     }

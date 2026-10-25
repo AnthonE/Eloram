@@ -24,7 +24,7 @@ pub mod hash;
 pub mod map;
 pub mod math;
 pub mod missile;
-mod own;
+pub mod own;
 pub mod path;
 pub mod record;
 pub mod storage;

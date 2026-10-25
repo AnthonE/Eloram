@@ -178,7 +178,7 @@ pub struct Champ {
 }
 
 impl Champ {
-    fn new(def: u8) -> Self {
+    pub(crate) fn new(def: u8) -> Self {
         Self {
             def,
             level: START_LEVEL,

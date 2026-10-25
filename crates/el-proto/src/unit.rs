@@ -9,10 +9,17 @@ use crate::bits::{BitSink, Packer};
 use crate::quant::{POS_X_BITS, POS_Y_BITS};
 use crate::{BitReader, BitWriter, DecodeError, MAP_H, MAP_W};
 
-/// Bits of a delta record's age: how many ticks before the snapshot's its baseline is (1 to 255).
-pub const BACK_BITS: u32 = 8;
-/// How far back a baseline may be: the server takes a delta only against a record of the unit
-/// it sent this few ticks ago, and the client keeps this many of each unit's records.
+/// A delta record's age, how many ticks before the snapshot's its baseline is: a bit, then 1 to
+/// [`BACK_SHORT`] in [`BACK_SHORT_BITS`] (a baseline a round trip old), or else up to [`BACK_MAX`]
+/// in [`BACK_LONG_BITS`] (a unit that said nothing new for a while).
+pub const BACK_SHORT_BITS: u32 = 4;
+pub const BACK_SHORT: u32 = 1 << BACK_SHORT_BITS;
+pub const BACK_LONG_BITS: u32 = 16;
+pub const BACK_MAX: u32 = (1 << BACK_LONG_BITS) - 1;
+/// The records of each unit the client keeps: the newest it took, however old. The server takes a
+/// delta only against a record the client acked and of which it has sent fewer than this many
+/// newer, so it is always one the client still holds; and it keeps every unit's records this many
+/// ticks, to know what an ack acked.
 pub const KEPT: usize = 16;
 /// A unit's velocity: how far it moved in its last tick, over ±[`VEL_MAX`] units at [`VEL_BITS`]
 /// on the centered grid (zero is exact: what stands, stands).
@@ -131,6 +138,19 @@ impl QUnit {
     pub fn carried(&self, back: u32) -> [u32; 2] {
         let at = carried(self, self.vel, back);
         [at[0] as u32, at[1] as u32]
+    }
+
+    /// Whether it says nothing that `base`, `back` ticks older, didn't (what [`Delta::is_same`]
+    /// says of a delta between them), with the cheap comparisons first.
+    pub fn adds_nothing_to(&self, base: &QUnit, back: u32) -> bool {
+        (1..=BACK_MAX).contains(&back)
+            && self.same_unit(base)
+            && self.vel == base.vel
+            && self.facing == base.facing
+            && self.hp == base.hp
+            && self.corner == base.corner
+            && misc_same(self, base)
+            && carried(base, self.vel, back) == [i64::from(self.pos[0]), i64::from(self.pos[1])]
     }
 
     /// Whether a delta can be taken against `base`: the same unit, the same life.
@@ -260,7 +280,7 @@ fn carried(base: &QUnit, vel: [i32; 2], back: u32) -> [i64; 2] {
 /// [`write`](Self::write) writes.
 #[derive(Clone, Copy, Debug)]
 pub struct Delta {
-    back: u8,
+    back: u16,
     vel: (Mode, [i64; 2]),
     pos: (Mode, [i64; 2]),
     cur: QUnit,
@@ -278,10 +298,10 @@ enum CornerChange {
 }
 
 impl Delta {
-    /// `cur` against `base`, `back` ticks older (1 to 255). `None` if it can't be: another unit or
-    /// life, or a baseline too old.
+    /// `cur` against `base`, `back` ticks older (1 to [`BACK_MAX`]). `None` if it can't be: another
+    /// unit or life, or a baseline too old.
     pub fn plan(cur: &QUnit, base: &QUnit, back: u32) -> Option<Self> {
-        if !(1..=255).contains(&back) || !cur.same_unit(base) {
+        if !(1..=BACK_MAX).contains(&back) || !cur.same_unit(base) {
             return None;
         }
         let dv =
@@ -294,7 +314,7 @@ impl Delta {
             _ => CornerChange::New,
         };
         Some(Self {
-            back: back as u8,
+            back: back as u16,
             vel: (Mode::of(&dv, VEL_SMALL, VEL_MEDIUM), dv),
             pos: (Mode::of(&dp, POS_SMALL, POS_MEDIUM), dp),
             cur: *cur,
@@ -309,7 +329,7 @@ impl Delta {
     pub fn bits(&self) -> usize {
         let misc = MAX_HP_BITS + MANA_BITS + SHIELD_BITS + LEVEL_BITS + FLAG_BITS + CAST_BITS + 8;
         (8 + 1
-            + BACK_BITS
+            + back_bits(u32::from(self.back))
             + self.vel.0.bits(2, VEL_SMALL, VEL_MEDIUM, 2 * VEL_BITS)
             + self.pos.0.bits(2, POS_SMALL, POS_MEDIUM, POS_X_BITS + POS_Y_BITS)
             + 1
@@ -337,7 +357,13 @@ impl Delta {
         let c = &self.cur;
         let mut packer = Packer::new(w);
         let w = &mut packer;
-        w.write_bits(u32::from(self.back), BACK_BITS);
+        let back = u32::from(self.back);
+        w.write_bool(back > BACK_SHORT);
+        if back > BACK_SHORT {
+            w.write_bits(back, BACK_LONG_BITS);
+        } else {
+            w.write_bits(back - 1, BACK_SHORT_BITS);
+        }
         write_group(w, self.vel, VEL_SMALL, VEL_MEDIUM, |w| {
             w.write_i32(c.vel[0], VEL_BITS);
             w.write_i32(c.vel[1], VEL_BITS);
@@ -371,9 +397,9 @@ impl Delta {
         packer.finish();
     }
 
-    /// Reads a delta record's age, after its slot and delta bit.
+    /// Reads a delta record's age, after its slot and delta bit (0 only from a hostile writer).
     pub fn read_back(r: &mut BitReader<'_>) -> u32 {
-        r.read_bits(BACK_BITS)
+        if r.read_bool() { r.read_bits(BACK_LONG_BITS) } else { r.read_bits(BACK_SHORT_BITS) + 1 }
     }
 
     /// Reads the rest of a delta record against `base`, `back` ticks older.
@@ -426,6 +452,11 @@ impl Delta {
         }
         if r.overflowed() { Err(DecodeError::Truncated) } else { Ok(q) }
     }
+}
+
+/// Bits of a delta record's age.
+fn back_bits(back: u32) -> u32 {
+    1 + if back > BACK_SHORT { BACK_LONG_BITS } else { BACK_SHORT_BITS }
 }
 
 fn write_group(
@@ -502,8 +533,32 @@ mod tests {
         assert!(walking <= 36, "walking: {walking} bits");
         let still = unit(5_000.0, 0);
         let resting = round_trip(&still, &still, 5);
-        assert!(resting <= 28, "at rest: {resting} bits");
+        assert!(resting <= 25, "at rest: {resting} bits");
+        // A unit at rest a minute: its baseline is that old, at a dozen bits more.
+        let long = round_trip(&still, &still, 1_800);
+        assert!(long <= 37, "at rest a minute: {long} bits");
         assert!(Delta::plan(&still, &still, 5).unwrap().is_same());
+    }
+
+    #[test]
+    fn adding_nothing_is_a_delta_that_says_nothing() {
+        let v = (10.8 / VEL_MAX * max_code(VEL_BITS - 1) as f32).round() as i32;
+        let base = unit(5_000.0, v);
+        let mut cases = [base; 8];
+        for (k, back) in [1u32, 3, 3, 20].into_iter().enumerate() {
+            cases[k].pos = Delta::plan(&base, &base, back).map(|_| base.carried(back)).unwrap();
+        }
+        cases[2].pos[0] += 1;
+        cases[4].hp = 3;
+        cases[5].corner = None;
+        cases[6].generation = 9;
+        cases[7].flags = flags::SLOWED;
+        for back in [1, 3, 20, 4_000] {
+            for c in &cases {
+                let same = Delta::plan(c, &base, back).is_some_and(|d| d.is_same());
+                assert_eq!(c.adds_nothing_to(&base, back), same, "{c:?} back {back}");
+            }
+        }
     }
 
     #[test]
@@ -519,7 +574,11 @@ mod tests {
         round_trip(&cur, &base, 9);
         cur.corner = Some([1, 2]);
         round_trip(&cur, &base, 200);
+        for back in [1, BACK_SHORT, BACK_SHORT + 1, BACK_MAX] {
+            round_trip(&cur, &base, back);
+        }
         assert!(Delta::plan(&cur, &base, 0).is_none());
+        assert!(Delta::plan(&cur, &base, BACK_MAX + 1).is_none());
         let mut other = cur;
         other.generation = 8;
         assert!(Delta::plan(&other, &base, 3).is_none(), "another life is never a delta");

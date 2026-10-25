@@ -17,6 +17,7 @@ use el_proto::{BitReader, DecodeError, InputCmd, InputPacket, Order};
 use el_sim::content::rules;
 use el_sim::game::{Intent, MAX_ORDERS_TICK, NO_SLOT, SeatInput};
 use el_sim::map::Map;
+use el_sim::own::{OWN_BASELINES, OwnState, OwnWidths, own_widths};
 use el_sim::path::PathScratch;
 use el_sim::units::{FIRST_MINION, MAX_UNITS, SEATS, team_of_seat};
 use el_sim::{Match, ticks};
@@ -123,6 +124,11 @@ pub struct Client {
     pub clock: Clock,
     acks: AckWindow,
     baselines: Baselines,
+    /// The own champion's states taken of late, by tick: the server's baselines for the next.
+    own_kept: Box<[(u32, OwnState)]>,
+    own_widths: OwnWidths,
+    /// The own state the datagram being read carried.
+    own_new: Option<OwnState>,
     /// Everyone else's records for drawing, by slot.
     pub tracks: Box<[Track]>,
     pub missiles: Missiles,
@@ -185,6 +191,9 @@ impl Client {
             clock: Clock::default(),
             acks: AckWindow::default(),
             baselines: Baselines::default(),
+            own_kept: vec![(u32::MAX, OwnState::default()); OWN_BASELINES].into_boxed_slice(),
+            own_widths: own_widths(),
+            own_new: None,
             tracks: vec![Track::default(); MAX_UNITS].into_boxed_slice(),
             missiles: Missiles::default(),
             inputs: InputHistory::default(),
@@ -272,6 +281,9 @@ impl Client {
             }
         };
         self.acks.commit(h.stream, verdict, h.tick);
+        if let Some(s) = self.own_new.take() {
+            self.own_kept[h.tick as usize % OWN_BASELINES] = (h.tick, s);
+        }
         if new_stream {
             self.next_event = first;
         }
@@ -324,11 +336,19 @@ impl Client {
         recs: &mut [QUnit; MAX_UNITS],
     ) -> Result<(u16, usize, usize, usize), DecodeError> {
         self.world.tick = self.world.tick.max(h.tick);
+        self.own_new = None;
         if h.flags & snap_flags::OWN != 0 {
-            self.world.read_own(self.seat, r)?;
+            let kept = &self.own_kept;
+            let s = OwnState::read(r, &self.own_widths, |back| {
+                let t = h.tick.wrapping_sub(back);
+                let (at, s) = kept[t as usize % OWN_BASELINES];
+                (at == t).then_some(s)
+            })?;
+            self.world.apply_own(self.seat, &s)?;
+            self.own_new = Some(s);
         }
-        let (first, n_rel) = event::read_list(r, true, rel)?;
-        let (_, n_once) = event::read_list(r, false, once)?;
+        let (first, n_rel) = event::read_list(r, h.tick, true, rel)?;
+        let (_, n_once) = event::read_list(r, h.tick, false, once)?;
         let mut n = 0;
         while r.read_bool() {
             let slot = r.read_u8();
@@ -359,6 +379,7 @@ impl Client {
     /// whole, and counts the orders from 0.
     fn start_stream(&mut self) {
         self.baselines.clear();
+        self.own_kept.fill((u32::MAX, OwnState::default()));
         self.missiles.clear();
         for i in 0..MAX_UNITS {
             if i != self.seat && !(SEATS..FIRST_MINION).contains(&i) {
@@ -525,7 +546,7 @@ impl Client {
     /// prediction (WASD in `steer`, and any orders it gives), steps the prediction through them,
     /// and returns the input packet to send: the newest commands and every order not yet acked.
     /// `view` is where the camera looks (position codes). `None` until the champion's state has
-    /// come and the clock is set.
+    /// come and the clock is set, and on a frame that made no command and gave no order.
     pub fn poll(
         &mut self,
         now: f64,
@@ -561,6 +582,11 @@ impl Client {
             self.next_cmd = k + 1;
         }
         let newest = self.next_cmd.checked_sub(1)?;
+        // Nothing new (a frame between two ticks): nothing to send. The last packet's commands and
+        // acks stand until the next tick's.
+        if self.next_cmd == first && self.unsent == self.orders.next_seq {
+            return None;
+        }
         let (ack_stream, ack_seq, ack_bits) = self.acks.ack();
         let mut out = Packets { list: [InputPacket::default(); MAX_PACKETS], n: 0 };
         // Windows of the newest commands, back until every command this poll made is in one. The
