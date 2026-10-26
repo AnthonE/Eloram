@@ -28,7 +28,7 @@ if [ "$crate_ver" != "$cli_ver" ]; then
 fi
 
 mkdir -p web/dist
-cp web/index.html web/config.js web/boot.js web/loader.js web/wallet.js web/style.css web/favicon.svg web/dist/
+cp web/index.html web/config.js web/boot.js web/loader.js web/wallet.js web/audio.js web/style.css web/favicon.svg web/dist/
 # The art (docs/ART.md): the ground's textures, the brush, the models. JPEG and PNG are compressed
 # already; the models' geometry isn't, so they get precompressed copies like the wasm's.
 rm -rf web/dist/assets
@@ -40,6 +40,13 @@ node -e '
     fs.writeFileSync(p + ".br", z.brotliCompressSync(raw, { params: { [z.constants.BROTLI_PARAM_QUALITY]: 9 } }));
     fs.writeFileSync(p + ".gz", z.gzipSync(raw, { level: 9 }));
   }' web/dist/assets/models
+# The sounds (docs/FX.md): what's there, for the client to load without asking for what isn't (the
+# announcer's lines and the music are optional files).
+node -e '
+  const fs = require("fs"), dir = process.argv[1];
+  const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.(ogg|mp3)$/.test(f)).sort() : [];
+  fs.writeFileSync(dir + "/files.json", JSON.stringify(files));
+  console.log("==> audio: " + files.length + " files");' web/dist/assets/audio
 
 for v in "${variants[@]}"; do
   feats=()

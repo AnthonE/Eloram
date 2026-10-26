@@ -7,6 +7,7 @@ pub mod baselines;
 pub mod client;
 pub mod clock;
 pub mod fog;
+pub mod fx;
 pub mod inputs;
 pub mod interp;
 pub mod lobby;

@@ -33,6 +33,24 @@ use crate::zones::Zones;
 
 /// Events kept for the page to read: the kill feed, damage numbers, casts to animate.
 pub const FEED: usize = 256;
+/// The own champion's predicted casts and blinks kept for the page (`docs/FX.md`: its effects
+/// start from the prediction, a round trip before the server's say).
+pub const OWN_FEED: usize = 16;
+
+/// Something the own champion did in the prediction, the first time it was stepped.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum OwnEvent {
+    #[default]
+    Nothing,
+    /// It began a cast: the slot, and where it aimed.
+    Cast { slot: u8, at: Vec2 },
+    /// It was somewhere else at once.
+    Blink { from: Vec2, to: Vec2 },
+    /// A missile of its left (an ability's, or a ranged auto: its source's code).
+    Missile { source: u32, from: Vec2 },
+    /// It swung at something in melee.
+    Swing,
+}
 /// The most commands one poll makes; a client further behind than this (a stalled page) jumps.
 const CATCH_UP: u32 = 60;
 /// The most packets one poll sends: enough to carry every command it made.
@@ -143,6 +161,9 @@ pub struct Client {
     /// The newest [`FEED`] events, with their snapshots' ticks: event `n` sits at `n % FEED`.
     pub feed: Box<[(u32, WireEvent)]>,
     pub feed_n: u64,
+    /// The newest [`OWN_FEED`] of the own champion's predicted [`OwnEvent`]s, by tick, as the feed.
+    pub own_feed: [(u32, OwnEvent); OWN_FEED],
+    pub own_feed_n: u64,
     scratch: PathScratch,
     /// The next tick to make a command for; the prediction is at this tick.
     next_cmd: u32,
@@ -205,6 +226,8 @@ impl Client {
             next_event: 0,
             feed: vec![(0, WireEvent::Nothing); FEED].into_boxed_slice(),
             feed_n: 0,
+            own_feed: [(0, OwnEvent::Nothing); OWN_FEED],
+            own_feed_n: 0,
             scratch: PathScratch::new(),
             next_cmd: 0,
             unsent: 0,
@@ -547,6 +570,29 @@ impl Client {
         self.own_ticks[(k + 1) as usize % OWN_KEPT] = (k + 1, self.pred.units[self.seat].pos);
     }
 
+    /// What the own champion did in tick `k`'s first step (a reseed steps it again: that isn't
+    /// news).
+    fn own_events(&mut self, k: u32) {
+        let s = self.seat as u16;
+        for e in self.pred.events.as_slice() {
+            let own = match *e {
+                el_sim::events::Event::Cast { unit, slot, at } if unit == s => OwnEvent::Cast { slot, at },
+                el_sim::events::Event::Blink { unit, from, to } if unit == s => OwnEvent::Blink { from, to },
+                el_sim::events::Event::MissileSpawn { missile } => {
+                    let m = &self.pred.missiles[usize::from(missile)];
+                    if m.owner.idx != s {
+                        continue;
+                    }
+                    OwnEvent::Missile { source: m.source.code(), from: m.origin }
+                }
+                el_sim::events::Event::Attack { unit, .. } if unit == s => OwnEvent::Swing,
+                _ => continue,
+            };
+            self.own_feed[(self.own_feed_n % OWN_FEED as u64) as usize] = (k, own);
+            self.own_feed_n += 1;
+        }
+    }
+
     // -----------------------------------------------------------------------------------------
     // Inputs
     // -----------------------------------------------------------------------------------------
@@ -588,6 +634,7 @@ impl Client {
             }
             self.inputs.push(InputCmd { tick: k, steer: si.steer.min(8), view });
             self.pred_step(k);
+            self.own_events(k);
             self.next_cmd = k + 1;
         }
         let newest = self.next_cmd.checked_sub(1)?;

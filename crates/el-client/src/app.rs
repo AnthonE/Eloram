@@ -1,9 +1,11 @@
 use bevy::prelude::*;
 
+use crate::audio::AudioPlugin;
 use crate::camera::CameraPlugin;
 use crate::config::LaunchConfig;
 use crate::dev_hooks::{DevHooksPlugin, InboxPlugin};
 use crate::edges::EdgesPlugin;
+use crate::fx::FxPlugin;
 use crate::ground::GroundPlugin;
 use crate::hud::HudPlugin;
 use crate::input::InputPlugin;
@@ -51,6 +53,8 @@ pub fn run() {
             EdgesPlugin,
             SceneryPlugin,
             ViewPlugin,
+            FxPlugin,
+            AudioPlugin,
             HudPlugin,
             WatchPlugin,
         ))

@@ -120,9 +120,9 @@ impl Session {
         self.roster.get(s).map_or("?", |p| p.name.as_str())
     }
 
-    /// Takes the client's new events into the kill feed (and anything else the page tallies).
-    /// Returns the area flashes among them, for the scene.
-    pub fn read_events(&mut self, now: f64, mut area: impl FnMut(&WireEvent)) {
+    /// Takes the client's new events into the kill feed (and anything else the page tallies), and
+    /// hands the pings among them to the scene.
+    pub fn read_events(&mut self, now: f64, mut ping: impl FnMut(&WireEvent)) {
         let Some(c) = &self.client else { return };
         let from = self.feed_read.max(c.feed_n.saturating_sub(el_client_core::client::FEED as u64));
         let mut lines = Vec::new();
@@ -140,12 +140,11 @@ impl Session {
                     };
                     lines.push(FeedLine { text, at: now });
                 }
-                WireEvent::Area { .. } | WireEvent::MissileEnd { .. } => area(&e),
                 WireEvent::Ping { seat, kind, .. } => {
                     self.pings += 1;
                     let text = format!("{}: {}", self.name(usize::from(seat)), ping_words(kind));
                     lines.push(FeedLine { text, at: now });
-                    area(&e);
+                    ping(&e);
                 }
                 WireEvent::Vote { yes, no, open, passed, .. } => {
                     let text = match (open, passed) {

@@ -269,6 +269,90 @@ numbers on a real GPU into `ROADMAP.md`, which has none yet.
 - Down a client over 100 ms and 5% loss (`netcode.rs`), 3.7 to 3.8 KB/s, as before: the new
   fields cost less than the noise between runs.
 
+**Steps 2, 3 and 5's first pass: the runtime, the sound, a look for everything.**
+- `el_client_core::fx`, tested natively:
+  - `sound`: the table of every sound (128 ours, 226 takes; 25 lines for the announcer and the
+    music, optional). `web/assets/audio/manifest.json` is written from it, and a test fails when
+    it's stale or a take of ours is missing.
+  - `look`: a look for every source, derived from the ability as the sim's effect is (how it
+    reaches gives its parts; its ops, Riot's four things, its ratings for the caster, allies and
+    enemies; its champion's family, its palette and sounds). Tests: every ability of every
+    champion has one, a blast that lands late warns by ear, an ultimate has its layer, and what
+    stuns is rated over what pokes.
+  - `director`: the cues of a frame. Every `WireEvent` has its own line, with no catch-all. The
+    own champion's casts, blinks, missiles and swings come from the prediction, captured on a
+    tick's first step only (`Client::own_feed`), and the server's word of them isn't played
+    again. Anything about another unit waits for the drawn clock (at most half a second). Flags
+    that rise become statuses, a turret turning on the viewer is heard, and the own champion's
+    interface (a point spent, an item, the cards, an augment, a reroll) is heard from its state.
+  - `mix`: the ladder (the viewer's own; enemies' warnings and ultimates; enemies' casts and hits;
+    allies'; the world), a cap per sound and 32 voices in all, the lower rungs ducking 5 dB under a
+    big moment and 3 under a crowd, takes that never repeat back to back, a pitch within 40 cents,
+    and where a sound sits from where it is on the screen.
+  - `voice`: the announcer's lines, aimed from the viewer's side (first blood, a streak of two to
+    five, an ace, structures by whose they were, an inhibitor back, the minions, the result), one
+    at a time, the weightiest first, news more than 3 s old dropped. And the music's states.
+- The effects (`el-client/src/fx.rs`, `fx/`):
+  - Bursts are closed forms: a pool of meshes whose vertices hold each particle's whole life
+    (`shaders/fx_burst.wgsl`: glows, streaks, shards, puffs, rings, columns, flashes). Each family
+    has its recipe for a hit (ember sparks fall, frost shatters, tide splashes, stone throws
+    rubble and dust...), and every part has its own (cast motes, launch, impact, blast with its
+    ring, windup motes drawn in, dash puffs along the path, buff spiral, deaths by kind, levels,
+    relics). Size and brightness follow the cue's rating for the viewer.
+  - What lasts is a pool of quads (`shaders/fx_live.wgsl`). Missiles get a head and a trail in
+    place of the spheres: as wide as the lane, as long as the missile is fast. Zones get a
+    telegraph that fills toward the moment it lands, or a field that churns and pulses, drawn
+    from the wire's radius. An enemy's rim is hot and full, an ally's cool and fainter. Statuses
+    are drawn from the flags: stars, a root's ring and binding, the silence and reveal marks, a
+    shield's bubble, glows at the feet for a slow, a haste, strength and Combo Breaker.
+  - The camera shakes a little when something heavy lands on the viewer's champion.
+  - `?quality=low` keeps half the particles.
+- The sound (`el-client/src/audio.rs`) is Web Audio through `web-sys`, with no decoder in the
+  wasm.
+  - Every effect is its own source, then a low pass, its gain, and an equal-power panner, into
+    the front or back of the effects bus. The five buses go to the master, then a limiter.
+  - Where a sound sits comes from projecting where it happens through the camera: panned across
+    the screen (never fully into one ear), quieter toward the rim, fading and dulling over half a
+    screen past it, then nothing.
+  - A wind bed, and the nearest brazier's crackle, louder as the camera comes near and panned
+    where it stands.
+  - Opus where the browser plays it, else MP3, from `assets/audio/files.json` (what's there:
+    `build-web.sh`). The shared sounds load with the page, a family's once a match deals one of
+    its champions. The first click or key resumes the audio, as browsers ask.
+  - A panel on the page (`web/audio.js`, the corner button) with the master and each bus, kept in
+    `localStorage` and told to the client through the inbox (`{t:"volume",bus,v}`,
+    `{t:"mute",on}`).
+- The sounds (`art/tools/sounds.py`, `art/LICENSES.md`):
+  - The physical bodies are recordings from five of Kenney's CC0 packs, pinned by hash, their
+    licence checked. The elements are synthesised: fire's roar and crackle, water, wind bands,
+    bell and glass partials, starlight, plucked strings, the warnings (rising sweeps, a shell's
+    falling whistle).
+  - Everything shares one small room, then is mastered by bus. A take's randomness is seeded by
+    its name.
+  - 1.6 MiB in Opus, 1.8 in MP3. Every file is checked for its codec, its peak (at most -1 dBFS
+    after encoding), its onset (within 5 ms of its start) and its level.
+- The announcer and the music, ready for their files: drop `voice.<line>.ogg` and `.mp3` (or
+  `music.<state>`) into `web/assets/audio/`, give them a line in `art/LICENSES.md`, and rebuild.
+  The names and what each line says are in the manifest. A line without its file goes unsaid;
+  the music dips under a line.
+- In the browser (`scripts/e2e.sh match`, headless Chromium):
+  - The audio runs, and 178 sounds load with none failed.
+  - Taking an augment is heard, and Blink is drawn and heard from the prediction.
+  - Three minutes of a match: 2,632 cues, 66 sounds heard (the rest were off the screen, so never
+    started), at most 12 at once, none dropped, none missing.
+  - The walk is still predicted exactly (0.00).
+
+Not yet:
+- Nobody has listened: the sounds were judged by their spectrograms and measures, not by ear. The
+  look on a real GPU hasn't been seen either (SwiftShader draws a frame every two seconds, so a
+  burst is seldom in a picture).
+- Effects for a match watched or replayed (the record's referee has the events; no director
+  reads them yet).
+- Step 4's practice mode and the `fx` suite's contact sheet.
+- A model's flash when hit.
+- The per-ability hand-tuning step 5 ends with (the derived looks are the base it tunes from).
+- Step 6's frame numbers.
+
 ## Sources
 
 - Riot Games, [Clarity in League](https://www.leagueoflegends.com/en-us/news/dev/clarity-in-league/).

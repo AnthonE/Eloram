@@ -3,6 +3,8 @@
 #[cfg(target_arch = "wasm32")]
 mod app;
 #[cfg(target_arch = "wasm32")]
+mod audio;
+#[cfg(target_arch = "wasm32")]
 mod camera;
 #[cfg(target_arch = "wasm32")]
 mod config;
@@ -12,6 +14,8 @@ mod coords;
 mod dev_hooks;
 #[cfg(target_arch = "wasm32")]
 mod edges;
+#[cfg(target_arch = "wasm32")]
+mod fx;
 #[cfg(target_arch = "wasm32")]
 mod ground;
 #[cfg(target_arch = "wasm32")]

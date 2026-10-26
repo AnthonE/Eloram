@@ -137,3 +137,11 @@ two faults: `Source` codes gave champions 16 to 19 the codes of 0 to 3, and a fi
 its owner gave away an owner hidden in brush by its pulse. The leak oracle checks the new events
 (0 leaks over 14,734 events, 62 zones; the old rule for a pulse leaks twice in the same match), and
 down a client is 3.7 to 3.8 KB/s, as before.
+
+Then the runtime and the sound (`FX.md`, "What landed"): a look and a sound for every ability,
+derived from what it does and its champion's family; the director's cues, with the own
+champion's from the prediction; bursts as closed forms in the shader; missiles' trails,
+telegraphs, fields and statuses; Web Audio with a priority ladder, ducking and stereo from where
+a sound is on the screen; 226 takes made from Kenney's CC0 packs and synthesis; the announcer
+and music wired for their files. In a browser match: 2,632 cues in three minutes, at most 12
+sounds at once, none dropped, the walk still exact.
