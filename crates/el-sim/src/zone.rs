@@ -11,10 +11,13 @@ use crate::missile::Source;
 use crate::units::{Kind, SEATS};
 
 pub const MAX_ZONES: usize = 64;
+const _: () = assert!(MAX_ZONES <= 1 << el_proto::event::ZONE_BITS);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Zone {
     pub alive: bool,
+    /// Bumped every time the slot is reused (what the wire names a zone by, with its slot).
+    pub generation: u8,
     pub team: u8,
     pub owner: Handle,
     pub source: Source,
@@ -35,6 +38,7 @@ impl Default for Zone {
     fn default() -> Self {
         Self {
             alive: false,
+            generation: 0,
             team: 0,
             owner: Handle::NONE,
             source: Source::Auto,
@@ -70,6 +74,7 @@ impl Match {
         let next = self.tick + delay;
         self.zones[i] = Zone {
             alive: true,
+            generation: self.zones[i].generation.wrapping_add(1),
             team: u.team,
             owner: u.handle(owner),
             source,
@@ -103,7 +108,15 @@ impl Match {
                 continue;
             }
             let at = self.zones[i].pos;
-            self.event(Event::Area { at, radius: z.radius, team: z.team });
+            self.event(Event::Area {
+                zone: i as u8,
+                at,
+                radius: z.radius,
+                team: z.team,
+                source: z.source,
+                owner: owner as u16,
+                follows: z.follows,
+            });
             let ops = z.source.ops();
             for j in 0..self.units.len() {
                 let u = &self.units[j];
@@ -119,7 +132,7 @@ impl Match {
                     Filter::Allies => u.team == z.team && j < SEATS,
                 };
                 if hits {
-                    self.apply_ops(owner, j, ops, z.rank, true);
+                    self.apply_ops(owner, j, ops, z.rank, z.source);
                     if z.filter == Filter::Enemies {
                         self.ability_hit(owner, j);
                     }

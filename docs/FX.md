@@ -99,8 +99,8 @@ doesn't load: today's spheres and discs are the fallback.
 
 ### 1. The wire (protocol 4)
 
-- `Source` gets a code with room for the whole pool (the champion in five bits), and the record's
-  hash takes the same code: the golden hashes move once, with the protocol.
+- `Source` gets a code with room for the whole pool (the champion in five bits, the slot in three),
+  and the platform's laser one of its own.
 - `Area` carries its source.
 - A new reliable `ZoneSpawn`: a zone as a closed form (where, how wide, its source, its team, when
   it first fires, its period, when it ends, whether it follows its owner), told when the team
@@ -243,8 +243,31 @@ numbers on a real GPU into `ROADMAP.md`, which has none yet.
   sound, and a fight never went past the voice cap.
 - **Frame**: on a real GPU, a ten-way fight holds 60 fps at 1080p on `high`, and the effects'
   share of the frame is measured.
-- **Nothing else moves**: the golden hashes move only with step 1's code, `CONTENT_VERSION` holds,
-  no allocation in a tick, `ci.sh` green.
+- **Nothing else moves**: the golden hashes hold, `CONTENT_VERSION` holds, no allocation in a tick,
+  `ci.sh` green.
+
+## What landed
+
+**Step 1, the wire (protocol 4).**
+- `Source::code` has a champion in five bits and a slot in three (`Source::Fountain` is 2), and a
+  test that every source of the pool comes back as itself with a code of its own. The record's
+  hash takes the new code, and the golden hashes held (so no ability's missile is in flight at
+  either tick they're taken): what the match does didn't change.
+- The sim's `Damage` carries its kind and its source, `Heal` its source, and a new `Shield`;
+  `apply_ops` and `deal` take the `Source` they act for where they took a flag. `Area` names its
+  zone, source and owner, and whether it follows them; a zone has a generation.
+- On the wire: `ZoneSpawn` and `ZoneEnd` (reliable), `Shield` (not), `Damage` with its kind and
+  source, `Heal` and `Area` with theirs, and two flags, empowered and hasted (`FLAG_BITS` 12). A
+  zone's next pulse and end go as ticks either side of the snapshot's.
+- Replication tells a zone when the team first sees its ground, or, for one that follows its owner,
+  the owner; and ends it when it ends or that owner goes out of sight. A following zone's pulse
+  goes only where its owner is seen. `el_client_core::zones` keeps what was told: where, when it
+  fires next, how far its telegraph has filled.
+- The leak oracle checks the new events: 0 leaks over 14,734 events in five minutes, 62 zones told
+  (31 an enemy's, 16 following their owner). Put back the old rule for a pulse and it finds two in
+  the same match (an enemy's following zone's pulse, its owner unseen).
+- Down a client over 100 ms and 5% loss (`netcode.rs`), 3.7 to 3.8 KB/s, as before: the new
+  fields cost less than the noise between runs.
 
 ## Sources
 

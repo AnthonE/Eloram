@@ -29,6 +29,7 @@ use crate::inputs::InputHistory;
 use crate::interp::{Sample, Track};
 use crate::missiles::Missiles;
 use crate::orders::Orders;
+use crate::zones::Zones;
 
 /// Events kept for the page to read: the kill feed, damage numbers, casts to animate.
 pub const FEED: usize = 256;
@@ -132,6 +133,7 @@ pub struct Client {
     /// Everyone else's records for drawing, by slot.
     pub tracks: Box<[Track]>,
     pub missiles: Missiles,
+    pub zones: Zones,
     inputs: InputHistory,
     pub orders: Orders,
     /// The next order the prediction applies.
@@ -196,6 +198,7 @@ impl Client {
             own_new: None,
             tracks: vec![Track::default(); MAX_UNITS].into_boxed_slice(),
             missiles: Missiles::default(),
+            zones: Zones::default(),
             inputs: InputHistory::default(),
             orders: Orders::default(),
             replay_seq: 0,
@@ -307,6 +310,7 @@ impl Client {
         for e in &once[..n_once] {
             self.event(h.tick, e);
         }
+        self.zones.expire(h.tick);
         self.carry(h.tick);
         let rtt_ms = ms(now).wrapping_sub(h.time_echo).wrapping_sub(h.hold_ms);
         let rtt = (self.stats.packets > 0 && h.hold_ms < 1_023 && rtt_ms < 5_000)
@@ -381,6 +385,7 @@ impl Client {
         self.baselines.clear();
         self.own_kept.fill((u32::MAX, OwnState::default()));
         self.missiles.clear();
+        self.zones.clear();
         for i in 0..MAX_UNITS {
             if i != self.seat && !(SEATS..FIRST_MINION).contains(&i) {
                 self.tracks[i].forget();
@@ -403,6 +408,7 @@ impl Client {
                 }
             }
             WireEvent::MissileSpawn { .. } | WireEvent::MissileEnd { .. } => self.missiles.take(e),
+            WireEvent::ZoneSpawn { .. } | WireEvent::ZoneEnd { .. } => self.zones.take(tick, e),
             WireEvent::LevelUp { unit, level } => {
                 if let Some(c) = self.world.champs.get_mut(usize::from(unit)) {
                     c.level = level;
@@ -424,6 +430,7 @@ impl Client {
             | WireEvent::Relic { beam: true, .. }
             | WireEvent::Damage { .. }
             | WireEvent::Heal { .. }
+            | WireEvent::Shield { .. }
             | WireEvent::Attack { .. }
             | WireEvent::Area { .. }
             | WireEvent::Blink { .. }

@@ -13,6 +13,7 @@ pub mod lobby;
 pub mod missiles;
 pub mod orders;
 pub mod scenery;
+pub mod zones;
 
 pub use client::{Cause, Client, Correction, Packets, Stats, Taken};
 pub use clock::Clock;

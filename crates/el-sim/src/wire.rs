@@ -8,7 +8,7 @@ use el_proto::unit::{self, QUnit, VEL_BITS, VEL_MAX, flags};
 use glam::Vec2;
 
 use crate::game::{Match, NO_SLOT};
-use crate::units::{Kind, SEATS};
+use crate::units::{BuffKind, Kind, SEATS};
 
 impl Match {
     /// Unit `i`'s record as `team` may have it: what it's attacking is named only if `team` sees
@@ -31,6 +31,18 @@ impl Match {
         };
         let mut f = 0;
         let cc = &u.cc;
+        let (mut empowered, mut hasted) = (false, false);
+        for b in u.buffs.iter().filter(|b| b.until > now && b.value > 0.0) {
+            match BuffKind::from_u8(b.kind) {
+                BuffKind::MoveSpeed => hasted = true,
+                BuffKind::AttackSpeed
+                | BuffKind::AttackDamage
+                | BuffKind::AbilityPower
+                | BuffKind::Armor
+                | BuffKind::MagicResist => empowered = true,
+                BuffKind::Marked | BuffKind::None => {}
+            }
+        }
         for (on, bit) in [
             (cc.stun > now, flags::STUNNED),
             (cc.root > now, flags::ROOTED),
@@ -41,6 +53,8 @@ impl Match {
             (u.shield_until > now && u.shield > 0.0, flags::SHIELDED),
             (u.revealed > now, flags::REVEALED),
             (cc.immune > now, flags::IMMUNE),
+            (empowered, flags::EMPOWERED),
+            (hasted, flags::HASTED),
         ] {
             if on {
                 f |= bit;

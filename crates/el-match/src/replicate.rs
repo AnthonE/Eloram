@@ -21,6 +21,7 @@ use el_sim::missile::MAX_MISSILES;
 use el_sim::own::{OWN_BASELINES, OwnState, OwnWidths, own_widths};
 use el_sim::storage::boxed;
 use el_sim::units::{Kind, MAX_UNITS, SEATS, team_of_seat};
+use el_sim::zone::MAX_ZONES;
 
 use crate::metrics::Metrics;
 use crate::seat::SeatNet;
@@ -119,6 +120,9 @@ pub struct Replica {
     told_gen: [u8; MAX_UNITS],
     missiles: [u64; MAX_MISSILES / 64],
     missile_gen: [u8; MAX_MISSILES],
+    /// Zones the client has been told of, and which.
+    zones: u64,
+    zone_gen: [u8; MAX_ZONES],
     out: [WireEvent; OUTBOX],
     out_first: u16,
     out_next: u16,
@@ -147,6 +151,8 @@ impl Default for Replica {
             told_gen: [0; MAX_UNITS],
             missiles: [0; MAX_MISSILES / 64],
             missile_gen: [0; MAX_MISSILES],
+            zones: 0,
+            zone_gen: [0; MAX_ZONES],
             out: [WireEvent::Nothing; OUTBOX],
             out_first: 0,
             out_next: 0,
@@ -308,15 +314,36 @@ impl Replica {
                     }
                 }
                 // About a unit the seat knew of: who did it only if that's seen too.
-                Event::Damage { target, source, amount } => {
+                // What did it is told with it: an ability's look gives its champion away, as it does
+                // in League, but not where they stand.
+                Event::Damage { target, source, amount, kind, from } => {
                     if self.knows(usize::from(target)) || sees(target) {
                         let source = if sees(source) { source as u8 } else { HIDDEN };
-                        self.queue(WireEvent::Damage { target: target as u8, source, amount: amount as u16 });
+                        self.queue(WireEvent::Damage {
+                            target: target as u8,
+                            source,
+                            amount: amount as u16,
+                            kind: kind as u8,
+                            from: from.code() as u16,
+                        });
                     }
                 }
-                Event::Heal { target, amount } => {
+                Event::Heal { target, amount, from } => {
                     if self.knows(usize::from(target)) || sees(target) {
-                        self.queue(WireEvent::Heal { target: target as u8, amount: amount as u16 });
+                        self.queue(WireEvent::Heal {
+                            target: target as u8,
+                            amount: amount as u16,
+                            from: from.code() as u16,
+                        });
+                    }
+                }
+                Event::Shield { target, amount, from } => {
+                    if self.knows(usize::from(target)) || sees(target) {
+                        self.queue(WireEvent::Shield {
+                            target: target as u8,
+                            amount: amount as u16,
+                            from: from.code() as u16,
+                        });
                     }
                 }
                 // A champion's death is the kill feed's, everyone's; anything else's, the seat's
@@ -329,10 +356,21 @@ impl Replica {
                 // Champions' respawns and levels are on the scoreboard: everyone's.
                 Event::Respawn { unit } => self.queue(WireEvent::Respawn { unit: unit as u8 }),
                 Event::LevelUp { unit, level } => self.queue(WireEvent::LevelUp { unit: unit as u8, level }),
-                // An area: its own team's, or where the team can see it land.
-                Event::Area { at, radius, team: owner } => {
-                    if owner == team || Map::lit(&m.vision.grid[t], at) {
-                        self.queue(WireEvent::Area { at: pos_code(at), radius: radius as u16, team: owner });
+                // An area: its own team's, or where the team can see it land; one that follows its
+                // owner stands where they do, so only where the team sees them.
+                Event::Area { zone, at, radius, team: side, source, owner, follows } => {
+                    let shown = if follows { sees(owner) } else { Map::lit(&m.vision.grid[t], at) };
+                    if side == team || shown {
+                        self.queue(WireEvent::Area {
+                            zone,
+                            generation: m.zones[usize::from(zone)].generation,
+                            at: pos_code(at),
+                            radius: radius as u16,
+                            team: side,
+                            source: source.code() as u16,
+                            owner: if sees(owner) { owner as u8 } else { HIDDEN },
+                            follows,
+                        });
                     }
                 }
                 // Relics are on the map for all; who took one, only if seen.
@@ -405,6 +443,45 @@ impl Replica {
                 });
                 set(&mut self.missiles, i, true);
                 self.missile_gen[i] = ms.generation;
+            }
+        }
+        // Zones, the same: told when the team first sees their ground (or, for one that follows its
+        // owner, the owner), and told when they end, or the owner they follow goes out of sight.
+        let owner_of = |z: &el_sim::zone::Zone| z.owner.idx;
+        let zones = [self.zones];
+        for_each(&zones, |i| {
+            let z = &m.zones[i];
+            if !z.alive
+                || z.generation != self.zone_gen[i]
+                || (z.follows && z.team != team && !sees(owner_of(z)))
+            {
+                self.queue(WireEvent::ZoneEnd { id: i as u8, generation: self.zone_gen[i] });
+                self.zones &= !(1 << i);
+            }
+        });
+        for (i, z) in m.zones.iter().enumerate() {
+            if !z.alive || self.zones & (1 << i) != 0 {
+                continue;
+            }
+            let owner = owner_of(z);
+            let shown =
+                z.team == team || if z.follows { sees(owner) } else { Map::lit(&m.vision.grid[t], z.pos) };
+            if shown {
+                self.queue(WireEvent::ZoneSpawn {
+                    id: i as u8,
+                    generation: z.generation,
+                    team: z.team,
+                    source: z.source.code() as u16,
+                    owner: if sees(owner) { owner as u8 } else { HIDDEN },
+                    follows: z.follows,
+                    at: pos_code(z.pos),
+                    radius: z.radius as u16,
+                    next: z.next,
+                    period: z.period.min(u32::from(u16::MAX)) as u16,
+                    end: z.end,
+                });
+                self.zones |= 1 << i;
+                self.zone_gen[i] = z.generation;
             }
         }
     }

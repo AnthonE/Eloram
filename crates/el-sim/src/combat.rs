@@ -50,7 +50,7 @@ impl Match {
 
     /// Hurts `dst` by `raw` of `kind` from `src`; returns what it took after mitigation and
     /// shields. Kills it if that was the last of its health.
-    pub(crate) fn deal(&mut self, src: usize, dst: usize, raw: f32, kind: DmgKind, _ability: bool) -> f32 {
+    pub(crate) fn deal(&mut self, src: usize, dst: usize, raw: f32, kind: DmgKind, from: Source) -> f32 {
         let now = self.tick;
         if !self.units[dst].alive || raw <= 0.0 || !self.exposed(dst) {
             return 0.0;
@@ -86,7 +86,7 @@ impl Match {
         if dst < SEATS {
             self.units[src].hit_champion_at = now;
         }
-        self.event(Event::Damage { target: dst as u16, source: src as u16, amount });
+        self.event(Event::Damage { target: dst as u16, source: src as u16, amount, kind, from });
         if self.units[dst].hp <= 0.0 {
             self.kill(dst, src);
         }
@@ -94,7 +94,7 @@ impl Match {
     }
 
     /// Heals `dst` by `amount` (ARAM's cut applied), up to its maximum.
-    pub(crate) fn heal(&mut self, dst: usize, amount: f32) {
+    pub(crate) fn heal(&mut self, dst: usize, amount: f32, from: Source) {
         let u = &mut self.units[dst];
         if !u.alive || amount <= 0.0 {
             return;
@@ -102,15 +102,16 @@ impl Match {
         let got = (amount * HEALING).min(u.stats.max_hp - u.hp).max(0.0);
         u.hp += got;
         if got > 0.0 {
-            self.event(Event::Heal { target: dst as u16, amount: got });
+            self.event(Event::Heal { target: dst as u16, amount: got, from });
         }
     }
 
-    fn shield(&mut self, dst: usize, amount: f32, secs: f32) {
+    fn shield(&mut self, dst: usize, amount: f32, secs: f32, from: Source) {
         let now = self.tick;
         let u = &mut self.units[dst];
         u.shield = if u.shield_until > now { u.shield.max(amount) } else { amount };
         u.shield_until = now + ticks(secs);
+        self.event(Event::Shield { target: dst as u16, amount, from });
     }
 
     /// Crowd control lands unless the unit is a structure or immune (Combo Breaker).
@@ -119,8 +120,8 @@ impl Match {
         u.alive && !u.kind.is_structure() && u.cc.immune <= self.tick
     }
 
-    /// Does `ops` from `caster` (at `rank`, 0-based) to `target`.
-    pub(crate) fn apply_ops(&mut self, caster: usize, target: usize, ops: &[Op], rank: u8, ability: bool) {
+    /// Does `ops` from `caster` (at `rank`, 0-based) to `target`, on behalf of `from`.
+    pub(crate) fn apply_ops(&mut self, caster: usize, target: usize, ops: &[Op], rank: u8, from: Source) {
         let r = usize::from(rank.min(4));
         let now = self.tick;
         for op in ops {
@@ -132,10 +133,10 @@ impl Match {
                 Op::Damage { kind, base, ad, ap, missing } => {
                     let t = &self.units[target];
                     let raw = base[r] + ad * cs.ad + ap * cs.ap + missing * (t.stats.max_hp - t.hp).max(0.0);
-                    self.deal(caster, target, raw, kind, ability);
+                    self.deal(caster, target, raw, kind, from);
                 }
-                Op::Heal { base, ap } => self.heal(target, base[r] + ap * cs.ap),
-                Op::Shield { base, ap, secs } => self.shield(target, base[r] + ap * cs.ap, secs),
+                Op::Heal { base, ap } => self.heal(target, base[r] + ap * cs.ap, from),
+                Op::Shield { base, ap, secs } => self.shield(target, base[r] + ap * cs.ap, secs, from),
                 Op::Stun(s) => {
                     if self.cc_lands(target) {
                         let cc = &mut self.units[target].cc;
@@ -386,11 +387,11 @@ impl Match {
 
     /// An auto attack landed: its damage, lifesteal, and on-hit augments.
     pub(crate) fn auto_landed(&mut self, attacker: usize, target: usize, damage: f32) {
-        let dealt = self.deal(attacker, target, damage, DmgKind::Physical, false);
+        let dealt = self.deal(attacker, target, damage, DmgKind::Physical, Source::Auto);
         if attacker < SEATS && self.units[attacker].alive {
             let steal = self.units[attacker].stats.lifesteal;
             if steal > 0.0 {
-                self.heal(attacker, dealt * steal);
+                self.heal(attacker, dealt * steal, Source::Auto);
             }
             self.auto_hit_triggers(attacker, target);
         }

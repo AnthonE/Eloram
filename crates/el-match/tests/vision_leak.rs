@@ -40,6 +40,8 @@ struct Oracle {
     leaks: Vec<String>,
     records: u64,
     events: u64,
+    /// Zones told, of an enemy's among them, and of one following its owner.
+    zones: [u64; 3],
 }
 
 impl Oracle {
@@ -55,6 +57,15 @@ impl Oracle {
                 .history
                 .iter()
                 .any(|s| s.tick <= tick && s.tick + WINDOW >= tick && s.units[usize::from(team)][i])
+    }
+
+    /// Whether `team` saw the ground at `at` at some tick in the window before `tick`.
+    fn lit(&self, team: u8, at: [u32; 2], tick: u32) -> bool {
+        self.history.iter().any(|s| {
+            s.tick <= tick
+                && s.tick + WINDOW >= tick
+                && Map::lit(&s.grid[usize::from(team)], pos_from_code(at))
+        })
     }
 
     fn leak(&mut self, what: String) {
@@ -124,6 +135,11 @@ impl Oracle {
                     || (usize::from(i) < SEATS && team_of_seat(usize::from(i)) == team)
                     || o.saw(team, i, tick)
             };
+            if let WireEvent::ZoneSpawn { team: side, follows, .. } = e {
+                self.zones[0] += 1;
+                self.zones[1] += u64::from(side != team);
+                self.zones[2] += u64::from(follows);
+            }
             let bad = match e {
                 WireEvent::MissileSpawn { id, owner, t0, target, .. } => {
                     // Told where the team first saw it, naming only who the team saw then.
@@ -136,7 +152,7 @@ impl Oracle {
                 WireEvent::Cast { unit, .. } | WireEvent::Blink { unit, .. } => !ok_unit(self, unit),
                 WireEvent::Attack { unit, target } => !ok_unit(self, unit) || !ok_unit(self, target),
                 WireEvent::Damage { target, source, .. } => !ok_unit(self, target) || !ok_unit(self, source),
-                WireEvent::Heal { target, .. } => !ok_unit(self, target),
+                WireEvent::Heal { target, .. } | WireEvent::Shield { target, .. } => !ok_unit(self, target),
                 WireEvent::Death { unit, killer } => {
                     (usize::from(unit) >= SEATS && !ok_unit(self, unit)) || !ok_unit(self, killer)
                 }
@@ -144,13 +160,16 @@ impl Oracle {
                 WireEvent::Augment { unit, .. } => {
                     usize::from(unit) >= SEATS || team_of_seat(usize::from(unit)) != team
                 }
-                WireEvent::Area { at, team: owner, .. } => {
-                    owner != team
-                        && !self.history.iter().any(|s| {
-                            s.tick <= tick
-                                && s.tick + WINDOW >= tick
-                                && Map::lit(&s.grid[t], pos_from_code(at))
-                        })
+                // An area, or a zone, where the team saw its ground; one that follows its owner (so
+                // stands where they do) only while the team saw them, by name.
+                WireEvent::Area { at, team: side, owner, follows, .. }
+                | WireEvent::ZoneSpawn { at, team: side, owner, follows, .. } => {
+                    let shown = if follows {
+                        owner != HIDDEN && ok_unit(self, owner)
+                    } else {
+                        self.lit(team, at, tick)
+                    };
+                    !ok_unit(self, owner) || (side != team && !shown)
                 }
                 WireEvent::Relic { unit, .. } => !ok_unit(self, unit),
                 // A teammate's word, naming what the team sees.
@@ -162,6 +181,7 @@ impl Oracle {
                 WireEvent::Vote { team: voters, .. } => voters != team,
                 WireEvent::Leave { .. }
                 | WireEvent::MissileEnd { .. }
+                | WireEvent::ZoneEnd { .. }
                 | WireEvent::Outcome { .. }
                 | WireEvent::Nothing => false,
             };
@@ -189,15 +209,19 @@ fn a_team_is_sent_only_what_it_sees() {
     let o = oracle.borrow();
     let kills: u16 = rig.m().champs.iter().map(|c| c.kills).sum();
     println!(
-        "{} records and {} events checked over {} ticks, {kills} kills",
+        "{} records and {} events checked over {} ticks, {kills} kills; zones told {} ({} an enemy's, {} following)",
         o.records,
         o.events,
-        rig.m().tick
+        rig.m().tick,
+        o.zones[0],
+        o.zones[1],
+        o.zones[2]
     );
     for l in &o.leaks {
         println!("LEAK {l}");
     }
     assert!(o.records > 100_000 && o.events > 5_000, "{} records, {} events", o.records, o.events);
     assert!(kills > 5, "a fight to see: {kills} kills");
+    assert!(o.zones[1] > 0, "an enemy's zone to check: {:?}", o.zones);
     assert!(o.leaks.is_empty(), "{} leaks, the first: {}", o.leaks.len(), o.leaks[0]);
 }

@@ -666,7 +666,7 @@ fn draw_flashes(
     let mesh = ring.get_or_insert_with(|| meshes.add(Annulus::new(0.9, 1.0))).clone();
     let mut new = Vec::new();
     session.read_events(now, |e| match *e {
-        WireEvent::Area { at, radius, team } => {
+        WireEvent::Area { at, radius, team, .. } => {
             new.push((pos_from_code(at), f32::from(radius), TEAM[usize::from(team.min(1))], 0.6));
         }
         // A teammate's ping: a ring that stays a while, coloured by what it says.

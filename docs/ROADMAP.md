@@ -124,3 +124,16 @@ Then the links, made hard to break (`NETCODE.md`, "Many matches a process"):
   minimap dots are written only when they move (a write marks a component changed, which costs
   propagation, extraction and UI layout); flashes fade in steps; health bars are drawn opaque;
   `window.__el` is converted to JavaScript only when it is published.
+
+## 6. Effects and sound
+`FX.md` is the plan: what Riot's posts say makes League's effects and sound read, the wire they
+need, particles as closed forms, Web Audio, a practice mode, a look and a sound for every ability,
+and the mix. Before champion animation, which will be timed to the same windups.
+
+The wire landed first (protocol 4): zones told as closed forms (`ZoneSpawn`, `ZoneEnd`), so a
+blast that lands late can be telegraphed to whoever sees its ground; damage with its kind and
+source, heals and shields with theirs, areas with theirs; flags for a buff and a haste. On the way,
+two faults: `Source` codes gave champions 16 to 19 the codes of 0 to 3, and a field that follows
+its owner gave away an owner hidden in brush by its pulse. The leak oracle checks the new events
+(0 leaks over 14,734 events, 62 zones; the old rule for a pulse leaks twice in the same match), and
+down a client is 3.7 to 3.8 KB/s, as before.
