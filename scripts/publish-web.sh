@@ -11,7 +11,7 @@
 # HTTP side (`status.json`, `records/`); both are required: the page is served from another site
 # than the server, so it must name it.
 #
-# Env: EL_WEB_VARIANTS (default "webgl2"; "webgl2 webgpu" ships both), STATUS_URL (the live
+# Env: EL_WEB_VARIANTS (default "webgl2 webgpu": both, the page picks; "webgl2" one), STATUS_URL (the live
 # server's /status.json, for the wire check), OUT (the staging directory, default target/webpub).
 #
 # Before Colony's script (itself Gates' ci/publish_web.sh): every publish lands whole in its own
@@ -66,7 +66,7 @@ else
   exit 1
 fi
 
-read -r -a variants <<< "${EL_WEB_VARIANTS:-webgl2}"
+read -r -a variants <<< "${EL_WEB_VARIANTS:-webgl2 webgpu}"
 if [ "$BUILD" = 1 ]; then
   ./scripts/build-web.sh "${variants[@]}"
 fi
@@ -85,12 +85,15 @@ done
 for f in index.html config.js boot.js loader.js wallet.js style.css favicon.svg; do
   [ -f "$OUT/$f" ] || { echo "$OUT/$f is missing: run scripts/build-web.sh" >&2; exit 1; }
 done
-# A variant left over from an older build would be picked (loader.js probes ./webgpu/) and would
-# speak an older protocol: ship only what was asked for.
+# A variant left over from an older build would be picked (build.json names it) and would speak
+# an older protocol: ship only what was asked for (and the art, which isn't a variant).
+[ -d "$OUT/assets" ] || { echo "$OUT/assets is missing: run scripts/build-web.sh" >&2; exit 1; }
 for d in "$OUT"/*/; do
   name="$(basename "$d")"
+  [ "$name" = assets ] && continue
   printf '%s\n' "${variants[@]}" | grep -qx "$name" || { echo "== dropping stale $name/"; rm -rf "$d"; }
 done
+scripts/web-modules.sh "$OUT"
 
 sha="$(git rev-parse --short=10 HEAD)"
 version="$(grep -m1 -oP '^version = "\K[^"]+' Cargo.toml)"

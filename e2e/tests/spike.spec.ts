@@ -43,3 +43,22 @@ test("the game server welcomes a Hello", async ({ page }, info) => {
   const players = await (await page.request.get(`${game}/status.json`)).json();
   expect(players.players).toBe(1);
 });
+
+// The page's module: WebGPU where the browser has an adapter (the `webgpu` project), WebGL 2 where
+// it hasn't, and WebGL 2 once this WebGPU build has failed here (loader.js, `build.json`).
+test("the page picks its module", async ({ page }, info) => {
+  const picked = async () => {
+    await page.waitForFunction(() => !!(window as any).EL_CONFIG?.gfx, null, { timeout: 60_000 });
+    return page.evaluate(() => (window as any).EL_CONFIG.gfx);
+  };
+  await page.goto(`/?mode=echo`);
+  const built = await page.evaluate(async () => (await fetch("./build.json", { cache: "no-store" })).json());
+  if (info.project.name !== "webgpu" || !built.webgpu) {
+    expect(await picked()).toBe("webgl2");
+    return;
+  }
+  expect(await picked()).toBe("webgpu");
+  await page.evaluate((hash) => localStorage.setItem("el.webgpu-failed", hash), built.webgpu);
+  await page.reload();
+  expect(await picked()).toBe("webgl2");
+});

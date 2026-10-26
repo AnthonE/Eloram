@@ -30,11 +30,12 @@ export default defineConfig({
       },
     },
     {
-      // Best-effort: WebGPU needs a headed browser (run under xvfb-run) and SwiftShader Vulkan.
+      // WebGPU through SwiftShader's Vulkan, headless: Playwright's headless shell offers an
+      // adapter with these (a headed browser under Xvfb doesn't). The page needs a secure
+      // context, which 127.0.0.1 is.
       name: "webgpu",
       use: {
         browserName: "chromium",
-        headless: false,
         launchOptions: {
           args: [
             ...common,
@@ -42,8 +43,9 @@ export default defineConfig({
             "--enable-features=Vulkan",
             "--use-vulkan=swiftshader",
             "--use-webgpu-adapter=swiftshader",
-            "--use-angle=vulkan",
-            "--disable-vulkan-surface",
+            "--use-angle=swiftshader",
+            "--enable-unsafe-swiftshader",
+            "--ignore-gpu-blocklist",
           ],
         },
       },

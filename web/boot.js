@@ -22,6 +22,11 @@
   }
   function fail(message, detail) {
     if (state.failed || state.done) return;
+    // A WebGPU client that fails before its first frame goes back to WebGL 2 (loader.js), once.
+    if (window.elGpuFallBack && window.elGpuFallBack(message)) {
+      state.failed = true;
+      return;
+    }
     state.failed = true;
     clearTimeout(timer);
     var boot = el("boot");

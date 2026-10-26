@@ -203,6 +203,15 @@ Changed on the way:
   before this pass 1.2 to 1.6; now 0.77 on the low tier and 0.5 on the high. With everything this
   pass draws hidden, 9.8: the ground's shading is about half the frame, the models most of the
   rest. A CPU rasteriser pays for every pixel; a GPU's numbers will be different in kind.
+- **WebGPU.** The page ships both modules and picks WebGPU where the browser has it, as Gates
+  does (`build.json`, a fallback to WebGL2 remembered for that build: before the first frame on
+  a failure, or at any time on a render error). Its high tier adds HDR and bloom (Bevy's bloom
+  isn't for WebGL2; Gates saw it blow a moon out there, so WebGL2 no longer has it) and a 4096 px
+  shadow map. Tried and taken out: ambient occlusion. Bevy's wants five storage textures a stage
+  (SwiftShader's adapter gives fewer, and the plugin declines), and its depth and normal prepasses
+  add view textures that took the ground's material to 17 sampled textures, past WebGPU's 16:
+  Bevy quit on the first frame. Not taken: Bevy's GPU mip generator (it writes storage textures,
+  which can't be sRGB) and its runtime environment-map filter (no cube map to give it yet).
 - Not measured: the frame rate on a real GPU, so neither tier's number is known; the draw-call
   count.
 - Not done: decals (cracks, scorch, drifts over seams); merging the static props into a few meshes

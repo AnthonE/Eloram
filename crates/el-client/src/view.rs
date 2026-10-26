@@ -382,7 +382,7 @@ fn setup_pools(
 const STRUCTURES: [(Kind, &str, crate::scenery::Size, (u8, u8)); 4] = [
     (Kind::Turret, "turret", crate::scenery::Size::Height(5.0), (57, 70)),
     (Kind::Inhibitor, "inhibitor", crate::scenery::Size::Height(3.6), (50, 100)),
-    (Kind::Nexus, "nexus", crate::scenery::Size::Height(6.2), (28, 100)),
+    (Kind::Nexus, "nexus", crate::scenery::Size::Height(6.2), (48, 100)),
     (Kind::Fountain, "fountain", crate::scenery::Size::Radius(1.7), (60, 100)),
 ];
 

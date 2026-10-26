@@ -19,7 +19,13 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
 - `cargo clippy --workspace --all-targets -- -D warnings`, and for the client
   `cargo clippy -p el-client --target wasm32-unknown-unknown [--features webgpu] -- -D warnings`.
 - `scripts/build-web.sh [webgl2] [webgpu]`: the browser build into `web/dist/` (needs
-  wasm-bindgen-cli 0.2.128).
+  wasm-bindgen-cli 0.2.128); both modules by default, each checked for the backend it binds, and
+  `web/dist/build.json` naming them. The page takes WebGPU where the browser has an adapter, and
+  goes back to WebGL2 once (remembered for that build) if the WebGPU client fails before its first
+  frame, or on a render error at any time (a reload takes the seat back); `?gfx=` forces one. The
+  WebGPU build's high tier adds HDR and bloom (not for WebGL2) and a sharper shadow map
+  (`look.rs`). A pipeline gets 16 sampled textures a stage on WebGPU too: the ground's material
+  is near it, and anything that adds view textures (prepasses: SSAO, TAA) takes it over.
 - `scripts/dev.sh`: the page built and a server to play on at http://127.0.0.1:8080, the server's
   bots in the other nine seats after 3 s (`EL_FILL`), then 20 s of champion select (`--select-secs`;
   it ends sooner once everyone seated is ready, and agents are ready at once). The server alone:
@@ -29,7 +35,8 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   predicted exactly, the fog; and `?keys=wasd`'s keys walking the champion; `watch`: an agent's match watched live a minute behind, then
   replayed; `login`: a stub wallet signing through `el-auth`'s `sign` example, `/online.json`, the
   resume token; `art`: the camera over each place on the map, the fog's darkness off (`{t:"camera"}`,
-  `{t:"fog"}`); screenshots in `e2e/artifacts/`). `scripts/e2e.sh` serves the `web/dist/` already
+  `{t:"fog"}`); screenshots in `e2e/artifacts/`). The `webgpu` project (`scripts/e2e.sh art
+  webgpu`) is headless WebGPU on SwiftShader's Vulkan. `scripts/e2e.sh` serves the `web/dist/` already
   built: rebuild it first. A test or the console drives the champion through `window.__elInbox`
   (`{t:"move",x,y}`, `cast`, `buy`, `pick`, `level`, `champ_reroll`, `champ_swap`, `ready`, `aim`, `drop_link`,
   `ping`, `surrender`...:

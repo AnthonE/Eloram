@@ -1,8 +1,16 @@
 //! The picture's light and finish (`docs/ART.md`, step 1): a cold moon over the Causeway with
-//! shadows, a blue ambient, the camera in HDR with tonemapping and bloom so fire and crystals
-//! glow, a faint haze with distance. `?quality=low` keeps the light and drops the costly parts:
-//! HDR and bloom, shadows, multisampling (FXAA instead), the braziers' lights and most of the
-//! snow.
+//! shadows, a blue ambient, tonemapping, a faint haze with distance. `?quality=low` keeps the light
+//! and drops the costly parts: shadows, multisampling (FXAA instead), the braziers' lights and most
+//! of the snow.
+//!
+//! The WebGPU build's high tier adds what WebGL2 shouldn't have: HDR with bloom (Bevy's bloom isn't
+//! for WebGL2, and Gates saw it blow a moon out into a white glow there) and a sharper shadow map.
+//! Not ambient occlusion: Bevy's wants five storage textures a stage, more than many adapters
+//! give, and its depth and normal prepasses add view textures that take the ground's material
+//! past the sixteen a stage WebGPU allows (measured: 17, and Bevy quits on the error).
+//!
+//! On the WebGPU build a render error doesn't end the client: the page goes back to the WebGL2
+//! module (loader.js, `elGpuFallBack`), once for that build, and a reload takes the seat back.
 
 use bevy::anti_alias::fxaa::Fxaa;
 use bevy::camera::Hdr;
@@ -15,10 +23,13 @@ use bevy::render::view::Msaa;
 use crate::camera::MainCamera;
 use crate::net::LaunchConfigRes;
 
+/// The WebGPU build (Bevy picks its GPU API when it's compiled).
+pub const WEBGPU: bool = cfg!(feature = "webgpu");
+
 /// How the picture is made.
 #[derive(Resource)]
 pub struct Look {
-    /// The high tier: shadows, bloom, multisampling.
+    /// The high tier: shadows, multisampling (on WebGPU: HDR and bloom).
     pub high: bool,
     /// The fog of war's darkness drawn (a test turns it off to look at the whole map).
     pub fog: bool,
@@ -41,9 +52,18 @@ impl Plugin for LookPlugin {
         let (high, art) = (!cfg.low, !cfg.echo);
         app.insert_resource(Look { high, fog: true, art })
             .insert_resource(GlobalAmbientLight { color: NIGHT, brightness: 110.0, ..default() })
-            .insert_resource(DirectionalLightShadowMap { size: if high { 2048 } else { 512 } })
+            .insert_resource(DirectionalLightShadowMap {
+                size: match (high, WEBGPU) {
+                    (true, true) => 4096,
+                    (true, false) => 2048,
+                    _ => 512,
+                },
+            })
             .insert_resource(ClearColor(HAZE))
             .add_systems(PostStartup, (dress_camera, light));
+        if WEBGPU {
+            app.insert_resource(bevy::render::error_handler::RenderErrorHandler(on_render_error));
+        }
     }
 }
 
@@ -53,12 +73,18 @@ fn dress_camera(mut commands: Commands, look: Res<Look>, cam: Single<Entity, Wit
         Tonemapping::TonyMcMapface,
         DistanceFog { color: HAZE, falloff: FogFalloff::Linear { start: 34.0, end: 120.0 }, ..default() },
     ));
-    // HDR is for the bloom: without it, the low tier tonemaps in its shaders, with no float targets
+    // HDR is for the bloom: without it, the picture tonemaps in its shaders, with no float targets
     // and no pass of its own.
-    if look.high {
-        cam.insert((Hdr, Msaa::Sample4, Bloom { intensity: 0.18, ..Bloom::NATURAL }));
-    } else {
-        cam.insert((Msaa::Off, Fxaa::default()));
+    match (look.high, WEBGPU) {
+        (true, true) => {
+            cam.insert((Hdr, Msaa::Sample4, Bloom { intensity: 0.18, ..Bloom::NATURAL }));
+        }
+        (true, false) => {
+            cam.insert(Msaa::Sample4);
+        }
+        (false, _) => {
+            cam.insert((Msaa::Off, Fxaa::default()));
+        }
     }
 }
 
@@ -85,4 +111,25 @@ fn light(mut commands: Commands, look: Res<Look>) {
         .build(),
         Transform::from_xyz(-20.0, 30.0, 7.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
+}
+
+/// A render error on the WebGPU build: back to the WebGL2 module if the page can take us there
+/// (it reloads), else Bevy's own answer (stop, and say so).
+fn on_render_error(
+    error: &bevy::render::error_handler::RenderError,
+    main_world: &mut World,
+    _: &mut World,
+) -> bevy::render::error_handler::RenderErrorPolicy {
+    use bevy::render::error_handler::RenderErrorPolicy;
+    use wasm_bindgen::{JsCast, JsValue};
+    let fell_back = web_sys::window()
+        .and_then(|w| js_sys::Reflect::get(&w, &JsValue::from_str("elGpuFallBack")).ok())
+        .and_then(|f| f.dyn_into::<js_sys::Function>().ok())
+        .and_then(|f| f.call1(&JsValue::NULL, &JsValue::from_str(&error.description)).ok())
+        .is_some_and(|r| r.is_truthy());
+    if !fell_back {
+        bevy::log::error!("Quitting the application due to {:?} RenderError", error.ty);
+        main_world.write_message(AppExit::error());
+    }
+    RenderErrorPolicy::StopRendering
 }

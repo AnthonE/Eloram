@@ -35,17 +35,18 @@ const SPOTS: [string, number, number, number][] = [
 
 test("the map's look", async ({ page }, info) => {
   // SwiftShader takes a minute or more a picture at this size.
-  test.setTimeout(1_500_000);
+  test.setTimeout(2_400_000);
   const logs = collectConsole(page);
   const shots = `artifacts/art-${info.project.name}`;
   await page.setViewportSize({ width: 1280, height: 720 });
   // The high tier, which software rendering would otherwise not get.
   await page.goto(`/?gfx=${info.project.name}&quality=high&name=Painter`);
   try {
-    await until(page, "champion select", (s) => s.phase === "selecting", 150_000);
+    await until(page, "champion select", (s) => s.phase === "selecting", 300_000);
     await push(page, { t: "ready" });
-    await until(page, "a seat in a match", (s) => s.started === true, 120_000);
-    await until(page, "the art", (s) => s.art === true, 240_000);
+    // The first frames compile every pipeline, minutes on a CPU rasteriser (WebGPU most of all).
+    await until(page, "a seat in a match", (s) => s.started === true, 600_000);
+    await until(page, "the art", (s) => s.art === true, 600_000);
     // The first augment's cards, out of the way.
     await push(page, { t: "pick", card: 0 });
     await until(page, "an augment", (s) => s.augments === 1 && s.screen_open === false);
