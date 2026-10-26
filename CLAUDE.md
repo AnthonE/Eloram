@@ -9,6 +9,7 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   replication, vision or the record.
 - `docs/DESIGN.md` is the mode: the rules at League's numbers, in our own names.
 - `docs/ROADMAP.md` is the phases.
+- `docs/ART.md` is the plan for the map's look: light, floor, edges, structures, the assets and their licences.
 
 ## Commands
 
