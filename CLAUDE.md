@@ -10,6 +10,8 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
 - `docs/DESIGN.md` is the mode: the rules at League's numbers, in our own names.
 - `docs/ROADMAP.md` is the phases.
 - `docs/ART.md` is the plan for the map's look: light, floor, edges, structures, the assets and their licences.
+- `docs/FX.md` is the plan for effects and sound: what Riot says makes them read, the wire they need, the
+  runtime, the look table, the mix.
 
 ## Commands
 
