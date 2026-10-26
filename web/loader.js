@@ -73,6 +73,29 @@ function keysSetting() {
   }
 }
 
+// A browser drawing without a GPU (SwiftShader, llvmpipe): the low tier, unless asked otherwise.
+function softwareRenderer() {
+  try {
+    const gl = document.createElement("canvas").getContext("webgl2");
+    const info = gl && gl.getExtension("WEBGL_debug_renderer_info");
+    const name = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : "";
+    return /swiftshader|llvmpipe|software/i.test(name);
+  } catch (_) {
+    return false;
+  }
+}
+
+function qualitySetting() {
+  const asked = params.get("quality");
+  const fallback = () => (softwareRenderer() ? "low" : "high");
+  try {
+    if (asked === "low" || asked === "high") localStorage.setItem("el.quality", asked);
+    return localStorage.getItem("el.quality") || fallback();
+  } catch (_) {
+    return asked || fallback();
+  }
+}
+
 async function main() {
   const config = {
     echo: params.get("mode") === "echo",
@@ -87,6 +110,9 @@ async function main() {
     indicators: indicatorsSetting(),
     // League's WASD layout (`?keys=wasd`; `?keys=league` back to its default). Remembered.
     wasd: keysSetting() === "wasd",
+    // The picture's tier (`?quality=low`: no HDR, bloom, shadows or multisampling, a few textures
+    // read for the ground; `high` back). Remembered; without a GPU, low unless asked.
+    quality: qualitySetting(),
   };
   if (config.signIn) {
     try {

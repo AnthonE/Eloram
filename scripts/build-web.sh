@@ -25,6 +25,17 @@ fi
 
 mkdir -p web/dist
 cp web/index.html web/config.js web/boot.js web/loader.js web/wallet.js web/style.css web/favicon.svg web/dist/
+# The art (docs/ART.md): the ground's textures, the brush, the models. JPEG and PNG are compressed
+# already; the models' geometry isn't, so they get precompressed copies like the wasm's.
+rm -rf web/dist/assets
+cp -r web/assets web/dist/assets
+node -e '
+  const fs = require("fs"), z = require("zlib"), path = require("path");
+  for (const f of fs.readdirSync(process.argv[1]).filter((f) => f.endsWith(".glb"))) {
+    const p = path.join(process.argv[1], f), raw = fs.readFileSync(p);
+    fs.writeFileSync(p + ".br", z.brotliCompressSync(raw, { params: { [z.constants.BROTLI_PARAM_QUALITY]: 9 } }));
+    fs.writeFileSync(p + ".gz", z.gzipSync(raw, { level: 9 }));
+  }' web/dist/assets/models
 
 for v in "${variants[@]}"; do
   feats=()

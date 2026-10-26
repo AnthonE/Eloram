@@ -165,3 +165,45 @@ a CC0 library has comes from there.
   untouched (no `CONTENT_VERSION` bump), the vision-leak test still reads zero, and `ci.sh` is green.
 - **Licences**: `art/LICENSES.md` covers every shipped file, and no file name or prompt names
   anything of Riot's.
+
+## What landed
+
+All seven steps, in `crates/el-client/src/`: `look.rs` (step 1), `ground.rs` and
+`shaders/ground.wgsl` (2), `edges.rs` (3), `scenery.rs` and the structures in `view.rs` (4 to 6),
+`mips.rs`, and `shaders/fog.wgsl`, the fog of war every material shares. Where things stand that
+the match doesn't know about is `el_client_core::scenery`, tested natively: the outline is one
+loop round the whole floor, no unit's centre can stand on the wall and there's floor a step inside
+it everywhere rock doesn't stand over the edge, `outward` points off the floor, and no prop or the
+rock it stands on takes walkable floor. `scripts/e2e.sh art` takes the pictures.
+
+Changed on the way:
+- **No KTX2, no HDRI.** Nothing here encodes KTX2 or prefilters a cube map, and Bevy's own mip
+  and environment-map filters are compute shaders WebGL2 doesn't have. So textures ship as JPEG
+  and PNG and `mips.rs` builds every file-loaded image's chain on the CPU when it arrives; the
+  highlights come from the moon, the blue ambient and the bloom, not an environment map.
+- **The models' crystals glow by height, not colour.** Meshy's atlases paint stone and crystal
+  the same blues, so a structure's crystal is a band of its height (`STRUCTURES` in `view.rs`:
+  the turret's lantern, the inhibitor's and the nexus's crystals); one model serves both teams,
+  tinted in the shader.
+- **The parapets are built in code** along the outline, with merlons; Meshy's wall segment didn't
+  ship. The brush is frozen still (no sway: no vertex shader for it).
+- **A fallen structure leaves a ruin** (its model dark, cold, broken off low), only when the
+  client's world says it fell, never for what fog hides.
+- **The low tier became the software renderer's.** `?quality=low` drops HDR and bloom, shadows,
+  multisampling (FXAA instead), the braziers' lights and most of the snow, and its ground reads
+  the paving alone (snow and gravel flat colours over it; the edges from one side, not three). The
+  loader picks it when the browser draws without a GPU (SwiftShader, llvmpipe) and nothing was
+  asked, so headless Chromium gets it. The models were cut to about 1,000 to 5,000 triangles each,
+  their textures to 512 px; all the art is 4.9 MB (the plan allowed 10 MiB). The wasm grew by
+  1 MiB raw (the JPEG decoder), not at all brotli'd (7 MiB).
+- **The transport smoke test (`?mode=echo`) loads no art**: it has no match to draw. The `match`
+  and `art` suites run champion select for 45 s, not 20 (it ends once everyone's ready):
+  software rendering stalls on its first frames, while the new shaders compile.
+- Measured in headless Chromium (SwiftShader, 960×540, four cores), frames a second in a match:
+  before this pass 1.2 to 1.6; now 0.77 on the low tier and 0.5 on the high. With everything this
+  pass draws hidden, 9.8: the ground's shading is about half the frame, the models most of the
+  rest. A CPU rasteriser pays for every pixel; a GPU's numbers will be different in kind.
+- Not measured: the frame rate on a real GPU, so neither tier's number is known; the draw-call
+  count.
+- Not done: decals (cracks, scorch, drifts over seams); merging the static props into a few meshes
+  (each is its own draw: about seventy props and rocks, three edge meshes, six brushes).

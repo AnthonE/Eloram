@@ -21,7 +21,8 @@ el-client-core.workspace = true
 el-auth = { path = "../el-auth", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
-bevy = { workspace = true, features = ["3d", "ui"] }
+# jpeg: the ground's textures and the models' (`web/assets/`, `art/`).
+bevy = { workspace = true, features = ["3d", "ui", "jpeg"] }
 # Bevy's derive macros resolve `bevy` by reading only [dependencies]; since ours is target-specific
 # they fall back to `bevy_ecs::…` and so on, so name the (already-built) crates directly.
 bevy_asset = { version = "0.19.1", default-features = false }
@@ -29,6 +30,8 @@ bevy_ecs = { version = "0.19.1", default-features = false }
 bevy_image = { version = "0.19.1", default-features = false }
 bevy_reflect = { version = "0.19.1", default-features = false }
 bevy_render = { version = "0.19.1", default-features = false }
+# `ShaderType`'s derive names it.
+encase = { version = "0.12", default-features = false }
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
 js-sys.workspace = true

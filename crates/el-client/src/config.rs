@@ -29,6 +29,10 @@ pub struct LaunchConfig {
     pub indicators: bool,
     /// League's WASD layout (`?keys=wasd`, remembered): the keys steer, the mouse and Shift cast.
     pub wasd: bool,
+    /// The picture's tier (`?quality=low`, remembered; the default without a GPU): without HDR,
+    /// bloom, shadows, multisampling or the braziers' lights, and the ground read from a few
+    /// textures, for older machines.
+    pub low: bool,
 }
 
 fn get(obj: &JsValue, key: &str) -> JsValue {
@@ -64,6 +68,7 @@ impl LaunchConfig {
                 .and_then(|b| b.try_into().ok()),
             indicators: flag("indicators"),
             wasd: flag("wasd"),
+            low: string("quality") == "low",
         }
     }
 }

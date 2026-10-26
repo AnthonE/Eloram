@@ -7,7 +7,9 @@ const common = ["--no-proxy-server", "--autoplay-policy=no-user-gesture-required
 
 export default defineConfig({
   testDir: "./tests",
-  timeout: 180_000,
+  // Headless Chromium draws in software (SwiftShader), well under a frame a second on the map's
+  // art (docs/ART.md): a whole match's walk-through needs the time.
+  timeout: 300_000,
   retries: 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : [["list"]],
   outputDir: "./test-results",

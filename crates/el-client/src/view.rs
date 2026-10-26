@@ -15,6 +15,7 @@ use el_sim::units::{Kind, MAX_UNITS, SEATS};
 use el_sim::{MAP_H, MAP_W};
 
 use crate::coords::{S, world};
+use crate::ground::{FogTex, FoggedMat};
 use crate::input::{Armed, Controls};
 use crate::net::now_s;
 use crate::session::Session;
@@ -75,8 +76,15 @@ struct Kit {
     bodies: [Handle<Mesh>; Kind::COUNT],
     /// The champions' figures, a role each (`models`), in `Role`'s order.
     figures: [Handle<Mesh>; 6],
-    team: [[Handle<StandardMaterial>; 2]; Kind::COUNT],
-    champion: [Handle<StandardMaterial>; 20],
+    team: [[Handle<FoggedMat>; 2]; Kind::COUNT],
+    champion: [Handle<FoggedMat>; 20],
+    /// A body's height off the floor and its scale, by kind (a structure's model stands on its
+    /// foot at its own size; its primitive until then, lifted).
+    lift: [f32; Kind::COUNT],
+    scale: [f32; Kind::COUNT],
+    /// What a fallen structure leaves, by kind (its model, cold and dark), once the models are in.
+    ruin: [Option<Handle<FoggedMat>>; Kind::COUNT],
+    models_in: bool,
     ring: [Handle<StandardMaterial>; 2],
     fill: [Handle<StandardMaterial>; 3],
     missile: [Handle<StandardMaterial>; 2],
@@ -127,8 +135,9 @@ fn bar_of(kind: Kind) -> (f32, f32) {
     match kind {
         Kind::Champion => (1.5, 2.4),
         k if k.is_minion() => (0.8, 1.1),
-        Kind::Turret => (2.2, 3.9),
-        Kind::Nexus => (3.0, 3.6),
+        Kind::Turret => (2.2, 5.6),
+        Kind::Nexus => (3.0, 6.6),
+        Kind::Inhibitor => (2.4, 3.6),
         _ => (2.4, 2.6),
     }
 }
@@ -146,7 +155,7 @@ fn radius_of(kind: Kind) -> f32 {
 }
 
 /// Faces a flat thing lying in XY to the camera (which only ever moves, never turns).
-fn facing_camera() -> Quat {
+pub fn facing_camera() -> Quat {
     let o = crate::camera::offset(1.0).normalize();
     Quat::from_rotation_x(-o.y.atan2(o.z))
 }
@@ -155,14 +164,12 @@ pub struct ViewPlugin;
 
 impl Plugin for ViewPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Drawn>()
-            .insert_resource(GlobalAmbientLight { brightness: 260.0, ..default() })
-            .add_systems(Startup, (setup_map, setup_pools))
-            .add_systems(
-                Update,
-                (draw_units, draw_missiles, draw_flashes, draw_relics, draw_fog, draw_gizmos)
-                    .after(crate::net::NetSet::Send),
-            );
+        app.init_resource::<Drawn>().add_systems(Startup, (setup_map, setup_pools)).add_systems(
+            Update,
+            (structure_models, draw_units, draw_missiles, draw_flashes, draw_relics, draw_fog, draw_gizmos)
+                .chain()
+                .after(crate::net::NetSet::Send),
+        );
     }
 }
 
@@ -202,101 +209,32 @@ fn floor_image() -> Image {
     )
 }
 
-fn setup_map(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut images: ResMut<Assets<Image>>,
-) {
-    let floor = images.add(floor_image());
-    commands.insert_resource(FloorImage(floor.clone()));
-    commands.spawn((
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(MAP_W * S, MAP_H * S))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color_texture: Some(floor),
-            perceptual_roughness: 0.95,
-            ..default()
-        })),
-        Transform::default(),
-    ));
-    let rock = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.30, 0.27, 0.25),
-        perceptual_roughness: 0.9,
-        ..default()
-    });
-    for d in map::ROCKS.iter().flat_map(|d| [*d, d.mirrored()]) {
-        commands.spawn((
-            Mesh3d(meshes.add(Cylinder::new(d.1 * S, 1.6))),
-            MeshMaterial3d(rock.clone()),
-            Transform::from_translation(world(d.0, 0.8)),
-        ));
-    }
-    let grass = materials.add(StandardMaterial {
-        base_color: Color::srgba(0.20, 0.42, 0.18, 0.88),
-        alpha_mode: AlphaMode::Blend,
-        perceptual_roughness: 1.0,
-        ..default()
-    });
-    for r in map::brushes() {
-        let size = (r.1 - r.0) * S;
-        commands.spawn((
-            Mesh3d(meshes.add(Cuboid::new(size.x, 0.45, size.y))),
-            MeshMaterial3d(grass.clone()),
-            Transform::from_translation(world((r.0 + r.1) * 0.5, 0.22)),
-        ));
-    }
-    // The fog, just over the floor.
-    let fog_img = Image::new(
-        Extent3d { width: VIS_W as u32, height: VIS_H as u32, depth_or_array_layers: 1 },
-        TextureDimension::D2,
-        vec![0u8; VIS_W * VIS_H * 4],
-        TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::default(),
-    );
-    let handle = images.add(fog_img);
+fn setup_map(mut commands: Commands, fog: Res<FogTex>, mut images: ResMut<Assets<Image>>) {
+    // The floor is `ground.rs`'s, the edges `edges.rs`'s, rock and brush `scenery.rs`'s; this
+    // picture of the map is the minimap's.
+    commands.insert_resource(FloorImage(images.add(floor_image())));
     commands.insert_resource(FogImage {
-        handle: handle.clone(),
+        handle: fog.0.clone(),
         dark: vec![0.6; VIS_W * VIS_H],
         alpha: vec![u8::MAX; VIS_W * VIS_H],
         last: 0.0,
     });
-    commands.spawn((
-        Mesh3d(
-            meshes.add(
-                Plane3d::default()
-                    .mesh()
-                    .size(VIS_W as f32 * map::VIS_CELL * S, VIS_H as f32 * map::VIS_CELL * S),
-            ),
-        ),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color_texture: Some(handle),
-            alpha_mode: AlphaMode::Blend,
-            unlit: true,
-            ..default()
-        })),
-        Transform::from_translation(world(
-            Vec2::new(VIS_W as f32 * map::VIS_CELL, VIS_H as f32 * map::VIS_CELL) * 0.5,
-            0.05,
-        )),
-    ));
-    commands.spawn((
-        DirectionalLight { illuminance: 9_000.0, shadow_maps_enabled: false, ..default() },
-        Transform::from_xyz(-20.0, 30.0, 18.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
 }
 
 fn setup_pools(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut fogged: ResMut<Assets<FoggedMat>>,
+    fog: Res<FogTex>,
 ) {
     let mut mat = |c: Color, glow: f32| {
-        materials.add(StandardMaterial {
+        fogged.add(fog.plain(StandardMaterial {
             base_color: c,
             emissive: LinearRgba::from(c) * glow,
             perceptual_roughness: 0.6,
             ..default()
-        })
+        }))
     };
     let bodies: [Handle<Mesh>; Kind::COUNT] = [
         meshes.add(Capsule3d::new(0.5, 0.9)),
@@ -413,7 +351,81 @@ fn setup_pools(
             RelicView(k),
         ));
     }
-    commands.insert_resource(Kit { bodies, figures, team, champion, ring, fill, missile });
+    let lift = std::array::from_fn(|k| match Kind::from_u8(k as u8) {
+        Kind::Melee => 0.28,
+        Kind::Caster => 0.34,
+        Kind::Siege => 0.32,
+        Kind::Super => 0.55,
+        Kind::Turret => 1.6,
+        Kind::Fountain => 1.0,
+        Kind::Inhibitor | Kind::Nexus => 0.6,
+        Kind::Champion => 0.0,
+    });
+    commands.insert_resource(Kit {
+        bodies,
+        figures,
+        team,
+        champion,
+        lift,
+        scale: [1.0; Kind::COUNT],
+        ruin: std::array::from_fn(|_| None),
+        models_in: false,
+        ring,
+        fill,
+        missile,
+    });
+}
+
+/// The structures' models (`scenery.rs`), how big each stands (a turret and the nexus by their
+/// height, the fountain's dais by its width) and the band of its height its crystal fills (in
+/// percent: it glows in the team's colour).
+const STRUCTURES: [(Kind, &str, crate::scenery::Size, (u8, u8)); 4] = [
+    (Kind::Turret, "turret", crate::scenery::Size::Height(5.0), (57, 70)),
+    (Kind::Inhibitor, "inhibitor", crate::scenery::Size::Height(3.6), (50, 100)),
+    (Kind::Nexus, "nexus", crate::scenery::Size::Height(6.2), (28, 100)),
+    (Kind::Fountain, "fountain", crate::scenery::Size::Radius(1.7), (60, 100)),
+];
+
+/// Once the structures' models are in, they take the primitives' place, and every unit is drawn
+/// afresh.
+fn structure_models(
+    mut kit: ResMut<Kit>,
+    mut models: ResMut<crate::scenery::Models>,
+    fog: Res<FogTex>,
+    gltf_mats: Res<Assets<bevy::gltf::GltfMaterial>>,
+    mut mats: ResMut<Assets<FoggedMat>>,
+    mut views: Query<&mut UnitView>,
+) {
+    use crate::scenery::Kind as Look;
+    if kit.models_in {
+        return;
+    }
+    let mut got = Vec::new();
+    for (kind, name, size, crystal) in STRUCTURES {
+        let glow = |t: u8, models: &mut crate::scenery::Models, mats: &mut Assets<FoggedMat>| {
+            models.get(name, size, Look::Glow(t, crystal.0, crystal.1), &fog, &gltf_mats, mats)
+        };
+        let (Some(dawn), Some(dusk), Some(ruin)) = (
+            glow(0, &mut models, &mut mats),
+            glow(1, &mut models, &mut mats),
+            models.get(name, size, Look::Ruin, &fog, &gltf_mats, &mut mats),
+        ) else {
+            return;
+        };
+        got.push((kind, dawn, dusk, ruin));
+    }
+    for (kind, (mesh, scale, dawn), (_, _, dusk), (_, _, ruin)) in got {
+        let k = kind as usize;
+        kit.bodies[k] = mesh;
+        kit.team[k] = [dawn, dusk];
+        kit.ruin[k] = Some(ruin);
+        kit.lift[k] = 0.0;
+        kit.scale[k] = scale;
+    }
+    kit.models_in = true;
+    for mut v in &mut views {
+        v.shown = None;
+    }
 }
 
 #[allow(clippy::type_complexity)]
@@ -422,7 +434,14 @@ fn draw_units(
     kit: Res<Kit>,
     mut drawn: ResMut<Drawn>,
     mut roots: Query<(&mut UnitView, &mut Transform, &mut Visibility)>,
-    mut parts: Query<(&mut Transform, &mut Mesh3d, &mut MeshMaterial3d<StandardMaterial>), Without<UnitView>>,
+    mut bodies: Query<
+        (&mut Transform, &mut Mesh3d, &mut MeshMaterial3d<FoggedMat>, &mut Visibility),
+        Without<UnitView>,
+    >,
+    mut parts: Query<
+        (&mut Transform, &mut MeshMaterial3d<StandardMaterial>, &mut Visibility),
+        (Without<UnitView>, Without<MeshMaterial3d<FoggedMat>>),
+    >,
 ) {
     let now = now_s();
     // What's drawn: the match being played, as the team sees it, or the one being watched, all
@@ -480,8 +499,35 @@ fn draw_units(
         // Only what changed is written: a component written is a component changed, and changed
         // ones are walked, propagated and extracted again.
         let Some((pos, facing, kind, team, generation, hp)) = unit else {
-            vis.set_if_neq(Visibility::Hidden);
             drawn.units[i] = None;
+            // A structure that fell leaves its ruin (only when the match says it fell: never for
+            // what the fog hides).
+            let fell = match (watch, client) {
+                (Some(w), _) => !w.referee.m.units[i].alive,
+                (None, Some(c)) => !c.world.units[i].alive,
+                (None, None) => false,
+            };
+            let ruin = uv
+                .shown
+                .and_then(|(k, _, _)| kit.ruin[k as usize].clone().filter(|_| k.is_structure() && fell));
+            let Some(ruin) = ruin else {
+                vis.set_if_neq(Visibility::Hidden);
+                continue;
+            };
+            vis.set_if_neq(Visibility::Visible);
+            if let Ok((mut t, _, mut m, _)) = bodies.get_mut(uv.body)
+                && m.0 != ruin
+            {
+                m.0 = ruin;
+                // Broken off low.
+                t.scale.y *= 0.4;
+                uv.shown = uv.shown.map(|(k, tm, d)| (k, tm, d.wrapping_add(128)));
+            }
+            for e in [uv.ring, uv.bar, uv.fill] {
+                if let Ok((_, _, mut v)) = parts.get_mut(e) {
+                    v.set_if_neq(Visibility::Hidden);
+                }
+            }
             continue;
         };
         vis.set_if_neq(Visibility::Visible);
@@ -492,7 +538,12 @@ fn draw_units(
         let (w, h) = bar_of(kind);
         if uv.shown != Some((kind, team, def)) {
             uv.shown = Some((kind, team, def));
-            if let Ok((mut t, mut mesh, mut m)) = parts.get_mut(uv.body) {
+            for e in [uv.ring, uv.bar, uv.fill] {
+                if let Ok((_, _, mut v)) = parts.get_mut(e) {
+                    v.set_if_neq(Visibility::Inherited);
+                }
+            }
+            if let Ok((mut t, mut mesh, mut m, _)) = bodies.get_mut(uv.body) {
                 if kind == Kind::Champion {
                     let d = &el_sim::content::champions::CHAMPIONS[usize::from(def) % kit.champion.len()];
                     mesh.0 = kit.figures[d.role as usize].clone();
@@ -502,10 +553,10 @@ fn draw_units(
                 } else {
                     mesh.0 = kit.bodies[kind as usize].clone();
                     m.0 = kit.team[kind as usize][usize::from(team.min(1))].clone();
-                    t.scale = Vec3::ONE;
+                    t.scale = Vec3::splat(kit.scale[kind as usize]);
                 }
             }
-            if let Ok((mut t, _, mut m)) = parts.get_mut(uv.ring) {
+            if let Ok((mut t, mut m, _)) = parts.get_mut(uv.ring) {
                 m.0 = kit.ring[usize::from(team.min(1))].clone();
                 t.scale = Vec3::splat(radius_of(kind) * S * 1.25);
             }
@@ -513,7 +564,7 @@ fn draw_units(
                 t.translation.y = h;
                 t.scale = Vec3::new(w, 1.0, 1.0);
             }
-            if let Ok((_, _, mut m)) = parts.get_mut(uv.fill) {
+            if let Ok((_, mut m, _)) = parts.get_mut(uv.fill) {
                 // Yours, your team's, theirs; watching, each side its own colour.
                 let k = if i == seat {
                     0
@@ -525,20 +576,9 @@ fn draw_units(
                 m.0 = kit.fill[k].clone();
             }
         }
-        if let Ok((mut t, _, _)) = parts.get_mut(uv.body) {
-            let lift = match kind {
-                // A figure stands on its feet.
-                Kind::Champion => 0.0,
-                Kind::Melee => 0.28,
-                Kind::Caster => 0.34,
-                Kind::Siege => 0.32,
-                Kind::Super => 0.55,
-                Kind::Turret => 1.6,
-                Kind::Fountain => 1.0,
-                _ => 0.6,
-            };
+        if let Ok((mut t, _, _, _)) = bodies.get_mut(uv.body) {
             let mut n = *t;
-            n.translation.y = lift;
+            n.translation.y = kit.lift[kind as usize];
             n.rotation = Quat::from_rotation_y(facing);
             t.set_if_neq(n);
         }
@@ -683,7 +723,12 @@ fn draw_relics(session: Res<Session>, mut q: Query<(&RelicView, &mut Transform, 
     }
 }
 
-fn draw_fog(session: Res<Session>, mut fog_img: ResMut<FogImage>, mut images: ResMut<Assets<Image>>) {
+fn draw_fog(
+    session: Res<Session>,
+    look: Res<crate::look::Look>,
+    mut fog_img: ResMut<FogImage>,
+    mut images: ResMut<Assets<Image>>,
+) {
     let now = now_s();
     let dt = (now - fog_img.last).clamp(0.0, 0.25) as f32;
     fog_img.last = now;
@@ -698,7 +743,7 @@ fn draw_fog(session: Res<Session>, mut fog_img: ResMut<FogImage>, mut images: Re
     let mut changed = false;
     for y in 0..VIS_H {
         for x in 0..VIS_W {
-            let want = if fog::lit(&grid, x, y) { 0.0 } else { 0.58 };
+            let want = if !look.fog || fog::lit(&grid, x, y) { 0.0 } else { 0.58 };
             let k = y * VIS_W + x;
             let d = &mut fog_img.dark[k];
             *d += (want - *d) * ease;
@@ -720,7 +765,7 @@ fn draw_fog(session: Res<Session>, mut fog_img: ResMut<FogImage>, mut images: Re
     let Some(mut image) = images.get_mut(&fog_img.handle) else { return };
     let Some(data) = image.data.as_mut() else { return };
     for (px, &a) in data.as_chunks_mut::<4>().0.iter_mut().zip(fog_img.alpha.iter()) {
-        *px = [4, 6, 14, a];
+        *px = [a, 0, 0, 255];
     }
 }
 

@@ -11,13 +11,23 @@ mod coords;
 #[cfg(target_arch = "wasm32")]
 mod dev_hooks;
 #[cfg(target_arch = "wasm32")]
+mod edges;
+#[cfg(target_arch = "wasm32")]
+mod ground;
+#[cfg(target_arch = "wasm32")]
 mod hud;
 #[cfg(target_arch = "wasm32")]
 mod input;
 #[cfg(target_arch = "wasm32")]
+mod look;
+#[cfg(target_arch = "wasm32")]
+mod mips;
+#[cfg(target_arch = "wasm32")]
 mod models;
 #[cfg(target_arch = "wasm32")]
 mod net;
+#[cfg(target_arch = "wasm32")]
+mod scenery;
 #[cfg(target_arch = "wasm32")]
 mod session;
 #[cfg(target_arch = "wasm32")]
