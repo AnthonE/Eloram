@@ -8,6 +8,7 @@ use crate::content::{Op, StatMods};
 use crate::events::Event;
 use crate::game::Match;
 use crate::math;
+use crate::missile::Source;
 use crate::ticks;
 use crate::units::{BuffKind, SEATS, Stats, team_of_seat};
 
@@ -305,7 +306,13 @@ impl Match {
                                 && (u.pos - at).length_squared() <= reach * reach
                                 && self.attackable(team, j)
                             {
-                                self.apply_ops(seat, j, ops, 0, false);
+                                self.apply_ops(
+                                    seat,
+                                    j,
+                                    ops,
+                                    0,
+                                    Source::Augment(self.champs[seat].augments[k]),
+                                );
                             }
                         }
                     }
@@ -313,7 +320,13 @@ impl Match {
                         let u = &self.units[seat];
                         if u.hp < u.stats.max_hp * below {
                             self.champs[seat].aug_ready[k] = now + ticks(cd);
-                            self.apply_ops(seat, seat, ops, 0, false);
+                            self.apply_ops(
+                                seat,
+                                seat,
+                                ops,
+                                0,
+                                Source::Augment(self.champs[seat].augments[k]),
+                            );
                         }
                     }
                     _ => {}
@@ -335,7 +348,7 @@ impl Match {
                 && self.units[target].alive
             {
                 self.champs[caster].aug_ready[k] = now + ticks(cd);
-                self.apply_ops(caster, target, ops, 0, false);
+                self.apply_ops(caster, target, ops, 0, Source::Augment(self.champs[caster].augments[k]));
             }
         }
     }
@@ -348,7 +361,7 @@ impl Match {
                 && self.champs[seat].aug_ready[k] <= now
             {
                 self.champs[seat].aug_ready[k] = now + ticks(cd);
-                self.apply_ops(seat, seat, ops, 0, false);
+                self.apply_ops(seat, seat, ops, 0, Source::Augment(self.champs[seat].augments[k]));
             }
         }
     }
@@ -363,7 +376,7 @@ impl Match {
                 && n.is_multiple_of(u16::from(every.max(1)))
                 && self.units[target].alive
             {
-                self.apply_ops(seat, target, ops, 0, false);
+                self.apply_ops(seat, target, ops, 0, Source::Augment(self.champs[seat].augments[k]));
             }
         }
     }
@@ -374,7 +387,7 @@ impl Match {
             if let Trigger::Takedown { ops } = AUGMENTS[usize::from(self.champs[seat].augments[k])].trigger {
                 let ops: &[Op] = ops;
                 if self.units[seat].alive {
-                    self.apply_ops(seat, seat, ops, 0, false);
+                    self.apply_ops(seat, seat, ops, 0, Source::Augment(self.champs[seat].augments[k]));
                 }
             }
         }

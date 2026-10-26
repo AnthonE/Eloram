@@ -207,6 +207,15 @@ enum Cmd {
     Fog {
         on: bool,
     },
+    /// A volume on the page's audio panel: `"master"` or a bus's name (`effects`, `voice`, `ui`,
+    /// `ambience`, `music`), 0 to 1.
+    Volume {
+        bus: String,
+        v: f32,
+    },
+    Mute {
+        on: bool,
+    },
 }
 
 pub struct InboxPlugin;
@@ -228,6 +237,7 @@ fn inbox(
     mut controls: ResMut<crate::input::Controls>,
     mut rig: ResMut<crate::camera::Rig>,
     mut look: ResMut<crate::look::Look>,
+    mut audio: ResMut<crate::audio::AudioSettings>,
     drawn: Res<crate::view::Drawn>,
 ) {
     use el_client_core::lobby::ToServer;
@@ -295,6 +305,16 @@ fn inbox(
             }
             Cmd::Fog { on } => {
                 look.fog = on;
+                continue;
+            }
+            Cmd::Volume { bus, v } => {
+                audio.set(&bus, v);
+                audio.save();
+                continue;
+            }
+            Cmd::Mute { on } => {
+                audio.muted = on;
+                audio.save();
                 continue;
             }
             Cmd::ChampReroll => {

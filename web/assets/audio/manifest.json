@@ -1,0 +1,2096 @@
+{
+  "about": "Every sound the game plays (el_client_core::fx::sound). Written by `cargo test -p el-client-core fx::sound -- --ignored write_manifest`; art/tools/sounds.py makes the files of every line that isn't optional.",
+  "formats": [
+    "ogg",
+    "mp3"
+  ],
+  "sounds": [
+    {
+      "bus": "effects",
+      "files": [
+        "ember.cast.1",
+        "ember.cast.2"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "ember.cast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "fire drawn up: a rising whoosh of flame with crackle, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "ember.launch.1",
+        "ember.launch.2",
+        "ember.launch.3"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "ember.launch",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a fireball thrown: a short roar and hiss leaving, 0.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "ember.impact.1",
+        "ember.impact.2",
+        "ember.impact.3"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "ember.impact",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "fire bursting on a body: a thump and a crackling flare, 0.5 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "ember.blast.1",
+        "ember.blast.2"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "ember.blast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "an explosion of embers: a deep whump, roar and falling sparks, 0.9 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "ember.windup"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "ember.windup",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "fire gathering to fall: a rising roar with a bright edge, 0.8 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "ember.dash.1",
+        "ember.dash.2"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "ember.dash",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a step through flame: a quick whoosh and a puff of fire, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "ember.buff.1",
+        "ember.buff.2"
+      ],
+      "gain_db": -5.0,
+      "loop": false,
+      "name": "ember.buff",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a warm kindling: a soft flare and crackle that settles, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "ember.ult"
+      ],
+      "gain_db": 1.0,
+      "loop": false,
+      "name": "ember.ult",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a great fire called: a swelling roar under a ringing tone, 1.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "frost.cast.1",
+        "frost.cast.2"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "frost.cast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "cold drawn in: a breathy shimmer and glassy tinkle rising, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "frost.launch.1",
+        "frost.launch.2",
+        "frost.launch.3"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "frost.launch",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "an ice shard thrown: a crystalline whistle and whoosh, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "frost.impact.1",
+        "frost.impact.2",
+        "frost.impact.3"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "frost.impact",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "ice shattering on a body: a crack and a spray of glass chimes, 0.5 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "frost.blast.1",
+        "frost.blast.2"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "frost.blast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a field of rime bursting: a deep crunch and ringing shards, 0.9 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "frost.windup"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "frost.windup",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "frost creeping: a rising glassy drone with crackling, 0.8 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "frost.dash.1",
+        "frost.dash.2"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "frost.dash",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a glide on ice: a quick airy swish with a chime, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "frost.buff.1",
+        "frost.buff.2"
+      ],
+      "gain_db": -5.0,
+      "loop": false,
+      "name": "frost.buff",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a cold glow: a soft bell-like shimmer, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "frost.ult"
+      ],
+      "gain_db": 1.0,
+      "loop": false,
+      "name": "frost.ult",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a whiteout: a howling gust, cracking ice and a low glass drone, 1.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "tide.cast.1",
+        "tide.cast.2"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "tide.cast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "water drawn up: a rising slosh and swell, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "tide.launch.1",
+        "tide.launch.2",
+        "tide.launch.3"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "tide.launch",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a wave thrown: a rushing splash leaving, 0.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "tide.impact.1",
+        "tide.impact.2",
+        "tide.impact.3"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "tide.impact",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "water crashing on a body: a heavy splash and spray, 0.5 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "tide.blast.1",
+        "tide.blast.2"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "tide.blast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a surge breaking: a deep crash of water and foam, 0.9 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "tide.windup"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "tide.windup",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "an undertow gathering: a swelling low rush, 0.8 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "tide.dash.1",
+        "tide.dash.2"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "tide.dash",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "riding a breaker: a quick rushing splash, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "tide.buff.1",
+        "tide.buff.2"
+      ],
+      "gain_db": -5.0,
+      "loop": false,
+      "name": "tide.buff",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a calm swell: a soft wash and bubble, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "tide.ult"
+      ],
+      "gain_db": 1.0,
+      "loop": false,
+      "name": "tide.ult",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a maelstrom: a roaring whirl of water rising, 1.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "wind.cast.1",
+        "wind.cast.2"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "wind.cast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "air drawn in: a rising airy whoosh, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "wind.launch.1",
+        "wind.launch.2",
+        "wind.launch.3"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "wind.launch",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a gale cut: a sharp whistling swish leaving, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "wind.impact.1",
+        "wind.impact.2",
+        "wind.impact.3"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "wind.impact",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a blade of wind landing: a cutting swish and thud, 0.45 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "wind.blast.1",
+        "wind.blast.2"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "wind.blast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a burst of wind: a deep gust and swirl, 0.9 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "wind.windup"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "wind.windup",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a gust gathering: a rising howl, 0.8 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "wind.dash.1",
+        "wind.dash.2"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "wind.dash",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a glide: a quick flutter and whoosh, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "wind.buff.1",
+        "wind.buff.2"
+      ],
+      "gain_db": -5.0,
+      "loop": false,
+      "name": "wind.buff",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "an updraft: a soft rising breeze and flutter, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "wind.ult"
+      ],
+      "gain_db": 1.0,
+      "loop": false,
+      "name": "wind.ult",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a tempest: a roaring spiral of wind with a whistle, 1.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "dusk.cast.1",
+        "dusk.cast.2"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "dusk.cast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "starlight drawn in: a rising shimmer over a low hum, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "dusk.launch.1",
+        "dusk.launch.2",
+        "dusk.launch.3"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "dusk.launch",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a dark bolt thrown: a phasey whoosh with a sparkle, 0.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "dusk.impact.1",
+        "dusk.impact.2",
+        "dusk.impact.3"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "dusk.impact",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a hex striking: a hollow thump and a dark shimmer, 0.5 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "dusk.blast.1",
+        "dusk.blast.2"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "dusk.blast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a well of night collapsing: a deep boom and swirling shimmer, 0.9 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "dusk.windup"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "dusk.windup",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "the sky about to fall: a rising whine of starlight, 0.8 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "dusk.dash.1",
+        "dusk.dash.2"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "dusk.dash",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a shade step: a breathy swoosh and a soft pop, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "dusk.buff.1",
+        "dusk.buff.2"
+      ],
+      "gain_db": -5.0,
+      "loop": false,
+      "name": "dusk.buff",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a hush: a soft dark shimmer, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "dusk.ult"
+      ],
+      "gain_db": 1.0,
+      "loop": false,
+      "name": "dusk.ult",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a dark hour: a falling star's roar into a deep boom and shimmer, 1.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "growth.cast.1",
+        "growth.cast.2"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "growth.cast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "sap rising: a woody creak and rustle, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "growth.launch.1",
+        "growth.launch.2",
+        "growth.launch.3"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "growth.launch",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a seed thrown: a soft whoosh with a leafy flutter, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "growth.impact.1",
+        "growth.impact.2",
+        "growth.impact.3"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "growth.impact",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "thorns striking: a woody crack and rustle, 0.45 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "growth.blast.1",
+        "growth.blast.2"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "growth.blast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a bloom bursting: a soft thump, rustle and rising chimes, 0.9 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "growth.windup"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "growth.windup",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "roots stirring: a creaking rising groan, 0.8 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "growth.dash.1",
+        "growth.dash.2"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "growth.dash",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a step through leaves: a quick rustling swish, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "growth.buff.1",
+        "growth.buff.2"
+      ],
+      "gain_db": -5.0,
+      "loop": false,
+      "name": "growth.buff",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a healing bloom: soft bright chimes and a breath, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "growth.ult"
+      ],
+      "gain_db": 1.0,
+      "loop": false,
+      "name": "growth.ult",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a verdance: a swelling chord of chimes over rustling, 1.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "stone.cast.1",
+        "stone.cast.2"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "stone.cast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "weight gathered: a low grinding rumble, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "stone.launch.1",
+        "stone.launch.2",
+        "stone.launch.3"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "stone.launch",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a shell or stone hurled: a heavy thud and whoosh, 0.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "stone.impact.1",
+        "stone.impact.2",
+        "stone.impact.3"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "stone.impact",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "rock striking a body: a heavy crunch and thud, 0.5 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "stone.blast.1",
+        "stone.blast.2"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "stone.blast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "the ground breaking: a deep boom with falling rubble, 0.9 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "stone.windup"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "stone.windup",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a shell falling: a descending whistle into a rumble, 0.8 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "stone.dash.1",
+        "stone.dash.2"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "stone.dash",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a charge: heavy pounding steps and a grind, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "stone.buff.1",
+        "stone.buff.2"
+      ],
+      "gain_db": -5.0,
+      "loop": false,
+      "name": "stone.buff",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a stone skin: a low crackling grind settling, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "stone.ult"
+      ],
+      "gain_db": 1.0,
+      "loop": false,
+      "name": "stone.ult",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "an upheaval: a huge rumble and crack of breaking ground, 1.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "bronze.cast.1",
+        "bronze.cast.2"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "bronze.cast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "light gathered: a rising warm chime, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "bronze.launch.1",
+        "bronze.launch.2",
+        "bronze.launch.3"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "bronze.launch",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a bolt of light thrown: a bright ringing whoosh, 0.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "bronze.impact.1",
+        "bronze.impact.2",
+        "bronze.impact.3"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "bronze.impact",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a bell's toll striking: a metallic clang and ring, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "bronze.blast.1",
+        "bronze.blast.2"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "bronze.blast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a peal: a great bell struck once, ringing out, 1.0 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "bronze.windup"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "bronze.windup",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "light about to fall: a rising shimmering chord, 0.8 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "bronze.dash.1",
+        "bronze.dash.2"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "bronze.dash",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a spur: a quick ringing swish and hoofbeat, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "bronze.buff.1",
+        "bronze.buff.2"
+      ],
+      "gain_db": -5.0,
+      "loop": false,
+      "name": "bronze.buff",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "an aegis: a soft bright chime that hangs, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "bronze.ult"
+      ],
+      "gain_db": 1.0,
+      "loop": false,
+      "name": "bronze.ult",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a sanctuary or a banner: a deep bell under a rising choir-like chord, 1.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "steel.cast.1",
+        "steel.cast.2"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "steel.cast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a weapon drawn: a metallic scrape and click, 0.3 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "steel.launch.1",
+        "steel.launch.2",
+        "steel.launch.3"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "steel.launch",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a bolt loosed or a shot fired: a twang or crack and a whiz, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "steel.impact.1",
+        "steel.impact.2",
+        "steel.impact.3"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "steel.impact",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "steel striking a body: a slicing hit with a ring, 0.45 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "steel.blast.1",
+        "steel.blast.2"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "steel.blast",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a salvo landing: rapid cracks and thuds, 0.9 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "steel.windup"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "steel.windup",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a long shot drawn: a rising metallic whine, 0.8 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "steel.dash.1",
+        "steel.dash.2"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "steel.dash",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a roll or a close-in: a quick cloth swish and footfall, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "steel.buff.1",
+        "steel.buff.2"
+      ],
+      "gain_db": -5.0,
+      "loop": false,
+      "name": "steel.buff",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a war cry: a short metallic ring and grunt-like swell, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "steel.ult"
+      ],
+      "gain_db": 1.0,
+      "loop": false,
+      "name": "steel.ult",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a verdict or an execution: a long ringing blade and heavy hit, 1.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "auto.swing.1",
+        "auto.swing.2",
+        "auto.swing.3"
+      ],
+      "gain_db": -8.0,
+      "loop": false,
+      "name": "auto.swing",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a melee swing: a short weapon whoosh, 0.2 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "auto.hit.1",
+        "auto.hit.2",
+        "auto.hit.3",
+        "auto.hit.4"
+      ],
+      "gain_db": -6.0,
+      "loop": false,
+      "name": "auto.hit",
+      "optional": false,
+      "stereo": false,
+      "takes": 4,
+      "what": "a melee hit landing: a punchy thud with a little metal, 0.25 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "minion.swing.1",
+        "minion.swing.2",
+        "minion.swing.3"
+      ],
+      "gain_db": -16.0,
+      "loop": false,
+      "name": "minion.swing",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a small creature's swing: a light whoosh, 0.15 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "minion.hit.1",
+        "minion.hit.2",
+        "minion.hit.3"
+      ],
+      "gain_db": -15.0,
+      "loop": false,
+      "name": "minion.hit",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a small hit: a light thud, 0.15 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "minion.shot.1",
+        "minion.shot.2",
+        "minion.shot.3"
+      ],
+      "gain_db": -16.0,
+      "loop": false,
+      "name": "minion.shot",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a small magic bolt: a soft zap, 0.2 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "minion.siege.1",
+        "minion.siege.2"
+      ],
+      "gain_db": -11.0,
+      "loop": false,
+      "name": "minion.siege",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a small cannon: a muffled boom, 0.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "minion.die.1",
+        "minion.die.2",
+        "minion.die.3"
+      ],
+      "gain_db": -14.0,
+      "loop": false,
+      "name": "minion.die",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "a small creature falling: a short crumble and puff, 0.3 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "turret.shot.1",
+        "turret.shot.2"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "turret.shot",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a turret's bolt of crystal fire: a charged zap and whoosh, 0.5 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "turret.hit.1",
+        "turret.hit.2"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "turret.hit",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a turret's bolt striking: a heavy crackling thump, 0.5 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "turret.warn"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "turret.warn",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a turret turning on you: a low rising warning tone, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "turret.fall"
+      ],
+      "gain_db": 2.0,
+      "loop": false,
+      "name": "turret.fall",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a turret destroyed: a crack, a roar of falling stone, 1.8 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "inhibitor.fall"
+      ],
+      "gain_db": 2.0,
+      "loop": false,
+      "name": "inhibitor.fall",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "an inhibitor's crystal breaking: a ringing shatter and boom, 1.8 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "nexus.fall"
+      ],
+      "gain_db": 4.0,
+      "loop": false,
+      "name": "nexus.fall",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "the nexus destroyed: a huge shatter and a long falling roar, 3.0 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "status.stun.1",
+        "status.stun.2"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "status.stun",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "stunned: a ringing daze, a tinny wobble, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "status.root.1",
+        "status.root.2"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "status.root",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "rooted: a quick snare of creaking binding, 0.5 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "status.silence"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "status.silence",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "silenced: a muffled hush and a soft pop, 0.5 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "status.slow.1",
+        "status.slow.2"
+      ],
+      "gain_db": -8.0,
+      "loop": false,
+      "name": "status.slow",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "slowed: a dragging downward smear, 0.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "status.airborne.1",
+        "status.airborne.2"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "status.airborne",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "thrown into the air: a rising whoosh and a thud, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "status.shove.1",
+        "status.shove.2"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "status.shove",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "knocked back or pulled: a heavy shove and scrape, 0.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "status.reveal"
+      ],
+      "gain_db": -8.0,
+      "loop": false,
+      "name": "status.reveal",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "revealed: a short bright ping, 0.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "status.immune"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "status.immune",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "cleansed and unstoppable: a bright rising ring, 0.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "shield.up.1",
+        "shield.up.2"
+      ],
+      "gain_db": -6.0,
+      "loop": false,
+      "name": "shield.up",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a shield raised: a soft humming swell, 0.5 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "heal.1",
+        "heal.2"
+      ],
+      "gain_db": -8.0,
+      "loop": false,
+      "name": "heal",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "healed: a soft bright rising chime, 0.5 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "empowered"
+      ],
+      "gain_db": -8.0,
+      "loop": false,
+      "name": "empowered",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a buff to strength: a short warm surge, 0.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "hasted"
+      ],
+      "gain_db": -9.0,
+      "loop": false,
+      "name": "hasted",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a buff to speed: a short airy lift, 0.35 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "blink.1",
+        "blink.2"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "blink",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "Blink, there at once: a sharp zip and a pop, 0.3 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "tag.throw"
+      ],
+      "gain_db": -6.0,
+      "loop": false,
+      "name": "tag.throw",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a snowball thrown: a soft whoosh, 0.3 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "tag.hit"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "tag.hit",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a snowball's hit: a soft packed-snow thump, 0.3 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "tag.dash"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "tag.dash",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "the dash to a tag: a rushing swish, 0.4 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "death.champion.1",
+        "death.champion.2"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "death.champion",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "a champion falls: a heavy body-fall and a low swell, 1.0 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "death.own"
+      ],
+      "gain_db": 2.0,
+      "loop": false,
+      "name": "death.own",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "you fall: a muffled heavy hit into a low drone, 1.6 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "respawn"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "respawn",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "back on the platform: a soft rising whoosh and chime, 0.8 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "level.up"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "level.up",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a level gained: a bright rising arpeggio, 0.8 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "relic.take"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "relic.take",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a relic taken: a bright bubbling heal, 0.7 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "relic.beam"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "relic.beam",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a relic's beam about to fall: a rising hum, 1.0 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
+        "augment.proc.1",
+        "augment.proc.2"
+      ],
+      "gain_db": -9.0,
+      "loop": false,
+      "name": "augment.proc",
+      "optional": false,
+      "stereo": false,
+      "takes": 2,
+      "what": "an augment answering: a small magical tick, 0.25 s"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ui.click"
+      ],
+      "gain_db": -6.0,
+      "loop": false,
+      "name": "ui.click",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a button: a soft dry click"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ui.buy"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "ui.buy",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "an item bought: a coin clink"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ui.sell"
+      ],
+      "gain_db": -6.0,
+      "loop": false,
+      "name": "ui.sell",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "an item sold: two coins down"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ui.level"
+      ],
+      "gain_db": -5.0,
+      "loop": false,
+      "name": "ui.level",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a skill point spent: a short bright tick up"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ui.card"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "ui.card",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "the augment cards dealt: three soft card flips"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ui.augment"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "ui.augment",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "an augment taken: a shimmering confirm"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ui.reroll"
+      ],
+      "gain_db": -5.0,
+      "loop": false,
+      "name": "ui.reroll",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a reroll: a quick shuffle"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ui.error"
+      ],
+      "gain_db": -6.0,
+      "loop": false,
+      "name": "ui.error",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "not now: a short low double buzz"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ui.found"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "ui.found",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a match found: a bright rising chime"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ui.ready"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "ui.ready",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "ready: a firm confirming chime"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ui.tick"
+      ],
+      "gain_db": -8.0,
+      "loop": false,
+      "name": "ui.tick",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a countdown's last seconds: a small clock tick"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ui.vote"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "ui.vote",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a vote called: a two-note horn"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ping.look"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "ping.look",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a ping, look here: a short clear bell"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ping.danger"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "ping.danger",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a ping, careful: a sharp two-tone warning"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ping.coming"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "ping.coming",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a ping, on my way: a quick rising run"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ping.gone"
+      ],
+      "gain_db": -4.0,
+      "loop": false,
+      "name": "ping.gone",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a ping, one's missing: a questioning two-note fall"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ping.attack"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "ping.attack",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a ping, go in: a bold low horn"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "ping.back"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "ping.back",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a ping, fall back: a falling three-note warning"
+    },
+    {
+      "bus": "ambience",
+      "files": [
+        "amb.wind"
+      ],
+      "gain_db": 0.0,
+      "loop": true,
+      "name": "amb.wind",
+      "optional": false,
+      "stereo": true,
+      "takes": 1,
+      "what": "the wind over the bridge at night, a seamless 24 s stereo loop"
+    },
+    {
+      "bus": "ambience",
+      "files": [
+        "amb.fire"
+      ],
+      "gain_db": 0.0,
+      "loop": true,
+      "name": "amb.fire",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "a brazier's crackle, a seamless 8 s loop"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.welcome"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.welcome",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "the match begins: welcome to the Causeway"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.minions_soon"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.minions_soon",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "thirty seconds until the minions march"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.minions"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.minions",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "the minions march"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.first_blood"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.first_blood",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "the first kill of the match"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.you_slew"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.you_slew",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "you killed an enemy"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.you_fell"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.you_fell",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "you were killed"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.ally_fell"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.ally_fell",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "an ally was killed"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_fell"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_fell",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "an enemy was killed"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.multi_2"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.multi_2",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "two kills in a row, quickly"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.multi_3"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.multi_3",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "three kills in a row"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.multi_4"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.multi_4",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "four kills in a row"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.multi_5"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.multi_5",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "all five, by one hand"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.ace"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.ace",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "a whole team down"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.turret_down"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.turret_down",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "your team destroyed a turret"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.turret_lost"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.turret_lost",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "your team lost a turret"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.inhibitor_down"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.inhibitor_down",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "your team destroyed an inhibitor"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.inhibitor_lost"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.inhibitor_lost",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "your team lost an inhibitor"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.inhibitor_back"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.inhibitor_back",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "an inhibitor stands again"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.victory"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.victory",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "victory"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.defeat"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.defeat",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "defeat"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.surrender"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.surrender",
+      "optional": true,
+      "stereo": false,
+      "takes": 1,
+      "what": "a team has surrendered"
+    },
+    {
+      "bus": "music",
+      "files": [
+        "music.select"
+      ],
+      "gain_db": 0.0,
+      "loop": true,
+      "name": "music.select",
+      "optional": true,
+      "stereo": true,
+      "takes": 1,
+      "what": "champion select, looped"
+    },
+    {
+      "bus": "music",
+      "files": [
+        "music.match"
+      ],
+      "gain_db": -4.0,
+      "loop": true,
+      "name": "music.match",
+      "optional": true,
+      "stereo": true,
+      "takes": 1,
+      "what": "the match, looped under it all"
+    },
+    {
+      "bus": "music",
+      "files": [
+        "music.victory"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "music.victory",
+      "optional": true,
+      "stereo": true,
+      "takes": 1,
+      "what": "a win"
+    },
+    {
+      "bus": "music",
+      "files": [
+        "music.defeat"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "music.defeat",
+      "optional": true,
+      "stereo": true,
+      "takes": 1,
+      "what": "a loss"
+    }
+  ]
+}

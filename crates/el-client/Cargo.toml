@@ -41,6 +41,11 @@ web-sys = { workspace = true, features = [
     # The WebTransport is built here, for its datagram queue's high-water mark (`transport.rs`).
     "WebTransport", "WebTransportOptions", "WebTransportHash", "WebTransportCongestionControl",
     "WebTransportDatagramDuplexStream",
+    # The sound (`audio.rs`): Web Audio, straight.
+    "AudioContext", "BaseAudioContext", "AudioContextState", "AudioBuffer", "AudioBufferSourceNode",
+    "AudioScheduledSourceNode", "AudioNode", "AudioParam", "AudioDestinationNode", "GainNode",
+    "StereoPannerNode", "BiquadFilterNode", "BiquadFilterType", "DynamicsCompressorNode",
+    "HtmlMediaElement",
 ] }
 web-transport-wasm.workspace = true
 console_error_panic_hook.workspace = true

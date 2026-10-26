@@ -226,7 +226,7 @@ impl Match {
             }
             Effect::Strike { ops } => {
                 if let Some(t) = self.live(c.target) {
-                    self.apply_ops(seat, t, ops, rank, true);
+                    self.apply_ops(seat, t, ops, rank, source);
                     if self.units[t].team != self.units[seat].team {
                         self.ability_hit(seat, t);
                     }
@@ -265,10 +265,10 @@ impl Match {
                 self.units[seat].path.clear();
                 self.event(Event::Blink { unit: seat as u16, from: pos, to });
                 if radius > 0.0 {
-                    self.ops_around(seat, to, radius, ops, rank);
+                    self.ops_around(seat, to, radius, ops, rank, source);
                 }
             }
-            Effect::OnSelf { ops } => self.apply_ops(seat, seat, ops, rank, true),
+            Effect::OnSelf { ops } => self.apply_ops(seat, seat, ops, rank, source),
         }
     }
 
@@ -280,6 +280,7 @@ impl Match {
         radius: f32,
         ops: &'static [crate::content::Op],
         rank: u8,
+        source: Source,
     ) {
         let team = self.units[caster].team;
         for j in 0..self.units.len() {
@@ -291,7 +292,7 @@ impl Match {
             {
                 continue;
             }
-            self.apply_ops(caster, j, ops, rank, true);
+            self.apply_ops(caster, j, ops, rank, source);
             self.ability_hit(caster, j);
         }
     }
@@ -330,14 +331,14 @@ impl Match {
         let ops = d.source.ops();
         if d.radius > 0.0 {
             let at = self.units[seat].pos;
-            self.ops_around(seat, at, d.radius, ops, d.rank);
+            self.ops_around(seat, at, d.radius, ops, d.rank, d.source);
         } else if let Some(t) = target {
             if !ops.is_empty() {
-                self.apply_ops(seat, t, ops, d.rank, true);
+                self.apply_ops(seat, t, ops, d.rank, d.source);
                 self.ability_hit(seat, t);
             }
         } else if !ops.is_empty() {
-            self.apply_ops(seat, seat, ops, d.rank, true);
+            self.apply_ops(seat, seat, ops, d.rank, d.source);
         }
     }
 

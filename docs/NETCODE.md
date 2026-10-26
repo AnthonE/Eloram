@@ -213,9 +213,11 @@ Before Colony's, sized for a match:
   be, so one datagram lost costs nothing; after that only if the ack names the datagram that held
   it lost, or none comes for 16 ticks. Gaffer's way sends the newest of everything every tick until
   an ack; at 100 ms that is each change four or five times, which was three bytes in four.
-- Events: the reliable ones (a unit leaving sight, a missile's start and end, deaths, casts,
-  levels, pings, votes) repeat until a datagram holding them is acked; their ticks go as ages
-  from the snapshot's.
+- Events: the reliable ones (a unit leaving sight, a missile's or a zone's start and end, deaths,
+  casts, levels, pings, votes) repeat until a datagram holding them is acked; their ticks go as
+  ages from the snapshot's (a zone's next pulse and end either side of it). A zone is a closed
+  form as a missile is, told where the team sees its ground; one that follows its owner, only while
+  the team sees the owner (`docs/FX.md`, "The wire").
 - A priority accumulator under a byte budget.
 - Every datagram ≤1,100 B, never fragmented (at 1% loss a 10-fragment packet is lost 9.5% of the
   time).

@@ -29,11 +29,43 @@ impl Default for Rig {
     }
 }
 
+/// A shake of the camera, kicked when something heavy lands on the viewer's champion (`fx.rs`):
+/// how hard, and when.
+#[derive(Resource, Default)]
+pub struct Shake {
+    amp: f32,
+    at: f64,
+}
+
+impl Shake {
+    pub fn kick(&mut self, amp: f32, now: f64) {
+        // A new kick on a fading one: the stronger of what's left and what's new.
+        let left = self.now(now);
+        self.amp = amp.max(left).min(0.25);
+        self.at = now;
+    }
+
+    /// How far (m) it moves the camera at `now`.
+    fn now(&self, now: f64) -> f32 {
+        self.amp * (-(now - self.at).max(0.0) as f32 * 9.0).exp()
+    }
+
+    fn offset(&self, now: f64) -> Vec3 {
+        let a = self.now(now);
+        if a < 0.002 {
+            return Vec3::ZERO;
+        }
+        let t = now as f32;
+        Vec3::new((t * 53.0).sin(), (t * 41.0 + 1.3).sin() * 0.5, (t * 47.0 + 2.1).sin()) * a
+    }
+}
+
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Rig>()
+            .init_resource::<Shake>()
             .add_systems(Startup, setup)
             .add_systems(PostUpdate, follow.before(TransformSystems::Propagate));
     }
@@ -67,6 +99,7 @@ fn follow(
     window: Single<&Window>,
     time: Res<Time>,
     session: Res<Session>,
+    shake: Res<Shake>,
     mut controls: ResMut<Controls>,
     mut cam: Single<&mut Transform, With<MainCamera>>,
 ) {
@@ -122,5 +155,6 @@ fn follow(
     rig.focus = rig.focus.clamp(Vec2::new(600.0, 900.0), Vec2::new(MAP_W - 600.0, MAP_H - 900.0));
     controls.view = rig.focus;
     let target = world(rig.focus, 0.0);
-    **cam = Transform::from_translation(target + offset(rig.zoom)).looking_at(target, Vec3::Y);
+    let jolt = shake.offset(crate::net::now_s());
+    **cam = Transform::from_translation(target + offset(rig.zoom) + jolt).looking_at(target + jolt, Vec3::Y);
 }

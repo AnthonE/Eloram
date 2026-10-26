@@ -32,3 +32,15 @@ button { font: inherit; letter-spacing: 0.08em; color: var(--ink); background: t
   border: 1px solid var(--line); padding: 8px 14px; cursor: pointer; }
 button.primary { border-color: var(--ink); }
 button:hover { background: rgba(233, 238, 245, 0.08); }
+
+/* The sound's panel (audio.js): a button in the top left corner (the kill feed has the right), the
+   volumes under it. */
+#sound { position: fixed; top: 10px; left: 10px; z-index: 5; display: flex; flex-direction: column;
+  align-items: flex-start; gap: 6px; }
+#sound-toggle { padding: 4px 9px; font-size: 16px; background: var(--panel); }
+#sound-panel { order: 2; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px;
+  background: var(--panel); border: 1px solid var(--line); min-width: 220px; }
+.sound-row { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  color: var(--dim); font-size: 13px; letter-spacing: 0.04em; }
+.sound-row input { width: 120px; accent-color: var(--ink); }
+#sound-mute { align-self: flex-start; padding: 4px 10px; font-size: 12px; }

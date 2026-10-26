@@ -1,7 +1,6 @@
 //! The match drawn: the Causeway (its floor from the map's own shapes, rock, brush), every unit
-//! slot an entity kept from the start (shown while the team sees its unit), missiles at the own
-//! champion's clock (`docs/NETCODE.md`, "Closed forms go once"), area flashes, relics, and the fog
-//! over what the team can't see.
+//! slot an entity kept from the start (shown while the team sees its unit), pings, relics, and the
+//! fog over what the team can't see. Missiles, blasts and every other effect are `fx.rs`'s.
 
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
@@ -10,7 +9,6 @@ use el_client_core::fog;
 use el_proto::event::WireEvent;
 use el_proto::quant::pos_from_code;
 use el_sim::map::{self, VIS_H, VIS_W};
-use el_sim::missile::MAX_MISSILES;
 use el_sim::units::{Kind, MAX_UNITS, SEATS};
 use el_sim::{MAP_H, MAP_W};
 
@@ -87,7 +85,6 @@ struct Kit {
     models_in: bool,
     ring: [Handle<StandardMaterial>; 2],
     fill: [Handle<StandardMaterial>; 3],
-    missile: [Handle<StandardMaterial>; 2],
 }
 
 #[derive(Component)]
@@ -99,9 +96,6 @@ struct UnitView {
     fill: Entity,
     shown: Option<(Kind, u8, u8)>,
 }
-
-#[derive(Component)]
-struct MissileView(usize);
 
 #[derive(Component)]
 struct Flash {
@@ -162,12 +156,17 @@ pub fn facing_camera() -> Quat {
 
 pub struct ViewPlugin;
 
+/// The view's systems: what's drawn of units is set by their end (`Drawn`).
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ViewSet;
+
 impl Plugin for ViewPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Drawn>().add_systems(Startup, (setup_map, setup_pools)).add_systems(
             Update,
-            (structure_models, draw_units, draw_missiles, draw_flashes, draw_relics, draw_fog, draw_gizmos)
+            (structure_models, draw_units, draw_flashes, draw_relics, draw_fog, draw_gizmos)
                 .chain()
+                .in_set(ViewSet)
                 .after(crate::net::NetSet::Send),
         );
     }
@@ -275,20 +274,6 @@ fn setup_pools(
         opaque(&mut materials, Color::srgb(0.95, 0.28, 0.24)),
     ];
     let bar_bg = unlit(&mut materials, Color::srgba(0.0, 0.0, 0.0, 0.75));
-    let missile = [
-        materials.add(StandardMaterial {
-            base_color: TEAM[0],
-            emissive: LinearRgba::from(TEAM[0]) * 3.0,
-            unlit: true,
-            ..default()
-        }),
-        materials.add(StandardMaterial {
-            base_color: TEAM[1],
-            emissive: LinearRgba::from(TEAM[1]) * 3.0,
-            unlit: true,
-            ..default()
-        }),
-    ];
     let ring_mesh = meshes.add(Annulus::new(0.85, 1.0));
     let bar_mesh = meshes.add(Rectangle::new(1.0, 0.13));
     let flat = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
@@ -326,16 +311,6 @@ fn setup_pools(
             ))
             .add_children(&[body, ring_e, bar, fill_e]);
     }
-    let missile_mesh = meshes.add(Sphere::new(1.0));
-    for k in 0..MAX_MISSILES / 2 {
-        commands.spawn((
-            Mesh3d(missile_mesh.clone()),
-            MeshMaterial3d(missile[0].clone()),
-            Transform::default(),
-            Visibility::Hidden,
-            MissileView(k),
-        ));
-    }
     let relic = materials.add(StandardMaterial {
         base_color: Color::srgb(0.4, 1.0, 0.5),
         emissive: LinearRgba::rgb(0.6, 2.0, 0.8),
@@ -372,7 +347,6 @@ fn setup_pools(
         models_in: false,
         ring,
         fill,
-        missile,
     });
 }
 
@@ -594,54 +568,6 @@ fn draw_units(
     }
 }
 
-#[allow(clippy::type_complexity)]
-fn draw_missiles(
-    session: Res<Session>,
-    kit: Res<Kit>,
-    drawn: Res<Drawn>,
-    mut q: Query<(&MissileView, &mut Transform, &mut Visibility, &mut MeshMaterial3d<StandardMaterial>)>,
-    mut views: Local<Vec<Entity>>,
-    mut shots: Local<Vec<(Vec2, f32, u8)>>,
-    ids: Query<(Entity, &MissileView)>,
-) {
-    // The pool's entities in their order, found once.
-    if views.is_empty() {
-        let mut all: Vec<_> = ids.iter().map(|(e, v)| (v.0, e)).collect();
-        all.sort_by_key(|(k, _)| *k);
-        views.extend(all.into_iter().map(|(_, e)| e));
-    }
-    // Each live missile: where it's drawn, how big, whose.
-    shots.clear();
-    if let Some(w) = session.watch.as_deref() {
-        let m = &w.referee.m;
-        for ms in m.missiles.iter().filter(|ms| ms.alive) {
-            let r = if ms.homing { 0.14 } else { (ms.width * S * 0.5).clamp(0.16, 0.6) };
-            shots.push((ms.pos, r, ms.team));
-        }
-    } else if let Some(c) = session.client.as_ref() {
-        let at = c.missile_tick(now_s());
-        for (_, s) in c.missiles.live() {
-            let target = drawn.units.get(usize::from(s.target)).copied().flatten().map(|d| d.pos);
-            let r = if s.homing { 0.14 } else { (s.width * S * 0.5).clamp(0.16, 0.6) };
-            shots.push((s.pos(at, target), r, s.team));
-        }
-    }
-    let mut shots = shots.iter();
-    for &e in views.iter() {
-        let Ok((_, mut tf, mut vis, mut mat)) = q.get_mut(e) else { continue };
-        let Some(&(p, r, team)) = shots.next() else {
-            vis.set_if_neq(Visibility::Hidden);
-            continue;
-        };
-        vis.set_if_neq(Visibility::Visible);
-        tf.set_if_neq(Transform::from_translation(world(p, 1.1)).with_scale(Vec3::splat(r)));
-        let want = &kit.missile[usize::from(team.min(1))];
-        if mat.0 != *want {
-            mat.0 = want.clone();
-        }
-    }
-}
-
 /// A ping's colour: warnings red, a call to fight orange, the rest the team's own light.
 fn ping_color(kind: u8) -> Color {
     use el_proto::order::ping;
@@ -653,7 +579,7 @@ fn ping_color(kind: u8) -> Color {
     }
 }
 
-/// Spawns a flash for an area that landed or a ping, and fades every flash out.
+/// Spawns a ring for a teammate's ping, and fades every ring out.
 fn draw_flashes(
     mut commands: Commands,
     mut session: ResMut<Session>,
@@ -665,13 +591,11 @@ fn draw_flashes(
     let now = now_s();
     let mesh = ring.get_or_insert_with(|| meshes.add(Annulus::new(0.9, 1.0))).clone();
     let mut new = Vec::new();
-    session.read_events(now, |e| match *e {
-        WireEvent::Area { at, radius, team } => {
-            new.push((pos_from_code(at), f32::from(radius), TEAM[usize::from(team.min(1))], 0.6));
-        }
+    session.read_events(now, |e| {
         // A teammate's ping: a ring that stays a while, coloured by what it says.
-        WireEvent::Ping { at, kind, .. } => new.push((pos_from_code(at), 150.0, ping_color(kind), 2.5)),
-        _ => {}
+        if let WireEvent::Ping { at, kind, .. } = *e {
+            new.push((pos_from_code(at), 150.0, ping_color(kind), 2.5));
+        }
     });
     for (at, radius, color, life) in new {
         let m = materials.add(StandardMaterial {

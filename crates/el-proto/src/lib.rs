@@ -30,7 +30,7 @@ pub use order::{Aim, Order, UnitRef};
 
 /// Bumped on any incompatible wire change, the lobby's JSON included; the handshake rejects
 /// mismatches.
-pub const PROTOCOL_VERSION: u16 = 3;
+pub const PROTOCOL_VERSION: u16 = 4;
 
 /// Upper bound for every datagram we send. 1200 bytes is the smallest UDP payload QUIC guarantees;
 /// the QUIC short header, AEAD tag and HTTP/3 datagram prefix need ~30–40 of those.

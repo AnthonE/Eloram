@@ -41,6 +41,10 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
     await push(page, { t: "champ_swap", champ: dealt });
     s = await until(page, "the bench", (s) => s.select_champion_id === dealt && s.select_bench_ids === String(rerolled));
     chosen = s.select_champion;
+    // The sound: the browser plays it (the suite starts Chromium without waiting for a gesture), and
+    // the shared sounds are in.
+    expect(s.audio_state).toBe("running");
+    s = await until(page, "the sounds loaded", (s) => s.audio_loaded >= 40, 60_000);
     await push(page, { t: "ready" });
     s = await until(page, "a seat in a match", (s) => s.started === true, 60_000);
   } catch (e) {
@@ -59,8 +63,11 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
 
   // The first augment screen is open at the start: take the first card.
   expect(s.screen_open).toBe(true);
+  const heard = s.audio_played;
   await push(page, { t: "pick", card: 0 });
   s = await until(page, "an augment", (s) => s.augments === 1 && s.screen_open === false);
+  // Taking it is heard (the interface's own sound, from the champion's state).
+  s = await until(page, "the augment heard", (s) => s.audio_played > heard);
 
   // The shop: an Iron Knife (350).
   const gold = s.gold;
@@ -81,9 +88,13 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   s = await until(page, "the key let go", (s) => s.aiming === -1);
   const ahead = (x: number) => (s.team === 0 ? x : 15360 - x);
   const before = s.x;
+  const [cues, played] = [s.fx_cues, s.audio_played];
   await push(page, { t: "cast", slot: 4, x: ahead(3000), y: 1920 });
   s = await until(page, "Blink on cooldown", (s) => Number(s.cds.split(",")[4]) > 0);
   expect(Math.abs(s.x - before)).toBeGreaterThan(200);
+  // Blink is seen and heard from the prediction, before the server's word of it.
+  s = await until(page, "Blink's effect", (s) => s.fx_cues > cues && s.audio_played > played, 20_000);
+  await page.screenshot({ path: `${shots}-blink.png` });
 
   // A ping down the lane: the server tells it to the team, the pinger too, and it's drawn there.
   await push(page, { t: "ping", x: ahead(4500), y: 1920, kind: 2 });
@@ -103,6 +114,10 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
 
   s = await el(page);
   console.log(`match status: ${JSON.stringify(s)}`);
+  // The fight's effects and sounds: cues drawn and heard, every sound found, none failed to load.
+  expect(s.fx_cues).toBeGreaterThan(20);
+  expect(s.audio_played).toBeGreaterThan(5);
+  expect(s.audio_failed).toBe(0);
   expect(s.errors).toBe(0);
   expect(s.datagrams).toBeGreaterThan(600);
   expect(s.orders_unacked).toBeLessThanOrEqual(2);

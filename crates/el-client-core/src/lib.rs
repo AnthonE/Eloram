@@ -7,12 +7,14 @@ pub mod baselines;
 pub mod client;
 pub mod clock;
 pub mod fog;
+pub mod fx;
 pub mod inputs;
 pub mod interp;
 pub mod lobby;
 pub mod missiles;
 pub mod orders;
 pub mod scenery;
+pub mod zones;
 
 pub use client::{Cause, Client, Correction, Packets, Stats, Taken};
 pub use clock::Clock;

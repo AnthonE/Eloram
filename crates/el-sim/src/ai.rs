@@ -95,7 +95,7 @@ impl Match {
             let u = &self.units[c];
             let r = rules::FOUNTAIN_RANGE;
             if u.alive && u.team != team && (u.pos - at).length_squared() <= r * r {
-                self.deal(i, c, rules::FOUNTAIN_DPS * crate::DT, DmgKind::True, false);
+                self.deal(i, c, rules::FOUNTAIN_DPS * crate::DT, DmgKind::True, Source::Fountain);
             }
         }
     }

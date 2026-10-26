@@ -31,7 +31,7 @@ pub const MAX_HP_BITS: u32 = 14;
 pub const MANA_BITS: u32 = 7;
 pub const SHIELD_BITS: u32 = 11;
 pub const LEVEL_BITS: u32 = 5;
-pub const FLAG_BITS: u32 = 10;
+pub const FLAG_BITS: u32 = 12;
 pub const CAST_BITS: u32 = 3;
 /// "No target".
 pub const NO_TARGET: u8 = u8::MAX;
@@ -51,6 +51,10 @@ pub mod flags {
     pub const REVEALED: u32 = 1 << 8;
     /// Immune to crowd control (Combo Breaker).
     pub const IMMUNE: u32 = 1 << 9;
+    /// A buff to its attack damage, ability power, attack speed or resists.
+    pub const EMPOWERED: u32 = 1 << 10;
+    /// A buff to its move speed.
+    pub const HASTED: u32 = 1 << 11;
 }
 
 /// A unit's record as codes.

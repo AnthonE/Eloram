@@ -4,6 +4,9 @@
 
 use glam::Vec2;
 
+use crate::content::DmgKind;
+use crate::missile::Source;
+
 /// Most events a tick keeps; past it they're counted and dropped.
 pub const MAX_EVENTS: usize = 512;
 
@@ -29,14 +32,24 @@ pub enum Event {
         missile: u16,
         at: Vec2,
     },
+    /// `source` hurt `target`, by way of `from` (an auto, an ability, an augment...).
     Damage {
         target: u16,
         source: u16,
         amount: f32,
+        kind: DmgKind,
+        from: Source,
     },
     Heal {
         target: u16,
         amount: f32,
+        from: Source,
+    },
+    /// A shield of `amount` went up on `target`.
+    Shield {
+        target: u16,
+        amount: f32,
+        from: Source,
     },
     Death {
         unit: u16,
@@ -55,11 +68,16 @@ pub enum Event {
         from: Vec2,
         to: Vec2,
     },
-    /// An area's effect landed (a delayed blast, a zone's pulse).
+    /// An area's effect landed (a delayed blast, a zone's pulse): zone `zone`'s, of `owner`'s
+    /// `source`; `follows` if it moves with its owner (so where it is is where they are).
     Area {
+        zone: u8,
         at: Vec2,
         radius: f32,
         team: u8,
+        source: Source,
+        owner: u16,
+        follows: bool,
     },
     RelicTaken {
         pad: u8,
