@@ -1,0 +1,105 @@
+{
+  "models": {
+    "turret": {
+      "preview_task": "01a17675-d60c-7454-93af-bebf9d197ee5",
+      "refine_task": "01a1767a-9e01-73fd-ab4c-1f1de0070173",
+      "ai_model": "meshy-6-lite",
+      "prompt": "stylized fantasy game tower: a tall hooded stone sentinel statue standing on an octagonal carved stone plinth, both hands raising a stone lantern cage on top holding a crystal flame, frost and snow on the stone ledges, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game texture: weathered blue-grey carved stone with soft painted highlights, white snow on top ledges, the lantern holds a bright glowing pale cyan crystal flame"
+    },
+    "inhibitor": {
+      "preview_task": "01a17676-2abe-77fc-97e8-352ea4e859d6",
+      "refine_task": "01a1767a-d8d9-71f1-9a94-54f66add95ed",
+      "ai_model": "meshy-6-lite",
+      "prompt": "stylized fantasy game object: a large faceted elongated crystal floating above a round carved stone pedestal ring with four short curved stone fins, runes, frost on stone, chunky silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game texture: weathered blue-grey carved stone with soft painted highlights and darker crevices, white snow on top surfaces, the floating crystal is bright glowing pale cyan"
+    },
+    "nexus": {
+      "preview_task": "01a1767b-2168-771c-9898-346adf31e418",
+      "refine_task": "01a1767f-07ac-75f2-b221-80b3ab610c00",
+      "ai_model": "meshy-6-lite",
+      "prompt": "stylized fantasy game monument: a giant faceted crystal spire, many smaller crystals around its foot, set into a heavy round carved stone base with four curved stone claws gripping the crystal, frost and snow, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game texture: weathered blue-grey carved stone claws and base with soft painted highlights and snow on top surfaces, the big crystal and small crystals are bright glowing pale cyan-white"
+    },
+    "fountain": {
+      "preview_task": "01a17676-3878-7230-ab24-59c8a8a4ff4d",
+      "refine_task": "01a1767a-e31e-765b-bb6c-1e87a0a941fd",
+      "ai_model": "meshy-6-lite",
+      "prompt": "stylized fantasy game spawn platform: a wide low round raised stone dais with carved runic rings and steps, a short carved pillar in the middle topped with a glowing crystal orb, frost on stone, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game texture: weathered blue-grey carved stone with soft painted highlights and darker crevices, white snow on top surfaces, carved rune rings in the stone glow faint cyan, the orb on the pillar is glowing pale cyan"
+    },
+    "brazier": {
+      "preview_task": "01a17676-3ffa-73df-8978-87fce140612a",
+      "refine_task": "01a1767a-ec7b-756a-821d-387468038e68",
+      "ai_model": "meshy-6-lite",
+      "prompt": "stylized fantasy stone brazier: a wide shallow carved stone bowl full of glowing embers on a thick carved stone pedestal, chunky, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game texture: weathered blue-grey carved stone with soft painted highlights and darker crevices, white snow on top surfaces, the bowl is full of glowing orange embers and coals"
+    },
+    "rock_a": {
+      "preview_task": "01a17676-4717-71da-bf22-c7fdc275ae18",
+      "refine_task": "01a1767a-f40f-750f-8742-4257e402eda2",
+      "ai_model": "meshy-6-lite",
+      "prompt": "stylized jagged rock outcrop, grey-blue stone with sharp angular faces and thick snow caps on top, low and wide, game environment asset, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game texture: dark blue-grey jagged rock with soft painted highlights, thick white snow on top"
+    },
+    "rock_b": {
+      "preview_task": "01a17676-4e5e-774a-87cf-33e7f625b373",
+      "refine_task": "01a1767a-fac2-75e2-992a-c9f8ea11a255",
+      "ai_model": "meshy-6-lite",
+      "prompt": "stylized cluster of tall jagged ice and stone spikes, blue-white ice crystals mixed with dark grey rock, snow at the base, game environment asset, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game texture: pale blue translucent-looking ice crystals with white frost, dark blue-grey rock at the base, snow"
+    },
+    "pillar": {
+      "preview_task": "01a17676-558a-756d-b4cf-d1e055b45e74",
+      "refine_task": "01a1767b-017f-771f-b773-7a741f8524a8",
+      "ai_model": "meshy-6-lite",
+      "prompt": "stylized broken ancient carved stone column on a square base, top snapped off, frost and snow, rubble at the foot, game environment asset, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game texture: weathered blue-grey carved stone with soft painted highlights and darker crevices, white snow on top surfaces"
+    },
+    "statue": {
+      "preview_task": "01a17676-5e35-758e-97da-c47e5622b2d1",
+      "refine_task": "01a1767b-084b-7672-93ab-97daa1977d17",
+      "ai_model": "meshy-6-lite",
+      "prompt": "stylized ancient stone guardian statue of a robed figure with a hood holding a long sword point-down in front, standing on a square plinth, frost and snow on stone, game environment asset, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game texture: weathered blue-grey carved stone with soft painted highlights and darker crevices, white snow on top surfaces"
+    },
+    "spire": {
+      "preview_task": "01a17676-6590-7477-8559-521c09a674da",
+      "refine_task": "01a1767b-0931-7252-a399-1fef1f121851",
+      "ai_model": "meshy-6-lite",
+      "prompt": "stylized tall jagged frozen ice spire rising from dark rock, pale blue translucent-looking ice, game environment backdrop asset, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game texture: pale blue glacial ice with white frost highlights, dark rock at the base"
+    },
+    "arch": {
+      "preview_task": "01a17676-6df0-76ba-857a-40dc97687280",
+      "refine_task": "01a1767b-0fe0-71a1-8f53-43f3fafd4437",
+      "ai_model": "meshy-6-lite",
+      "prompt": "stylized ruined ancient stone archway, half collapsed, carved blocks, snow on top, game environment asset, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game texture: weathered blue-grey carved stone with soft painted highlights and darker crevices, white snow on top surfaces"
+    },
+    "banner": {
+      "preview_task": "01a17676-7d43-7295-b90a-7b9969f4d545",
+      "refine_task": "01a1767b-11a5-7281-9ca5-756215c73e63",
+      "ai_model": "meshy-6-lite",
+      "prompt": "stylized tall iron pole with a long hanging plain cloth banner with a simple geometric emblem, stone base, game environment asset, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game texture: dark iron pole, deep blue cloth banner with a simple pale geometric emblem, grey stone base with snow"
+    }
+  },
+  "images": {
+    "bush0": {
+      "task": "01a1767b-4293-70c3-aa76-5b5edec0cde0",
+      "ai_model": "nano-banana",
+      "prompt": "a single dense bush of leafless frozen branching twigs like white coral, covered in frost and ice crystals, pale white and icy blue, side view, whole bush visible, centered, isolated on a pure solid black background, stylized hand-painted fantasy game art"
+    },
+    "bush1": {
+      "task": "01a1767b-69b5-775c-86f2-85eadaedd17e",
+      "ai_model": "nano-banana",
+      "prompt": "a low wide spreading thicket of leafless frozen bramble twigs, covered in frost and small ice crystals, pale white and icy blue, side view, whole plant visible, centered, isolated on a pure solid black background, stylized hand-painted fantasy game art"
+    },
+    "bush2": {
+      "task": "01a1767b-6af3-71d0-968e-36fc34348000",
+      "ai_model": "nano-banana",
+      "prompt": "a tall clump of thin frozen reeds and leafless frosted branches, white rime ice on every twig, pale white and icy blue, side view, whole plant visible, centered, isolated on a pure solid black background, stylized hand-painted fantasy game art"
+    }
+  }
+}

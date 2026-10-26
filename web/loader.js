@@ -28,20 +28,60 @@ const step = (name, line, fraction) => {
 const within = (promise, ms, fallback) =>
   Promise.race([promise, new Promise((done) => setTimeout(() => done(fallback), ms))]);
 
-async function pickGraphics() {
+// The game modules this page has (`build.json`: each by its hash, scripts/web-modules.sh).
+async function builtModules() {
+  try {
+    const res = await fetch("./build.json", { cache: "no-store" });
+    if (res.ok) return await res.json();
+  } catch (_) {
+    /* an older page: WebGL 2 alone */
+  }
+  return { webgl2: "" };
+}
+
+// A WebGPU module that failed here is remembered by its hash, so this build isn't tried again but
+// the next one is.
+const GPU_FAILED = "el.webgpu-failed";
+
+// WebGPU where the browser has an adapter and the page has the module, WebGL 2 otherwise (Gates'
+// `pickModule`). `?gfx=` forces one.
+async function pickGraphics(built) {
   const forced = params.get("gfx");
-  if (forced === "webgl2" || forced === "webgpu") return forced;
+  if (forced === "webgpu") {
+    try {
+      localStorage.removeItem(GPU_FAILED);
+    } catch (_) {}
+  }
+  if ((forced === "webgl2" || forced === "webgpu") && forced in built) return forced;
+  if (!("webgpu" in built)) return "webgl2";
+  try {
+    if (localStorage.getItem(GPU_FAILED) === built.webgpu) return "webgl2";
+  } catch (_) {}
   try {
     // Some drivers never answer the adapter request: past a few seconds, WebGL 2 it is.
-    if (navigator.gpu && (await within(navigator.gpu.requestAdapter(), 4000, null))) {
-      // Only use WebGPU if that build was shipped.
-      const probe = await fetch("./webgpu/el.js", { method: "HEAD" });
-      if (probe.ok) return "webgpu";
-    }
+    if (navigator.gpu && (await within(navigator.gpu.requestAdapter(), 4000, null))) return "webgpu";
   } catch (_) {
     /* fall through */
   }
   return "webgl2";
+}
+
+// Back into the WebGL 2 module, once: the failure is written against this WebGPU build before the
+// reload, so it can't loop (where storage won't keep it, nothing is tried: the failure shows).
+// A reload because a canvas that has held a WebGPU context never takes a WebGL one, and Bevy's
+// run doesn't return.
+function fallBackFrom(hash) {
+  return (why) => {
+    try {
+      localStorage.setItem(GPU_FAILED, hash);
+      if (localStorage.getItem(GPU_FAILED) !== hash) return false;
+    } catch (_) {
+      return false;
+    }
+    console.warn(`eloram: the WebGPU client failed (${why}): WebGL 2 instead`);
+    location.reload();
+    return true;
+  };
 }
 
 // Fades the loading screen out, then hides it for good (called when the first frame is drawn).
@@ -73,6 +113,29 @@ function keysSetting() {
   }
 }
 
+// A browser drawing without a GPU (SwiftShader, llvmpipe): the low tier, unless asked otherwise.
+function softwareRenderer() {
+  try {
+    const gl = document.createElement("canvas").getContext("webgl2");
+    const info = gl && gl.getExtension("WEBGL_debug_renderer_info");
+    const name = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : "";
+    return /swiftshader|llvmpipe|software/i.test(name);
+  } catch (_) {
+    return false;
+  }
+}
+
+function qualitySetting() {
+  const asked = params.get("quality");
+  const fallback = () => (softwareRenderer() ? "low" : "high");
+  try {
+    if (asked === "low" || asked === "high") localStorage.setItem("el.quality", asked);
+    return localStorage.getItem("el.quality") || fallback();
+  } catch (_) {
+    return asked || fallback();
+  }
+}
+
 async function main() {
   const config = {
     echo: params.get("mode") === "echo",
@@ -87,6 +150,9 @@ async function main() {
     indicators: indicatorsSetting(),
     // League's WASD layout (`?keys=wasd`; `?keys=league` back to its default). Remembered.
     wasd: keysSetting() === "wasd",
+    // The picture's tier (`?quality=low`: no HDR, bloom, shadows or multisampling, a few textures
+    // read for the ground; `high` back). Remembered; without a GPU, low unless asked.
+    quality: qualitySetting(),
   };
   if (config.signIn) {
     try {
@@ -114,10 +180,22 @@ async function main() {
   }
   window.EL_CONFIG = config;
   step("graphics", "choosing WebGPU or WebGL 2…");
-  const gfx = await pickGraphics();
+  const built = await builtModules();
+  const gfx = await pickGraphics(built);
   window.EL_CONFIG.gfx = gfx;
+  // Until the first frame, a WebGPU failure (this module not loading, or the client panicking:
+  // boot.js) goes back to WebGL 2 rather than to an error, unless WebGPU was asked for by name.
+  if (gfx === "webgpu" && params.get("gfx") !== "webgpu" && "webgl2" in built) {
+    window.elGpuFallBack = fallBackFrom(built.webgpu);
+  }
   step("client", `fetching the ${gfx} client…`);
-  const mod = await import(`./${gfx}/el.js`);
+  let mod;
+  try {
+    mod = await import(`./${gfx}/el.js`);
+  } catch (e) {
+    if (window.elGpuFallBack && window.elGpuFallBack(String(e.message || e))) return;
+    throw e;
+  }
   const wasm = fetchCounted(new URL(`./${gfx}/el_bg.wasm`, location.href), (got, total) =>
     step("client", `fetching the ${gfx} client · ${(got / 1048576).toFixed(1)} MB`, total ? got / total : null),
   );
@@ -127,7 +205,9 @@ async function main() {
   try {
     await mod.default({ module_or_path: wasm });
   } catch (e) {
-    if (!String(e).includes("Using exceptions for control flow")) throw e;
+    if (String(e).includes("Using exceptions for control flow")) return;
+    if (window.elGpuFallBack && window.elGpuFallBack(String(e.message || e))) return;
+    throw e;
   }
 }
 

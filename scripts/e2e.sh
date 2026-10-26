@@ -4,6 +4,7 @@
 #   scripts/e2e.sh match [project]   # a match from the queue against the server's bots
 #   scripts/e2e.sh watch [project]   # an agent's match watched live from its record, then replayed
 #   scripts/e2e.sh login [project]   # wallet sign-in with a stub wallet, /online.json, the resume token
+#   scripts/e2e.sh art [project]     # the map's look: the camera over each place, pictures in artifacts/
 # Anything after the project goes to Playwright.
 # The server listens on EL_HTTP_PORT (8080) and EL_WT_PORT (UDP, 4433).
 set -euo pipefail
@@ -36,9 +37,10 @@ case "$suite" in
     pids+=($!)
     export EL_GAME_URL="http://127.0.0.1:$((port + 1))"
     ;;
-  match)
-    # Bots take the empty seats a second after the first player queues.
-    server --mode game --fill-after 1 --http "127.0.0.1:${port}" --wt-port "$wt" &
+  match|art)
+    # Bots take the empty seats a second after the first player queues. Champion select runs 45 s,
+    # not 20 (it ends once everyone is ready): software rendering stalls on its first frames.
+    server --mode game --fill-after 1 --select-secs 45 --http "127.0.0.1:${port}" --wt-port "$wt" &
     pids+=($!)
     ;;
   watch)
@@ -68,5 +70,6 @@ done
 
 cd e2e
 [ -d node_modules ] || npm ci --no-audit --no-fund
-shift 2 || true
+# The suite and the project, as many of them as were given.
+shift $(( $# < 2 ? $# : 2 ))
 npx playwright test "tests/$suite.spec.ts" --project "$project" "$@"

@@ -20,7 +20,7 @@ pub struct Rig {
     pub zoom: f32,
     pub locked: bool,
     /// It has been put on the champion once.
-    placed: bool,
+    pub placed: bool,
 }
 
 impl Default for Rig {

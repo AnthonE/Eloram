@@ -12,6 +12,7 @@ pub mod interp;
 pub mod lobby;
 pub mod missiles;
 pub mod orders;
+pub mod scenery;
 
 pub use client::{Cause, Client, Correction, Packets, Stats, Taken};
 pub use clock::Clock;

@@ -197,6 +197,16 @@ enum Cmd {
     },
     /// The link closed under the page, as a lost connection would (it dials again).
     DropLink,
+    /// The camera freed and put over a point of the map (`zoom` as the wheel's, 0.7 to 1.4).
+    Camera {
+        x: f32,
+        y: f32,
+        zoom: Option<f32>,
+    },
+    /// The fog's darkness drawn or not (only the picture: what the team isn't sent still isn't).
+    Fog {
+        on: bool,
+    },
 }
 
 pub struct InboxPlugin;
@@ -217,6 +227,7 @@ fn inbox(
     net: NonSend<crate::net::NetState>,
     mut controls: ResMut<crate::input::Controls>,
     mut rig: ResMut<crate::camera::Rig>,
+    mut look: ResMut<crate::look::Look>,
     drawn: Res<crate::view::Drawn>,
 ) {
     use el_client_core::lobby::ToServer;
@@ -273,6 +284,17 @@ fn inbox(
             }
             Cmd::Lock { on } => {
                 rig.locked = on;
+                continue;
+            }
+            Cmd::Camera { x, y, zoom } => {
+                rig.locked = false;
+                rig.placed = true;
+                rig.focus = Vec2::new(x, y);
+                rig.zoom = zoom.unwrap_or(rig.zoom).clamp(0.7, 1.4);
+                continue;
+            }
+            Cmd::Fog { on } => {
+                look.fog = on;
                 continue;
             }
             Cmd::ChampReroll => {

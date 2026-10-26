@@ -7,7 +7,9 @@ const common = ["--no-proxy-server", "--autoplay-policy=no-user-gesture-required
 
 export default defineConfig({
   testDir: "./tests",
-  timeout: 180_000,
+  // Headless Chromium draws in software (SwiftShader), well under a frame a second on the map's
+  // art (docs/ART.md): a whole match's walk-through needs the time.
+  timeout: 300_000,
   retries: 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : [["list"]],
   outputDir: "./test-results",
@@ -28,11 +30,12 @@ export default defineConfig({
       },
     },
     {
-      // Best-effort: WebGPU needs a headed browser (run under xvfb-run) and SwiftShader Vulkan.
+      // WebGPU through SwiftShader's Vulkan, headless: Playwright's headless shell offers an
+      // adapter with these (a headed browser under Xvfb doesn't). The page needs a secure
+      // context, which 127.0.0.1 is.
       name: "webgpu",
       use: {
         browserName: "chromium",
-        headless: false,
         launchOptions: {
           args: [
             ...common,
@@ -40,8 +43,9 @@ export default defineConfig({
             "--enable-features=Vulkan",
             "--use-vulkan=swiftshader",
             "--use-webgpu-adapter=swiftshader",
-            "--use-angle=vulkan",
-            "--disable-vulkan-surface",
+            "--use-angle=swiftshader",
+            "--enable-unsafe-swiftshader",
+            "--ignore-gpu-blocklist",
           ],
         },
       },
