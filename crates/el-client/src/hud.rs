@@ -696,6 +696,8 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                 ),
                 Phase::Failed => session.error.clone().unwrap_or_else(|| "Disconnected".into()),
                 Phase::Over => match (session.winner, c) {
+                    // Neither team: the server stopped the match (`el_server::lobby::NO_CONTEST`).
+                    (Some(w), _) if w > 1 => "No contest: the match was stopped".into(),
                     (Some(w), Some(c)) if w == c.team => "Victory".into(),
                     (Some(_), Some(_)) => "Defeat".into(),
                     _ => "The match is over".into(),

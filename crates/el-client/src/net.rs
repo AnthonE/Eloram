@@ -122,16 +122,35 @@ fn connect(net: NonSend<NetState>, cfg: Res<LaunchConfigRes>) {
         *net.error.borrow_mut() = Some("this browser has no WebTransport: use Chrome or Edge".into());
         return;
     }
-    dial(&net, &cfg.0);
+    dial(&net, &cfg.0, false);
 }
 
-/// Dials the server; the transport lands in `net`'s slot, or the reason it didn't in its error.
-fn dial(net: &NetState, cfg: &LaunchConfig) {
+/// Where to dial now, as the page's `elDiscover()` finds it: a server restarted since the page
+/// loaded may have a new certificate (and its hash) to pin. `None` if the page can't say.
+async fn discover() -> Option<(String, Option<Vec<u8>>)> {
+    use wasm_bindgen::JsCast;
+    let window = web_sys::window()?;
+    let f: js_sys::Function = js_sys::Reflect::get(&window, &"elDiscover".into()).ok()?.dyn_into().ok()?;
+    let promise: js_sys::Promise = f.call0(&window).ok()?.dyn_into().ok()?;
+    let found = wasm_bindgen_futures::JsFuture::from(promise).await.ok()?;
+    let url = js_sys::Reflect::get(&found, &"wtUrl".into()).ok()?.as_string()?;
+    let hash = js_sys::Reflect::get(&found, &"certHash".into())
+        .ok()?
+        .as_string()
+        .and_then(|h| crate::config::decode_hex(&h));
+    Some((url, hash))
+}
+
+/// Dials the server; the transport lands in `net`'s slot, or the reason it didn't in its error. A
+/// redial (`fresh`) asks the page where the server is first.
+fn dial(net: &NetState, cfg: &LaunchConfig, fresh: bool) {
     let slot = net.transport.clone();
     let err = net.error.clone();
-    let url = cfg.wt_url.clone();
-    let hash = cfg.cert_hash.clone();
+    let (mut url, mut hash) = (cfg.wt_url.clone(), cfg.cert_hash.clone());
     wasm_bindgen_futures::spawn_local(async move {
+        if fresh && let Some(found) = discover().await {
+            (url, hash) = found;
+        }
         match Transport::connect(&url, hash).await {
             Ok(t) => {
                 t.start_pump(now_s);
@@ -440,7 +459,7 @@ fn redial(net: &NetState, link: &mut Link, cfg: &LaunchConfig, session: &mut Ses
         if now_s() >= at {
             link.redial_at = None;
             link.redials += 1;
-            dial(net, cfg);
+            dial(net, cfg, true);
         }
         return false;
     }

@@ -32,11 +32,12 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   bots in the other nine seats after 3 s (`EL_FILL`), then 20 s of champion select (`--select-secs`;
   it ends sooner once everyone seated is ready, and agents are ready at once). The server alone:
   `cargo run -p el-server --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
-- `scripts/e2e.sh spike|match|watch|login|art [webgl2]`: Playwright against a real server (`match`:
-  queue, champion select (a reroll, the bench, ready), the headliner, augment, shop, Blink, a walk
-  predicted exactly, the fog; and `?keys=wasd`'s keys walking the champion; `watch`: an agent's match watched live a minute behind, then
-  replayed; `login`: a stub wallet signing through `el-auth`'s `sign` example, `/online.json`, the
-  resume token; `art`: the camera over each place on the map, the fog's darkness off (`{t:"camera"}`,
+- `scripts/e2e.sh spike|match|watch|login|art|recover [webgl2]`: Playwright against a real server
+  (`match`: queue, champion select (a reroll, the bench, ready), the headliner, augment, shop,
+  Blink, a walk predicted exactly, the fog; and `?keys=wasd`'s keys walking the champion; `watch`:
+  an agent's match watched live a minute behind from a checkpoint, then replayed; `recover`: the
+  server SIGKILLed mid-match and started again, the page back in its seat; `login`: a stub wallet
+  signing through `el-auth`'s `sign` example, `/online.json`, the resume token; `art`: the camera over each place on the map, the fog's darkness off (`{t:"camera"}`,
   `{t:"fog"}`); screenshots in `e2e/artifacts/`). The `webgpu` project (`scripts/e2e.sh art
   webgpu`) is headless WebGPU on SwiftShader's Vulkan. `scripts/e2e.sh` serves the `web/dist/` already
   built: rebuild it first. A test or the console drives the champion through `window.__elInbox`
@@ -66,11 +67,20 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   [-- matches minutes]`: a shard of matches, every seat replicated, p50/p99 and matches a core.
 - `cargo run -p el-bot --release --bin el-swarm -- --bots 20 --secs 30` against a running server
   (`--fill-after 3` makes matches fast): agents over WebTransport, then the server's `/status`.
-- Records: `el-server --records dir` writes each finished match's (`el_sim::record`);
-  `cargo run -p el-replay --release -- verify dir/` re-steps them against their hashes, `dump x.elr`
-  prints one. `/records.json` lists a server's; the page watches one with `?watch=<id>` (a minute
-  behind) or `?replay=<url>`. Anything that changes what a match does with the same inputs bumps
-  `el_sim::record::CONTENT_VERSION`.
+- Records: `el-server --records dir` writes each match's (`el_sim::record`) as it's played
+  (`{id}.elr.part`, `{id}.elr` once finished); `cargo run -p el-replay --release -- verify dir/`
+  re-steps them against their hashes (and each `{id}.ck` to the same end), `dump x.elr` prints one.
+  `/records.json` lists a server's; the page watches one with `?watch=<id>` (a minute behind, from
+  the last verified checkpoint) or `?replay=<url>`. Anything that changes what a match does with the
+  same inputs bumps `el_sim::record::CONTENT_VERSION`; a field added to `Match` (or anything in it)
+  must go in `el_sim::snapshot` (it won't compile until it does) and bumps `snapshot::VERSION`.
+- Checkpoints, the referee and crash recovery (`docs/NETCODE.md`, "The record"): the shard writes
+  each match's checkpoint (`el_sim::snapshot`) every `--checkpoint-secs` (60); the referee on each
+  recorder thread (`el-server/src/referee.rs`, off with `--no-referee`) re-steps every live record
+  and keeps a checkpoint only once it's the same bytes, naming the unit and field when it isn't
+  (`/status` `game.referee`). A server started on the same `--records` directory takes up the matches
+  the last one left (killed or stopped: `el-server/src/recover.rs`), and their players rejoin with
+  their tokens. `cargo test -p el-server --release --test recover` kills a real server mid-match.
 - Wallet sign-in (`el-auth`: the SIWE text both sides build, the Elo Pros launcher's `prove` text
   for `eloram`): the page signs in on `?signin=1` (`web/wallet.js`), agents with a key
   (`BotConfig::key`, `el-swarm --sign-in` with throwaway test keys). The server names

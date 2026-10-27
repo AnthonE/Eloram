@@ -20,7 +20,8 @@ test("watching a live match, then its replay", async ({ page, request }, info) =
   const end = Date.now() + 150_000;
   for (;;) {
     const list = await (await request.get("/records.json")).json();
-    rec = list.find((r: any) => r.live && r.ticks > 60 * 30 + 450);
+    // Served a minute behind, with a checkpoint (every 10 s here) inside what's served.
+    rec = list.find((r: any) => r.live && r.ticks > 60 * 30 + 450 && r.served_checkpoint > 0);
     if (rec || Date.now() > end) break;
     await new Promise((r) => setTimeout(r, 2_000));
   }
@@ -35,6 +36,8 @@ test("watching a live match, then its replay", async ({ page, request }, info) =
     throw e;
   }
   expect(s.watch_live).toBe(true);
+  // From the server's checkpoint, not the record's first tick.
+  expect(s.watch_from).toBeGreaterThan(0);
   // A minute behind: never past what the server serves.
   expect(s.watch_tick).toBeLessThanOrEqual(rec.ticks);
   const shot = await page.screenshot({ path: `artifacts/watch-${info.project.name}.png` });
