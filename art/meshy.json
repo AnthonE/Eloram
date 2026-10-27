@@ -101,5 +101,414 @@
       "ai_model": "nano-banana",
       "prompt": "a tall clump of thin frozen reeds and leafless frosted branches, white rime ice on every twig, pale white and icy blue, side view, whole plant visible, centered, isolated on a pure solid black background, stylized hand-painted fantasy game art"
     }
+  },
+  "champions": {
+    "vessa": {
+      "prompt": "stylized fantasy game hero character, full body, standing, a lean watchful huntress in a long hooded grey-blue coat with a high collar and leather straps, holding an oversized long heavy crossbow in her right hand that reaches past her knees, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: steel-grey and slate-blue coat, dark leather straps, polished steel crossbow with white fletched bolts, pale skin, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.75,
+      "preview_task": "01a17f8d-8ee7-751e-81d3-5b7035d14101",
+      "refine_task": "01a17f8e-9447-7101-91ad-e68fdceb61ea",
+      "rig_task": "01a17f8f-43ff-7186-8b0e-f841310779d4"
+    },
+    "marret": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a stocky gunsmith with brass goggles pushed up on his head, a leather apron over a work shirt with rolled sleeves, a bandolier of brass cartridges across his chest, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: brown leather apron, cream shirt, bright polished brass goggles and cartridges, dark steel fittings, tanned skin, red-brown beard, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.7,
+      "preview_task": "01a17f96-27d1-7774-984c-985b89d2cbde",
+      "refine_task": "01a17f98-5f8b-762f-97be-80d40cbf8fc5",
+      "rig_task": "01a17f99-0a99-769c-906b-9ff450cf2624"
+    },
+    "orrin": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a tall gaunt fire priest in long layered choir robes with a deep hood, a smouldering brass censer hanging from his belt, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: ash-grey robes with ember-orange and gold trim, blackened brass censer glowing orange inside, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.85,
+      "preview_task": "01a17f96-27af-7464-b6cd-be1cc9235df5",
+      "refine_task": "01a17f99-2995-77e0-b7c8-5649844e9d98",
+      "rig_task": "01a17f99-f862-77af-a923-eeb24f2ee2e7"
+    },
+    "seren": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a slender star mage woman in long flowing robes with a wide sash, a large crescent moon shaped crown floating behind her head, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: deep violet and midnight-blue robes with silver star embroidery, pale silver crescent crown glowing faintly, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.75,
+      "preview_task": "01a17f96-2832-76ba-a8f5-aebddf3b90ef",
+      "refine_task": "01a17f98-8b63-73c2-9abb-e23ed75ac486",
+      "rig_task": "01a17f99-5d7c-7173-906e-92a202e29a0d"
+    },
+    "nimra": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a frost sorceress in a long fitted robe with a tall crown and high collar made of jagged ice crystal shards, ice shards on her shoulders, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: pale ice-blue and white robe, translucent glowing pale cyan ice crystals, frost white hair, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.7,
+      "preview_task": "01a17f96-274f-719c-a4b0-58890e68bd8f",
+      "refine_task": "01a17f98-b787-7732-9d01-fce9d6085e50",
+      "rig_task": "01a17f99-6703-71ec-87f0-50b493ed7bbf"
+    },
+    "torek": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a short broad-shouldered siege engineer in heavy iron and stone plate armour, a huge stubby mortar cannon mounted over his right shoulder, thick gauntlets, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: dark iron plates with rust and brass rivets, grey stone shoulder guard, black soot, warm brown leather, the mortar's mouth glowing faint orange, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.6,
+      "preview_task": "01a17f96-27cd-7301-9f2a-f8506834c605",
+      "refine_task": "01a17f99-2291-75b9-ba4f-0158afa5378e",
+      "rig_task": "01a17f99-ca10-73c9-b0a1-e1c039c997c5"
+    },
+    "brakka": {
+      "prompt": "stylized fantasy game hero character, full body, standing, a huge hulking brute made of quarried rock, massive boulder shoulders and fists, a heavy iron chain wrapped around his right forearm ending in a large iron hook, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: rough grey-brown quarried stone body with chisel marks and cracks, moss in the crevices, dark rusted iron chain and hook, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 2.1,
+      "preview_task": "01a17f8f-7613-7700-8e61-8a5784d00f61",
+      "refine_task": "01a17f90-48fb-75cc-880f-feedd9e27d45",
+      "rig_task": "01a17f90-d066-77c9-b843-99edc0da34f3"
+    },
+    "hollis": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a huge armoured warden in heavy bronze plate armour with a tall helm, a giant bronze bell strapped to his back, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: warm polished bronze armour with green patina in the creases, dark leather, the great bell gleaming bronze with engraved rings, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 2.0,
+      "preview_task": "01a17f96-27f1-76a4-80a8-38a18d0b2235",
+      "refine_task": "01a17f99-2656-748a-99f9-4286339c5372",
+      "rig_task": "01a17f99-f516-74f8-8831-d54e021c4515"
+    },
+    "gorum": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a massive old warrior wearing a great ox skull helm with long curved horns, a thick shaggy fur mantle over iron armour, bare huge forearms, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: bone-white ox skull and ivory horns, dark brown shaggy fur, dull iron armour, weathered tanned skin, braided grey beard, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 2.05,
+      "preview_task": "01a17f96-2a67-73a4-86db-7b1fb00055cc",
+      "refine_task": "01a17f98-497a-70ef-88c2-5010e7d98a81",
+      "rig_task": "01a17f98-f171-75d9-befa-0b51f83f08c6"
+    },
+    "talmar": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a broad sea warrior in armour made of shells and coral plates, a long tattered teal cloak, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: deep teal and sea-green cloak, coral-orange and pearl-white shell armour, dark skin, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.85,
+      "preview_task": "01a17f96-2c34-741b-95ad-9ce1974971d7",
+      "refine_task": "01a17f98-8bf8-7070-9607-63699ec0afb4",
+      "rig_task": "01a17f99-33e5-773d-992b-1268e09936d5"
+    },
+    "vire": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a lean duelist in ash-grey plate and chain armour with a long tattered scarf, a sword scabbard at his hip, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: ash-grey and charcoal steel armour, a faded dark red scarf, black leather scabbard, pale skin, white hair, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.8,
+      "preview_task": "01a17f99-226b-71ab-a2f8-c349b03ba4bd",
+      "refine_task": "01a17f9a-4175-7574-a410-ab2e207f0a5a",
+      "rig_task": "01a17f9a-c0a2-70d6-9462-cbcbb5ef8730"
+    },
+    "pell": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a young hedge knight in mismatched plate armour with a bucket helm, a tall banner pole strapped on his back with a long pennant, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: dull steel and warm bronze armour, a green and gold pennant, brown leather, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.75,
+      "preview_task": "01a17f99-3bf3-752e-8404-22a902a15a32",
+      "refine_task": "01a17f9a-5e05-76cc-b00c-ec15080b717d",
+      "rig_task": "01a17f9a-de3b-77a7-b146-df7f16c738a2"
+    },
+    "brun": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a burly blacksmith with huge bare forearms, a thick leather apron and heavy gloves, glowing coals and tongs on his belt, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: dark brown leather apron, glowing orange coals, red-brown beard, ruddy tanned skin, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.85,
+      "preview_task": "01a17f99-6471-74bb-81f9-7d36df7d4e72",
+      "refine_task": "01a17f9a-5bbe-70e1-99fb-1a1440c59af8",
+      "rig_task": "01a17f9a-dbcc-7542-8287-56839c8d8b58"
+    },
+    "sefa": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a graceful wind dancer woman in light flowing clothes with very long trailing ribbons and scarves around her arms and waist, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: white and pale sky-blue cloth, cream ribbons with silver edges, tan skin, long dark hair, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.7,
+      "preview_task": "01a17f99-9452-7160-a215-4533ad06f0ae",
+      "refine_task": "01a17f9a-6258-7469-96e2-611f02b418b3",
+      "rig_task": "01a17f9a-e094-7487-93bf-1b9365cbb8be"
+    },
+    "kesh": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a lean hooded assassin, a smooth featureless mask, close-fitting dark leathers and wraps, knife sheaths on his thighs, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: charcoal and black leathers, a pale grey mask, dark red wraps, steel knife hilts, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.65,
+      "preview_task": "01a17f99-c005-74b1-9bb5-370fc94c9871",
+      "refine_task": "01a17f9a-66c5-76aa-8947-28ee52d08985",
+      "rig_task": "01a17f9a-e9eb-757b-8825-3f23fdd8ed91"
+    },
+    "sable": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a slender night courier woman with a wide-brimmed hat, a long dark cape, a satchel of letters at her hip, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: deep violet and black cape and hat, dark leather satchel, pale skin, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.7,
+      "preview_task": "01a17f9a-0126-72eb-bc08-1fd5bbeec965",
+      "refine_task": "01a17f9a-cf65-7784-bf39-b73512a50190",
+      "rig_task": "01a17f9b-50d6-70bc-82c6-1a14559ca41f"
+    },
+    "liora": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a serene priestess in long white and gold robes with a round sunburst disc halo behind her head, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: white robes with warm gold trim and bronze ornaments, bronze sunburst halo glowing warm gold, dark skin, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.75,
+      "preview_task": "01a17f9a-2c9f-7278-863b-2fe033e4ba98",
+      "refine_task": "01a17f9a-fb68-7129-8e2e-9422cf22863e",
+      "rig_task": "01a17f9b-7b82-72cc-b3d2-be8238cf40a0"
+    },
+    "oda": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, an old wandering pilgrim woman in a long travelling cloak, an enormous travel pack on her back piled with bundles and a bedroll, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: faded brown and ochre cloak, bronze buckles, canvas pack with colourful bundles, grey hair, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.6,
+      "preview_task": "01a17f9a-3629-70be-9672-4057a4247c4f",
+      "refine_task": "01a17f9b-2d6f-76c7-a78e-e1076835922e",
+      "rig_task": "01a17f9b-aef7-75bc-83d0-36ba01f5bdcb"
+    },
+    "ulla": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a gentle druid healer in a cloak of leaves and moss, a crown of branching antler-like twigs with small flowers, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: fresh green leaves and moss, pale bark, small pink and white flowers, warm brown skin, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.75,
+      "preview_task": "01a17f9a-f20a-7354-8c16-e11c6e2942cc",
+      "refine_task": "01a17f9b-c1a3-73c4-99a4-70ecafbd50dd",
+      "rig_task": "01a17f9c-4266-7426-8afc-2997e69f6373"
+    },
+    "mira": {
+      "prompt": "stylized fantasy game hero character, full body, standing, empty open hands, a young lamplighter girl in a buttoned long coat and a flat cap, a small brass lamp hanging at her belt, chunky readable silhouette, hand-painted style",
+      "texture_prompt": "hand-painted stylized fantasy game character texture: dark blue coat with bright brass buttons, warm brown scarf, a small brass lamp glowing orange-gold, freckles, red hair, soft painted highlights and darker crevices",
+      "ai_model": "meshy-6-lite",
+      "polycount": 8000,
+      "height": 1.6,
+      "preview_task": "01a17f9b-10c4-717a-9874-b5899324d35f",
+      "refine_task": "01a17f9b-e05a-75a0-b29b-b5a0d8eec50b",
+      "rig_task": "01a17f9c-5ff6-7672-87c2-ba7121f130b7"
+    }
+  },
+  "animations": {
+    "body": {
+      "rig": "vessa",
+      "task": "01a17f94-ab82-77ab-9bc3-2ed6ebffbf35",
+      "clips": [
+        [
+          "idle",
+          0
+        ],
+        [
+          "hit",
+          178
+        ],
+        [
+          "death",
+          189
+        ],
+        [
+          "airborne",
+          7
+        ],
+        [
+          "roll",
+          158
+        ],
+        [
+          "charge",
+          510
+        ],
+        [
+          "victory",
+          412
+        ],
+        [
+          "shout",
+          101
+        ],
+        [
+          "slam",
+          127
+        ],
+        [
+          "judgment",
+          102
+        ]
+      ]
+    },
+    "hands": {
+      "rig": "vessa",
+      "task": "01a17f95-00c8-750a-a7d5-9515c1ae0f6f",
+      "clips": [
+        [
+          "slash",
+          219
+        ],
+        [
+          "thrust",
+          240
+        ],
+        [
+          "smash",
+          128
+        ],
+        [
+          "punch",
+          195
+        ],
+        [
+          "shoot",
+          232
+        ],
+        [
+          "bolt",
+          132
+        ],
+        [
+          "flick",
+          129
+        ],
+        [
+          "point",
+          126
+        ],
+        [
+          "channel",
+          125
+        ]
+      ]
+    }
+  },
+  "props": {
+    "crossbow": {
+      "prompt": "a single large heavy crossbow with a very long wooden stock and short steel limbs, seen from the side, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f98-e5ce-766c-98e2-dcbbb7d19785"
+    },
+    "blunderbuss": {
+      "prompt": "a single brass flintlock blunderbuss gun with a wide flared bell muzzle and a curved wooden stock, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f98-e78f-749a-a47d-14691e97b54d"
+    },
+    "censer_staff": {
+      "prompt": "a single tall wooden staff with a hooked top from which hangs a round brass censer on a short chain, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f98-e72c-703e-919f-0ca562c4f37c"
+    },
+    "star_wand": {
+      "prompt": "a single short slender silver wand with a five-pointed star at its tip, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f98-e78c-7399-90c1-2b51fb791275"
+    },
+    "hook_chain": {
+      "prompt": "a single heavy iron grappling hook with one large curved barbed hook on a length of thick iron chain, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f98-e7e6-7460-8230-3a0de731492e"
+    },
+    "mace": {
+      "prompt": "a single heavy flanged bronze war mace with a short leather-wrapped handle, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f98-e770-7145-a712-2a10e4cba38b"
+    },
+    "trident": {
+      "prompt": "a single long trident spear with three barbed prongs and a straight shaft, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f98-e7e2-7534-8a3a-3f992e143e99"
+    },
+    "greatsword": {
+      "prompt": "a single long straight two-handed greatsword with a simple crossguard, blade pointing up, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f98-e79f-7195-9d00-d3841f7094f4"
+    },
+    "sword": {
+      "prompt": "a single short straight one-handed arming sword with a round pommel, blade pointing up, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9d-0144-7594-bf3d-3192fdd155a6"
+    },
+    "kite_shield": {
+      "prompt": "a single tall wooden kite shield with a metal rim, front view, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9d-0169-737b-86cb-e21476659cb5"
+    },
+    "forge_hammer": {
+      "prompt": "a single huge blacksmith sledgehammer with a long wooden handle and a heavy square iron head, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9d-0174-7073-a488-c765ba756142"
+    },
+    "crescent_blade": {
+      "prompt": "a single curved crescent moon shaped sword blade with a short wrapped grip, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9d-01c4-7732-b16e-a908a3760a03"
+    },
+    "dagger": {
+      "prompt": "a single long slim dagger with a straight double-edged blade and a small crossguard, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9d-01d4-7666-83da-48a4c75ba8dc"
+    },
+    "lantern_small": {
+      "prompt": "a single small iron hand lantern with a ring handle on top and glass panes, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9d-01d8-76f2-8587-356e52919382"
+    },
+    "lantern": {
+      "prompt": "a single large ornate brass lantern with a ring handle on top and glass panes, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9d-0201-767f-addd-413f41724d2a"
+    },
+    "walking_staff": {
+      "prompt": "a single tall gnarled wooden walking staff with a small carved stone charm tied near the top, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9d-0299-7505-b13e-f09e94591c9d"
+    },
+    "branch_staff": {
+      "prompt": "a single gnarled living branch staff sprouting leaves and small flowers at its top, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9d-804c-7029-91cd-eb04870bd392"
+    },
+    "lamp_pole": {
+      "prompt": "a single long thin lamplighter pole of dark wood with a small brass hook and wick holder at its tip, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9d-8049-754c-ad16-7380f4fc0684"
+    },
+    "bell": {
+      "prompt": "a single large heavy bronze church bell with engraved rings and a thick crown loop on top, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9f-ae91-7341-90d3-6432ca1f69eb"
+    },
+    "mortar": {
+      "prompt": "a single short stubby iron siege mortar cannon barrel with thick bands and a wide mouth, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9f-aeac-755c-a407-79fccc1e21f9"
+    },
+    "pack": {
+      "prompt": "a single enormous traveller's backpack piled high with bundles, pots and a rolled bedroll, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9f-aea9-70a9-b401-165900e2431b"
+    },
+    "banner": {
+      "prompt": "a single tall wooden banner pole with a long narrow pennant flag hanging from a crossbar at its top, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9f-aeb3-7589-9847-72181d1a9306"
+    },
+    "halo": {
+      "prompt": "a single flat round sunburst disc with radiating rays, like a saint's halo, one object alone, isolated, centered, stylized fantasy game prop, chunky readable silhouette, hand-painted style",
+      "polycount": 1500,
+      "task": "01a17f9f-aec8-730d-8dbf-d39d6d84e4b3"
+    }
   }
 }

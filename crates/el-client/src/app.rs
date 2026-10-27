@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::audio::AudioPlugin;
 use crate::camera::CameraPlugin;
+use crate::champions::ChampionsPlugin;
 use crate::config::LaunchConfig;
 use crate::dev_hooks::{DevHooksPlugin, InboxPlugin};
 use crate::edges::EdgesPlugin;
@@ -58,5 +59,7 @@ pub fn run() {
             HudPlugin,
             WatchPlugin,
         ))
+        // Past the sixteen a tuple of plugins takes.
+        .add_plugins(ChampionsPlugin)
         .run();
 }

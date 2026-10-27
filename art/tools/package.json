@@ -1,0 +1,12 @@
+{
+  "name": "eloram-art-tools",
+  "private": true,
+  "description": "art/tools/champions.mjs's libraries: npm ci --prefix art/tools",
+  "type": "module",
+  "dependencies": {
+    "@gltf-transform/core": "4.5.1",
+    "@gltf-transform/functions": "4.5.1",
+    "meshoptimizer": "1.3.0",
+    "sharp": "0.35.5"
+  }
+}
