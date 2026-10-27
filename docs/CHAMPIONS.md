@@ -109,3 +109,30 @@ made, so a run that stops is taken up and nothing is paid for twice); `art/tools
 - **Pictures**: the `match` suite's screenshots with the champions in them.
 - **Nothing else moves**: the sim, the wire and the record untouched (no `CONTENT_VERSION` bump),
   the golden hashes, no allocation in a tick, `ci.sh` green.
+
+## What landed
+
+- Twenty models, 494 to 656 KiB each (6.6 MiB brotli for all twenty, about 3.3 for a match's ten),
+  7,000 to 9,800 triangles with their props, nine to eleven clips each; twenty-three props from
+  twenty-five made.
+- In the browser (`scripts/e2e.sh match`, headless Chromium): the models in as the match starts
+  (the team's five and a benched one already in champion select), the own champion standing and
+  then running down the lane, the walk still predicted exactly, a fallen champion lying where it
+  fell; 0.74 frames a second in SwiftShader, 0.77 before (its frame rate means nothing but that
+  nothing got much slower).
+
+Changed on the way:
+- **What's held became props.** A model made in an A-pose (which rigging needs) drops what it holds
+  and most of what's on its back: the crossbow, the bell, the pack, the mortar, the banner were all
+  gone. Meshy's untextured props, coloured in bands by the pipeline, cost a third of a textured one.
+- **One rig's clips for all.** Meshy charges a clip a rig; twenty rigs would have taken most of the
+  credits for the clips alone. Retargeted by each bone's turn from rest in the world, they match
+  Meshy's own retarget.
+- **Lit a little by their own colour.** Under the moon the textured champions read dark against
+  the stone; each is lit by its own texture at a fifth of its colour, as Riot's skinned meshes have
+  an emissive of their own.
+
+Not yet:
+- Nobody has seen them on a real GPU, and the frame rate there isn't measured.
+- An outline (Riot's "inking") or a rim light; the clips' windows shared by every champion, not
+  tuned one by one; a recall; the minions are still primitives.

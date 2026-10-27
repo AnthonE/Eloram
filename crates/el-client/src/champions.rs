@@ -28,6 +28,8 @@ const CORPSE: f64 = 12.0;
 /// material prepared again).
 const FLASH: f64 = 0.16;
 const FLASH_STEPS: f32 = 4.0;
+/// How much a champion is lit by its own colour.
+const LIFT: f32 = 0.22;
 /// How tall a champion stands for its radius (a radius of 60 is 1.8 m).
 const HEIGHT: f32 = 3.0 * S;
 
@@ -194,9 +196,15 @@ fn ready(
         if let Ok(m) = meshes.get(c)
             && let Some(mut own) = materials.get(&m.0).cloned()
         {
-            // Lit as the rest of the Causeway is; a hit flashes this one alone.
+            // Lit as the rest of the Causeway is, and a little by its own colour so it reads
+            // against the night's stone (Riot's skinned meshes are lit by their own emissive as
+            // well as the scene); a hit flashes this one alone.
             own.double_sided = true;
             own.cull_mode = None;
+            if own.base_color_texture.is_some() && own.emissive_texture.is_none() {
+                own.emissive_texture = own.base_color_texture.clone();
+                own.emissive = LinearRgba::rgb(LIFT, LIFT, LIFT);
+            }
             let glow = own.emissive;
             let h = materials.add(own);
             commands.entity(c).insert(MeshMaterial3d(h.clone()));
