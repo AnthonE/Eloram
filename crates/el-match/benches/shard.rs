@@ -1,5 +1,6 @@
 //! A shard of matches, every seat a player's, timed tick by tick:
-//! `cargo bench -p el-match --bench shard [-- matches minutes]` (64 and 4 by default).
+//! `cargo bench -p el-match --bench shard [-- matches minutes]` (64 and 4 by default;
+//! `EL_CHECKPOINTS=0` without the minute's checkpoints).
 //!
 //! Each seat is played over a loopback: its bot's orders go in as input packets (the bot reads the
 //! server's own match, which is cheap and not what's timed), and its datagrams are read back and
@@ -30,8 +31,15 @@ fn main() {
     let matches: usize = args.first().and_then(|s| s.parse().ok()).unwrap_or(64);
     let minutes: f64 = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(4.0);
     let map = Map::leaked();
+    let checkpoint_every = if std::env::var("EL_CHECKPOINTS").is_ok_and(|v| v == "0") {
+        0
+    } else {
+        el_match::queues::CHECKPOINT_EVERY
+    };
     let (mut shard, shared, mut leases, mut egress, mut records) =
-        build(ShardConfig { matches, map, hot_guard: None });
+        build(ShardConfig { matches, map, hot_guard: None, checkpoint_every });
+    let mut snap = vec![0u8; el_sim::snapshot::len(&shard.matches[0])];
+    let mut checkpoint_times = Vec::new();
     for m in 0..matches {
         let seed = 1 + m as u64;
         let picks = std::array::from_fn(|s| {
@@ -79,9 +87,15 @@ fn main() {
                 let _ = leases[g].input.push(InputMsg { packet: p, recv_us: now_us });
             }
         }
+        let written = shared.metrics.checkpoints.load(std::sync::atomic::Ordering::Relaxed);
         let start = Instant::now();
         shard.tick_at(now_us);
         let us = start.elapsed().as_micros() as u64;
+        if shared.metrics.checkpoints.load(std::sync::atomic::Ordering::Relaxed) > written && t >= warm {
+            checkpoint_times.push(us);
+        }
+        // The checkpoints, as a referee would take them (not timed).
+        while el_match::queues::read_checkpoint(&mut records.checkpoints, &mut snap).is_some() {}
         // Read back and ack what each seat was sent (not timed).
         for (g, lb) in seats.iter_mut().enumerate() {
             while let Some(n) = read_packet(&mut egress.rings[g], &mut buf) {
@@ -106,6 +120,7 @@ fn main() {
         }
     }
     times.sort_unstable();
+    checkpoint_times.sort_unstable();
     let q = |p: f64| times[((times.len() as f64 - 1.0) * p) as usize];
     let budget = 1_000_000 / u64::from(TICK_HZ);
     let live = (0..matches).filter(|&m| shard.matches[m].outcome.is_none()).count();
@@ -132,6 +147,14 @@ fn main() {
         m.replicate_hist.quantile_us(0.5),
         m.replicate_hist.quantile_us(0.99)
     );
+    if let (Some(lo), Some(hi)) = (checkpoint_times.first(), checkpoint_times.last()) {
+        println!(
+            "  ticks with a checkpoint ({} of {} B, {} dropped): {lo} to {hi} µs",
+            checkpoint_times.len(),
+            snap.len(),
+            shared.metrics.checkpoint_drops.load(std::sync::atomic::Ordering::Relaxed)
+        );
+    }
     println!("  down a seat: {:.1} KB/s", sent_bytes as f64 / secs / (matches * SEATS) as f64 / 1_000.0);
     println!("  matches a core at p99: {}", (budget * matches as u64) / q(0.99).max(1));
     let rec = shared.metrics.record_bytes.load(std::sync::atomic::Ordering::Relaxed) as f64;

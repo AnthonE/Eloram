@@ -10,13 +10,13 @@ use el_proto::MAX_DATAGRAM;
 use el_sim::game::SeatInput;
 use el_sim::map::Map;
 use el_sim::path::PathScratch;
-use el_sim::record;
 use el_sim::storage::boxed;
 use el_sim::units::SEATS;
 use el_sim::{Match, bot};
+use el_sim::{record, snapshot};
 
 use crate::metrics::Metrics;
-use crate::queues::{Control, MatchState, Outcome, ShardEnds, ShardShared};
+use crate::queues::{Control, MatchState, Outcome, ShardEnds, ShardShared, checkpoint_due, write_checkpoint};
 use crate::replicate::{MatchNet, Replica};
 use crate::seat::SeatNet;
 
@@ -28,6 +28,9 @@ pub struct ShardConfig {
     pub map: &'static Map,
     /// Marks each tick a hot region (`el_alloc::set_hot`), so an allocation in one is counted.
     pub hot_guard: Option<fn(bool)>,
+    /// Ticks between each match's checkpoints ([`crate::queues::checkpoint_due`]; 0: none), for a
+    /// referee to check and keep. [`crate::queues::CHECKPOINT_EVERY`] on a server.
+    pub checkpoint_every: u32,
 }
 
 pub struct Shard {
@@ -44,6 +47,8 @@ pub struct Shard {
     buf: Box<[u8]>,
     /// A record frame being written.
     frame: Box<[u8]>,
+    /// A checkpoint being written (empty without `checkpoints`).
+    snap: Box<[u8]>,
 }
 
 impl Shard {
@@ -62,6 +67,10 @@ impl Shard {
             scratch: PathScratch::new(),
             buf: boxed(MAX_DATAGRAM, 0u8),
             frame: boxed(record::MAX_FRAME, 0u8),
+            snap: boxed(
+                if cfg.checkpoint_every > 0 { snapshot::len(&Match::new(cfg.map, 0, [0; SEATS])) } else { 0 },
+                0u8,
+            ),
         }
     }
 
@@ -88,8 +97,15 @@ impl Shard {
         let mut live = 0;
         for m in 0..self.cfg.matches {
             if self.running[m] {
-                self.tick_match(m, now_us);
-                live += 1;
+                // A match that panics is stopped; the others in the shard go on. (Unwinding costs
+                // nothing until something panics.)
+                let ticked =
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.tick_match(m, now_us)));
+                if ticked.is_err() {
+                    self.fail(m);
+                } else {
+                    live += 1;
+                }
             }
         }
         Metrics::set(&self.shared.metrics.matches, live);
@@ -104,6 +120,49 @@ impl Shard {
             return;
         }
         Metrics::add(&self.shared.metrics.record_bytes, n as u64);
+    }
+
+    /// Match `m` panicked: stopped, its seats sent nothing more, the network side told.
+    fn fail(&mut self, m: usize) {
+        self.running[m] = false;
+        self.reported[m] = true;
+        let tick = self.matches[m].tick;
+        let _ = self.shared.outcomes.push(Outcome::Failed { m: m as u16, tick });
+        self.shared.states[m].store(MatchState::Over as u32, Ordering::Release);
+        Metrics::add(&self.shared.metrics.failed, 1);
+    }
+
+    /// Takes up match `m` from a checkpoint (a match recovered after a restart, before the shard's
+    /// thread starts): its record goes on from the checkpoint's tick, with a new `secret` for the
+    /// augment keys not yet drawn. Every seat starts with the server's bot: the players had all
+    /// gone with the old server, and the record says so; they take their seats back as they
+    /// rejoin.
+    pub fn restore(&mut self, m: usize, checkpoint: &[u8], secret: u64) -> Result<(), snapshot::SnapError> {
+        if m >= self.cfg.matches {
+            return Err(snapshot::SnapError::Shape);
+        }
+        snapshot::read(checkpoint, &mut self.matches[m])?;
+        if secret != 0 {
+            self.matches[m].set_offer_secret(secret);
+        }
+        let tick = self.matches[m].tick;
+        for seat in 0..SEATS {
+            let g = m * SEATS + seat;
+            self.seats[g] = SeatNet::default();
+            self.replicas[g].reset();
+            if self.matches[m].seated & (1 << seat) != 0 {
+                self.matches[m].set_seated(seat, false);
+                let n = record::write_seat(&mut self.frame, tick, seat as u8, false);
+                self.record(m, n);
+            }
+        }
+        self.running[m] = true;
+        // A match that ended just before the crash (its outcome after the hash it was cut at) is
+        // reported on its next tick, and its record given the outcome.
+        self.reported[m] = false;
+        self.shared.ticks[m].store(tick, Ordering::Release);
+        self.shared.states[m].store(MatchState::Running as u32, Ordering::Release);
+        Ok(())
     }
 
     fn control(&mut self, c: Control) {
@@ -203,6 +262,14 @@ impl Shard {
             let m = &self.matches[mi];
             let n = record::write_hash(&mut self.frame, m.tick, m.hash());
             self.record(mi, n);
+            if checkpoint_due(mi, self.matches[mi].tick, self.cfg.checkpoint_every) {
+                let n = snapshot::write(&self.matches[mi], &mut self.snap);
+                if n > 0 && write_checkpoint(&mut self.ends.checkpoints, mi as u16, &self.snap[..n]) {
+                    Metrics::add(&self.shared.metrics.checkpoints, 1);
+                } else {
+                    Metrics::add(&self.shared.metrics.checkpoint_drops, 1);
+                }
+            }
         }
         let stepped = Instant::now();
         self.shared.metrics.sim_hist.record((stepped - started).as_micros() as u64);

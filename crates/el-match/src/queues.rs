@@ -43,6 +43,8 @@ pub enum Control {
 pub enum Outcome {
     /// Match `m` ended: `winner` won, at `tick`; `hash` is its state then.
     Over { m: u16, winner: u8, tick: u32, hash: u64 },
+    /// Match `m` panicked at `tick`: it was stopped where it stood, the rest of the shard going on.
+    Failed { m: u16, tick: u32 },
 }
 
 /// The right to send one seat's inputs: owned by exactly one session at a time.
@@ -96,9 +98,11 @@ pub struct EgressEnds {
 }
 
 /// Record ends: one byte ring a match, its record's frames (`el_sim::record`) as the shard writes
-/// them, for the recorder.
+/// them, and the shard's checkpoints (`[u16 match][u32 len][el_sim::snapshot]`), for the recorder
+/// and its referee.
 pub struct RecordEnds {
     pub rings: Vec<rtrb::Consumer<u8>>,
+    pub checkpoints: rtrb::Consumer<u8>,
 }
 
 /// The shard thread's ends.
@@ -106,6 +110,7 @@ pub(crate) struct ShardEnds {
     pub inputs: Vec<rtrb::Consumer<InputMsg>>,
     pub outputs: Vec<rtrb::Producer<u8>>,
     pub records: Vec<rtrb::Producer<u8>>,
+    pub checkpoints: rtrb::Producer<u8>,
 }
 
 /// Bytes of a seat's outbound queue (about thirty full datagrams).
@@ -114,6 +119,36 @@ pub const OUT_RING_BYTES: usize = 32 * 1024;
 pub const IN_RING: usize = 64;
 /// Bytes of a match's record ring: a few seconds of its busiest ticks.
 pub const RECORD_RING_BYTES: usize = 64 * 1024;
+
+/// Ticks between a match's checkpoints, unless a shard is told otherwise: a minute
+/// (`docs/NETCODE.md`, "The record").
+pub const CHECKPOINT_EVERY: u32 = 60 * el_sim::TICK_HZ;
+const _: () = assert!(CHECKPOINT_EVERY.is_multiple_of(el_sim::record::HASH_EVERY));
+
+/// `secs` between checkpoints, as ticks: a whole number of hashes, at least one (0: none).
+pub fn checkpoint_ticks(secs: f64) -> u32 {
+    if secs <= 0.0 {
+        return 0;
+    }
+    let h = el_sim::record::HASH_EVERY;
+    ((secs * f64::from(el_sim::TICK_HZ) / f64::from(h)).round() as u32).max(1) * h
+}
+/// Checkpoints a shard's ring holds: matches' checkpoints are a hash apart, so the recorder
+/// (every tenth of a second) takes each long before the next.
+const CHECKPOINTS_HELD: usize = 3;
+/// A checkpoint frame's head: the match, and the snapshot's length.
+pub const CHECKPOINT_HEAD: usize = 6;
+
+/// Whether match `m` takes a checkpoint at `tick` (just after that tick's hash), one every
+/// `every` ticks (a whole number of hashes; 0: never), each match a hash later than the one
+/// before it, so a shard writes one a tick at most. Never at tick 0 (the header is the start).
+pub fn checkpoint_due(m: usize, tick: u32, every: u32) -> bool {
+    if every == 0 {
+        return false;
+    }
+    let at = (m as u32 * el_sim::record::HASH_EVERY) % every;
+    tick > 0 && tick % every == at
+}
 
 /// Allocates every queue of a shard of `matches` matches: the shard itself, its shared state, the
 /// seats' leases (index `match × 10 + seat`), the egress ends and the record ends. The only place the runtime
@@ -137,6 +172,9 @@ pub fn build(
     }
     let (records, record_rings): (Vec<_>, Vec<_>) =
         (0..cfg.matches).map(|_| rtrb::RingBuffer::<u8>::new(RECORD_RING_BYTES)).unzip();
+    let probe = el_sim::Match::new(cfg.map, 0, [0; SEATS]);
+    let (checkpoints, checkpoint_ring) =
+        rtrb::RingBuffer::<u8>::new(CHECKPOINTS_HELD * (CHECKPOINT_HEAD + el_sim::snapshot::len(&probe)));
     let shared = Arc::new(ShardShared {
         control: ArrayQueue::new(cfg.matches * 16 + 16),
         outcomes: ArrayQueue::new(cfg.matches + 16),
@@ -148,8 +186,9 @@ pub fn build(
         matches: cfg.matches,
         started: std::time::Instant::now(),
     });
-    let shard = crate::Shard::new(cfg, shared.clone(), ShardEnds { inputs, outputs, records });
-    (shard, shared, leases, EgressEnds { rings }, RecordEnds { rings: record_rings })
+    let shard = crate::Shard::new(cfg, shared.clone(), ShardEnds { inputs, outputs, records, checkpoints });
+    let record_ends = RecordEnds { rings: record_rings, checkpoints: checkpoint_ring };
+    (shard, shared, leases, EgressEnds { rings }, record_ends)
 }
 
 /// Puts one `[u16 len][payload]` frame on an egress ring in a single commit, so the egress thread
@@ -189,6 +228,49 @@ pub fn read_packet(ring: &mut rtrb::Consumer<u8>, buf: &mut [u8]) -> Option<usiz
         }
         // Bigger than any datagram: can't be written, but never panic or lose the framing on the
         // egress path; skip it whole.
+        ring.read_chunk(n).ok()?.commit_all();
+    }
+}
+
+/// Puts match `m`'s checkpoint on the ring in one commit, or nothing if it doesn't fit.
+pub fn write_checkpoint(ring: &mut rtrb::Producer<u8>, m: u16, snapshot: &[u8]) -> bool {
+    let Ok(len) = u32::try_from(snapshot.len()) else { return false };
+    let Ok(mut chunk) = ring.write_chunk(CHECKPOINT_HEAD + snapshot.len()) else { return false };
+    let mut head = [0u8; CHECKPOINT_HEAD];
+    head[..2].copy_from_slice(&m.to_le_bytes());
+    head[2..].copy_from_slice(&len.to_le_bytes());
+    let (one, two) = chunk.as_mut_slices();
+    for (dst, src) in one.iter_mut().chain(two.iter_mut()).zip(head.iter().chain(snapshot)) {
+        *dst = *src;
+    }
+    chunk.commit_all();
+    true
+}
+
+/// Takes the next whole checkpoint off the ring into `buf`: its match and its length, or `None`
+/// until one is all there. One longer than `buf` is passed over.
+pub fn read_checkpoint(ring: &mut rtrb::Consumer<u8>, buf: &mut [u8]) -> Option<(u16, usize)> {
+    loop {
+        let (m, n) = {
+            let chunk = ring.read_chunk(CHECKPOINT_HEAD).ok()?;
+            let (a, b) = chunk.as_slices();
+            let mut head = [0u8; CHECKPOINT_HEAD];
+            for (dst, src) in head.iter_mut().zip(a.iter().chain(b)) {
+                *dst = *src;
+            }
+            (
+                u16::from_le_bytes([head[0], head[1]]),
+                u32::from_le_bytes([head[2], head[3], head[4], head[5]]) as usize,
+            )
+        };
+        if ring.slots() < CHECKPOINT_HEAD + n {
+            return None;
+        }
+        ring.read_chunk(CHECKPOINT_HEAD).ok()?.commit_all();
+        if n <= buf.len() {
+            ring.pop_entire_slice(&mut buf[..n]).ok()?;
+            return Some((m, n));
+        }
         ring.read_chunk(n).ok()?.commit_all();
     }
 }

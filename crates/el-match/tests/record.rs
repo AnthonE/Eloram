@@ -60,6 +60,49 @@ fn a_match_replays_from_its_record_to_every_hash() {
     assert_eq!(seats, 2);
 }
 
+/// The shard's checkpoints, once a minute, are the referee's to the byte: re-stepping the record
+/// to each one's tick comes to the same match. And a referee started from one goes on to the same
+/// end as one that stepped the whole record.
+#[test]
+fn every_checkpoint_is_the_record_re_stepped_and_resumes_alike() {
+    let mut rig = Rig::new(29, vec![(1, BAD, walker(3)), (7, BAD, bot_brain())]);
+    rig.run(250.0);
+    let bytes = rig.record.clone();
+    let cks = rig.checkpoints.clone();
+    assert!(cks.len() >= 4, "{} checkpoints in four minutes", cks.len());
+    assert_eq!(rig.shared.metrics.checkpoint_drops.load(std::sync::atomic::Ordering::Relaxed), 0);
+    let mut r = Referee::new(map());
+    let mut buf = vec![0u8; el_sim::snapshot::len(&r.m)];
+    let mut matched = 0;
+    for f in Frames::new(&bytes) {
+        r.take(&f).expect("the record replays");
+        if let Frame::Hash { tick, .. } = f
+            && let Some(ck) = cks.iter().find(|c| el_sim::snapshot::tick_of(c) == Some(tick))
+        {
+            let n = r.checkpoint(&mut buf);
+            assert_eq!(&buf[..n], &ck[..], "the checkpoint at {tick} differs: {:?}", {
+                let mut theirs = el_sim::Match::new(map(), 0, [0; el_sim::units::SEATS]);
+                el_sim::snapshot::read(ck, &mut theirs).unwrap();
+                el_sim::snapshot::diff(&theirs, &r.m).map(|w| w.to_string())
+            });
+            matched += 1;
+        }
+    }
+    assert_eq!(matched, cks.len(), "every checkpoint's tick is a hash in the record");
+    r.flush();
+    let whole = (r.m.tick, r.m.hash());
+    // From the second checkpoint: the record read from its start, the frames before it passed over.
+    let mut from = Referee::new(map());
+    from.resume(&cks[1]).unwrap();
+    for f in Frames::new(&bytes) {
+        from.take(&f).expect("resumed, the record replays");
+    }
+    from.flush();
+    assert!(!from.skipping());
+    assert_eq!((from.m.tick, from.m.hash()), whole, "resumed from a checkpoint, the same end");
+    assert!(from.checked > 0 && from.checked < r.checked, "only the hashes after it checked");
+}
+
 /// A live match draws its augment offers from the server's secret: the record gives each screen's
 /// key only as the screen opens, it replays with them, and without them (all a watcher could take
 /// from the header) the offers come out otherwise and the replay goes astray.
