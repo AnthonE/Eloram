@@ -308,32 +308,103 @@ pub struct Referee {
     started: bool,
     /// The tick read and not yet stepped.
     pending: Option<[SeatInput; SEATS]>,
+    /// Resumed from a checkpoint at this tick: the record's frames up to its hash are passed over.
+    skip_to: Option<u32>,
 }
 
 impl Referee {
     /// A referee for records of matches on `map` (its match is set up by the record's header).
     pub fn new(map: &'static Map) -> Self {
+        Self::with_scratch(map, PathScratch::new())
+    }
+
+    /// A referee that is lent a path scratch for each frame ([`take_with`](Self::take_with)), as a
+    /// server's referees share one a thread: it owns none of its own.
+    pub fn sharing(map: &'static Map) -> Self {
+        Self::with_scratch(map, PathScratch::empty())
+    }
+
+    fn with_scratch(map: &'static Map, scratch: PathScratch) -> Self {
         Self {
             m: Match::new(map, 0, [0; SEATS]),
-            scratch: PathScratch::new(),
+            scratch,
             checked: 0,
             outcome: None,
             started: false,
             pending: None,
+            skip_to: None,
         }
+    }
+
+    /// Starts from a checkpoint instead of the record's first tick: the record is then read from
+    /// its start as usual, and every frame up to the checkpoint's hash is passed over (the header's
+    /// versions still checked). The checkpoint must have been taken just after a hash, as the
+    /// shard takes them; nothing before it is checked again.
+    pub fn resume(&mut self, checkpoint: &[u8]) -> Result<(), crate::snapshot::SnapError> {
+        crate::snapshot::read(checkpoint, &mut self.m)?;
+        self.checked = 0;
+        self.outcome = self.m.outcome.map(|w| (self.m.tick, w));
+        self.started = true;
+        self.pending = None;
+        self.skip_to = Some(self.m.tick);
+        Ok(())
+    }
+
+    /// Writes the match as it stands into `out` (a checkpoint, `snapshot::write`): right after a
+    /// hash, where nothing is waiting to be stepped (else it writes nothing and returns 0).
+    pub fn checkpoint(&self, out: &mut [u8]) -> usize {
+        if self.pending.is_some() {
+            return 0;
+        }
+        crate::snapshot::write(&self.m, out)
+    }
+
+    /// Passing over the frames before a checkpoint it resumed from.
+    pub fn skipping(&self) -> bool {
+        self.skip_to.is_some()
     }
 
     /// Steps the tick read and waiting, if one is.
     pub fn flush(&mut self) {
+        let mut s = core::mem::replace(&mut self.scratch, PathScratch::empty());
+        self.flush_with(&mut s);
+        self.scratch = s;
+    }
+
+    /// [`flush`](Self::flush) with a lent scratch.
+    pub fn flush_with(&mut self, scratch: &mut PathScratch) {
         if let Some(inputs) = self.pending.take() {
-            self.m.step(&inputs, &mut self.scratch);
+            self.m.step(&inputs, scratch);
         }
     }
 
     /// Takes the next frame.
     pub fn take(&mut self, f: &Frame) -> Result<(), Divergence> {
+        let mut s = core::mem::replace(&mut self.scratch, PathScratch::empty());
+        let r = self.take_with(f, &mut s);
+        self.scratch = s;
+        r
+    }
+
+    /// [`take`](Self::take) with a lent scratch.
+    pub fn take_with(&mut self, f: &Frame, scratch: &mut PathScratch) -> Result<(), Divergence> {
+        if let Some(at) = self.skip_to {
+            match *f {
+                Frame::Header(h)
+                    if h.protocol != el_proto::PROTOCOL_VERSION || h.content != CONTENT_VERSION =>
+                {
+                    return Err(Divergence::Version { protocol: h.protocol, content: h.content });
+                }
+                Frame::Hash { tick, .. } if tick == at => self.skip_to = None,
+                Frame::Tick { tick, .. } if tick >= at => {
+                    return Err(Divergence::Gap { expected: at, got: tick });
+                }
+                _ => {}
+            }
+            return Ok(());
+        }
         if !matches!(f, Frame::Key { .. }) {
-            self.flush();
+            self.flush_with(scratch);
         }
         match *f {
             Frame::Header(h) => {
@@ -345,6 +416,7 @@ impl Referee {
                 self.outcome = None;
                 self.started = true;
                 self.pending = None;
+                self.skip_to = None;
             }
             _ if !self.started => return Err(Divergence::NoHeader),
             Frame::Tick { tick, ref inputs } => {

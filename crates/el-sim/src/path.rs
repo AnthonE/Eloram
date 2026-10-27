@@ -91,6 +91,24 @@ impl Default for PathScratch {
 }
 
 impl PathScratch {
+    /// A scratch that owns nothing, to stand in while the real one is lent out: searching with it
+    /// panics.
+    pub fn empty() -> Self {
+        Self {
+            g: boxed(0, 0u32),
+            parent: boxed(0, NONE),
+            stamp: boxed(0, 0u16),
+            closed: boxed(0, 0u16),
+            heap: boxed(0, (0u32, 0u32, 0u32)),
+            heap_len: 0,
+            query: 0,
+            trail: boxed(0, 0u32),
+            searches: 0,
+            expanded: 0,
+            last: (Vec2::ZERO, Vec2::ZERO, 0),
+        }
+    }
+
     pub fn new() -> Self {
         let n = NAV_W * NAV_H;
         Self {

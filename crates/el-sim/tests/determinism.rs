@@ -22,6 +22,28 @@ fn two_minutes() -> u64 {
     m.hash()
 }
 
+/// The FNV-1a of a checkpoint taken a minute into `two_minutes`'s match: the same bytes native and
+/// wasm (update with the golden hash).
+const SNAPSHOT_GOLDEN: u64 = 0xe811_51f6_6f5e_7897;
+
+/// `two_minutes`, read back from a checkpoint at one minute and stepped on from there: the same
+/// hash, and the checkpoint's bytes digested.
+fn two_minutes_from_a_checkpoint() -> (u64, u64) {
+    let (mut m, mut s) = common::bot_match(7);
+    common::run(&mut m, &mut s, ticks(60.0));
+    let mut bytes = vec![0u8; el_sim::snapshot::len(&m)];
+    el_sim::snapshot::write(&m, &mut bytes);
+    let mut digest = el_sim::hash::Fnv::default();
+    for b in &bytes {
+        digest.u32(u32::from(*b));
+    }
+    let mut r = el_sim::Match::new(common::map(), 0, [0; el_sim::units::SEATS]);
+    el_sim::snapshot::read(&bytes, &mut r).unwrap();
+    let mut s = el_sim::path::PathScratch::new();
+    common::run(&mut r, &mut s, ticks(60.0));
+    (r.hash(), digest.0)
+}
+
 fn whole_match() -> (u64, u32) {
     let (mut m, mut s) = common::bot_match(11);
     common::run(&mut m, &mut s, ticks(40.0 * 60.0));
@@ -42,6 +64,20 @@ fn golden_hash_native() {
 fn a_whole_match_is_golden_native() {
     let got = whole_match();
     assert_eq!(got, MATCH_GOLDEN, "the match changed: ({:#018x}, {})", got.0, got.1);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn a_checkpoint_is_golden_native() {
+    let (h, d) = two_minutes_from_a_checkpoint();
+    assert_eq!(h, GOLDEN, "read back at a minute, the match went elsewhere: {h:#018x}");
+    assert_eq!(d, SNAPSHOT_GOLDEN, "the checkpoint's bytes changed: {d:#018x}");
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen_test::wasm_bindgen_test]
+fn a_checkpoint_is_golden_wasm() {
+    assert_eq!(two_minutes_from_a_checkpoint(), (GOLDEN, SNAPSHOT_GOLDEN));
 }
 
 #[cfg(target_arch = "wasm32")]
