@@ -6,6 +6,8 @@ pub mod http;
 pub mod lobby;
 pub mod net;
 pub mod records;
+pub mod recover;
+pub mod referee;
 pub mod signin;
 pub mod telemetry;
 
@@ -49,8 +51,14 @@ pub struct Config {
     pub fill_after: Duration,
     /// How long champion select lasts, unless everyone seated is ready sooner (0: none).
     pub select_for: Duration,
-    /// Where finished records are written (`{id}.elr`), if anywhere.
+    /// Where records are written (`{id}.elr`, and the live ones' parts and checkpoints), and the
+    /// state a restart takes up: the self-signed certificate, the resume tokens' hashes, the
+    /// matches left running (`recover`).
     pub records_dir: Option<PathBuf>,
+    /// A referee re-steps every live match's record and checks its checkpoints (`referee`).
+    pub referee: bool,
+    /// Seconds between a match's checkpoints (with the referee).
+    pub checkpoint_secs: f64,
     /// The domains a wallet sign-in may name (`--siwe-domain`): the pages' hosts. Empty: this
     /// server's own HTTP address.
     pub siwe_domains: Vec<String>,
@@ -74,6 +82,8 @@ impl Default for Config {
             fill_after: Duration::from_secs(30),
             select_for: lobby::SELECT_FOR,
             records_dir: None,
+            referee: true,
+            checkpoint_secs: 60.0,
             siwe_domains: Vec::new(),
             require_sign_in: false,
         }
@@ -101,10 +111,13 @@ pub struct Handle {
 }
 
 impl Handle {
+    /// Stops the server: the matches where they stand, the last of their records taken off the
+    /// rings (a restart with the same records directory takes them up again).
     pub fn shutdown(&self) {
         let _ = self.shutdown.send(true);
         if let Some(l) = &self.lobby {
             l.game.halt();
+            l.game.join_recorders();
         }
     }
 }
@@ -118,13 +131,16 @@ pub fn install_crypto() {
 /// Starts the WebTransport endpoint and the HTTP side; returns once both are listening.
 pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
     install_crypto();
+    if let Some(dir) = &cfg.records_dir {
+        std::fs::create_dir_all(dir)?;
+    }
     let (identity, hash, pinned) = match &cfg.tls {
         Some((cert, key)) => {
             let (id, hash) = net::endpoint::pem_identity(cert, key).await?;
             (id, hash, false)
         }
         None => {
-            let (id, hash) = net::endpoint::self_signed_identity()?;
+            let (id, hash) = net::endpoint::kept_self_signed_identity(cfg.records_dir.as_deref()).await?;
             (id, hash, true)
         }
     };
@@ -136,16 +152,21 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
     let lobby = match cfg.mode {
         Mode::Game => {
             let map = el_sim::map::Map::leaked();
-            if let Some(dir) = &cfg.records_dir {
-                std::fs::create_dir_all(dir)?;
-            }
-            let game = game::Game::start(
+            let (game, recovered) = game::Game::start(
                 cfg.shards.max(1),
                 cfg.matches_per_shard.max(1),
                 map,
                 cfg.records_dir.clone(),
+                cfg.referee,
+                el_match::queues::checkpoint_ticks(cfg.checkpoint_secs),
             )?;
-            let lobby = lobby::Lobby::new(game, cfg.fill_after, cfg.select_for);
+            let lobby = lobby::Lobby::with_state(
+                game,
+                cfg.fill_after,
+                cfg.select_for,
+                cfg.records_dir.clone(),
+                recovered,
+            );
             tokio::spawn(lobby.clone().run());
             Some(lobby)
         }
@@ -163,7 +184,11 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
     } else {
         cfg.siwe_domains.clone()
     };
-    let signin = Arc::new(signin::SignIn::new(domains, cfg.require_sign_in));
+    let mut signin = signin::SignIn::new(domains, cfg.require_sign_in);
+    if let Some(dir) = &cfg.records_dir {
+        signin.tokens = signin::Tokens::kept(dir.join("tokens.json"));
+    }
+    let signin = Arc::new(signin);
     tokio::spawn(net::endpoint::accept_loop(
         endpoint,
         cfg.mode,
@@ -231,16 +256,24 @@ fn game_json(lobby: &lobby::Lobby) -> serde_json::Value {
                 "snapshot_bytes": r(&m.snapshot_bytes),
                 "snapshot_max_bytes": r(&m.snapshot_max_bytes),
                 "out_drops": r(&m.out_drops),
+                "record_bytes": r(&m.record_bytes),
+                "record_drops": r(&m.record_drops),
+                "checkpoints": r(&m.checkpoints),
+                "checkpoint_drops": r(&m.checkpoint_drops),
+                "failed": r(&m.failed),
                 "sent": r(&e.datagrams),
                 "sent_bytes": r(&e.bytes),
                 "refused": r(&e.refused),
             })
         })
         .collect();
+    let (astray, written) = lobby.game.records.lock().map_or((0, 0), |r| (r.astray(), r.written));
     serde_json::json!({
         "matches": live,
         "queued": queued,
         "matches_started": started,
         "shards": shards,
+        "referee": lobby.game.referee.json(),
+        "records": { "written": written, "astray": astray },
     })
 }

@@ -178,6 +178,8 @@ pub struct Rig {
     records: RecordEnds,
     /// Match 0's record so far.
     pub record: Vec<u8>,
+    /// Match 0's checkpoints so far, as the shard wrote them.
+    pub checkpoints: Vec<Vec<u8>>,
     pub players: Vec<Player>,
     pub now: f64,
     next_tick: f64,
@@ -198,8 +200,12 @@ impl Rig {
     /// Match 0 of a one-match shard, `seed`, with these seats played over links; bots on the server
     /// play the rest.
     pub fn new(seed: u64, humans: Vec<(usize, LinkSpec, Brain)>) -> Rig {
-        let (shard, shared, leases, egress, records) =
-            build(ShardConfig { matches: 1, map: map(), hot_guard: None });
+        let (shard, shared, leases, egress, records) = build(ShardConfig {
+            matches: 1,
+            map: map(),
+            hot_guard: None,
+            checkpoint_every: el_match::queues::CHECKPOINT_EVERY,
+        });
         let mask = humans.iter().fold(0u16, |m, (s, _, _)| m | 1 << s);
         // A secret for the offers, as the live server's matches have.
         let secret = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
@@ -230,6 +236,7 @@ impl Rig {
             egress,
             records,
             record: Vec::new(),
+            checkpoints: Vec::new(),
             players,
             now: 0.0,
             next_tick: 0.0,
@@ -303,6 +310,12 @@ impl Rig {
             }
             while let Ok(b) = self.records.rings[0].pop() {
                 self.record.push(b);
+            }
+            let mut snap = vec![0u8; el_sim::snapshot::len(&self.shard.matches[0])];
+            while let Some((_, n)) =
+                el_match::queues::read_checkpoint(&mut self.records.checkpoints, &mut snap)
+            {
+                self.checkpoints.push(snap[..n].to_vec());
             }
             for p in &mut self.players {
                 while let Some(n) = read_packet(&mut self.egress.rings[p.seat], &mut self.buf) {

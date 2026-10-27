@@ -3,6 +3,10 @@
 //! no closer), fetching what's new every few seconds; `?replay=<url>` plays any record from the
 //! start. The record is the truth (`docs/NETCODE.md`, "The record"): every hash in it is checked
 //! on the way, so what's watched is what was played.
+//!
+//! A live match starts from the last checkpoint the server's referee verified
+//! (`/records/{id}/checkpoint`, as far behind as the record), not from the record's first tick: the
+//! frames before it are passed over, and the hashes after it checked.
 
 use std::sync::{Arc, Mutex};
 
@@ -42,6 +46,10 @@ pub struct Watch {
     pub url: String,
     pub error: Option<String>,
     started: bool,
+    /// The checkpoint asked for (a live match), until it's come or isn't to be had.
+    checkpoint: Option<Fetched>,
+    /// The tick it started from (0: the record's first).
+    pub from: u32,
 }
 
 impl Watch {
@@ -61,6 +69,8 @@ impl Watch {
             url,
             error: None,
             started: false,
+            checkpoint: None,
+            from: 0,
         }
     }
 
@@ -76,31 +86,57 @@ impl Watch {
     }
 
     fn fetch(&mut self) {
-        let slot = self.fetched.clone();
-        let url = self.url.clone();
-        wasm_bindgen_futures::spawn_local(async move {
-            let got = async {
-                let window = web_sys::window().ok_or("no window")?;
-                let res: web_sys::Response = JsFuture::from(window.fetch_with_str(&url))
-                    .await
-                    .map_err(|e| format!("{e:?}"))?
-                    .dyn_into()
-                    .map_err(|_| "not a response")?;
-                if !res.ok() {
-                    return Err(format!("{url}: the server answered {}", res.status()));
-                }
-                let buf = JsFuture::from(res.array_buffer().map_err(|e| format!("{e:?}"))?)
-                    .await
-                    .map_err(|e| format!("{e:?}"))?;
-                Ok(js_sys::Uint8Array::new(&buf).to_vec())
-            }
-            .await;
-            if let Ok(mut s) = slot.lock() {
-                *s = Some(got);
-            }
-        });
+        fetch_into(self.fetched.clone(), self.url.clone());
     }
 
+    /// Starts from the checkpoint, if it came and reads; else from the record's first tick.
+    fn start_from_checkpoint(&mut self) {
+        let Some(got) = self.checkpoint.take().and_then(|c| c.lock().ok().and_then(|mut s| s.take())) else {
+            return;
+        };
+        let Ok(ck) = got else { return };
+        match self.referee.resume(&ck) {
+            Ok(()) => {
+                self.from = self.referee.m.tick;
+                for (p, u) in self.prev.iter_mut().zip(self.referee.m.units.iter()) {
+                    *p = u.pos;
+                }
+                info!("watching from the checkpoint at tick {}", self.from);
+            }
+            Err(e) => {
+                warn!("the checkpoint passed over ({e}): from the record's first tick");
+                self.referee = Referee::new(self.referee.m.map);
+            }
+        }
+    }
+}
+
+/// Fetches `url` into `slot`: its bytes, or why not.
+fn fetch_into(slot: Fetched, url: String) {
+    wasm_bindgen_futures::spawn_local(async move {
+        let got = async {
+            let window = web_sys::window().ok_or("no window")?;
+            let res: web_sys::Response = JsFuture::from(window.fetch_with_str(&url))
+                .await
+                .map_err(|e| format!("{e:?}"))?
+                .dyn_into()
+                .map_err(|_| "not a response")?;
+            if !res.ok() {
+                return Err(format!("{url}: the server answered {}", res.status()));
+            }
+            let buf = JsFuture::from(res.array_buffer().map_err(|e| format!("{e:?}"))?)
+                .await
+                .map_err(|e| format!("{e:?}"))?;
+            Ok(js_sys::Uint8Array::new(&buf).to_vec())
+        }
+        .await;
+        if let Ok(mut s) = slot.lock() {
+            *s = Some(got);
+        }
+    });
+}
+
+impl Watch {
     /// Takes what was fetched, steps the match on to the clock, and asks for more when it's time.
     fn advance(&mut self) {
         let now = now_s();
@@ -122,12 +158,21 @@ impl Watch {
                 Ok(_) => {}
                 Err(e) => self.error = Some(e),
             }
-            if !self.started && self.available > 0 {
-                self.started = true;
-                // A live match: straight to the newest the server gives, less a moment to buffer.
-                if self.live {
-                    self.at = f64::from(self.available.saturating_sub(60));
-                }
+        }
+        if self.live && !self.started && self.checkpoint.is_none() && self.from == 0 && self.next_fetch == 0.0
+        {
+            let slot: Fetched = Arc::new(Mutex::new(None));
+            fetch_into(slot.clone(), format!("{}/checkpoint", self.url));
+            self.checkpoint = Some(slot);
+        }
+        let checkpoint_waiting =
+            self.checkpoint.as_ref().is_some_and(|c| c.lock().is_ok_and(|s| s.is_none()));
+        if !self.started && self.available > 0 && !checkpoint_waiting {
+            self.start_from_checkpoint();
+            self.started = true;
+            // A live match: straight to the newest the server gives, less a moment to buffer.
+            if self.live {
+                self.at = f64::from(self.available.saturating_sub(60).max(self.from));
             }
         }
         if now >= self.next_fetch && (self.live || self.bytes.is_empty()) {

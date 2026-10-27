@@ -249,7 +249,7 @@ fn visit(u: &mut Unit, c: &mut Champ, f: &mut impl Fields) {
 }
 
 impl Match {
-    /// Becomes a copy of `from`    /// Becomes a copy of `from`, in place and without allocating: how the client's prediction
+    /// Becomes a copy of `from`, in place and without allocating: how the client's prediction
     /// starts over from its model of the server's match.
     pub fn assume(&mut self, from: &Match) {
         self.seed = from.seed;

@@ -14,6 +14,8 @@ use crossbeam_queue::ArrayQueue;
 use el_match::{EgressEnds, SeatLease, ShardConfig, ShardShared, ShardThread, build, read_packet};
 
 use crate::records::RecordStore;
+use crate::recover::Recovered;
+use crate::referee::{RefereeStats, Referees};
 use el_sim::map::Map;
 use el_sim::units::SEATS;
 use wtransport::Connection;
@@ -61,27 +63,74 @@ pub struct Game {
     pub matches_per_shard: usize,
     /// Every match's record, live and finished.
     pub records: Arc<Mutex<RecordStore>>,
-    recorders: Vec<JoinHandle<()>>,
+    recorders: Mutex<Vec<JoinHandle<()>>>,
     recorders_stop: Arc<AtomicBool>,
+    /// What the referees have checked.
+    pub referee: Arc<RefereeStats>,
 }
 
 impl Game {
     /// Starts `shards` shard threads of `matches` matches each (with their egress and recorder
-    /// threads), writing finished records to `records_dir` if there is one.
+    /// threads), writing records to `records_dir` if there is one, and with a referee re-stepping
+    /// them if `referee` (checking a checkpoint of each every `checkpoint_every` ticks). Matches the last server left in `records_dir` are taken up first
+    /// (`crate::recover`) and returned, for the lobby.
     pub fn start(
         shards: usize,
         matches: usize,
         map: &'static Map,
         records_dir: Option<std::path::PathBuf>,
-    ) -> std::io::Result<Game> {
+        referee: bool,
+        checkpoint_every: u32,
+    ) -> std::io::Result<(Game, Vec<Recovered>)> {
+        let checkpoint_every = if referee { checkpoint_every } else { 0 };
         let mut out = Vec::with_capacity(shards);
-        let records = Arc::new(Mutex::new(RecordStore::new(shards, matches, records_dir)));
+        let mut store = RecordStore::new(shards, matches, records_dir.clone());
         let recorders_stop = Arc::new(AtomicBool::new(false));
         let mut recorders = Vec::with_capacity(shards);
-        for k in 0..shards {
-            let (shard, shared, leases, ends, record_ends) =
-                build(ShardConfig { matches, map, hot_guard: Some(el_alloc::set_hot) });
-            recorders.push(crate::records::spawn(k, record_ends, records.clone(), recorders_stop.clone())?);
+        let referee_stats = Arc::new(RefereeStats::default());
+        let mut built = Vec::with_capacity(shards);
+        let mut referees = Vec::with_capacity(shards);
+        for _ in 0..shards {
+            built.push(build(ShardConfig {
+                matches,
+                map,
+                hot_guard: Some(el_alloc::set_hot),
+                checkpoint_every,
+            }));
+            referees
+                .push(referee.then(|| Referees::new(map, matches, checkpoint_every, referee_stats.clone())));
+        }
+        let recovered = match &records_dir {
+            Some(dir) => {
+                let mut pool: Vec<el_match::Shard> = Vec::new();
+                let mut rest = Vec::new();
+                for (shard, shared, leases, ends, record_ends) in built {
+                    pool.push(shard);
+                    rest.push((shared, leases, ends, record_ends));
+                }
+                let r = crate::recover::recover(dir, map, &mut pool, &mut store, &mut referees);
+                built = pool
+                    .into_iter()
+                    .zip(rest)
+                    .map(|(shard, (shared, leases, ends, record_ends))| {
+                        (shard, shared, leases, ends, record_ends)
+                    })
+                    .collect();
+                r
+            }
+            None => Vec::new(),
+        };
+        let records = Arc::new(Mutex::new(store));
+        for (k, ((shard, shared, leases, ends, record_ends), referees)) in
+            built.into_iter().zip(referees).enumerate()
+        {
+            recorders.push(crate::records::spawn(
+                k,
+                record_ends,
+                records.clone(),
+                referees,
+                recorders_stop.clone(),
+            )?);
             let egress = Arc::new(Egress {
                 cmds: ArrayQueue::new(matches * SEATS * 2 + 16),
                 stop: AtomicBool::new(false),
@@ -99,7 +148,15 @@ impl Game {
                 leases: Mutex::new(leases.into_iter().map(Some).collect()),
             });
         }
-        Ok(Game { shards: out, matches_per_shard: matches, records, recorders, recorders_stop })
+        let game = Game {
+            shards: out,
+            matches_per_shard: matches,
+            records,
+            recorders: Mutex::new(recorders),
+            recorders_stop,
+            referee: referee_stats,
+        };
+        Ok((game, recovered))
     }
 
     /// Takes seat `g`'s lease from shard `k` (none if a session holds it already).
@@ -142,12 +199,9 @@ impl Game {
         }
     }
 
-    /// Stops every thread and waits for them.
+    /// Stops every thread and waits for them: the shards first, then the recorders, which take
+    /// the last of the records off the rings (the live ones stay parts, for a restart).
     pub fn stop(&mut self) {
-        self.recorders_stop.store(true, Ordering::Release);
-        for t in self.recorders.drain(..) {
-            let _ = t.join();
-        }
         for s in &mut self.shards {
             if let Some(t) = s.thread.take() {
                 t.stop();
@@ -157,6 +211,16 @@ impl Game {
                 t.thread().unpark();
                 let _ = t.join();
             }
+        }
+        self.join_recorders();
+    }
+
+    /// Tells the recorders to stop and waits for their last pass.
+    pub fn join_recorders(&self) {
+        self.recorders_stop.store(true, Ordering::Release);
+        let handles = self.recorders.lock().map(|mut r| std::mem::take(&mut *r)).unwrap_or_default();
+        for t in handles {
+            let _ = t.join();
         }
     }
 }

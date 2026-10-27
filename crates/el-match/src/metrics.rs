@@ -61,6 +61,11 @@ pub struct Metrics {
     /// Record frames that didn't fit their ring (the recorder fell behind): each breaks a record.
     pub record_drops: AtomicU64,
     pub record_bytes: AtomicU64,
+    /// Checkpoints written, and those that didn't fit the ring (the recorder fell behind).
+    pub checkpoints: AtomicU64,
+    pub checkpoint_drops: AtomicU64,
+    /// Matches stopped because they panicked.
+    pub failed: AtomicU64,
     pub inputs: AtomicU64,
     pub inputs_stale: AtomicU64,
     pub inputs_missing: AtomicU64,

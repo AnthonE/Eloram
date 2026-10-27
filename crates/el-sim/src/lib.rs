@@ -27,6 +27,7 @@ pub mod missile;
 pub mod own;
 pub mod path;
 pub mod record;
+pub mod snapshot;
 pub mod storage;
 pub mod units;
 mod vision;

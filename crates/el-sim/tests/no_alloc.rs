@@ -77,3 +77,18 @@ fn resetting_a_match_allocates_nothing() {
     let ((), n) = el_alloc::count(|| m.reset(99, common::picks(99)));
     assert_eq!(n, 0, "a shard reuses its matches: {n} heap operations");
 }
+
+#[test]
+fn a_checkpoint_writes_and_reads_without_allocating() {
+    let (mut m, mut s) = common::bot_match(17);
+    common::run(&mut m, &mut s, ticks(60.0));
+    let mut buf = vec![0u8; el_sim::snapshot::len(&m)];
+    let mut into = el_sim::Match::new(common::map(), 0, [0; el_sim::units::SEATS]);
+    let (n, a) = el_alloc::count(|| el_sim::snapshot::write(&m, &mut buf));
+    assert_eq!(n, buf.len());
+    let (r, b) = el_alloc::count(|| el_sim::snapshot::read(&buf, &mut into));
+    r.unwrap();
+    let (d, c) = el_alloc::count(|| el_sim::snapshot::diff(&m, &into));
+    assert_eq!(d, None);
+    assert_eq!((a, b, c), (0, 0, 0), "heap operations writing, reading and comparing a checkpoint");
+}

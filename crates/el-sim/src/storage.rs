@@ -44,6 +44,13 @@ impl BitSet {
     pub fn copy_from(&mut self, other: &BitSet) {
         self.words.copy_from_slice(&other.words);
     }
+    /// Its words, low bits first (a checkpoint's).
+    pub fn words(&self) -> &[u64] {
+        &self.words
+    }
+    pub fn words_mut(&mut self) -> &mut [u64] {
+        &mut self.words
+    }
     /// Iterates set bits in ascending order.
     pub fn iter(&self) -> BitIter<'_> {
         BitIter { words: &self.words, wi: 0, cur: self.words.first().copied().unwrap_or(0) }
@@ -109,6 +116,14 @@ impl FreeList {
     pub fn copy_from(&mut self, other: &FreeList) {
         self.stack.copy_from_slice(&other.stack);
         self.len = other.len;
+    }
+
+    /// The stack and how much of it is free (a checkpoint's).
+    pub fn parts(&self) -> (&[u16], usize) {
+        (&self.stack, self.len)
+    }
+    pub fn parts_mut(&mut self) -> (&mut [u16], &mut usize) {
+        (&mut self.stack, &mut self.len)
     }
 
     pub fn pop(&mut self) -> Option<u16> {

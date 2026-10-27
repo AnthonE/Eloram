@@ -351,6 +351,7 @@ fn match_status(
         status.set("watch_tick", w.referee.m.tick);
         status.set("watch_available", w.available);
         status.set("watch_hashes", w.referee.checked);
+        status.set("watch_from", w.from);
         status.set("watch_live", w.live);
         status.set("watch_units", drawn.units.iter().filter(|d| d.is_some()).count() as u32);
         if let Some(e) = &w.error {

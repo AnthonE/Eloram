@@ -5,6 +5,7 @@
 #   scripts/e2e.sh watch [project]   # an agent's match watched live from its record, then replayed
 #   scripts/e2e.sh login [project]   # wallet sign-in with a stub wallet, /online.json, the resume token
 #   scripts/e2e.sh art [project]     # the map's look: the camera over each place, pictures in artifacts/
+#   scripts/e2e.sh recover [project] # the server killed mid-match and started again: the page back in its seat
 # Anything after the project goes to Playwright.
 # The server listens on EL_HTTP_PORT (8080) and EL_WT_PORT (UDP, 4433).
 set -euo pipefail
@@ -25,7 +26,11 @@ wt="${EL_WT_PORT:-4433}"
 server() { exec "$bin/el-server" --web-dir web/dist "$@"; }
 pids=()
 # Each server is waited for, so the next suite's can have its ports.
-cleanup() { for p in "${pids[@]}"; do kill "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; done; }
+cleanup() {
+  for p in "${pids[@]}"; do kill "$p" 2>/dev/null || true; wait "$p" 2>/dev/null || true; done
+  # The server a suite started again itself (`recover`).
+  if [ -n "${EL_PIDFILE:-}" ] && [ -f "$EL_PIDFILE" ]; then kill "$(cat "$EL_PIDFILE")" 2>/dev/null || true; fi
+}
 trap cleanup EXIT
 
 case "$suite" in
@@ -46,10 +51,22 @@ case "$suite" in
   watch)
     # An agent plays a match for the page to watch.
     cargo build --release -p el-bot
-    server --mode game --fill-after 1 --http "127.0.0.1:${port}" --wt-port "$wt" &
+    # Checkpoints every 10 s, so the page starts from one a minute behind.
+    server --mode game --fill-after 1 --checkpoint-secs 10 --http "127.0.0.1:${port}" --wt-port "$wt" &
     pids+=($!)
     (sleep 2; exec "$bin/el-swarm" --server "$EL_URL" --bots 1 --secs 600 >/dev/null) &
     pids+=($!)
+    ;;
+  recover)
+    # The suite kills this server (SIGKILL) mid-match and starts it again on the same records
+    # directory and ports (EL_SERVER_CMD), keeping the new one's pid in EL_PIDFILE.
+    records="$(mktemp -d)"
+    # Absolute: the suite runs from e2e/.
+    export EL_SERVER_CMD="$PWD/$bin/el-server --web-dir $PWD/web/dist --mode game --fill-after 1 --select-secs 45 \
+--http 127.0.0.1:${port} --wt-port $wt --records $records --checkpoint-secs 5"
+    export EL_PIDFILE="$records/server.pid"
+    $EL_SERVER_CMD &
+    echo $! > "$EL_PIDFILE"
     ;;
   login)
     # The stub wallet signs through el-auth's example with a throwaway key.

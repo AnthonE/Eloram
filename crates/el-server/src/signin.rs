@@ -5,8 +5,9 @@
 //! Never logged: signatures and resume tokens. An address is logged only shortened ([`short`]).
 
 use std::collections::{BTreeMap, HashMap};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use el_proto::auth::{Address, NONCE_BYTES, TOKEN_BYTES};
 
@@ -46,26 +47,64 @@ pub fn random<const N: usize>() -> [u8; N] {
     out
 }
 
-/// Resume tokens: each names a wallet, for a while.
+/// Resume tokens: each names a wallet, for a while. A token is kept only as its keccak-256, and
+/// with a file (`--records`' `tokens.json`) the hashes outlive a restart, so a signed-in player's
+/// page resumes on the next server as on this one.
 #[derive(Default)]
-pub struct Tokens(Mutex<HashMap<[u8; TOKEN_BYTES], (Address, Instant)>>);
+pub struct Tokens {
+    /// Each token's hash: its wallet, and until when (seconds since the epoch).
+    held: Mutex<HashMap<[u8; 32], (Address, u64)>>,
+    file: Option<PathBuf>,
+}
 
 impl Tokens {
+    /// Tokens kept in `file`, read back from it if it's there.
+    pub fn kept(file: PathBuf) -> Self {
+        let mut held = HashMap::new();
+        if let Ok(b) = std::fs::read(&file)
+            && let Ok(rows) = serde_json::from_slice::<Vec<(String, String, u64)>>(&b)
+        {
+            let now = unix_now();
+            for (hash, wallet, until) in rows {
+                let (Ok(h), Some(a)) = (hex::decode(&hash), el_auth::parse_address(&wallet)) else {
+                    continue;
+                };
+                if let Ok(h) = <[u8; 32]>::try_from(h.as_slice())
+                    && until > now
+                {
+                    held.insert(h, (a, until));
+                }
+            }
+        }
+        Self { held: Mutex::new(held), file: Some(file) }
+    }
+
     /// A new token for `address`, good for `ttl`.
     pub fn issue(&self, address: Address, ttl: Duration) -> [u8; TOKEN_BYTES] {
         let token = random::<TOKEN_BYTES>();
-        if let Ok(mut t) = self.0.lock() {
-            let now = Instant::now();
+        if let Ok(mut t) = self.held.lock() {
+            let now = unix_now();
             t.retain(|_, (_, until)| *until > now);
-            t.insert(token, (address, now + ttl));
+            t.insert(el_auth::keccak256(&token), (address, now + ttl.as_secs()));
+            if let Some(file) = &self.file {
+                let rows: Vec<(String, String, u64)> = t
+                    .iter()
+                    .map(|(h, (a, until))| {
+                        (hex::encode(h), String::from_utf8_lossy(&el_auth::lower_hex(a)).into_owned(), *until)
+                    })
+                    .collect();
+                if let Ok(b) = serde_json::to_vec(&rows) {
+                    crate::records::write_atomically(file, &b);
+                }
+            }
         }
         token
     }
 
     /// The wallet a token names, if it's one of ours and still good.
     pub fn redeem(&self, token: &[u8; TOKEN_BYTES]) -> Option<Address> {
-        let t = self.0.lock().ok()?;
-        t.get(token).filter(|(_, until)| *until > Instant::now()).map(|(a, _)| *a)
+        let t = self.held.lock().ok()?;
+        t.get(&el_auth::keccak256(token)).filter(|(_, until)| *until > unix_now()).map(|(a, _)| *a)
     }
 }
 

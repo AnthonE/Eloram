@@ -603,6 +603,7 @@ fn beds(e: &mut Engine, session: &Session, rig: &crate::camera::Rig, ndc: impl F
         Phase::Selecting => Music::Select,
         Phase::Playing | Phase::Reconnecting | Phase::Watching => Music::Match,
         Phase::Over => match (session.winner, team) {
+            (Some(w), _) if w > 1 => Music::Quiet,
             (Some(w), Some(t)) if w == t => Music::Victory,
             (Some(_), Some(_)) => Music::Defeat,
             _ => Music::Match,
