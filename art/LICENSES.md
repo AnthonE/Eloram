@@ -41,6 +41,38 @@ its Meshy account, under [Meshy's terms](https://www.meshy.ai/terms-of-use).
 | `arch.glb` | a ruined stone arch |
 | `banner.glb` | a pole with a hanging banner |
 
+## The champions (`web/assets/models/champions/`)
+
+Made with Meshy (`art/meshy.json`): each champion by text-to-3D (`meshy-6-lite`, in an A-pose) from
+our own prompts, textured and rigged by Meshy, its run from its rigging; the other clips from
+Meshy's animation library, made on one champion's rig and retargeted onto each; the props it
+holds by text-to-3D (untextured), coloured in bands (`art/champions.json`). Put together by
+`art/tools/champions.mjs` (glTF Transform). Ours: generated for this project on its Meshy account,
+under [Meshy's terms](https://www.meshy.ai/terms-of-use).
+
+| File | The champion, and the props it holds |
+|---|---|
+| `brakka.glb` | Brakka: hook chain |
+| `brun.glb` | Brun: forge hammer |
+| `gorum.glb` | Gorum: none |
+| `hollis.glb` | Hollis: mace, bell |
+| `kesh.glb` | Kesh: dagger, dagger |
+| `liora.glb` | Liora: lantern, halo |
+| `marret.glb` | Marret: blunderbuss |
+| `mira.glb` | Mira: lamp pole |
+| `nimra.glb` | Nimra: none |
+| `oda.glb` | Oda: walking staff, pack |
+| `orrin.glb` | Orrin: censer staff |
+| `pell.glb` | Pell: sword, kite shield, banner |
+| `sable.glb` | Sable: lantern small |
+| `sefa.glb` | Sefa: crescent blade |
+| `seren.glb` | Seren: star wand |
+| `talmar.glb` | Talmar: trident |
+| `torek.glb` | Torek: mortar |
+| `ulla.glb` | Ulla: branch staff |
+| `vessa.glb` | Vessa: crossbow |
+| `vire.glb` | Vire: greatsword |
+
 ## The sounds (`web/assets/audio/`)
 
 Made by `art/tools/sounds.py` from the lines of `manifest.json` (ours: written from

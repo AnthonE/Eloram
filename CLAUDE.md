@@ -10,6 +10,8 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
 - `docs/DESIGN.md` is the mode: the rules at League's numbers, in our own names.
 - `docs/ROADMAP.md` is the phases.
 - `docs/ART.md` is the plan for the map's look: light, floor, edges, structures, the assets and their licences.
+- `docs/CHAMPIONS.md` is the plan for the champions' models and animation: what Riot says makes a champion
+  read, the assets, the pipeline, the pose.
 - `docs/FX.md` is the plan for effects and sound: what Riot says makes them read, the wire they need, the
   runtime, the look table, the mix.
 
@@ -51,6 +53,14 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `art/LICENSES.md`. `?quality=low` (the default without a GPU, so in headless Chromium too) drops
   HDR, bloom, shadows, multisampling and the braziers' lights, and reads the ground from a few
   textures; `scripts/e2e.sh art` asks for `high`.
+- The champions (`docs/CHAMPIONS.md`): `web/assets/models/champions/` ships as it is;
+  `art/tools/meshy.py champions|animations|props` makes Meshy's tasks (ids kept in `art/meshy.json` as
+  they're made: one writer at a time) and `fetch <dir>` gets them; `npm ci --prefix art/tools` then
+  `node art/tools/champions.mjs <dir> [name]` retargets the clips, hangs the props
+  (`art/champions.json`) and writes the models. `el_client_core::pose` is the clip table and each
+  champion's kit; when it changes, `cargo test -p el-client-core pose -- --ignored write_clips`
+  rewrites `art/clips.json` (a test fails while it's stale, and another checks every model carries
+  its kit's clips). `window.__el` has `champion_models` and `champion_poses` (`seat:clip,...`).
 - The effects and sounds (`docs/FX.md`): `el_client_core::fx` decides (the sound table, a look a
   source, the director's cues, the mixer, the announcer), `el-client/src/fx.rs` draws and
   `audio.rs` plays (Web Audio). `python3 -I art/tools/sounds.py` remakes `web/assets/audio/` from

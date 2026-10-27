@@ -171,3 +171,19 @@ state, not by a checksum, since "only the first divergence really matters".
   keccak-256.
 - A match that panics stops alone, no contest, its shard's others going on; a shard that stops
   ticking is taken as gone.
+
+## 7. The champions, drawn
+`CHAMPIONS.md` is the plan: what Riot's posts say makes a champion read (its silhouette and
+primary feature, animation as the game's tell timed to it, the hitbox as where the champion is),
+a model each with what it holds, clips timed to the windups, the body never leaving its place.
+
+What landed:
+- Twenty champions made with Meshy (text-to-3D in an A-pose, textured, rigged), twenty-three props
+  for what they hold and carry, and nineteen clips from Meshy's library made once on one rig and
+  retargeted onto the others (checked against Meshy's own retarget: the same pose frame for frame).
+  `art/tools/champions.mjs` puts each together: its kit's clips cut to their windows, its props on
+  its bones, simplified to about six thousand triangles, packed small.
+- `el_client_core::pose`: each champion's kit, and the clip, time and fade a frame from what the
+  client knows; attacks strike as the windup ends, casts release as their ability does.
+- `el-client/src/champions.rs`: the models fetched as the match (or champion select) deals them,
+  animated in their units' places; a body lies where it fell; a hit flashes.
