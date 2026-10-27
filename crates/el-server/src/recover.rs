@@ -211,7 +211,9 @@ pub fn recover(
         let tick = s.referee.m.tick;
         let file = cut_part(&part, s.cut);
         let mut rec = Rec::resumed(k, m as u16, s.seed, bytes[..s.cut].to_vec(), file);
-        rec.checkpoint = s.checkpoint.map(|(t, b)| (t, b.into()));
+        if let Some((t, b)) = s.checkpoint {
+            rec.keep_checkpoint(t, b.into());
+        }
         store.resume(k, m, rec);
         if let Some(r) = referees.get_mut(k).and_then(|r| r.as_mut()) {
             r.adopt(m, &id, s.referee);

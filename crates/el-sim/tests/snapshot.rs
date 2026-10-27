@@ -75,7 +75,18 @@ fn the_same_length_for_every_match_and_read_write_round_trips() {
     snapshot::read(&once, &mut b).unwrap();
     assert_eq!(take(&b), once);
     assert_eq!(snapshot::write(&a, &mut vec![0u8; once.len() - 1]), 0, "too short a buffer writes nothing");
-    println!("a checkpoint is {} bytes", once.len());
+    let mut buf = vec![0u8; once.len()];
+    let started = std::time::Instant::now();
+    for _ in 0..100 {
+        snapshot::write(&a, &mut buf);
+    }
+    let write_us = started.elapsed().as_secs_f64() * 1e4;
+    let started = std::time::Instant::now();
+    for _ in 0..100 {
+        snapshot::read(&once, &mut b).unwrap();
+    }
+    let read_us = started.elapsed().as_secs_f64() * 1e4;
+    println!("a checkpoint is {} bytes, written in {write_us:.0} µs, read in {read_us:.0}", once.len());
 }
 
 #[test]

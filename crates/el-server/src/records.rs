@@ -45,8 +45,10 @@ pub struct Rec {
     pub winner: Option<u8>,
     pub live: bool,
     touched: Instant,
-    /// The last checkpoint the referee verified, with its tick.
-    pub checkpoint: Option<(u32, Arc<[u8]>)>,
+    /// The checkpoints the referee verified, oldest first, with their ticks: the newest (what a
+    /// restart takes up), and back to the newest a spectator may be given (served a minute
+    /// behind, as the record is). Older ones go.
+    pub checkpoints: Vec<(u32, Arc<[u8]>)>,
     /// Why the referee says it went astray, if it did.
     pub astray: Option<String>,
     /// Its part on disk (with a directory), and how much of it is written: whole frames only.
@@ -67,7 +69,7 @@ impl Rec {
             winner: None,
             live: true,
             touched: Instant::now(),
-            checkpoint: None,
+            checkpoints: Vec::new(),
             astray: None,
             part: None,
             on_disk: 0,
@@ -107,13 +109,23 @@ impl Rec {
 
     /// The checkpoint a spectator may start from: the last verified one inside what's served.
     pub fn served_checkpoint(&self) -> Option<Arc<[u8]>> {
-        let (t, b) = self.checkpoint.as_ref()?;
-        (*t <= self.served_tick()).then(|| b.clone())
+        let upto = self.served_tick();
+        self.checkpoints.iter().rev().find(|(t, _)| *t <= upto).map(|(_, b)| b.clone())
     }
 
     /// That checkpoint's tick.
     fn served_checkpoint_tick(&self) -> Option<u32> {
-        self.checkpoint.as_ref().map(|(t, _)| *t).filter(|t| *t <= self.served_tick())
+        let upto = self.served_tick();
+        self.checkpoints.iter().rev().map(|(t, _)| *t).find(|t| *t <= upto)
+    }
+
+    /// A checkpoint verified: kept, and those older than the one a spectator would be given let go.
+    pub fn keep_checkpoint(&mut self, tick: u32, bytes: Arc<[u8]>) {
+        self.checkpoints.push((tick, bytes));
+        let upto = self.served_tick();
+        if let Some(k) = self.checkpoints.iter().rposition(|(t, _)| *t <= upto) {
+            self.checkpoints.drain(..k);
+        }
     }
 
     /// Writes the whole frames read so far to its part.
@@ -201,7 +213,7 @@ impl RecordStore {
                 if let Some(path) = ck_path {
                     write_atomically(&path, &bytes);
                 }
-                rec.checkpoint = Some((tick, bytes));
+                rec.keep_checkpoint(tick, bytes);
             }
             Verdict::Astray { why, .. } => rec.astray = Some(why),
         }
@@ -319,7 +331,7 @@ impl RecordStore {
                 "bytes": r.bytes.len(),
                 "served_bytes": r.served().len(),
                 "winner": r.winner,
-                "checkpoint": r.checkpoint.as_ref().map(|(t, _)| *t),
+                "checkpoint": r.checkpoints.last().map(|(t, _)| *t),
                 "served_checkpoint": r.served_checkpoint_tick(),
                 "astray": r.astray,
             })
@@ -461,5 +473,21 @@ mod tests {
         s.take(0, 1, &frames(8, 0, 10, true));
         assert_eq!(s.get(&format!("{:016x}", 7)).unwrap(), bytes);
         assert_eq!(s.list().as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn a_spectator_gets_the_newest_checkpoint_a_minute_behind_and_older_ones_go() {
+        let mut s = RecordStore::new(1, 1, None);
+        s.take(0, 0, &frames(9, 0, 3_000, true));
+        let id = format!("{:016x}", 9);
+        let ck = |t: u32| -> Arc<[u8]> { vec![t as u8; 4].into() };
+        let rec = s.live[0][0].as_mut().unwrap();
+        // Served to the hash at or before 3,000 - 1,800 = 1,200.
+        for t in [300, 600, 900, 1_200, 1_500, 1_800, 2_100] {
+            rec.keep_checkpoint(t, ck(t));
+        }
+        let ticks: Vec<u32> = rec.checkpoints.iter().map(|(t, _)| *t).collect();
+        assert_eq!(ticks, [1_200, 1_500, 1_800, 2_100], "the newest served one and those after it");
+        assert_eq!(s.checkpoint(&id).as_deref(), Some(&ck(1_200)[..]));
     }
 }

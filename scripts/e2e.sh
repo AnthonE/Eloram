@@ -61,7 +61,8 @@ case "$suite" in
     # The suite kills this server (SIGKILL) mid-match and starts it again on the same records
     # directory and ports (EL_SERVER_CMD), keeping the new one's pid in EL_PIDFILE.
     records="$(mktemp -d)"
-    export EL_SERVER_CMD="$bin/el-server --web-dir web/dist --mode game --fill-after 1 --select-secs 45 \
+    # Absolute: the suite runs from e2e/.
+    export EL_SERVER_CMD="$PWD/$bin/el-server --web-dir $PWD/web/dist --mode game --fill-after 1 --select-secs 45 \
 --http 127.0.0.1:${port} --wt-port $wt --records $records --checkpoint-secs 5"
     export EL_PIDFILE="$records/server.pid"
     $EL_SERVER_CMD &

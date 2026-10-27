@@ -50,6 +50,8 @@ pub fn router(state: HttpState) -> Router {
         .route("/records/{id}", get(record))
         .route("/records/{id}/checkpoint", get(checkpoint))
         .with_state(state)
+        // Gzipped for those who ask: a checkpoint's dead slots take it from 156 KB to about 5.
+        .layer(tower_http::compression::CompressionLayer::new())
         .layer(middleware::from_fn(move |req: Request, next: Next| {
             let origins = origins.clone();
             async move { cors(&origins, req, next).await }

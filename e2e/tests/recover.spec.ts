@@ -34,7 +34,7 @@ test("a server killed mid-match: the page back in its seat on the next one", asy
     await push(page, { t: "ready" });
     // Long enough for a checkpoint (every 5 s here) to be verified.
     s = await until(page, "the match", (s) => s.started === true && s.tick > 450, 180_000);
-    const { seat, champion, session, tick } = s;
+    const { seat, champion, tick } = s;
     const before = await (await request.get("/status")).json();
     expect(before.game.referee.checkpoints).toBeGreaterThan(0);
 
@@ -43,12 +43,10 @@ test("a server killed mid-match: the page back in its seat on the next one", asy
     writeFileSync(pidfile, String(next.pid));
     next.unref();
 
-    s = await until(
-      page,
-      "back in the match",
-      (s) => s.phase === "playing" && s.started === true && s.session !== session,
-      120_000,
-    );
+    // The page sees the link go quiet and dials again (session ids start over with each server,
+    // so it's the reconnecting that says it's another).
+    await until(page, "reconnecting", (s) => s.phase === "reconnecting", 60_000);
+    s = await until(page, "back in the match", (s) => s.phase === "playing" && s.started === true, 120_000);
     expect(s.seat).toBe(seat);
     expect(s.champion).toBe(champion);
     expect(s.tick).toBeGreaterThan(tick - 60);
