@@ -593,12 +593,12 @@ mod tests {
         assert_eq!(kit(def("Liora")).casts[2], Clip::Flick, "a ward on an ally");
         assert_eq!(kit(def("Marret")).dash, Clip::Roll);
         assert_eq!(kit(def("Gorum")).dash, Clip::Charge);
-        for d in 0..CHAMPIONS.len() {
+        for (d, c) in CHAMPIONS.iter().enumerate() {
             let k = kit(d);
             // The melee swing with what they hold; the rest cast.
-            let melee = CHAMPIONS[d].missile_speed == 0.0;
+            let melee = c.missile_speed == 0.0;
             assert_eq!(melee, matches!(k.attack, Clip::Slash | Clip::Thrust | Clip::Smash | Clip::Punch));
-            assert!(k.clips().len() <= 12, "{}: {} clips", CHAMPIONS[d].name, k.clips().len());
+            assert!(k.clips().len() <= 12, "{}: {} clips", c.name, k.clips().len());
         }
     }
 
