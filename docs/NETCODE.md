@@ -231,26 +231,62 @@ Before Colony's, sized for a match:
 - Each match writes one file (`el_sim::record`, `.elr`): its seed, champions, protocol and content
   version, then each tick's *applied* inputs for all ten seats (the bots' too), everything from
   outside (a seat taken or left, an augment screen's key as it opens), and a state hash every 30
-  ticks. A referee steps a tick once its frames are in (the keys come after the step that drew
-  them, so a tick waits for the next frame that isn't one). The shard thread writes the
-  frames into a ring a match without allocating; a recorder thread a shard keeps them
-  (`el-server/src/records.rs`; `--records dir` writes them out). Measured: 25 KB a match a minute
-  with two people and eight bots, about 500 KB for twenty minutes.
+  ticks. A referee steps a tick once its frames are in (the keys come after the step that drew them,
+  so a tick waits for the next frame that isn't one). The shard thread writes the frames into a ring
+  a match without allocating; a recorder thread a shard keeps them (`el-server/src/records.rs`;
+  `--records dir` writes them out). Measured: 25 KB a match a minute with two people and eight bots,
+  about 500 KB for twenty minutes.
 - **A referee** (`el_sim::record::Referee`) re-steps a record and checks every hash: `el-replay
-  verify` over files, and every spectator's page as it watches. A divergence is named to the 30
-  ticks it happened in; one order changed in a record is caught at the next hash
-  (`el-match/tests/record.rs`). Still to come: a referee thread on the server re-stepping live
-  matches a minute behind with a checkpoint a minute, and naming the unit that went astray.
-- **Spectating** is the record served a minute behind its players (`/records/{id}`: a live record
-  is cut at the last hash at least 60 s old), stepped in the browser by the same sim with full
-  vision (`?watch=<id>`; `/records.json` lists them). The delay is the server's, so it can't be
-  skipped. The page steps the record from the start, catching up at 900 ticks a frame;
-  checkpoints will shorten that.
+  verify` over files, every spectator's page as it watches, and the server itself, live. A
+  divergence is named to the 30 ticks it happened in; one order changed in a record is caught at the
+  next hash (`el-match/tests/record.rs`).
+- **A checkpoint** (`el_sim::snapshot`) is a whole match as bytes: every field of every slot, the
+  dead ones too, so a match read back steps exactly as the one written (the hash covers less; the
+  tests step both for minutes and compare every tick and the bytes at the end). Little-endian,
+  floats as their bits, enums padded: the same bytes native and wasm (a golden digest on both), and
+  the same length for every match, 156 KB (5.6 KB gzipped, as `/records/{id}/checkpoint` serves it),
+  written in about 240 µs and read in 300. Never the offer secret. Each type is destructured field
+  by field, so a field added to the match doesn't compile until the checkpoint has it.
+- **The live referee.** Each match's shard writes its checkpoint once a minute
+  (`--checkpoint-secs`), just after a hash, each match a hash later than the one before so a shard
+  writes one a tick at most, onto a ring of its own (about 240 µs each: the shard bench, 64
+  matches, has its p99 at 23.6 ms with them and 23.9 without, 90 and 89 matches a core). The recorder thread re-steps every live record as it takes it, outside the store's lock
+  (about 83 µs a tick, a match's sim again: with 40 agents in four matches, 18,012 ticks re-stepped
+  in 1.5 s of a core, 600 hashes and 11 checkpoints checked, none astray), and at a checkpoint's
+  tick compares its own match with the shard's, byte for byte (`el-server/src/referee.rs`). Riot's
+  rule holds: a checkpoint is only a cache of the record. One is served or recovered from only once
+  the referee has found it the same; one that isn't is named to its unit and field ("unit 37 (melee
+  minion, team 1): stats.armor differs"), after the hash that first went wrong, since "only the
+  first divergence really matters". `/status` has the referee's ticks, hashes, checkpoints and
+  divergences; `/records.json` a record's checkpoint and any complaint.
+- **Spectating** is the record served a minute behind its players (`/records/{id}`: a live record is
+  cut at the last hash at least 60 s old), stepped in the browser by the same sim with full vision
+  (`?watch=<id>`; `/records.json` lists them). The delay is the server's, so it can't be skipped.
+  The page starts from the last verified checkpoint inside what's served
+  (`/records/{id}/checkpoint`) and checks every hash after it, catching up at 900 ticks a frame.
 - **A replay** is the same from tick 0 (`?replay=<url>`; `[` and `]` change the speed), and any
-  recorded match re-runs far faster than real time: `el-replay verify` re-steps a minute of play
-  in about 0.1 s.
-- **A crash** will be recovered from the last checkpoint and the record, and clients resume their
-  seats (not built yet).
+  recorded match re-runs far faster than real time: `el-replay verify` re-steps a minute of play in
+  about 0.1 s, and resumes each record's checkpoint (`{id}.ck`) to the same end.
+- **A crash** is recovered as Chronobreak recovers one: the record re-stepped, not memory restored
+  (Riot tried save-states of game memory first, and they "failed to give esports officials the
+  precise tools they needed"). With `--records dir` a live match's record is written as it comes
+  (`{id}.elr.part`, whole frames only), with its last verified checkpoint (`{id}.ck`) and what its
+  players were told with their rejoin tokens' hashes (`{id}.live`). A server started on that
+  directory re-steps each part from its checkpoint to its last hash and cuts it there (at most a
+  second lost), puts the match in a free place with its bots in every seat, and keeps it a minute
+  for its players; the page and the agents dial again on their own and take their seats back with
+  their tokens, as after any dropped link (four matches two and a half minutes in, killed with
+  SIGKILL, were taken up by the next server in under half a second, 56 to 83 ms each, about 120
+  bytes of record lost each). The keys already drawn are in the record; a screen not yet opened
+  draws from a new secret. The self-signed certificate and the resume tokens' hashes are kept there
+  too, so pages pin the same hash and signed-in players resume. Only the newest checkpoint is kept
+  on disk, so a match taken up is watched from its first tick until the referee has verified one a
+  minute old. Stopped (Ctrl-C), a server leaves its matches the same way, for the next one to take
+  up. `el-server/tests/recover.rs` SIGKILLs a real server mid-match, and the one record that results
+  re-steps from its first tick to its last; `scripts/e2e.sh recover` does it under the page.
+- **A match that panics** is stopped alone (each match's tick is unwound to, so its shard's other
+  matches go on), and its players told it was no contest. A shard whose thread stops ticking is
+  taken as gone: its matches end, and the lobby puts no more there.
 - CI re-steps every match it records and fails on the first differing hash.
 
 ### Many matches a process

@@ -84,8 +84,8 @@ replays and the 60 s spectator feed from the record. Wallet sign-in, `/status.js
 The record landed first: written by the shard thread without allocating, kept by a recorder thread,
 served at `/records/{id}` a minute behind, re-stepped by `el-replay verify` and by the page that
 watches it (`scripts/e2e.sh watch`). A match reset in place now starts every slot's generation from
-0, as a new one does, so its record replays on a fresh match. Still to come of it: the live
-referee thread, checkpoints, crash recovery.
+0, as a new one does, so its record replays on a fresh match. The live referee, checkpoints and
+crash recovery came after the effects (Phase 6, "Then the record, finished").
 
 Then Elo Pros: wallet sign-in (`el-auth`, Before Colony's, signing the launcher's text for
 `eloram`) from the page (`?signin=1`) and from agents with a key, resume tokens, `/online.json`
@@ -145,3 +145,29 @@ telegraphs, fields and statuses; Web Audio with a priority ladder, ducking and s
 a sound is on the screen; 226 takes made from Kenney's CC0 packs and synthesis; the announcer
 and music wired for their files. In a browser match: 2,632 cues in three minutes, at most 12
 sounds at once, none dropped, the walk still exact.
+
+Then the record, finished (`NETCODE.md`, "The record"), checked against Riot's posts on determinism
+and Chronobreak first: a crash recovered by re-stepping the record (Riot tried save-states of memory
+and dropped them), a checkpoint only a cache of the record, and a divergence named by comparing
+state, not by a checksum, since "only the first divergence really matters".
+- A whole match as bytes (`el_sim::snapshot`): 156 KB (5.6 KB gzipped, as `/records/{id}/checkpoint`
+  serves it), written in about 240 µs and read in 300, the same native and wasm (a golden digest on
+  both), read back and stepped for minutes alike tick for tick, written and read without allocating.
+  A field added to the match doesn't compile until the checkpoint has it.
+- The shard writes each match's checkpoint once a minute; the referee on each recorder thread
+  re-steps every live record and keeps a checkpoint only once it's the same bytes, else names the
+  unit and the field. The shard bench (64 matches): p99 23.6 ms with checkpoints, 23.9 without, 90
+  and 89 matches a core. The referee: about 83 µs a tick re-stepped, a match's sim again (40 agents
+  in four matches: 18,012 ticks in 1.5 s, 600 hashes and 11 checkpoints, none astray).
+- Spectators start from the last verified checkpoint a minute behind (`/records/{id}/checkpoint`),
+  not the record's first tick; `el-replay verify` resumes each `{id}.ck` to the record's end.
+- A server killed outright, or stopped, leaves each live match's record part, checkpoint and lobby
+  file; the next one on the same `--records` takes them up from the last hash and the players rejoin
+  with their tokens: four matches two and a half minutes in, killed with SIGKILL, were taken up by
+  the next server in under half a second, 56 to 83 ms each, about 120 bytes of record lost each
+  (`el-server/tests/recover.rs`, and `scripts/e2e.sh recover` under the page). The self-signed
+  certificate and the resume tokens' hashes are kept beside them, and the page asks for the
+  certificate's hash again on every redial. Rejoin and resume tokens are kept only as their
+  keccak-256.
+- A match that panics stops alone, no contest, its shard's others going on; a shard that stops
+  ticking is taken as gone.
