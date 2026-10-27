@@ -31,5 +31,8 @@ tracing-subscriber.workspace = true
 hex.workspace = true
 futures.workspace = true
 
+[dev-dependencies]
+el-bot = { path = "../el-bot" }
+
 [lints]
 workspace = true

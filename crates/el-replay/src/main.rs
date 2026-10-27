@@ -1,6 +1,7 @@
 //! Records (`.elr`, `el_sim::record`) from the command line.
 //!
-//!   el-replay verify records/            # every record: re-stepped, every hash checked
+//!   el-replay verify records/            # every record: re-stepped, every hash checked, and its
+//!                                        # checkpoint (`{id}.ck`) resumed to the same end
 //!   el-replay verify a.elr b.elr
 //!   el-replay dump a.elr [--ticks]       # the header, the hashes, the seats, the outcome
 //!
@@ -40,7 +41,9 @@ fn files(paths: &[PathBuf]) -> anyhow::Result<Vec<PathBuf>> {
         if p.is_dir() {
             let mut inner: Vec<PathBuf> = std::fs::read_dir(p)?
                 .filter_map(|e| e.ok().map(|e| e.path()))
-                .filter(|p| p.extension().is_some_and(|e| e == "elr"))
+                .filter(|p| {
+                    p.extension().is_some_and(|e| e == "elr") || p.to_string_lossy().ends_with(".elr.part")
+                })
                 .collect();
             inner.sort();
             out.extend(inner);
@@ -80,9 +83,31 @@ fn verify(map: &'static Map, path: &Path) -> anyhow::Result<()> {
         anyhow::bail!("{}: a frame at byte {at} doesn't read ({e})", path.display());
     }
     r.flush();
+    // The checkpoint beside it, if there is one: resumed, the record takes it to the same end.
+    let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let id = name.trim_end_matches(".part").trim_end_matches(".elr");
+    let ck_path = path.with_file_name(format!("{id}.ck"));
+    let checkpoint = match std::fs::read(&ck_path) {
+        Ok(ck) => {
+            let mut from = Referee::new(map);
+            from.resume(&ck).map_err(|e| anyhow::anyhow!("{}: {e}", ck_path.display()))?;
+            let tick = from.m.tick;
+            for f in Frames::new(&bytes) {
+                from.take(&f).map_err(|d| anyhow::anyhow!("{}: from it, {d:?}", ck_path.display()))?;
+            }
+            from.flush();
+            anyhow::ensure!(
+                (from.m.tick, from.m.hash()) == (r.m.tick, r.m.hash()),
+                "{}: from it, the record comes to another match",
+                ck_path.display()
+            );
+            format!(", its checkpoint at tick {tick} too")
+        }
+        Err(_) => String::new(),
+    };
     let outcome = r.outcome.map_or("unfinished".to_string(), |(t, w)| format!("team {w} won at tick {t}"));
     println!(
-        "{}: ok, {} ticks, {} hashes, {outcome}, re-stepped in {:.2} s",
+        "{}: ok, {} ticks, {} hashes, {outcome}, re-stepped in {:.2} s{checkpoint}",
         path.display(),
         r.m.tick,
         r.checked,

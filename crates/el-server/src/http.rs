@@ -2,7 +2,8 @@
 //! `serverCertificateHashes` (its `hash` is null when the certificate is CA-issued: nothing to pin),
 //! `/status` metrics and `/status.json`, the player count in the shape the Elo Pros launcher and
 //! store poll; `/online.json`, the signed-in wallets on now (the store's playtime); and the
-//! matches' records (`/records.json`, `/records/{id}`). The JSON routes answer pages on the store's origin too (CORS, `Config::cors_origins`),
+//! matches' records (`/records.json`, `/records/{id}`, and `/records/{id}/checkpoint`, the last
+//! checkpoint the referee verified within what's served, for a spectator to start from). The JSON routes answer pages on the store's origin too (CORS, `Config::cors_origins`),
 //! since the store serves the game's page from its own site.
 
 use std::path::PathBuf;
@@ -47,6 +48,7 @@ pub fn router(state: HttpState) -> Router {
         .route("/online.json", get(online))
         .route("/records.json", get(records_list))
         .route("/records/{id}", get(record))
+        .route("/records/{id}/checkpoint", get(checkpoint))
         .with_state(state)
         .layer(middleware::from_fn(move |req: Request, next: Next| {
             let origins = origins.clone();
@@ -119,6 +121,20 @@ async fn record(
     let bytes = s.records.as_ref().and_then(|r| r.lock().ok().and_then(|r| r.get(id)));
     match bytes {
         Some(b) => ([(header::CONTENT_TYPE, "application/octet-stream")], b).into_response(),
+        None => axum::http::StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+/// The checkpoint a spectator of record `id` may start from (a live match's at least a minute
+/// behind, as its record is).
+async fn checkpoint(
+    State(s): State<HttpState>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
+    use axum::response::IntoResponse;
+    let bytes = s.records.as_ref().and_then(|r| r.lock().ok().and_then(|r| r.checkpoint(&id)));
+    match bytes {
+        Some(b) => ([(header::CONTENT_TYPE, "application/octet-stream")], b.to_vec()).into_response(),
         None => axum::http::StatusCode::NOT_FOUND.into_response(),
     }
 }

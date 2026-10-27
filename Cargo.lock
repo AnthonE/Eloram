@@ -2887,6 +2887,7 @@ dependencies = [
  "crossbeam-queue",
  "el-alloc",
  "el-auth",
+ "el-bot",
  "el-client-core",
  "el-match",
  "el-proto",

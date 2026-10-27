@@ -40,6 +40,44 @@ pub fn self_signed_identity() -> anyhow::Result<(Identity, [u8; 32])> {
     Ok((identity, hash))
 }
 
+/// How long a kept self-signed certificate is used before a new one is made: well inside its 14
+/// days, so a page that pinned it a while ago still connects.
+const KEEP_CERT: Duration = Duration::from_secs(10 * 24 * 3_600);
+
+/// A self-signed identity kept in `dir` (`self-signed.pem`, `self-signed.key`) while it's young,
+/// so a restarted server has the hash its players' pages pinned; a new one otherwise (and without
+/// a directory).
+pub async fn kept_self_signed_identity(
+    dir: Option<&std::path::Path>,
+) -> anyhow::Result<(Identity, [u8; 32])> {
+    let Some(dir) = dir else { return self_signed_identity() };
+    let (cert, key) = (dir.join("self-signed.pem"), dir.join("self-signed.key"));
+    let young = std::fs::metadata(&cert)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.elapsed().ok())
+        .is_some_and(|age| age < KEEP_CERT);
+    if young && let Ok(kept) = pem_identity(&cert, &key).await {
+        return Ok(kept);
+    }
+    let (identity, hash) = self_signed_identity()?;
+    let stored = async {
+        // The key's file is the owner's alone before anything is written to it.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+            std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&key)?;
+            std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600))?;
+        }
+        identity.private_key().store_secret_pemfile(&key).await?;
+        identity.certificate_chain().store_pemfile(&cert).await
+    };
+    if let Err(e) = stored.await {
+        tracing::warn!("keeping the self-signed certificate in {}: {e}", dir.display());
+    }
+    Ok((identity, hash))
+}
+
 /// Binds dual-stack when the host has IPv6, IPv4-only otherwise (e.g. containers without IPv6).
 pub fn make_endpoint(port: u16, identity: Identity) -> anyhow::Result<Endpoint<Server>> {
     let build = |bind: IpBindConfig, identity: Identity| -> anyhow::Result<ServerConfig> {

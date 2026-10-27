@@ -10,9 +10,14 @@
 //! bot playing it meanwhile. A match whose players have all gone is kept [`REJOIN_FOR`] for them
 //! to come back to before it ends.
 //!
+//! A token is kept only as its keccak-256, here and in the match's lobby file (`{id}.live`, with a
+//! records directory), so a restart can give players their seats back (`crate::recover`) and
+//! nothing on disk can be used to take one.
+//!
 //! It runs on tokio and may lock: it is nowhere near a shard thread, which hears of a match only
 //! through its control queue, and only once its select is over.
 
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -24,6 +29,13 @@ use el_sim::units::{SEATS, team_of_seat};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::game::Game;
+use crate::recover::{LiveFile, Recovered};
+
+/// The winner a match that couldn't go on is given: neither team (the page says no contest).
+pub const NO_CONTEST: u8 = 2;
+/// A shard whose tick hasn't moved for this long, with matches in it, is taken as gone: its
+/// matches are ended and no more are put on it.
+const STALLED: Duration = Duration::from_secs(3);
 
 /// How long a finished match is kept (its last snapshots say who won) before its place is freed.
 const AFTER: Duration = Duration::from_secs(5);
@@ -69,6 +81,8 @@ struct Waiting {
     agent: bool,
     max_datagram: u16,
     tx: UnboundedSender<LobbyEvent>,
+    /// The rejoin token it came with (rejoining; empty in the queue).
+    token: String,
 }
 
 struct Live {
@@ -81,19 +95,24 @@ struct Live {
     empty_since: Option<Instant>,
     /// What a player is told of the match, their seat and token aside.
     told: ToClient,
-    /// Each seat's rejoin token (0: none, a bot's seat from the start).
-    tokens: [u128; SEATS],
+    /// Each seat's rejoin token's keccak-256 (zeros: none, a bot's seat from the start).
+    tokens: [[u8; 32]; SEATS],
     /// Rejoins waiting for their seat's old session to hand its lease back.
     pending: Vec<(u8, Waiting)>,
 }
 
+/// What a rejoin token is kept as.
+fn token_hash(token: &str) -> [u8; 32] {
+    el_auth::keccak256(token.as_bytes())
+}
+
 impl Live {
     /// What `seat` is told of the match: everything, and its rejoin token.
-    fn match_msg(&self, seat: u8) -> ToClient {
+    fn match_msg(&self, seat: u8, token: &str) -> ToClient {
         let mut msg = self.told.clone();
         if let ToClient::Match { seat: s, rejoin, .. } = &mut msg {
             *s = seat;
-            *rejoin = format!("{:032x}", self.tokens[usize::from(seat)]);
+            *rejoin = token.to_string();
         }
         msg
     }
@@ -228,12 +247,18 @@ struct Inner {
     live: Vec<Live>,
     next: u64,
     started: u64,
+    /// Each shard's tick when it last moved, and when that was.
+    beats: Vec<(u64, Instant)>,
+    /// Shards taken as gone.
+    dead: Vec<bool>,
 }
 
 pub struct Lobby {
     pub game: Game,
     fill_after: Duration,
     select_for: Duration,
+    /// Where each live match's lobby file goes (`{id}.live`), if anywhere.
+    dir: Option<PathBuf>,
     inner: Mutex<Inner>,
 }
 
@@ -244,14 +269,48 @@ fn bots_roster() -> Vec<Player> {
 
 impl Lobby {
     pub fn new(game: Game, fill_after: Duration, select_for: Duration) -> Arc<Lobby> {
+        Self::with_state(game, fill_after, select_for, None, Vec::new())
+    }
+
+    /// A lobby that keeps each live match's lobby file in `dir`, holding the matches a restart
+    /// took up (`recovered`) for their players to rejoin.
+    pub fn with_state(
+        game: Game,
+        fill_after: Duration,
+        select_for: Duration,
+        dir: Option<PathBuf>,
+        recovered: Vec<Recovered>,
+    ) -> Arc<Lobby> {
         let seed = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(1, |d| d.as_nanos() as u64);
+        let now = Instant::now();
+        let live = recovered
+            .into_iter()
+            .map(|r| Live {
+                shard: r.shard,
+                m: r.m,
+                sessions: Vec::new(),
+                over_at: None,
+                empty_since: Some(now),
+                tokens: r.live.token_hashes(),
+                told: r.live.told,
+                pending: Vec::new(),
+            })
+            .collect();
+        let shards = game.shards.len();
         Arc::new(Lobby {
             game,
             fill_after,
             select_for,
-            inner: Mutex::new(Inner { next: seed, ..Inner::default() }),
+            dir,
+            inner: Mutex::new(Inner {
+                next: seed,
+                live,
+                beats: vec![(0, now); shards],
+                dead: vec![false; shards],
+                ..Inner::default()
+            }),
         })
     }
 
@@ -271,7 +330,14 @@ impl Lobby {
         let mut inner = self.inner();
         Self::out_of_select(&mut inner, session);
         inner.queue.retain(|w| w.session != session);
-        inner.queue.push(Waiting { session, name: name.to_string(), agent, max_datagram, tx });
+        inner.queue.push(Waiting {
+            session,
+            name: name.to_string(),
+            agent,
+            max_datagram,
+            tx,
+            token: String::new(),
+        });
         if inner.since.is_none() {
             inner.since = Some(Instant::now());
         }
@@ -385,14 +451,16 @@ impl Lobby {
         else {
             return false;
         };
+        let token = format!("{token:032x}");
+        let hash = token_hash(&token);
         let mut inner = self.inner();
         inner.queue.retain(|w| w.session != session);
         Self::out_of_select(&mut inner, session);
-        let Some(l) = inner.live.iter_mut().find(|l| l.over_at.is_none() && l.tokens.contains(&token)) else {
+        let Some(l) = inner.live.iter_mut().find(|l| l.over_at.is_none() && l.tokens.contains(&hash)) else {
             return false;
         };
-        let Some(seat) = l.tokens.iter().position(|&t| t == token).map(|s| s as u8) else { return false };
-        let w = Waiting { session, name: name.to_string(), agent, max_datagram, tx };
+        let Some(seat) = l.tokens.iter().position(|t| *t == hash).map(|s| s as u8) else { return false };
+        let w = Waiting { session, name: name.to_string(), agent, max_datagram, tx, token };
         l.pending.retain(|(st, _)| *st != seat);
         if let Some((_, _, old)) = l.sessions.iter().find(|(_, st, _)| *st == seat) {
             if old.send(LobbyEvent::Replaced).is_ok() {
@@ -412,7 +480,8 @@ impl Lobby {
         let Some(lease) = self.game.take_lease(shard, g) else { return false };
         let shared = self.game.shards[shard].shared.clone();
         let _ = shared.control.push(Control::Seat { m, seat, max_datagram: w.max_datagram });
-        let seating = Seating { shard, m, seat, g, msg: l.match_msg(seat), lease, shared: shared.clone() };
+        let seating =
+            Seating { shard, m, seat, g, msg: l.match_msg(seat, &w.token), lease, shared: shared.clone() };
         if let Err(e) = w.tx.send(LobbyEvent::Seated(Box::new(seating))) {
             if let LobbyEvent::Seated(s) = e.0 {
                 let _ = shared.control.push(Control::Unseat { m, seat });
@@ -445,13 +514,43 @@ impl Lobby {
         let mut inner = self.inner();
         // Results.
         for (k, s) in self.game.shards.iter().enumerate() {
-            while let Some(Outcome::Over { m, winner, tick, hash }) = s.shared.outcomes.pop() {
-                tracing::info!(shard = k, m, winner, tick, hash = format_args!("{hash:016x}"), "match over");
-                if let Some(l) = inner.live.iter_mut().find(|l| l.shard == k && l.m == m) {
-                    l.over_at = Some(Instant::now());
-                    for (_, _, tx) in &l.sessions {
-                        let _ = tx.send(LobbyEvent::Over { winner });
+            while let Some(o) = s.shared.outcomes.pop() {
+                let (m, winner) = match o {
+                    Outcome::Over { m, winner, tick, hash } => {
+                        tracing::info!(
+                            shard = k,
+                            m,
+                            winner,
+                            tick,
+                            hash = format_args!("{hash:016x}"),
+                            "match over"
+                        );
+                        (m, winner)
                     }
+                    Outcome::Failed { m, tick } => {
+                        tracing::error!(shard = k, m, tick, "a match panicked: stopped, no contest");
+                        (m, NO_CONTEST)
+                    }
+                };
+                Self::over(&mut inner, k, m, winner);
+            }
+        }
+        // A shard whose thread has stopped ticking (it panicked outside a match): its matches are
+        // over, and nothing more goes on it.
+        let now = Instant::now();
+        for (k, s) in self.game.shards.iter().enumerate() {
+            let tick = s.shared.tick.load(std::sync::atomic::Ordering::Acquire);
+            if tick != inner.beats[k].0 {
+                inner.beats[k] = (tick, now);
+                continue;
+            }
+            let busy = inner.live.iter().any(|l| l.shard == k && l.over_at.is_none());
+            if busy && !inner.dead[k] && now.duration_since(inner.beats[k].1) >= STALLED {
+                tracing::error!(shard = k, tick, "a shard stopped ticking: its matches end, no contest");
+                inner.dead[k] = true;
+                let ms: Vec<u16> = inner.live.iter().filter(|l| l.shard == k).map(|l| l.m).collect();
+                for m in ms {
+                    Self::over(&mut inner, k, m, NO_CONTEST);
                 }
             }
         }
@@ -508,6 +607,16 @@ impl Lobby {
         self.start_due(&mut inner);
     }
 
+    /// Match `m` of shard `k` is over: its players told who won.
+    fn over(inner: &mut Inner, k: usize, m: u16, winner: u8) {
+        if let Some(l) = inner.live.iter_mut().find(|l| l.shard == k && l.m == m && l.over_at.is_none()) {
+            l.over_at = Some(Instant::now());
+            for (_, _, tx) in &l.sessions {
+                let _ = tx.send(LobbyEvent::Over { winner });
+            }
+        }
+    }
+
     /// Starts every match whose select is over: its time up, or everyone in it ready.
     fn start_due(&self, inner: &mut Inner) {
         let now = Instant::now();
@@ -530,6 +639,9 @@ impl Lobby {
     fn free_match(&self, inner: &Inner) -> Option<(usize, u16)> {
         let mut best = None;
         for (k, s) in self.game.shards.iter().enumerate() {
+            if inner.dead[k] {
+                continue;
+            }
             let busy = inner.live.iter().filter(|l| l.shard == k).count()
                 + inner.selecting.iter().filter(|s| s.shard == k).count();
             let free = (0..self.game.matches_per_shard).find(|&m| {
@@ -558,7 +670,7 @@ impl Lobby {
         let secret = getrandom::u64().unwrap_or(seed.rotate_left(29) ^ 0x5EC2_E7C0_FFEE_D00D) | 1;
         let _ = shared.control.push(Control::Start { m, seed, picks, humans, secret });
         let mut sessions = Vec::new();
-        let mut tokens = [0u128; SEATS];
+        let mut tokens = [[0u8; 32]; SEATS];
         // What a player is told of the match: never the seed, from which every seat's augment
         // offers follow.
         let told = ToClient::Match {
@@ -578,14 +690,16 @@ impl Lobby {
             let _ = shared.control.push(Control::Seat { m, seat, max_datagram: p.max_datagram });
             let mut buf = [0u8; 16];
             let token = match getrandom::fill(&mut buf) {
-                Ok(()) => u128::from_le_bytes(buf).max(1),
-                Err(_) => 0,
+                Ok(()) => format!("{:032x}", u128::from_le_bytes(buf).max(1)),
+                Err(_) => String::new(),
             };
-            tokens[usize::from(seat)] = token;
+            if !token.is_empty() {
+                tokens[usize::from(seat)] = token_hash(&token);
+            }
             let mut msg = told.clone();
             if let ToClient::Match { seat: s, rejoin, .. } = &mut msg {
                 *s = seat;
-                *rejoin = if token == 0 { String::new() } else { format!("{token:032x}") };
+                *rejoin = token;
             }
             let seating = Seating { shard, m, seat, g, msg, lease, shared: shared.clone() };
             if let Err(e) = p.tx.send(LobbyEvent::Seated(Box::new(seating))) {
@@ -603,6 +717,11 @@ impl Lobby {
             return None;
         }
         tracing::info!(shard, m, seed, humans = sessions.len(), "match started");
+        if let Some(dir) = &self.dir {
+            let hex = |t: &[u8; 32]| if *t == [0; 32] { String::new() } else { hex::encode(t) };
+            let file = LiveFile { told: told.clone(), tokens: tokens.iter().map(hex).collect() };
+            file.write(dir, &format!("{seed:016x}"));
+        }
         Some(Live { shard, m, sessions, over_at: None, empty_since: None, told, tokens, pending: Vec::new() })
     }
 }

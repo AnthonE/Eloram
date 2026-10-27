@@ -53,9 +53,20 @@ struct Args {
     /// Seconds champion select lasts, unless everyone seated is ready sooner (0: none).
     #[arg(long, default_value_t = el_server::lobby::SELECT_FOR.as_secs_f64())]
     select_secs: f64,
-    /// Where finished matches' records are written (`{id}.elr`; `el-replay verify` checks them).
+    /// Where matches' records are written (`{id}.elr`; `el-replay verify` checks them), and the
+    /// state a restart takes up: live matches' records and checkpoints, the self-signed
+    /// certificate, resume tokens' hashes. A server started on the same directory carries on the
+    /// matches the last one left.
     #[arg(long)]
     records: Option<PathBuf>,
+    /// No referee re-stepping the live matches and checking their checkpoints (it costs about a
+    /// match's sim again; without it, a restart re-steps from the start of each record).
+    #[arg(long)]
+    no_referee: bool,
+    /// Seconds between a match's checkpoints (the referee checks each; a restart starts from the
+    /// last).
+    #[arg(long, default_value_t = 60.0)]
+    checkpoint_secs: f64,
     /// The hosts a wallet sign-in may name: the pages' (`elopros.com,game.elopros.com`). Repeat it
     /// or separate with commas. Without it, this server's own HTTP address.
     #[arg(long)]
@@ -92,6 +103,8 @@ fn main() -> anyhow::Result<()> {
         fill_after: std::time::Duration::from_secs_f64(args.fill_after.max(0.0)),
         select_for: std::time::Duration::from_secs_f64(args.select_secs.max(0.0)),
         records_dir: args.records,
+        referee: !args.no_referee,
+        checkpoint_secs: args.checkpoint_secs,
         siwe_domains: el_server::split_list(&args.siwe_domain),
         require_sign_in: args.require_sign_in,
         ..Config::default()
