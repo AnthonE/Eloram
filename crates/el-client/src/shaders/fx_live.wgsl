@@ -98,13 +98,15 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
             edge += pow(max(1.0 - q * 2.0, 0.0), 2.0) * 0.5;
         }
     } else if shape < 7.5 {
-        // A shield: a rim lit where the sphere turns from the eye, lines running down it.
+        // A shield: a rim lit where the sphere turns from the eye, lines running down it; its
+        // middle all but clear, so the unit inside reads through it (the fx suite's pictures: a
+        // fuller middle hid the dummy it was on).
         let n = normalize(in.world_normal);
         let eye = normalize(view.world_position - in.world_position.xyz);
-        let rim = pow(1.0 - abs(dot(n, eye)), 2.5);
+        let rim = pow(1.0 - abs(dot(n, eye)), 3.2);
         let lines = smoothstep(0.7, 1.0, sin(in.world_position.y * 22.0 + t * 5.0));
         edge = rim * 1.2;
-        core = rim * lines * 0.8 + 0.04;
+        core = rim * lines * 0.7 + 0.008;
     } else if shape < 8.5 {
         // A mark over the head: a silence's (a circle struck through), a reveal's (an open eye).
         let circle = ring(d, 0.75, 0.12);

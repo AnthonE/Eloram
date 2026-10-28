@@ -97,6 +97,9 @@ pub struct Session {
     pub feed: Vec<FeedLine>,
     /// Teammates' pings heard, all told.
     pub pings: u32,
+    /// The champion last asked to practise as (`?practice=1`, then `practice_champ`): what a
+    /// redial asks for again.
+    pub practice: Option<u8>,
     /// The client's events read so far.
     feed_read: u64,
 }
@@ -115,19 +118,32 @@ pub fn ping_words(kind: u8) -> &'static str {
 }
 
 impl Session {
-    /// The name in seat `s`.
+    /// The name in seat `s`: its player's, or (a record watched names no one) its champion's.
     pub fn name(&self, s: usize) -> &str {
-        self.roster.get(s).map_or("?", |p| p.name.as_str())
+        if let Some(p) = self.roster.get(s) {
+            return p.name.as_str();
+        }
+        let champs = match (&self.watch, &self.client) {
+            (Some(w), _) => &w.referee.m.champs,
+            (None, Some(c)) => &c.world.champs,
+            (None, None) => return "?",
+        };
+        champs.get(s).map_or("?", |c| c.def().name)
     }
 
-    /// Takes the client's new events into the kill feed (and anything else the page tallies), and
-    /// hands the pings among them to the scene.
+    /// Takes the new events (the client's, or what a match watched told) into the kill feed (and
+    /// anything else the page tallies), and hands the pings among them to the scene.
     pub fn read_events(&mut self, now: f64, mut ping: impl FnMut(&WireEvent)) {
-        let Some(c) = &self.client else { return };
-        let from = self.feed_read.max(c.feed_n.saturating_sub(el_client_core::client::FEED as u64));
+        const FEED: u64 = el_client_core::client::FEED as u64;
+        let (feed, feed_n) = match (&self.watch, &self.client) {
+            (Some(w), _) => (&w.told.feed, w.told.feed_n),
+            (None, Some(c)) => (&c.feed, c.feed_n),
+            (None, None) => return,
+        };
+        let from = self.feed_read.max(feed_n.saturating_sub(FEED));
+        let events: Vec<WireEvent> = (from..feed_n).map(|n| feed[(n % FEED) as usize].1).collect();
         let mut lines = Vec::new();
-        for n in from..c.feed_n {
-            let (_, e) = c.feed[(n % el_client_core::client::FEED as u64) as usize];
+        for e in events {
             match e {
                 WireEvent::Death { unit, killer } if usize::from(unit) < SEATS => {
                     let (u, k) = (usize::from(unit), usize::from(killer));
@@ -157,7 +173,7 @@ impl Session {
                 _ => {}
             }
         }
-        self.feed_read = c.feed_n;
+        self.feed_read = feed_n;
         self.feed.extend(lines);
         let keep = self.feed.len().saturating_sub(6);
         self.feed.drain(..keep);

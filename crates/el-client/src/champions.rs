@@ -5,15 +5,22 @@
 //!
 //! A champion seen to die stays where it fell, playing its death, until it lives again (or for a
 //! while, if it's an enemy no one sees come back). A champion hit flashes.
+//!
+//! Each is drawn with a rim of its team's light where it turns from the camera ([`Rim`],
+//! `shaders/rim.wgsl`), so its silhouette reads against the stone: Riot inks its champions'
+//! outlines; here the outline is lit.
 
 use bevy::gltf::Gltf;
+use bevy::pbr::{ExtendedMaterial, MaterialExtension};
 use bevy::prelude::*;
+use bevy::render::render_resource::{AsBindGroup, ShaderType};
+use bevy::shader::ShaderRef;
 use bevy::world_serialization::WorldInstanceReady;
 use el_client_core::client::{FEED, OWN_FEED, OwnEvent};
 use el_client_core::pose::{Clip, Layer, Poser, Seen};
 use el_proto::event::WireEvent;
 use el_sim::content::champions::CHAMPIONS;
-use el_sim::units::SEATS;
+use el_sim::units::{SEATS, team_of_seat};
 
 use crate::coords::S;
 use crate::dev_hooks::DevStatus;
@@ -32,6 +39,44 @@ const FLASH_STEPS: f32 = 4.0;
 const LIFT: f32 = 0.22;
 /// How tall a champion stands for its radius (a radius of 60 is 1.8 m).
 const HEIGHT: f32 = 3.0 * S;
+/// The rim: how bright at the very edge, how tight to it, and how much is kept underneath.
+const RIM: f32 = 0.9;
+const RIM_POWER: f32 = 3.0;
+const RIM_BELOW: f32 = 0.35;
+
+pub type RimMat = ExtendedMaterial<StandardMaterial, Rim>;
+
+/// A champion's rim of its team's light (`shaders/rim.wgsl`).
+#[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
+pub struct Rim {
+    #[uniform(100)]
+    pub params: RimParams,
+}
+
+#[derive(ShaderType, Debug, Clone, Copy, Default)]
+pub struct RimParams {
+    /// The colour (linear); w: its brightness at the edge.
+    pub color: Vec4,
+    /// x: the fresnel's power; y: how much is kept on what faces down.
+    pub shape: Vec4,
+}
+
+impl MaterialExtension for Rim {
+    fn fragment_shader() -> ShaderRef {
+        "embedded://el_client/shaders/rim.wgsl".into()
+    }
+}
+
+/// Team `team`'s rim.
+fn rim(team: u8) -> Rim {
+    let [r, g, b] = el_client_core::fx::look::world::TEAM[usize::from(team.min(1))].edge;
+    Rim {
+        params: RimParams {
+            color: Vec4::new(r, g, b, RIM),
+            shape: Vec4::new(RIM_POWER, RIM_BELOW, 0.0, 0.0),
+        },
+    }
+}
 
 /// A champion's model, once it's in: its scene, and its clips in a graph.
 struct Art {
@@ -74,7 +119,7 @@ struct Seats {
 #[derive(Component, Default)]
 struct Figure {
     player: Option<Entity>,
-    mats: Vec<(Handle<StandardMaterial>, LinearRgba)>,
+    mats: Vec<(Handle<RimMat>, LinearRgba)>,
     flash_step: u8,
 }
 
@@ -82,7 +127,9 @@ pub struct ChampionsPlugin;
 
 impl Plugin for ChampionsPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Models>()
+        bevy::asset::embedded_asset!(app, "shaders/rim.wgsl");
+        app.add_plugins(MaterialPlugin::<RimMat>::default())
+            .init_resource::<Models>()
             .init_resource::<Seats>()
             .add_systems(Update, (load, (spawn, animate).chain().after(ViewSet)));
     }
@@ -183,11 +230,16 @@ fn ready(
     children: Query<&Children>,
     players: Query<(), With<AnimationPlayer>>,
     meshes: Query<&MeshMaterial3d<StandardMaterial>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    materials: Res<Assets<StandardMaterial>>,
+    mut rims: ResMut<Assets<RimMat>>,
     mut figures: Query<&mut Figure>,
 ) {
     let e = event.event_target();
-    let Some(d) = seats.seats.iter().find_map(|s| s.figure.filter(|f| f.1 == e).map(|f| f.0)) else { return };
+    let Some((seat, d)) =
+        seats.seats.iter().enumerate().find_map(|(i, s)| s.figure.filter(|f| f.1 == e).map(|f| (i, f.0)))
+    else {
+        return;
+    };
     let Some(art) = &models.ready[d] else { return };
     let Ok(mut figure) = figures.get_mut(e) else { return };
     for c in children.iter_descendants(e) {
@@ -208,8 +260,8 @@ fn ready(
                 own.emissive = LinearRgba::rgb(LIFT, LIFT, LIFT);
             }
             let glow = own.emissive;
-            let h = materials.add(own);
-            commands.entity(c).insert(MeshMaterial3d(h.clone()));
+            let h = rims.add(ExtendedMaterial { base: own, extension: rim(team_of_seat(seat)) });
+            commands.entity(c).remove::<MeshMaterial3d<StandardMaterial>>().insert(MeshMaterial3d(h.clone()));
             figure.mats.push((h, glow));
         }
     }
@@ -226,7 +278,7 @@ fn animate(
     mut parts: Query<&mut Visibility, (Without<UnitView>, Without<Figure>)>,
     mut figures: Query<(&mut Figure, &mut Transform, &mut Visibility), Without<UnitView>>,
     mut players: Query<&mut AnimationPlayer>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<RimMat>>,
     mut dev: ResMut<DevStatus>,
 ) {
     let now = now_s();
@@ -404,7 +456,7 @@ fn animate(
             let k = f32::from(step) / FLASH_STEPS * 0.55;
             for (h, glow) in &figure.mats {
                 if let Some(mut m) = materials.get_mut(h) {
-                    m.emissive = *glow + LinearRgba::rgb(k, k, k);
+                    m.base.emissive = *glow + LinearRgba::rgb(k, k, k);
                 }
             }
         }

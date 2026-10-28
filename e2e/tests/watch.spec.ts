@@ -14,7 +14,7 @@ const until = async (page: any, what: string, pred: (s: Record<string, any>) => 
 // An agent plays (scripts/e2e.sh starts one): the page watches its match from the record, a
 // minute behind, every hash checked on the way; then plays the same record back from the start.
 test("watching a live match, then its replay", async ({ page, request }, info) => {
-  test.setTimeout(480_000);
+  test.setTimeout(660_000);
   const logs = collectConsole(page);
   // A record live long enough to show more than its header.
   let rec: any;
@@ -66,6 +66,9 @@ test("watching a live match, then its replay", async ({ page, request }, info) =
   }
   s = await until(page, "the replay's effects", (s) => s.fx_cues > 50 && s.fx_missiles > 0 && s.champion_casts > 0, 120_000);
   expect(s.watch_error).toBeUndefined();
+  // The kill feed, naming the champions (a record names no players).
+  s = await until(page, "a champion's fall in the feed", (s) => s.feed_deaths > 0, 150_000);
+  expect(String(s.feed_last)).toMatch(/^[A-Z][a-z]+ (slew [A-Z][a-z]+|fell)$/);
   await page.screenshot({ path: `artifacts/replay-${info.project.name}.png` });
   console.log(`watch status: ${JSON.stringify(s)}`);
 });

@@ -20,6 +20,10 @@ pub enum ToServer {
     /// Back into the seat a `Match` gave this `token` for, after the connection dropped (or the
     /// page reloaded). Answered with that `Match` again, or [`ToClient::NoSeat`].
     Rejoin { token: String },
+    /// A practice match as champion `champ` (`el_sim::practice`), on a server that holds them
+    /// (`el-server --practice`): at once, no champion select; asked again, a new one as another.
+    /// Answered with its `Match`, or [`ToClient::NoSeat`].
+    Practice { champ: u8 },
 }
 
 /// A seat in champion select with no champion shown: the other team's, unseen until the match.
@@ -58,6 +62,9 @@ pub enum ToClient {
         roster: Vec<Player>,
         #[serde(default)]
         rejoin: String,
+        /// A practice match (`el_sim::practice`): the client makes its copy one too.
+        #[serde(default)]
+        practice: bool,
     },
     /// A rejoin found no seat: the match is over, or the token isn't one.
     NoSeat,
@@ -89,6 +96,7 @@ mod tests {
             headliner: 4,
             roster: vec![Player { name: "Ash".into(), agent: false, bot: false }],
             rejoin: "00ff".into(),
+            practice: false,
         };
         let text = serde_json::to_string(&m).unwrap();
         assert!(text.starts_with(r#"{"t":"match","seat":3,"picks":[0,1,2"#), "{text}");
@@ -101,6 +109,7 @@ mod tests {
             (r#"{"t":"swap","champ":7}"#, ToServer::Swap { champ: 7 }),
             (r#"{"t":"ready"}"#, ToServer::Ready),
             (r#"{"t":"rejoin","token":"ab"}"#, ToServer::Rejoin { token: "ab".into() }),
+            (r#"{"t":"practice","champ":12}"#, ToServer::Practice { champ: 12 }),
         ] {
             assert_eq!(serde_json::from_str::<ToServer>(json).unwrap(), msg);
         }

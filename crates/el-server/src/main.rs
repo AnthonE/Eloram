@@ -74,6 +74,10 @@ struct Args {
     /// People must sign in with a wallet to play (agents may still come as guests).
     #[arg(long)]
     require_sign_in: bool,
+    /// Practice matches may be asked for (the page's `?practice=1`): one seat, any champion,
+    /// every rank, no cooldowns, target dummies (`docs/FX.md`, "Practice").
+    #[arg(long)]
+    practice: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -107,6 +111,7 @@ fn main() -> anyhow::Result<()> {
         checkpoint_secs: args.checkpoint_secs,
         siwe_domains: el_server::split_list(&args.siwe_domain),
         require_sign_in: args.require_sign_in,
+        practice: args.practice,
         ..Config::default()
     };
     // Two workers are plenty: the matches run on their own shard threads.

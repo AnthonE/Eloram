@@ -32,6 +32,7 @@ fn rewrite(bytes: &[u8], mut edit: impl FnMut(Frame) -> Option<Frame>) -> Vec<u8
             Frame::Outcome { tick, winner } => record::write_outcome(&mut buf, tick, winner),
             Frame::Seat { tick, seat, joined } => record::write_seat(&mut buf, tick, seat, joined),
             Frame::Key { tick, seat, screen, key } => record::write_key(&mut buf, tick, seat, screen, key),
+            Frame::Practice => record::write_practice(&mut buf),
         };
         out.extend_from_slice(&buf[..n]);
     }
@@ -161,4 +162,26 @@ fn one_order_changed_is_caught_at_the_next_hash() {
         other => panic!("not caught: {:?}", other.map(|r| r.checked)),
     }
     assert!(replay(&bytes).is_ok(), "the record as it was still replays");
+}
+
+#[test]
+fn a_practice_match_is_recorded_as_one_and_replays() {
+    // The player walks about; the shard's bots are the dummies.
+    let mut rig = Rig::practice(23, vec![(0, BAD, walker(2))]);
+    rig.run(60.0);
+    let bytes = rig.record.clone();
+    let frames: Vec<Frame> = Frames::new(&bytes).take(3).collect();
+    assert!(matches!(frames[0], Frame::Header(_)) && frames[1] == Frame::Practice, "{frames:?}");
+    let r = replay(&bytes).expect("the replay keeps to the record");
+    assert!(r.m.practice);
+    assert_eq!(r.m.hash(), rig.m().hash(), "and comes to the server's practice match");
+    let m = rig.m();
+    assert!(m.units[..el_sim::units::SEATS].iter().all(|u| u.alive), "no one dies in practice");
+    assert!(m.units[el_sim::units::FIRST_MINION..].iter().all(|u| !u.alive), "no minions march");
+    // The client's copy is practice too: its walk is predicted exactly from where practice put it.
+    let p = &rig.players[0];
+    let walking = p.corrections.iter().filter(|c| c.cause == el_client_core::Cause::Walking);
+    let worst = walking.clone().map(|c| c.error).fold(0.0, f32::max);
+    assert!(walking.count() > 500, "walking corrections");
+    assert!(worst < 1.0, "the walk predicted exactly: worst {worst}");
 }

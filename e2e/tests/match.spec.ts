@@ -123,6 +123,8 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   s = await until(page, "the minions walking", (s) => s.minions_drawn > 0 && clip(s, "run"), 120_000);
   s = await until(page, "the enemy in sight", (s) => s.enemy_mobile > 0, 120_000);
   s = await until(page, "a minion swinging", (s) => clip(s, "slash") || clip(s, "flick"), 60_000);
+  // A minion hit flashes alone (its materials are its kind's and team's, a set for each step).
+  s = await until(page, "a minion's flash", (s) => s.minion_flashes > 0, 60_000);
   const shot = await page.screenshot({ path: `${shots}-fight.png` });
   expect(luminanceStdDev(shot)).toBeGreaterThan(5);
   // Closer, over where the waves meet ahead of the champion (a picture to look at; the camera's

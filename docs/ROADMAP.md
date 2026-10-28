@@ -210,3 +210,13 @@ way, Brun's hammer turned the right way round. Measured: four models of 115 to 3
 as served with Dusk's textures, 2,000 to 3,000 triangles each; in a browser match twenty minions
 drawn at once, walking and swinging, the walk still exact, 0.69 frames a second in SwiftShader as
 before; 55 of Meshy's last 56 credits.
+
+Then the rest of what phases 6 and 7 left: a rim of each champion's team light where it turns from
+the camera (the outline Riot inks, lit instead); a minion's flash when hit, and the cart's wheels
+cut out of its mesh to turn as it rolls; the kill feed of a match watched. And practice
+(`FX.md`, step 4): `el-server --practice` and `?practice=1`, one seat as any champion with every
+rank and nothing on cooldown, nine dummies, no minions, its record saying so; and `scripts/e2e.sh
+fx`, every ability of every champion cast there, drawn and heard, with a contact sheet a champion.
+Measured: the golden hashes held (a checkpoint is a byte longer, `snapshot::VERSION` 2); in a
+browser match 149 minions flashed and the walk was still exact, 204 frames over the suite's main
+test against 208 before.

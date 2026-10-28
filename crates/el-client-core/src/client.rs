@@ -245,6 +245,13 @@ impl Client {
     }
 
     /// Whether the own champion's state has come (before it, there's nothing to predict or send).
+    /// Makes the client's copies of the match a practice one's, as the server's is (its
+    /// `ToClient::Match` said so): the prediction keeps practice's rules for the own champion.
+    pub fn set_practice(&mut self) {
+        self.world.set_practice();
+        self.pred.set_practice();
+    }
+
     pub fn started(&self) -> bool {
         self.started
     }

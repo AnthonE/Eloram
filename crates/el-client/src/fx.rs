@@ -22,9 +22,10 @@ pub struct Cues {
     /// The client the director was made for (its seat, or [`NO_SEAT`] for a match watched, and how
     /// much of its feed it had read).
     of: Option<(usize, u64)>,
-    /// Cues all told, and those with a sound.
+    /// Cues all told, and those with a sound; the own champion's casts.
     total: u64,
     sounded: u64,
+    own_casts: u64,
 }
 
 impl Cues {
@@ -104,8 +105,10 @@ fn direct(session: Res<Session>, mut cues: ResMut<Cues>, mut status: ResMut<crat
     }
     cues.total += cues.list.len() as u64;
     cues.sounded += cues.list.iter().filter(|q| q.sound.is_some()).count() as u64;
+    cues.own_casts += cues.list.iter().filter(|q| q.own && q.what == What::Part(Part::Cast)).count() as u64;
     status.set("fx_cues", cues.total as f64);
     status.set("fx_sounded", cues.sounded as f64);
+    status.set("fx_own_casts", cues.own_casts as f64);
 }
 
 /// A little shake for the viewer's own champion when something heavy lands on it.

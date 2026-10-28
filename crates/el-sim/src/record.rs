@@ -35,6 +35,7 @@ pub mod kind {
     pub const OUTCOME: u8 = 4;
     pub const SEAT: u8 = 5;
     pub const KEY: u8 = 6;
+    pub const PRACTICE: u8 = 7;
 }
 
 /// What a record is of.
@@ -86,6 +87,9 @@ pub enum Frame {
         screen: u8,
         key: u32,
     },
+    /// The match is a practice one (`crate::practice`): written just after the header, before any
+    /// tick. A record without one is a match like any other.
+    Practice,
 }
 
 /// Writes a frame's prefix and the payload `body` writes; its length, or 0 if `out` is too small.
@@ -112,6 +116,10 @@ fn write_u64(w: &mut BitWriter<'_>, v: u64) {
 
 fn read_u64(r: &mut BitReader<'_>) -> u64 {
     u64::from(r.read_u32()) | u64::from(r.read_u32()) << 32
+}
+
+pub fn write_practice(out: &mut [u8]) -> usize {
+    frame(out, kind::PRACTICE, |w| w.write_u8(1))
 }
 
 pub fn write_header(out: &mut [u8], h: &Header) -> usize {
@@ -230,6 +238,12 @@ pub fn read_frame(bytes: &[u8]) -> Result<Option<(Frame, usize)>, DecodeError> {
         kind::SEAT => Frame::Seat { tick: r.read_u32(), seat: r.read_u8(), joined: r.read_bool() },
         kind::KEY => {
             Frame::Key { tick: r.read_u32(), seat: r.read_u8(), screen: r.read_u8(), key: r.read_u32() }
+        }
+        kind::PRACTICE => {
+            if r.read_u8() != 1 {
+                return Err(DecodeError::Invalid);
+            }
+            Frame::Practice
         }
         _ => return Err(DecodeError::WrongKind),
     };
@@ -444,6 +458,12 @@ impl Referee {
             Frame::Outcome { tick, winner } => self.outcome = Some((tick, winner)),
             // Who holds a seat decides who votes.
             Frame::Seat { seat, joined, .. } => self.m.set_seated(usize::from(seat), joined),
+            Frame::Practice => {
+                if self.m.tick != 0 {
+                    return Err(Divergence::Gap { expected: 0, got: self.m.tick });
+                }
+                self.m.set_practice();
+            }
         }
         Ok(())
     }

@@ -148,6 +148,8 @@ struct Stats {
     peak: usize,
     lines: u32,
     last: &'static str,
+    /// The own champion's casts heard: their sounds started.
+    own_casts: u32,
 }
 
 fn js<T>(r: Result<T, JsValue>) -> Option<T> {
@@ -514,6 +516,9 @@ fn play(
                 e.playing.push(Playing { id, src, gain, ends: t + secs });
                 e.stats.played += 1;
                 e.stats.last = d.name;
+                if q.own && q.what == el_client_core::fx::director::What::Part(Part::Cast) {
+                    e.stats.own_casts += 1;
+                }
             }
             None => e.stats.missing += 1,
         }
@@ -548,6 +553,7 @@ fn play(
     status.set("audio_missing", e.stats.missing);
     status.set("audio_peak", e.stats.peak as u32);
     status.set("audio_lines", e.stats.lines);
+    status.set("audio_own_casts", e.stats.own_casts);
     status.set("audio_last", e.stats.last);
     status.set("audio_unlocked", e.unlocked.get());
 }

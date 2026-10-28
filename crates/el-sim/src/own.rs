@@ -271,6 +271,7 @@ impl Match {
         }
         self.aug_tiers = from.aug_tiers;
         self.headliner = from.headliner;
+        self.practice = from.practice;
         self.events.clear();
         self.events_dropped = 0;
         self.outcome = from.outcome;

@@ -180,6 +180,10 @@ enum Cmd {
         champ: u8,
     },
     Ready,
+    /// A practice match again, as champion `champ` (`?practice=1`).
+    PracticeChamp {
+        champ: u8,
+    },
     /// An ability's indicator shown, as if its key were held (`slot: null` lets go without casting).
     Aim {
         slot: Option<u8>,
@@ -197,7 +201,8 @@ enum Cmd {
     },
     /// The link closed under the page, as a lost connection would (it dials again).
     DropLink,
-    /// The camera freed and put over a point of the map (`zoom` as the wheel's, 0.7 to 1.4).
+    /// The camera freed and put over a point of the map (`zoom` as the wheel's, 1.4 out, and in to
+    /// 0.35: closer than the wheel goes, for pictures).
     Camera {
         x: f32,
         y: f32,
@@ -300,7 +305,7 @@ fn inbox(
                 rig.locked = false;
                 rig.placed = true;
                 rig.focus = Vec2::new(x, y);
-                rig.zoom = zoom.unwrap_or(rig.zoom).clamp(0.7, 1.4);
+                rig.zoom = zoom.unwrap_or(rig.zoom).clamp(0.35, 1.4);
                 continue;
             }
             Cmd::Fog { on } => {
@@ -329,6 +334,10 @@ fn inbox(
                 controls.lobby.push(ToServer::Ready);
                 continue;
             }
+            Cmd::PracticeChamp { champ } => {
+                controls.lobby.push(ToServer::Practice { champ });
+                continue;
+            }
             Cmd::Aim { slot } => {
                 controls.aiming = slot.filter(|&s| s < 6);
                 continue;
@@ -347,6 +356,11 @@ fn match_status(
     mut walk_max: Local<f32>,
     mut corrections: Local<(u64, u32)>,
 ) {
+    // The kill feed: deaths it has told, and its newest line.
+    status.set("feed_deaths", session.kd.iter().map(|&(_, d)| u32::from(d)).sum::<u32>());
+    if let Some(l) = session.feed.last() {
+        status.set("feed_last", l.text.as_str());
+    }
     if let Some(w) = session.watch.as_deref() {
         status.set("watch_tick", w.referee.m.tick);
         status.set("watch_available", w.available);
@@ -409,6 +423,19 @@ fn match_status(
     status.set("seat", s as u32);
     status.set("team", u32::from(c.team));
     status.set("champion", ch.def().name);
+    status.set("champion_def", u32::from(ch.def));
+    status.set("practice", c.pred.practice);
+    // How each of Q, W, E, R aims (the fx suite casts each at what it's for).
+    let kit: Vec<&str> = (0..4u8)
+        .map(|slot| match el_sim::content::champions::ability(ch.def, slot).target {
+            el_sim::content::Target::Dir => "dir",
+            el_sim::content::Target::Point => "point",
+            el_sim::content::Target::Enemy => "enemy",
+            el_sim::content::Target::Ally => "ally",
+            el_sim::content::Target::Caster => "caster",
+        })
+        .collect();
+    status.set("kit", kit.join(","));
     status.set("headliner", c.pred.headliner().name);
     status.set("aiming", controls.aiming.map_or(-1, i32::from));
     status.set("keys", if controls.wasd { "wasd" } else { "league" });

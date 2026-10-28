@@ -31,7 +31,7 @@ use crate::zone::Zone;
 
 pub const MAGIC: [u8; 4] = *b"ELS1";
 /// Bumped whenever the layout changes (a field added, a width changed).
-pub const VERSION: u16 = 1;
+pub const VERSION: u16 = 2;
 /// Magic, version, content version, tick, and the three pools' sizes.
 const HEAD: usize = 4 + 2 + 4 + 4 + 3 * 2;
 /// The FNV-1a digest of everything before it.
@@ -650,6 +650,7 @@ fn body(m: &Match, o: &mut Out<'_>) {
         seated,
         surrender,
         path_budget: _,
+        practice,
     } = m;
     seed.put(o);
     tick.put(o);
@@ -672,6 +673,7 @@ fn body(m: &Match, o: &mut Out<'_>) {
     outcome.put(o);
     seated.put(o);
     surrender.put(o);
+    practice.put(o);
 }
 
 /// The bytes a checkpoint of `m` takes: the same for every match on its map.
@@ -786,6 +788,7 @@ pub fn read(b: &[u8], m: &mut Match) -> Result<(), SnapError> {
         seated,
         surrender,
         path_budget,
+        practice,
     } = m;
     seed.get(&mut i)?;
     tick.get(&mut i)?;
@@ -808,6 +811,7 @@ pub fn read(b: &[u8], m: &mut Match) -> Result<(), SnapError> {
     outcome.get(&mut i)?;
     seated.get(&mut i)?;
     surrender.get(&mut i)?;
+    practice.get(&mut i)?;
     *offer_secret = None;
     *keys_drawn_n = 0;
     events.clear();
@@ -888,6 +892,7 @@ pub fn diff(a: &Match, b: &Match) -> Option<Where> {
         seated,
         surrender,
         path_budget: _,
+        practice,
     } = a;
     let m = "match";
     one(m, None, "seed", seed, &b.seed)
@@ -911,4 +916,5 @@ pub fn diff(a: &Match, b: &Match) -> Option<Where> {
         .or_else(|| one(m, None, "outcome", outcome, &b.outcome))
         .or_else(|| one(m, None, "seated", seated, &b.seated))
         .or_else(|| slots("vote", surrender, &b.surrender))
+        .or_else(|| one(m, None, "practice", practice, &b.practice))
 }

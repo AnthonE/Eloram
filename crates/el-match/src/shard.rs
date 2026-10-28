@@ -167,7 +167,7 @@ impl Shard {
 
     fn control(&mut self, c: Control) {
         match c {
-            Control::Start { m, seed, picks, humans, secret } => {
+            Control::Start { m, seed, picks, humans, secret, practice } => {
                 let m = usize::from(m);
                 if m >= self.cfg.matches {
                     return;
@@ -178,6 +178,11 @@ impl Shard {
                 }
                 let n = record::write_header(&mut self.frame, &record::Header::new(seed, picks));
                 self.record(m, n);
+                if practice {
+                    self.matches[m].set_practice();
+                    let n = record::write_practice(&mut self.frame);
+                    self.record(m, n);
+                }
                 for seat in 0..SEATS {
                     let g = m * SEATS + seat;
                     self.seats[g] = SeatNet::default();

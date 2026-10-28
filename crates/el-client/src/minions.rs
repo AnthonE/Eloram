@@ -1,13 +1,16 @@
 //! The minions drawn (`docs/CHAMPIONS.md`, "The minions"): a model a kind
 //! (`web/assets/models/minions/`), fetched once a match is on, hung under each minion slot's unit
 //! and posed by `el_client_core::pose` as the champions are: they walk, swing as their windup
-//! ends, flinch, are thrown up and fall. The siege cart has no rig: it rocks as it rolls and kicks
-//! back when it fires. Until a model is in, the slot's primitive stands in (`view.rs`).
+//! ends, flinch, are thrown up and fall. The siege cart has no rig: its wheels turn as it rolls (the
+//! pipeline cut them out of its body, each a node `wheel<k>` turning on its own X), it rocks, and
+//! it kicks back when it fires. Until a model is in, the slot's primitive stands in (`view.rs`).
 //!
 //! One model serves both teams. Each of its materials is made once a team and shared by every
 //! minion of that kind and team: Dusk's with its own texture (the blues Meshy painted turned red,
 //! `art/tools/champions.mjs`), each a little toward its team's light, and the band of what it holds
 //! that is the team's (`team`: a shield's face, a staff's stone, a hammer's head) in that light.
+//! A hit flashes it, fading in steps: each step is a material of its own, shared as the rest are,
+//! and a minion hit wears the step it's at.
 //!
 //! A minion seen to die falls where it was, lies a moment and sinks into the floor.
 
@@ -43,6 +46,12 @@ const LIFT: f32 = 0.14;
 /// The cart's kick when it fires (of its height) and how long it takes to settle (s).
 const KICK: f32 = 0.09;
 const SETTLE: f64 = 0.35;
+/// A hit's flash (s) and the steps it fades in, as a champion's (`champions.rs`), a little dimmer.
+const FLASH: f64 = 0.16;
+const FLASH_STEPS: usize = 3;
+const FLASH_GLOW: f32 = 0.45;
+/// A wheel's radius, of the cart's height (`art/tools/champions.mjs`'s `WHEEL`).
+const WHEEL: f32 = 0.22;
 
 /// A model, once it's in: its scene, and its clips in a graph.
 struct Art {
@@ -56,8 +65,9 @@ struct Models {
     asked: [Option<Handle<Gltf>>; MINIONS.len()],
     dusk: [Option<Handle<Image>>; MINIONS.len()],
     ready: [Option<Art>; MINIONS.len()],
-    /// A model's material as each team's, by the material its scene came with.
-    mats: HashMap<AssetId<StandardMaterial>, [Handle<StandardMaterial>; 2]>,
+    /// A model's material as each team's, by the material its scene came with: unlit by a hit, then
+    /// each step of a hit's flash.
+    mats: HashMap<AssetId<StandardMaterial>, [[Handle<StandardMaterial>; FLASH_STEPS + 1]; 2]>,
 }
 
 /// A minion slot's figure.
@@ -76,6 +86,11 @@ struct Slot {
     /// The cart: whether it was winding up, and when it last fired.
     winding: bool,
     fired: f64,
+    /// When it was last hit.
+    hit_at: f64,
+    /// How far its wheels have turned (radians), as of when.
+    spin: f32,
+    spun_at: f64,
 }
 
 #[derive(Resource)]
@@ -98,8 +113,11 @@ struct Figure {
     model: usize,
     player: Option<Entity>,
     meshes: Vec<(Entity, AssetId<StandardMaterial>)>,
-    /// The team whose materials it wears.
+    /// The team whose materials it wears, and the step of a hit's flash.
     team: Option<u8>,
+    flash: usize,
+    /// The cart's wheels, each as its scene placed it.
+    wheels: Vec<(Entity, Transform)>,
 }
 
 pub struct MinionsPlugin;
@@ -151,6 +169,7 @@ fn load(
 
 /// A figure's scene is in: its clips' graph on its player, and its meshes noted (their team's
 /// materials are put on as it's drawn).
+#[allow(clippy::too_many_arguments)]
 fn ready(
     event: On<WorldInstanceReady>,
     mut commands: Commands,
@@ -158,6 +177,7 @@ fn ready(
     children: Query<&Children>,
     players: Query<(), With<AnimationPlayer>>,
     meshes: Query<&MeshMaterial3d<StandardMaterial>>,
+    nodes: Query<(&Name, &Transform)>,
     mut figures: Query<&mut Figure>,
 ) {
     let e = event.event_target();
@@ -171,6 +191,12 @@ fn ready(
         if let Ok(m) = meshes.get(c) {
             figure.meshes.push((c, m.0.id()));
         }
+        // The node `wheel<k>` (not its primitive under it, named for its mesh: `wheel<k>.0`).
+        if let Ok((name, tf)) = nodes.get(c)
+            && name.as_str().strip_prefix("wheel").is_some_and(|k| k.bytes().all(|b| b.is_ascii_digit()))
+        {
+            figure.wheels.push((c, *tf));
+        }
     }
     // Not dressed yet.
     figure.team = None;
@@ -183,9 +209,27 @@ fn team_mats(
     team_band: bool,
     dusk: Option<&Handle<Image>>,
     materials: &mut Assets<StandardMaterial>,
-) -> [Handle<StandardMaterial>; 2] {
-    use el_client_core::fx::look::world::TEAM as LIGHT;
+) -> [[Handle<StandardMaterial>; FLASH_STEPS + 1]; 2] {
     std::array::from_fn(|t| {
+        let m = team_mat(original, t, team_band, dusk);
+        std::array::from_fn(|step| {
+            let mut m = m.clone();
+            let k = step as f32 / FLASH_STEPS as f32 * FLASH_GLOW;
+            m.emissive += LinearRgba::rgb(k, k, k);
+            materials.add(m)
+        })
+    })
+}
+
+/// A model's material as team `t`'s.
+fn team_mat(
+    original: &StandardMaterial,
+    t: usize,
+    team_band: bool,
+    dusk: Option<&Handle<Image>>,
+) -> StandardMaterial {
+    use el_client_core::fx::look::world::TEAM as LIGHT;
+    {
         let mut m = original.clone();
         m.double_sided = true;
         m.cull_mode = None;
@@ -195,7 +239,7 @@ fn team_mats(
             let glows = original.emissive.red > 0.5;
             m.base_color = crate::view::TEAM[t];
             m.emissive = if glows { LinearRgba::rgb(r, g, b) * 1.2 } else { LinearRgba::rgb(r, g, b) * 0.12 };
-            return materials.add(m);
+            return m;
         }
         if t == 1
             && m.base_color_texture.is_some()
@@ -211,8 +255,8 @@ fn team_mats(
             m.emissive_texture = m.base_color_texture.clone();
             m.emissive = LinearRgba::rgb(LIFT, LIFT, LIFT);
         }
-        materials.add(m)
-    })
+        m
+    }
 }
 
 /// What each minion slot's unit is doing, and its figure drawn doing it.
@@ -229,7 +273,9 @@ fn animate(
     names: Query<&GltfMaterialName>,
     mut players: Query<&mut AnimationPlayer>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut wheels: Query<&mut Transform, (Without<UnitView>, Without<Figure>)>,
     mut dev: ResMut<DevStatus>,
+    mut flashes: Local<u64>,
 ) {
     let now = now_s();
     let watch = session.watch.as_deref();
@@ -259,11 +305,31 @@ fn animate(
             {
                 s.fell = Some(now);
             }
+            if let WireEvent::Damage { target, .. } = e
+                && let Some(s) =
+                    usize::from(target).checked_sub(FIRST_MINION).and_then(|k| slots.slots.get_mut(k))
+            {
+                s.hit_at = now;
+            }
             n += 1;
         }
         slots.feed_read = n;
     }
+    // A match watched: its hits, already at the tick drawn (every death is seen as it is).
+    if let Some(w) = watch {
+        let (feed, feed_n) = (&w.told.feed, w.told.feed_n);
+        for n in slots.feed_read.max(feed_n.saturating_sub(FEED as u64))..feed_n {
+            if let WireEvent::Damage { target, .. } = feed[(n % FEED as u64) as usize].1
+                && let Some(s) =
+                    usize::from(target).checked_sub(FIRST_MINION).and_then(|k| slots.slots.get_mut(k))
+            {
+                s.hit_at = now;
+            }
+        }
+        slots.feed_read = feed_n;
+    }
     let mut shown = 0;
+    let mut turning = 0u32;
     let mut clips: HashMap<&'static str, u32> = HashMap::new();
     for (root, view, mut tf, mut vis) in &mut views {
         let i = view.slot;
@@ -349,9 +415,15 @@ fn animate(
             fvis.set_if_neq(Visibility::Hidden);
             continue;
         }
-        // Its team's materials, made once a model and team.
+        // Its team's materials, made once a model and team, at the step of a hit's flash it's at.
         let team = team.min(1);
-        if figure.team != Some(team) {
+        let t = ((now - slot.hit_at) / FLASH) as f32;
+        let flash = if (0.0..1.0).contains(&t) && !lying {
+            FLASH_STEPS - ((t * FLASH_STEPS as f32) as usize).min(FLASH_STEPS - 1)
+        } else {
+            0
+        };
+        if figure.team != Some(team) || figure.flash != flash {
             for &(e, orig) in &figure.meshes {
                 let mats = match models.mats.get(&orig) {
                     Some(h) => h.clone(),
@@ -363,9 +435,13 @@ fn animate(
                         h
                     }
                 };
-                commands.entity(e).insert(MeshMaterial3d(mats[usize::from(team)].clone()));
+                commands.entity(e).insert(MeshMaterial3d(mats[usize::from(team)][flash].clone()));
+            }
+            if figure.flash == 0 && flash > 0 {
+                *flashes += 1;
             }
             figure.team = Some(team);
+            figure.flash = flash;
         }
         if let Ok(mut v) = parts.get_mut(view.body) {
             v.set_if_neq(Visibility::Hidden);
@@ -416,8 +492,23 @@ fn animate(
             slot.winding = winding;
             let k = ((now - slot.fired) / SETTLE) as f32;
             let kick = if (0.0..1.0).contains(&k) { (1.0 - k) * (1.0 - k) } else { 0.0 };
-            let roll =
-                if s.speed > el_client_core::pose::MOVING { (now * 9.0).sin() as f32 * 0.035 } else { 0.0 };
+            let rolling = s.speed > el_client_core::pose::MOVING && !lying;
+            let roll = if rolling { (now * 9.0).sin() as f32 * 0.035 } else { 0.0 };
+            // Its wheels turn as far as it rolled: the rim's speed is its own.
+            let dt = (now - slot.spun_at).clamp(0.0, 0.25) as f32;
+            slot.spun_at = now;
+            if rolling {
+                slot.spin = (slot.spin + s.speed * dt / (WHEEL * height)) % std::f32::consts::TAU;
+                turning += figure.wheels.len() as u32;
+            }
+            for &(w, rest) in &figure.wheels {
+                if let Ok(mut wtf) = wheels.get_mut(w) {
+                    wtf.set_if_neq(Transform {
+                        rotation: rest.rotation * Quat::from_rotation_x(slot.spin),
+                        ..rest
+                    });
+                }
+            }
             place.translation += place.rotation * Vec3::new(0.0, 0.0, -kick * KICK * height);
             place.rotation *= Quat::from_rotation_x(-kick * 0.12 + roll);
             let state = if lying {
@@ -434,6 +525,8 @@ fn animate(
     }
     dev.set("minion_models", models.ready.iter().filter(|a| a.is_some()).count());
     dev.set("minions_drawn", shown);
+    dev.set("minion_flashes", *flashes as f64);
+    dev.set("wheels_turning", turning);
     let mut by: Vec<_> = clips.into_iter().collect();
     by.sort();
     dev.set("minion_clips", by.iter().map(|(c, n)| format!("{c}:{n}")).collect::<Vec<_>>().join(","));

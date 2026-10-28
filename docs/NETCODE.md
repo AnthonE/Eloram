@@ -236,6 +236,10 @@ Before Colony's, sized for a match:
   a match without allocating; a recorder thread a shard keeps them (`el-server/src/records.rs`;
   `--records dir` writes them out). Measured: 25 KB a match a minute with two people and eight bots,
   about 500 KB for twenty minutes.
+- A practice match (`el_sim::practice`, `el-server --practice`) is said so by a frame of its own
+  right after the header, before any tick: its rules are the record's like everything else, and a
+  record without one is a match like any other (`el-sim/tests/practice.rs`: the same inputs without
+  it go astray). Its dummies' doings are inputs, recorded as a bot's are.
 - **A referee** (`el_sim::record::Referee`) re-steps a record and checks every hash: `el-replay
   verify` over files, every spectator's page as it watches, and the server itself, live. A
   divergence is named to the 30 ticks it happened in; one order changed in a record is caught at the

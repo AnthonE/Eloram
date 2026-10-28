@@ -64,6 +64,8 @@ pub struct Config {
     pub siwe_domains: Vec<String>,
     /// People must sign in with a wallet (agents may still play as guests).
     pub require_sign_in: bool,
+    /// Practice matches may be asked for (`el_sim::practice`, `ToServer::Practice`).
+    pub practice: bool,
 }
 
 impl Default for Config {
@@ -86,6 +88,7 @@ impl Default for Config {
             checkpoint_secs: 60.0,
             siwe_domains: Vec::new(),
             require_sign_in: false,
+            practice: false,
         }
     }
 }
@@ -167,6 +170,9 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
                 cfg.records_dir.clone(),
                 recovered,
             );
+            if cfg.practice {
+                lobby.allow_practice();
+            }
             tokio::spawn(lobby.clone().run());
             Some(lobby)
         }

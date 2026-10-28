@@ -320,7 +320,12 @@ fn talk(
                 session.session = Some(id);
                 session.signed_in = flags & welcome_flags::SIGNED_IN != 0;
                 session.phase = Phase::Lobby;
-                if cfg.0.queue {
+                if let Some(champ) = session.practice.or(cfg.0.practice) {
+                    // A practice match is never come back to: a new one, as the champion last
+                    // asked for.
+                    session.practice = Some(champ);
+                    send_lobby(&t, &ToServer::Practice { champ });
+                } else if cfg.0.queue {
                     // Back to the seat this tab had, if its match may still be on.
                     match crate::config::rejoin_token() {
                         Some(token) => {
@@ -386,14 +391,25 @@ fn talk(
                     session.phase = Phase::Selecting;
                 }
                 Ok(m @ ToClient::Match { .. }) => {
-                    if let (Some(picks), ToClient::Match { seat, tiers, headliner, roster, rejoin, .. }) =
-                        (m.picks(), &m)
+                    if let (
+                        Some(picks),
+                        ToClient::Match { seat, tiers, headliner, roster, rejoin, practice, .. },
+                    ) = (m.picks(), &m)
                     {
                         crate::config::store_rejoin(Some(rejoin.as_str()).filter(|r| !r.is_empty()));
                         link.redials = 0;
                         link.last_datagram = now_s();
                         let seat = usize::from(*seat).min(el_sim::units::SEATS - 1);
-                        session.client = Some(Box::new(Client::new(map.0, seat, picks, *tiers, *headliner)));
+                        info!(
+                            "seated: seat {seat}, champion {}{}",
+                            picks[seat],
+                            if *practice { ", practice" } else { "" }
+                        );
+                        let mut c = Client::new(map.0, seat, picks, *tiers, *headliner);
+                        if *practice {
+                            c.set_practice();
+                        }
+                        session.client = Some(Box::new(c));
                         session.roster = roster.clone();
                         session.winner = None;
                         session.kd = Default::default();
@@ -411,7 +427,11 @@ fn talk(
                 Ok(ToClient::NoSeat) => {
                     crate::config::store_rejoin(None);
                     session.client = None;
-                    if cfg.0.queue {
+                    if cfg.0.practice.is_some() {
+                        session.phase = Phase::Failed;
+                        session.error =
+                            Some("This server holds no practice matches (el-server --practice).".into());
+                    } else if cfg.0.queue {
                         send_lobby(&t, &ToServer::Queue);
                         session.phase = Phase::Queued;
                     } else {
@@ -481,6 +501,12 @@ fn send(net: NonSend<NetState>, mut session: ResMut<Session>, mut controls: ResM
     let Some(t) = net.get() else { return };
     // Champion select's choices, while it lasts.
     for msg in controls.lobby.drain(..) {
+        // Practice again, as another champion: whenever it's asked.
+        if let ToServer::Practice { champ } = msg {
+            session.practice = Some(champ);
+            send_lobby(&t, &msg);
+            continue;
+        }
         if session.phase == Phase::Selecting {
             if msg == ToServer::Ready
                 && let Some(s) = session.select.as_mut()

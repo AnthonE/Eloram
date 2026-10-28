@@ -307,11 +307,14 @@ numbers on a real GPU into `ROADMAP.md`, which has none yet.
     shield's bubble, glows at the feet for a slow, a haste, strength and Combo Breaker.
   - The camera shakes a little when something heavy lands on the viewer's champion.
   - `?quality=low` keeps half the particles.
+- A hit flashes a minion as it does a champion: each minion material's flash steps are materials
+  of their own, shared as the rest are (`minions.rs`); in a browser match, 149 minions flashed.
 - A match watched or replayed (`?watch=`, `?replay=`) is shown and heard as it was played.
   `el_client_core::spectator` reads each tick the page steps from the record as replication
   reads it for a team, with every unit seen, into a feed, missiles and zones shaped as a
   client's; the director reads either through its `Scene`, and the missiles, telegraphs,
   fields, statuses and the champions' casts are drawn from it.
+  - The kill feed reads it too, naming the champions (a record names no players).
   - The watcher has no champion: Dawn is the near side, as the match is drawn, and nothing is
     the watcher's own. The announcer calls the fights from Dawn's side and says no victory. A
     team's pings and its vote stay the team's.
@@ -357,13 +360,40 @@ numbers on a real GPU into `ROADMAP.md`, which has none yet.
     started), at most 12 at once, none dropped, none missing.
   - The walk is still predicted exactly (0.00).
 
+**Step 4, practice, and the `fx` suite.**
+- `el_sim::practice`: a match made practice after its reset (`Match::set_practice`), its record
+  saying so in a frame after the header (`record::Frame::Practice`), so it replays as it was
+  played. Seat 0 is the player's at the top level with every rank, nothing on cooldown and its
+  mana full (kept so at the end of every tick, the server's and the player's own prediction
+  alike), with 50,000 gold. The other nine are dummies at the Causeway's middle, three of Dawn's
+  beside the player and five of Dusk's across from it (`PLACES`): they stand, walk a loop, or
+  (seat 7) are shielded every four seconds; they never fight back, and no champion dies (brought to
+  nothing, it's made whole). The gates are open from the start and no minions march. Nothing in it
+  runs in a match that isn't practice: the golden hashes held, and a record's practice frame taken
+  out makes the same inputs go astray (`el-sim/tests/practice.rs`).
+- `el-server --practice` holds them: the lobby's `ToServer::Practice { champ }` starts one at once
+  (no champion select) with that champion in seat 0, and asked again starts a new one; one ends as
+  soon as its player leaves. The page asks on `?practice=1` (`&champ=`), and again on
+  `{t:"practice_champ", champ}`; a page that dials again asks for the champion it last asked for.
+  The client makes its copies of the match practice too (`ToClient::Match`'s `practice`), so its
+  walk is still predicted exactly (`el-match/tests/record.rs`).
+- On the way, two faults the tests found: the dummies' walking orders weren't on the wire's grid,
+  as every order is, so a practice record didn't replay; and the gates held the player behind its
+  base for the first fifteen seconds.
+- `scripts/e2e.sh fx`: every ability of every champion cast in practice at what it's for (the
+  dummy in front, an ally, a point, itself), each counted as the player's own cast drawn
+  (`fx_own_casts`) and heard (`audio_own_casts`), two pictures of each, and a contact sheet a
+  champion and one of all of them in `e2e/artifacts/`. About five minutes a champion in
+  SwiftShader.
+- From the sheets, the first tuning: a shield's bubble had a middle full enough to hide the unit
+  inside it; its middle is all but clear now, its rim tighter.
+
 Not yet:
 - Nobody has listened: the sounds were judged by their spectrograms and measures, not by ear. The
   look on a real GPU hasn't been seen either (SwiftShader draws a frame every two seconds, so a
   burst is seldom in a picture).
-- Step 4's practice mode and the `fx` suite's contact sheet.
-- A model's flash when hit.
-- The per-ability hand-tuning step 5 ends with (the derived looks are the base it tunes from).
+- The per-ability hand-tuning step 5 ends with (the derived looks are the base it tunes from; the
+  contact sheets are where it starts).
 - Step 6's frame numbers.
 
 ## Sources
