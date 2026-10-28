@@ -1,0 +1,351 @@
+{
+  "about": "The clips each champion's model carries (el_client_core::pose). Written by `cargo test -p el-client-core pose -- --ignored write_clips`; art/tools/champions.mjs cuts them to these lengths from art/champions.json's windows.",
+  "champions": {
+    "brakka": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "punch",
+      "charge",
+      "thrust",
+      "shout",
+      "slam"
+    ],
+    "brun": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "smash",
+      "charge",
+      "slam",
+      "shout",
+      "thrust"
+    ],
+    "gorum": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "smash",
+      "charge",
+      "slam",
+      "shout"
+    ],
+    "hollis": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "smash",
+      "charge",
+      "shout",
+      "slam"
+    ],
+    "kesh": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "thrust",
+      "charge",
+      "slam",
+      "judgment"
+    ],
+    "liora": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "flick",
+      "roll",
+      "point",
+      "channel"
+    ],
+    "marret": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "shoot",
+      "roll",
+      "point",
+      "channel"
+    ],
+    "mira": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "flick",
+      "roll",
+      "point",
+      "channel"
+    ],
+    "nimra": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "bolt",
+      "roll",
+      "point",
+      "channel"
+    ],
+    "oda": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "flick",
+      "roll",
+      "point",
+      "channel"
+    ],
+    "orrin": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "bolt",
+      "roll",
+      "point",
+      "flick",
+      "channel"
+    ],
+    "pell": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "slash",
+      "charge",
+      "slam",
+      "shout"
+    ],
+    "sable": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "flick",
+      "roll",
+      "point",
+      "channel"
+    ],
+    "sefa": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "slash",
+      "charge",
+      "thrust",
+      "slam"
+    ],
+    "seren": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "bolt",
+      "roll",
+      "point",
+      "flick",
+      "channel"
+    ],
+    "talmar": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "thrust",
+      "charge",
+      "slam"
+    ],
+    "torek": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "bolt",
+      "roll",
+      "point",
+      "flick",
+      "channel"
+    ],
+    "ulla": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "flick",
+      "roll",
+      "point",
+      "channel"
+    ],
+    "vessa": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "shoot",
+      "roll",
+      "point"
+    ],
+    "vire": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "victory",
+      "slash",
+      "charge",
+      "slam",
+      "shout",
+      "judgment"
+    ]
+  },
+  "clips": {
+    "airborne": {
+      "length": 0.800000011920929,
+      "loop": false,
+      "strike": 0.0
+    },
+    "bolt": {
+      "length": 1.600000023841858,
+      "loop": false,
+      "strike": 0.699999988079071
+    },
+    "channel": {
+      "length": 2.6670000553131104,
+      "loop": false,
+      "strike": 1.7999999523162842
+    },
+    "charge": {
+      "length": 0.6330000162124634,
+      "loop": true,
+      "strike": 0.0
+    },
+    "death": {
+      "length": 1.899999976158142,
+      "loop": false,
+      "strike": 0.0
+    },
+    "flick": {
+      "length": 1.5,
+      "loop": false,
+      "strike": 0.5
+    },
+    "hit": {
+      "length": 1.6330000162124634,
+      "loop": true,
+      "strike": 0.0
+    },
+    "idle": {
+      "length": 4.0,
+      "loop": true,
+      "strike": 0.0
+    },
+    "judgment": {
+      "length": 2.0999999046325684,
+      "loop": false,
+      "strike": 0.699999988079071
+    },
+    "point": {
+      "length": 2.200000047683716,
+      "loop": false,
+      "strike": 1.4500000476837158
+    },
+    "punch": {
+      "length": 1.399999976158142,
+      "loop": false,
+      "strike": 0.5299999713897705
+    },
+    "roll": {
+      "length": 1.2999999523162842,
+      "loop": false,
+      "strike": 0.0
+    },
+    "run": {
+      "length": 0.6669999957084656,
+      "loop": true,
+      "strike": 0.0
+    },
+    "shoot": {
+      "length": 2.0,
+      "loop": false,
+      "strike": 0.8500000238418579
+    },
+    "shout": {
+      "length": 2.0999999046325684,
+      "loop": false,
+      "strike": 1.25
+    },
+    "slam": {
+      "length": 2.0,
+      "loop": false,
+      "strike": 1.0499999523162842
+    },
+    "slash": {
+      "length": 1.2999999523162842,
+      "loop": false,
+      "strike": 0.550000011920929
+    },
+    "smash": {
+      "length": 1.2000000476837158,
+      "loop": false,
+      "strike": 0.9300000071525574
+    },
+    "thrust": {
+      "length": 1.2000000476837158,
+      "loop": false,
+      "strike": 0.7300000190734863
+    },
+    "victory": {
+      "length": 3.200000047683716,
+      "loop": true,
+      "strike": 0.0
+    }
+  }
+}

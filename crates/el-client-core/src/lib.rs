@@ -13,6 +13,7 @@ pub mod interp;
 pub mod lobby;
 pub mod missiles;
 pub mod orders;
+pub mod pose;
 pub mod scenery;
 pub mod zones;
 

@@ -18,9 +18,9 @@ const until = async (page: any, what: string, pred: (s: Record<string, any>) => 
 };
 
 // A match from the queue, with the server's bots in the other nine seats (`--fill-after 1`):
-// seated at level 3 with ARAM's gold on the platform, an augment picked, an item bought, a skill
-// levelled and cast, a ping, a walk down the lane predicted exactly, and fog that hides the enemy
-// until someone of ours can see them.
+// seated at level 3 with ARAM's gold on the platform, the champions' models in, an augment picked,
+// an item bought, a skill levelled and cast, a ping, a walk down the lane predicted exactly (the
+// champion running), and fog that hides the enemy until someone of ours can see them.
 test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({ page }, info) => {
   const logs = collectConsole(page);
   const shots = `artifacts/match-${info.project.name}`;
@@ -59,6 +59,11 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   expect(s.enemy_champions).toBe(0);
   // The match's headliner, shown as it starts.
   expect(s.headliner).toBeTruthy();
+  // The champions drawn (docs/CHAMPIONS.md): the team's five fetched in champion select, the
+  // other five with the match; the own champion's figure is its model, standing.
+  s = await until(page, "the champions' models", (s) => s.champion_models >= 10, 120_000);
+  const posing = (s: Record<string, any>, clip: string) => String(s.champion_poses).split(",").includes(`${s.seat}:${clip}`);
+  s = await until(page, "the own champion standing", (s) => posing(s, "idle"));
   await page.screenshot({ path: `${shots}-start.png` });
 
   // The first augment screen is open at the start: take the first card.
@@ -101,8 +106,9 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   s = await until(page, "the ping heard back", (s) => s.pings_heard >= 1);
   await page.screenshot({ path: `${shots}-ping.png` });
 
-  // Walk down the lane to the outer turret: predicted exactly.
+  // Walk down the lane to the outer turret: predicted exactly, the champion running.
   await push(page, { t: "move", x: ahead(5000), y: 1920 });
+  s = await until(page, "the own champion running", (s) => posing(s, "run"), 30_000);
   s = await until(page, "the walk", (s) => Math.abs(s.x - ahead(5000)) < 150, 90_000);
   await page.screenshot({ path: `${shots}-lane.png` });
   expect(s.walk_err_max).toBeLessThan(1);

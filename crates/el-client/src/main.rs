@@ -7,6 +7,8 @@ mod audio;
 #[cfg(target_arch = "wasm32")]
 mod camera;
 #[cfg(target_arch = "wasm32")]
+mod champions;
+#[cfg(target_arch = "wasm32")]
 mod config;
 #[cfg(target_arch = "wasm32")]
 mod coords;

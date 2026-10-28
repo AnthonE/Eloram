@@ -22,6 +22,7 @@ use crate::session::Session;
 #[derive(Clone, Copy, Debug)]
 pub struct DrawnUnit {
     pub pos: Vec2,
+    pub facing: f32,
     pub radius: f32,
     pub team: u8,
     pub generation: u8,
@@ -87,13 +88,15 @@ struct Kit {
     fill: [Handle<StandardMaterial>; 3],
 }
 
+/// A unit slot's entity: its body (the figure of primitives, or a structure's model), its ring on
+/// the floor and its health bar. A champion's model hangs under it too (`champions.rs`).
 #[derive(Component)]
-struct UnitView {
-    slot: usize,
-    body: Entity,
-    ring: Entity,
-    bar: Entity,
-    fill: Entity,
+pub(crate) struct UnitView {
+    pub(crate) slot: usize,
+    pub(crate) body: Entity,
+    pub(crate) ring: Entity,
+    pub(crate) bar: Entity,
+    pub(crate) fill: Entity,
     shown: Option<(Kind, u8, u8)>,
 }
 
@@ -506,7 +509,7 @@ fn draw_units(
         };
         vis.set_if_neq(Visibility::Visible);
         tf.set_if_neq(Transform { translation: world(pos, 0.0), ..*tf });
-        drawn.units[i] = Some(DrawnUnit { pos, radius: radius_of(kind), team, generation });
+        drawn.units[i] = Some(DrawnUnit { pos, facing, radius: radius_of(kind), team, generation });
         let champs = watch.map_or_else(|| client.map(|c| &c.world.champs), |w| Some(&w.referee.m.champs));
         let def = if i < SEATS { champs.map_or(0, |ch| ch[i].def) } else { 0 };
         let (w, h) = bar_of(kind);
