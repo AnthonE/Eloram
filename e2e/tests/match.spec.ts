@@ -64,6 +64,8 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   s = await until(page, "the champions' models", (s) => s.champion_models >= 10, 120_000);
   const posing = (s: Record<string, any>, clip: string) => String(s.champion_poses).split(",").includes(`${s.seat}:${clip}`);
   s = await until(page, "the own champion standing", (s) => posing(s, "idle"));
+  // The minions' four models, in before the first wave.
+  s = await until(page, "the minions' models", (s) => s.minion_models === 4, 60_000);
   await page.screenshot({ path: `${shots}-start.png` });
 
   // The first augment screen is open at the start: take the first card.
@@ -113,10 +115,20 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   await page.screenshot({ path: `${shots}-lane.png` });
   expect(s.walk_err_max).toBeLessThan(1);
 
-  // Minions come at 0:50: the enemy's are seen only once ours meet them.
+  // Minions come at 0:50, drawn as their models, walking: the enemy's are seen only once ours
+  // meet them, and then they swing at each other.
+  const clip = (s: Record<string, any>, c: string) => new RegExp(`(^|,)${c}:`).test(String(s.minion_clips));
+  s = await until(page, "the minions walking", (s) => s.minions_drawn > 0 && clip(s, "run"), 120_000);
   s = await until(page, "the enemy in sight", (s) => s.enemy_mobile > 0, 120_000);
+  s = await until(page, "a minion swinging", (s) => clip(s, "slash") || clip(s, "flick"), 60_000);
   const shot = await page.screenshot({ path: `${shots}-fight.png` });
   expect(luminanceStdDev(shot)).toBeGreaterThan(5);
+  // Closer, over where the waves meet ahead of the champion (a picture to look at; the camera's
+  // put back on the champion after).
+  await push(page, { t: "camera", x: ahead(5900), y: 2000, zoom: 0.7 });
+  await page.waitForTimeout(6_000);
+  await page.screenshot({ path: `${shots}-minions.png` });
+  await push(page, { t: "lock", on: true });
 
   s = await el(page);
   console.log(`match status: ${JSON.stringify(s)}`);

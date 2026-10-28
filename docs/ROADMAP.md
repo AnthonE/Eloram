@@ -195,3 +195,13 @@ the own champion standing, then running, attacking and casting as the pose says,
 predicted exactly, a fallen champion lying where it fell; in a replay (`watch`) all ten run.
 Headless Chromium draws 0.69 to 0.74 frames a second in SwiftShader (0.77 before). Not measured: a
 real GPU.
+
+Then the minions (`CHAMPIONS.md`, "The minions"): the last primitives on the lane became models,
+two rigged bodies (a foot soldier, an acolyte) and a cannon cart from Meshy, the foot soldier
+again with a great hammer for the super minion; the champions' clips retargeted onto them, timed
+to their windups as the champions' are; one model for both teams, Dusk's colours its own texture
+and the band of what each holds its team's; a minion that falls lies a moment and sinks. On the
+way, Brun's hammer turned the right way round. Measured: four models of 115 to 301 KiB, 589 KiB
+as served with Dusk's textures, 2,000 to 3,000 triangles each; in a browser match twenty minions
+drawn at once, walking and swinging, the walk still exact, 0.69 frames a second in SwiftShader as
+before; 55 of Meshy's last 56 credits.

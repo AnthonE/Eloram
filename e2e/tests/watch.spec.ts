@@ -17,11 +17,12 @@ test("watching a live match, then its replay", async ({ page, request }, info) =
   const logs = collectConsole(page);
   // A record live long enough to show more than its header.
   let rec: any;
-  const end = Date.now() + 150_000;
+  const end = Date.now() + 210_000;
   for (;;) {
     const list = await (await request.get("/records.json")).json();
-    // Served a minute behind, with a checkpoint (every 10 s here) inside what's served.
-    rec = list.find((r: any) => r.live && r.ticks > 60 * 30 + 450 && r.served_checkpoint > 0);
+    // Served a minute behind, with a checkpoint (every 10 s here) inside what's served, taken
+    // once the first waves were out (0:50), so there are minions to draw from the start.
+    rec = list.find((r: any) => r.live && r.ticks > 60 * 30 + 450 && r.served_checkpoint > 56 * 30);
     if (rec || Date.now() > end) break;
     await new Promise((r) => setTimeout(r, 2_000));
   }
@@ -40,6 +41,8 @@ test("watching a live match, then its replay", async ({ page, request }, info) =
   expect(s.watch_from).toBeGreaterThan(0);
   // A minute behind: never past what the server serves.
   expect(s.watch_tick).toBeLessThanOrEqual(rec.ticks);
+  // The waves, drawn as their models.
+  s = await until(page, "the minions drawn", (s) => s.minion_models === 4 && s.minions_drawn > 0);
   const shot = await page.screenshot({ path: `artifacts/watch-${info.project.name}.png` });
   expect(luminanceStdDev(shot)).toBeGreaterThan(5);
   s = await until(page, "hashes checked", (s) => s.watch_hashes >= 3);
