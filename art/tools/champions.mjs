@@ -18,21 +18,31 @@
 //   16-bit integers, its redundant keys dropped;
 // - its props on its bones (art/champions.json), each coloured by bands along its length;
 // - its armature scaled so it stands 1 tall, feet at 0, facing +Z: the client sizes and turns it.
+//
+// The minions (art/champions.json, `minions`) are made the same way from minions/<body>.glb and
+// minions/<body>.run.glb into web/assets/models/minions/<name>.glb, smaller (fewer triangles, a
+// 256 px texture), with their clips (art/clips.json, `minions`); a prop's band coloured "team" is
+// the material `team`, which the client colours. Each also gets <name>.dusk.jpg: its texture with
+// the blues (its team's colour as Meshy painted it) turned to Dusk's red. The siege cart has no rig
+// and no clips: it's only turned, stood and made small.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NodeIO } from '@gltf-transform/core';
+import { NodeIO, getBounds } from '@gltf-transform/core';
 import { dedup, prune, resample, simplify, textureCompress, weld } from '@gltf-transform/functions';
 import { MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'web/assets/models/champions');
+const MINIONS = path.join(ROOT, 'web/assets/models/minions');
 const TASKS = JSON.parse(fs.readFileSync(path.join(ROOT, 'art/meshy.json'), 'utf8'));
 const DRESS = JSON.parse(fs.readFileSync(path.join(ROOT, 'art/champions.json'), 'utf8'));
 const CLIPS = JSON.parse(fs.readFileSync(path.join(ROOT, 'art/clips.json'), 'utf8'));
 /** A champion's triangles, at most. */
 const TRIANGLES = 6000;
+/** A minion's: Riot's minions keep "the low profile of their predecessors", and there are dozens. */
+const MINION_TRIANGLES = 2000;
 /** How far along a hand bone (of the champion's height) the palm is: where a prop is gripped. */
 const PALM = 0.045;
 
@@ -194,7 +204,9 @@ async function prop(io, doc, name, def, file) {
       [(pos[3 * i + others[0]] - mid[0]) * scale, (u - def.grip) * def.length, (pos[3 * i + others[1]] - mid[1]) * scale],
       3 * i,
     );
-    const rgb = def.bands[Math.max(0, band(u))][1].match(/[0-9a-f]{2}/g).map((h) => lin(parseInt(h, 16) / 255));
+    const hex = def.bands[Math.max(0, band(u))][1];
+    // The team's band is white here: the client colours its material.
+    const rgb = (hex === 'team' ? 'ffffff' : hex).match(/[0-9a-f]{2}/g).map((h) => lin(parseInt(h, 16) / 255));
     colors.set([...rgb.map((c) => Math.round(c * 255)), 255], 4 * i);
   }
   // Normals from the faces.
@@ -214,17 +226,19 @@ async function prop(io, doc, name, def, file) {
   const acc = (type, arr) => doc.createAccessor().setType(type).setArray(arr).setBuffer(buffer);
   const [position, normal, color] = [acc('VEC3', at), acc('VEC3', nrm), acc('VEC4', colors).setNormalized(true)];
   const mesh = doc.createMesh(name);
-  // A triangle glows when its first corner's band does.
+  // A triangle glows when its first corner's band does, and is the team's when that band is.
   const groups = new Map();
   for (let f = 0; f < idx.length; f += 3) {
-    const glow = def.bands[Math.max(0, band(along(idx[f])))][2] ?? null;
-    const key = JSON.stringify(glow);
-    if (!groups.has(key)) groups.set(key, { glow, tris: [] });
+    const b = def.bands[Math.max(0, band(along(idx[f])))];
+    const glow = b[2] ?? null;
+    const team = b[1] === 'team';
+    const key = JSON.stringify([glow, team]);
+    if (!groups.has(key)) groups.set(key, { glow, team, tris: [] });
     groups.get(key).tris.push(idx[f], idx[f + 1], idx[f + 2]);
   }
-  for (const { glow, tris } of groups.values()) {
+  for (const { glow, team, tris } of groups.values()) {
     const mat = doc
-      .createMaterial(glow ? `${name}.glow` : name)
+      .createMaterial(team ? 'team' : glow ? `${name}.glow` : name)
       .setRoughnessFactor(def.metal ? 0.45 : 0.8)
       .setMetallicFactor(def.metal ? 0.5 : 0)
       .setEmissiveFactor(glow ?? [0, 0, 0])
@@ -299,19 +313,26 @@ function shortRotations(doc) {
     }
 }
 
-async function champion(io, dir, name, ref) {
-  const doc = await io.read(path.join(dir, 'champions', `${name}.glb`));
-  const joints = skeleton(doc);
-  for (const a of doc.getRoot().listAnimations()) a.dispose();
-  // The clips it plays (el_client_core::pose's kit): its own run, the rest shared.
-  const window = (clip) => {
-    const w = DRESS.clips[clip];
-    const want = CLIPS.clips[clip].length;
-    if (!w || Math.abs(w[1] - w[0] - want) > 0.02) throw new Error(`${clip}'s window isn't ${want} s long`);
-    return w;
-  };
-  const plays = CLIPS.champions[name];
-  const run = await io.read(path.join(dir, 'champions', `${name}.run.glb`));
+/** Each prop of `held` made and hung on its bone. */
+async function dress(io, doc, dir, joints, scale, held) {
+  for (const def of held) {
+    const p = DRESS.props[def.prop];
+    const mesh = await prop(io, doc, def.prop, p, path.join(dir, 'props', `${p.mesh ?? def.prop}.glb`));
+    hold(doc, joints, scale, mesh, def);
+  }
+}
+
+/** The clip's window in its source, checked against the length the clip table gives it. */
+function window(clip) {
+  const w = DRESS.clips[clip];
+  const want = CLIPS.clips[clip].length;
+  if (!w || Math.abs(w[1] - w[0] - want) > 0.02) throw new Error(`${clip}'s window isn't ${want} s long`);
+  return w;
+}
+
+/** Puts on `doc` (rig `joints`) its own run from `runFile` and every shared clip in `plays`. */
+async function clips(io, dir, doc, joints, ref, runFile, plays) {
+  const run = await io.read(runFile);
   retarget(run.getRoot().listAnimations()[0], skeleton(run), doc, joints, 'run', window('run'));
   for (const [set, s] of Object.entries(TASKS.animations)) {
     const anims = (await io.read(path.join(dir, 'champions', `${set}.anim.glb`))).getRoot().listAnimations();
@@ -319,26 +340,137 @@ async function champion(io, dir, name, ref) {
     // Meshy keeps the order asked for.
     s.clips.forEach(([clip], i) => plays.includes(clip) && retarget(anims[i], ref, doc, joints, clip, window(clip)));
   }
-  // Stood 1 tall. The skin is bound at rest, so the mesh's own highest vertex is the champion's
-  // height as it stands (Meshy's vertices are metres; its bones are centimetres, under an armature
-  // scaled by a hundredth, undone by the inverse bind matrices).
-  const skinned = doc
-    .getRoot()
-    .listNodes()
-    .find((n) => n.getSkin());
-  const prim = skinned.getMesh().listPrimitives()[0];
+}
+
+/** Stands a rigged body 1 tall and returns the armature's new scale. The skin is bound at rest, so
+ *  the mesh's own highest vertex is its height as it stands (Meshy's vertices are metres; its bones
+ *  are centimetres, under an armature scaled by a hundredth, undone by the inverse bind matrices). */
+function standRigged(doc, prim) {
   let top = 0;
   const p = prim.getAttribute('POSITION');
   for (let i = 0; i < p.getCount(); i++) top = Math.max(top, p.getElement(i, [0, 0, 0])[1]);
   const armature = doc.getRoot().listScenes()[0].listChildren()[0];
   const scale = armature.getScale()[0] / top;
   armature.setScale([scale, scale, scale]);
+  return scale;
+}
+
+function triangles(doc) {
+  return doc
+    .getRoot()
+    .listMeshes()
+    .flatMap((m) => m.listPrimitives())
+    .reduce((n, p) => n + p.getIndices().getCount() / 3, 0);
+}
+
+/** Dusk's copy of a texture: the blues (the team's colour as Meshy painted it) turned to Dusk's
+ *  red, by how blue and how saturated each pixel is, its brightness kept. */
+async function dusk(jpeg) {
+  const { data, info } = await sharp(jpeg).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const smooth = (a, b, x) => {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+  for (let i = 0; i < data.length; i += 3) {
+    const [r, g, b] = [data[i], data[i + 1], data[i + 2]].map((c) => c / 255);
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    if (d === 0) continue;
+    const sat = d / max;
+    let hue = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    hue = (hue * 60 + 360) % 360;
+    // Blue, 195 to 250 degrees, fading out over 15 more either side; and saturated.
+    const w = Math.min(smooth(180, 195, hue), 1 - smooth(250, 265, hue)) * smooth(0.18, 0.35, sat);
+    if (w <= 0) continue;
+    // The same value and saturation at Dusk's hue (5 degrees: a red a little toward orange).
+    const h = 5 / 60;
+    const c = max * sat;
+    const x = c * (1 - Math.abs((h % 2) - 1));
+    const red = [max, min + x, min].map((v) => Math.min(1, v * 1.08));
+    for (let k = 0; k < 3; k++) data[i + k] = Math.round(((1 - w) * [r, g, b][k] + w * red[k]) * 255);
+  }
+  return sharp(data, { raw: { width: info.width, height: info.height, channels: 3 } }).jpeg({ quality: 85 }).toBuffer();
+}
+
+/** A minion: a rigged body with its clips and props, or the cart, turned and stood. */
+async function minion(io, dir, name, ref) {
+  const def = DRESS.minions[name];
+  const doc = await io.read(path.join(dir, 'minions', `${def.body}.glb`));
+  for (const a of doc.getRoot().listAnimations()) a.dispose();
+  const skinned = doc
+    .getRoot()
+    .listNodes()
+    .find((n) => n.getSkin());
+  let body;
+  if (skinned) {
+    const joints = skeleton(doc);
+    await clips(io, dir, doc, joints, ref, path.join(dir, 'minions', `${def.body}.run.glb`), CLIPS.minions[name]);
+    body = skinned.getMesh().listPrimitives()[0];
+    const scale = standRigged(doc, body);
+    await dress(io, doc, dir, joints, scale, def.held ?? []);
+  } else {
+    // Under a root of its own: turned to face +Z, stood 1 tall on 0, centred.
+    const scene = doc.getRoot().listScenes()[0];
+    const root = doc.createNode('cart').setRotation([0, Math.sin((def.turn * Math.PI) / 360), 0, Math.cos((def.turn * Math.PI) / 360)]);
+    for (const c of scene.listChildren()) {
+      scene.removeChild(c);
+      root.addChild(c);
+    }
+    scene.addChild(root);
+    const b = getBounds(scene);
+    const k = 1 / (b.max[1] - b.min[1]);
+    root.setScale([k, k, k]);
+    const c = getBounds(scene);
+    root.setTranslation([-(c.min[0] + c.max[0]) / 2, -c.min[1], -(c.min[2] + c.max[2]) / 2]);
+    body = doc.getRoot().listMeshes()[0].listPrimitives()[0];
+  }
+  if (!body.getMaterial()?.getNormalTexture()) body.setAttribute('TANGENT', null);
+  const tris = doc
+    .getRoot()
+    .listMeshes()[0]
+    .listPrimitives()
+    .reduce((n, p) => n + p.getIndices().getCount() / 3, 0);
+  await doc.transform(
+    weld(),
+    simplify({ simplifier: MeshoptSimplifier, ratio: Math.min(1, MINION_TRIANGLES / tris), error: 0.02 }),
+    resample({ tolerance: 1e-4 }),
+    // Names kept: the client finds the `team` material by its name.
+    dedup({ keepUniqueNames: true }),
+    prune(),
+    textureCompress({ encoder: sharp, targetFormat: 'jpeg', resize: [256, 256], quality: 85 }),
+  );
+  if (skinned) packSkin(skinned.getMesh().listPrimitives()[0]);
+  shortRotations(doc);
+  fs.mkdirSync(MINIONS, { recursive: true });
+  const file = path.join(MINIONS, `${name}.glb`);
+  await io.write(file, doc);
+  const tex = body.getMaterial()?.getBaseColorTexture();
+  if (!tex) throw new Error(`${name} has no texture`);
+  const night = path.join(MINIONS, `${name}.dusk.jpg`);
+  fs.writeFileSync(night, await dusk(tex.getImage()));
+  const n = doc.getRoot().listAnimations().length;
+  console.log(
+    `${name} ${Math.round(fs.statSync(file).size / 1024)} KiB (dusk ${Math.round(fs.statSync(night).size / 1024)}), ` +
+      `${triangles(doc)} triangles, ${n} clips`,
+  );
+}
+
+async function champion(io, dir, name, ref) {
+  const doc = await io.read(path.join(dir, 'champions', `${name}.glb`));
+  const joints = skeleton(doc);
+  for (const a of doc.getRoot().listAnimations()) a.dispose();
+  // The clips it plays (el_client_core::pose's kit): its own run, the rest shared.
+  await clips(io, dir, doc, joints, ref, path.join(dir, 'champions', `${name}.run.glb`), CLIPS.champions[name]);
+  const skinned = doc
+    .getRoot()
+    .listNodes()
+    .find((n) => n.getSkin());
+  const prim = skinned.getMesh().listPrimitives()[0];
+  const scale = standRigged(doc, prim);
   // No normal map: no tangents.
   if (!prim.getMaterial()?.getNormalTexture()) prim.setAttribute('TANGENT', null);
-  for (const def of DRESS.held[name] ?? []) {
-    const mesh = await prop(io, doc, def.prop, DRESS.props[def.prop], path.join(dir, 'props', `${def.prop}.glb`));
-    hold(doc, joints, scale, mesh, def);
-  }
+  await dress(io, doc, dir, joints, scale, DRESS.held[name] ?? []);
   await doc.transform(
     weld(),
     // About Riot's six thousand triangles a champion (Garen's 6,336).
@@ -352,13 +484,8 @@ async function champion(io, dir, name, ref) {
   shortRotations(doc);
   const file = path.join(OUT, `${name}.glb`);
   await io.write(file, doc);
-  const tris = doc
-    .getRoot()
-    .listMeshes()
-    .flatMap((m) => m.listPrimitives())
-    .reduce((n, p) => n + p.getIndices().getCount() / 3, 0);
-  const clips = doc.getRoot().listAnimations().length;
-  console.log(`${name} ${Math.round(fs.statSync(file).size / 1024)} KiB, ${tris} triangles, ${clips} clips`);
+  const n = doc.getRoot().listAnimations().length;
+  console.log(`${name} ${Math.round(fs.statSync(file).size / 1024)} KiB, ${triangles(doc)} triangles, ${n} clips`);
 }
 
 const [dir, ...names] = process.argv.slice(2);
@@ -370,4 +497,8 @@ fs.mkdirSync(OUT, { recursive: true });
 const io = new NodeIO();
 const refName = Object.values(TASKS.animations)[0].rig;
 const ref = skeleton(await io.read(path.join(dir, 'champions', `${refName}.glb`)));
-for (const name of names.length ? names : Object.keys(TASKS.champions)) await champion(io, dir, name, ref);
+const minions = Object.keys(DRESS.minions).filter((n) => n !== '_');
+for (const name of names.length ? names : [...Object.keys(TASKS.champions), ...minions]) {
+  if (minions.includes(name)) await minion(io, dir, name, ref);
+  else await champion(io, dir, name, ref);
+}

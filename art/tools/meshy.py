@@ -2,6 +2,7 @@
 """Meshy's tasks for the art: the champions made, and every output fetched again.
 
     python3 -I art/tools/meshy.py champions [name ...]
+    python3 -I art/tools/meshy.py minions [--previews] [name ...]
     python3 -I art/tools/meshy.py animations
     python3 -I art/tools/meshy.py props
     python3 -I art/tools/meshy.py fetch <dir>
@@ -9,14 +10,18 @@
 `champions` takes each champion in art/meshy.json (`champions`) as far as it goes: its mesh from
 its prompt (text-to-3D preview), its texture (refine), its rig. A task's id is written to
 art/meshy.json the moment Meshy gives it, so a run that stops is taken up where it stopped and
-nothing is paid for twice; a task that failed is made again. `animations` has the clips of
-art/meshy.json (`animations`) applied to the rig they name, the same way, and `props` makes the
-props' meshes (`props`: a preview, untextured; art/tools/champions.mjs colours them).
+nothing is paid for twice; a task that failed is made again. `minions` does the same for the
+minions of art/meshy.json (`minions`); one with no `height` is not a body (the siege cart) and is
+only made and textured, and `--previews` stops at the meshes, to be looked at before the rest is
+paid for. `animations` has the clips of art/meshy.json (`animations`) applied to the rig they
+name, the same way, and `props` makes the props' meshes (`props`: a preview, untextured;
+art/tools/champions.mjs colours them).
 
 `fetch` writes <dir>/<model>.glb and <dir>/<image>.png (the inputs of art/tools/models.sh and
 art/tools/sprites.py), and for the champions <dir>/champions/<name>.glb (rigged),
 <dir>/champions/<name>.run.glb (its run), <dir>/champions/<set>.anim.glb (the clips) and
-<dir>/props/<prop>.glb, the inputs of art/tools/champions.mjs.
+<dir>/props/<prop>.glb, the inputs of art/tools/champions.mjs; and <dir>/minions/<name>.glb
+(rigged, or textured for one that isn't) and <dir>/minions/<name>.run.glb.
 
 Authenticates with MESHY_API_KEY when it's set (a proxy may add it instead).
 """
@@ -88,7 +93,7 @@ STEPS = [
         "mode": "preview",
         "prompt": c["prompt"],
         "ai_model": c["ai_model"],
-        "pose_mode": "a-pose",
+        "pose_mode": c.get("pose", "a-pose"),
         "should_remesh": True,
         "topology": "triangle",
         "target_polycount": c["polycount"],
@@ -133,6 +138,22 @@ def champions(names):
     # Each champion's steps in order; the champions side by side.
     with ThreadPoolExecutor(8) as pool:
         list(pool.map(one, names or list(tasks["champions"])))
+
+
+def minions(args):
+    previews = "--previews" in args
+    names = [a for a in args if a != "--previews"]
+    tasks = load()
+
+    def one(name):
+        m = tasks["minions"][name]
+        # A body is rigged; the cart is only textured.
+        steps = STEPS[:1] if previews else STEPS if m.get("height") else STEPS[:2]
+        advance(tasks, name, tasks["minions"], steps)
+        print(f"{name}: {steps[-1][0]} done", flush=True)
+
+    with ThreadPoolExecutor(8) as pool:
+        list(pool.map(one, names or list(tasks["minions"])))
 
 
 def animations():
@@ -189,6 +210,14 @@ def fetch(out):
         if s.get("task"):
             r = call(f"v1/animations/{s['task']}")["result"]
             get(r["animation_glb_url"], os.path.join(out, "champions", f"{name}.anim.glb"))
+    os.makedirs(os.path.join(out, "minions"), exist_ok=True)
+    for name, m in tasks.get("minions", {}).items():
+        if m.get("rig_task"):
+            r = call(f"v1/rigging/{m['rig_task']}")["result"]
+            get(r["rigged_character_glb_url"], os.path.join(out, "minions", f"{name}.glb"))
+            get(r["basic_animations"]["running_glb_url"], os.path.join(out, "minions", f"{name}.run.glb"))
+        elif m.get("refine_task") and not m.get("height"):
+            get(call(f"v2/text-to-3d/{m['refine_task']}")["model_urls"]["glb"], os.path.join(out, "minions", f"{name}.glb"))
     os.makedirs(os.path.join(out, "props"), exist_ok=True)
     for name, p in tasks.get("props", {}).items():
         if p.get("task"):
@@ -199,6 +228,8 @@ def main():
     args = sys.argv[1:]
     if args[:1] == ["champions"]:
         champions(args[1:])
+    elif args[:1] == ["minions"]:
+        minions(args[1:])
     elif args == ["animations"]:
         animations()
     elif args == ["props"]:

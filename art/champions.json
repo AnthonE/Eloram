@@ -272,7 +272,8 @@
             0.0
           ]
         ]
-      ]
+      ],
+      "flip": true
     },
     "crescent_blade": {
       "length": 0.6,
@@ -485,6 +486,65 @@
             1.0,
             0.7,
             0.25
+          ]
+        ]
+      ]
+    },
+    "team_shield": {
+      "mesh": "kite_shield",
+      "length": 0.5,
+      "grip": 0.55,
+      "metal": false,
+      "bands": [
+        [
+          0.9,
+          "team"
+        ],
+        [
+          1,
+          "8a8f99"
+        ]
+      ]
+    },
+    "team_staff": {
+      "mesh": "walking_staff",
+      "length": 1.0,
+      "grip": 0.55,
+      "metal": false,
+      "bands": [
+        [
+          0.84,
+          "5a4430"
+        ],
+        [
+          1,
+          "team",
+          [
+            1,
+            1,
+            1
+          ]
+        ]
+      ]
+    },
+    "team_hammer": {
+      "mesh": "forge_hammer",
+      "length": 0.75,
+      "grip": 0.2,
+      "metal": true,
+      "flip": true,
+      "bands": [
+        [
+          0.6,
+          "5a3e28"
+        ],
+        [
+          1,
+          "team",
+          [
+            1,
+            1,
+            1
           ]
         ]
       ]
@@ -778,5 +838,69 @@
         ]
       }
     ]
+  },
+  "minions": {
+    "_": "How art/tools/champions.mjs makes each minion (docs/CHAMPIONS.md, \"The minions\"): the Meshy model it's made from (art/meshy.json, minions), and the props it holds, as `held` above (a prop's `mesh` is the file it's made from, when another's; a band coloured \"team\" is its team's, given by the client). The cart has no rig: `turn` (degrees about +Y) points its cannon ahead, +Z.",
+    "melee": {
+      "body": "melee",
+      "held": [
+        {
+          "prop": "sword",
+          "bone": "RightHand",
+          "dir": [
+            0,
+            0.4,
+            1
+          ]
+        },
+        {
+          "prop": "team_shield",
+          "bone": "LeftForeArm",
+          "dir": [
+            0,
+            1,
+            0
+          ],
+          "roll": 90,
+          "offset": [
+            0.06,
+            0,
+            0.02
+          ]
+        }
+      ]
+    },
+    "caster": {
+      "body": "caster",
+      "held": [
+        {
+          "prop": "team_staff",
+          "bone": "RightHand",
+          "dir": [
+            0,
+            1,
+            0.1
+          ]
+        }
+      ]
+    },
+    "super": {
+      "body": "melee",
+      "held": [
+        {
+          "prop": "team_hammer",
+          "bone": "RightHand",
+          "dir": [
+            0,
+            0.6,
+            1
+          ]
+        }
+      ]
+    },
+    "siege": {
+      "body": "siege",
+      "turn": 90
+    }
   }
 }

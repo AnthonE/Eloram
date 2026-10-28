@@ -70,7 +70,8 @@ Meshy, on this environment's proxy, with its rigging and animation as well as it
 
 The budget was the account's 650 credits: 400 for the twenty champions (5 + 10 + 5 each), 57 for
 the nineteen clips, 125 for twenty-five props (a crescent and antlers didn't come out and aren't
-used), 12 for the clips tried while finding the way; 56 are left.
+used), 12 for the clips tried while finding the way; 56 were left, and the minions took 55 of
+them ("The minions", below).
 
 ## The pipeline
 
@@ -99,6 +100,40 @@ made, so a run that stops is taken up and nothing is paid for twice); `art/tools
   animation graph; each frame the pose is played on it, paused at the pose's time (the clock is
   the pose's), two clips blended while one fades. The primitive figure stands in until it's there.
 
+## The minions
+
+The minions were the last primitives on the lane: a cube, a ball, a crate and a bigger cube. Riot's
+word on them is short. When Summoner's Rift was remade in 2014 the new minions kept "the low
+profile of their predecessors", and their "simple shapes mean they have a recognizable silhouette
+and lumber to their walk" (Dev Blog: SR's gameplay updates, 2014). So they're smaller and plainer
+than any champion, told apart at a glance by shape and by what they hold, and they walk.
+
+- **Four models, two bodies** (`art/meshy.json`, `minions`; `art/champions.json`, `minions`): a
+  squat helmed foot soldier with a sword and a kite shield (melee); a hooded acolyte with a staff
+  (caster); the foot soldier again with a great hammer, drawn bigger (super); and a cannon on a
+  four-wheeled cart (siege), which has no rig. The bodies are rigged by Meshy and carry the
+  champions' shared clips, retargeted as the champions' are: idle, their own run, a flinch,
+  thrown up, death and an attack (a slash, a flick of the staff, the hammer brought down).
+- **About 2,000 triangles** a body before what it holds (2,500 to 3,000 with it), a 256 px
+  texture, 115 to 300 KiB a model: there are dozens on the lane at once.
+- **A team's colours on one model.** Every material is made once a team and shared by every minion
+  of that kind and team. Meshy painted the team's colour blue (the caster's robe, the cart's
+  pennant), and `art/tools/champions.mjs` writes `<name>.dusk.jpg` beside each model with the blues
+  turned red; each team's materials lean a little toward its light; and a band of what each holds
+  is the team's (the shield's face, the staff's stone, the hammer's head; the stone and the head
+  glow), the props' `team` band, which the client colours. The melee soldier came back all steel,
+  without the blue tabard asked for, so its shield carries its team.
+- **Posed as the champions are** (`el_client_core::pose`, `Poser::minion`): an attack plays so its
+  strike lands as the minion's windup ends (a share of its time between attacks,
+  `el_sim::content::rules::MINION_WINDUP`: 11 ticks for a melee minion, 14 for a caster), a run
+  keeps its stride to the floor, states outrank the attack, and a minion never casts or cheers.
+  The cart rocks as it rolls and kicks back as its windup ends, when it fires.
+- **Fallen** (`el-client/src/minions.rs`): a minion seen to die (its death told, or watched) plays
+  its death where it was drawn, lies a moment and sinks into the floor; a new minion in the slot
+  cuts it short. The primitive stands in until its model is in.
+- The budget: 15 for three previews, looked at before anything else was paid for; 30 to texture
+  them; 10 to rig the two bodies. One credit is left.
+
 ## How we know it's done
 
 - **Coverage**: a test that every champion's model carries every clip its kit plays, at the
@@ -121,6 +156,13 @@ made, so a run that stops is taken up and nothing is paid for twice); `art/tools
   fell; 0.74 frames a second in SwiftShader, 0.77 before (its frame rate means nothing but that
   nothing got much slower).
 
+- The minions (above): four models of 115 to 301 KiB with Dusk's four textures beside them (589
+  KiB as served, brotli), 2,000 to 3,000 triangles each with what it holds, six clips each but the
+  cart's none. In the browser (`scripts/e2e.sh match`) the four are in before the first wave, then
+  twenty minions are drawn at once as models, walking and swinging; the walk still predicted
+  exactly; 0.69 frames a second in SwiftShader, as before. Watched (`watch`, from a checkpoint
+  after the first waves), they're drawn from the record as the champions are.
+
 Changed on the way:
 - **What's held became props.** A model made in an A-pose (which rigging needs) drops what it holds
   and most of what's on its back: the crossbow, the bell, the pack, the mortar, the banner were all
@@ -128,6 +170,9 @@ Changed on the way:
 - **One rig's clips for all.** Meshy charges a clip a rig; twenty rigs would have taken most of the
   credits for the clips alone. Retargeted by each bone's turn from rest in the world, they match
   Meshy's own retarget.
+- **Brun's hammer the right way round.** The forge hammer's mesh has its head at the end the
+  pipeline takes for the foot, so Brun held it by the head with the handle out in front, from the
+  start; the prop is flipped now (`art/champions.json`), and the super minion's hammer is the same.
 - **Lit a little by their own colour.** Under the moon the textured champions read dark against
   the stone; each is lit by its own texture at a fifth of its colour, as Riot's skinned meshes have
   an emissive of their own.
@@ -135,4 +180,6 @@ Changed on the way:
 Not yet:
 - Nobody has seen them on a real GPU, and the frame rate there isn't measured.
 - An outline (Riot's "inking") or a rim light; the clips' windows shared by every champion, not
-  tuned one by one; a recall; the minions are still primitives.
+  tuned one by one; a recall.
+- A minion's flash when hit (their materials are shared a kind and team, so one can't be lit
+  alone), and the cart's wheels turning.

@@ -330,7 +330,7 @@ impl Match {
         match self.units[i].kind {
             Kind::Champion => self.champs[i].def().windup,
             Kind::Turret | Kind::Fountain => 0.0,
-            _ => 0.3,
+            _ => rules::MINION_WINDUP,
         }
     }
 

@@ -8,12 +8,17 @@
 //! champion's windup is known to the tick; anyone else's is taken from its champion, its level and
 //! the last one seen. A champion that moves cancels into its run, as an order cancels a windup.
 //!
+//! The minions are posed the same way, with fewer clips: they walk, swing and fall, timed to their
+//! own windups (`el_sim::content::rules`), and never cast.
+//!
 //! Nothing here touches the sim: the figures are drawn from what the client was told.
 
 use el_proto::quant::dequantize_centered;
 use el_proto::unit::{QUnit, VEL_BITS, VEL_MAX, flags};
 use el_sim::content::champions::CHAMPIONS;
+use el_sim::content::rules::{MINION_WINDUP, minion_def};
 use el_sim::content::{Effect, Role, Target};
+use el_sim::units::Kind;
 
 /// A clip every champion's model carries (`web/assets/models/champions/<name>.glb`, by name).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -208,8 +213,32 @@ pub fn kit(def: usize) -> Kit {
     Kit { attack, casts, dash }
 }
 
+/// The minions' models (`web/assets/models/minions/<name>.glb`), by kind, with the attack each
+/// swings; the siege cart has no rig, so no clips at all.
+pub const MINIONS: [(Kind, &str, Option<Clip>); 4] = [
+    (Kind::Melee, "melee", Some(Clip::Slash)),   // a sword and a shield
+    (Kind::Caster, "caster", Some(Clip::Flick)), // a staff
+    (Kind::Siege, "siege", None),                // a cannon on a cart
+    (Kind::Super, "super", Some(Clip::Smash)),   // a great hammer
+];
+
+/// A minion's model and the attack it swings (`None` for what isn't a minion).
+pub fn minion(kind: Kind) -> Option<(&'static str, Option<Clip>)> {
+    MINIONS.iter().find(|m| m.0 == kind).map(|m| (m.1, m.2))
+}
+
+/// The clips a minion's model carries: it walks, swings, flinches, is thrown up and falls.
+pub fn minion_clips(kind: Kind) -> Vec<Clip> {
+    match minion(kind) {
+        Some((_, Some(attack))) => {
+            vec![Clip::Idle, Clip::Run, Clip::Hit, Clip::Death, Clip::Airborne, attack]
+        }
+        _ => Vec::new(),
+    }
+}
+
 /// What each champion's model carries, for `art/tools/champions.mjs`: every clip's name and
-/// timing, and each champion's clips (its kit's). `art/clips.json`, written by
+/// timing, and each champion's clips (its kit's) and each minion's. `art/clips.json`, written by
 /// `cargo test -p el-client-core pose -- --ignored write_clips`.
 pub fn clips_json() -> String {
     let clips: serde_json::Map<String, serde_json::Value> = Clip::ALL
@@ -224,12 +253,18 @@ pub fn clips_json() -> String {
         .enumerate()
         .map(|(d, c)| (c.name.to_lowercase(), kit(d).clips().iter().map(|c| c.name()).collect()))
         .collect();
+    let minions: serde_json::Map<String, serde_json::Value> = MINIONS
+        .iter()
+        .filter(|m| m.2.is_some())
+        .map(|&(k, name, _)| (name.into(), minion_clips(k).iter().map(|c| c.name()).collect()))
+        .collect();
     let mut out = serde_json::to_string_pretty(&serde_json::json!({
         "about": "The clips each champion's model carries (el_client_core::pose). Written by `cargo test -p \
                   el-client-core pose -- --ignored write_clips`; art/tools/champions.mjs cuts them to these \
                   lengths from art/champions.json's windows.",
         "clips": clips,
         "champions": champions,
+        "minions": minions,
     }))
     .unwrap_or_default();
     out.push('\n');
@@ -327,10 +362,18 @@ impl Playing {
     }
 }
 
-/// A champion's figure, frame to frame.
+/// Whose figure it is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Body {
+    /// A champion, by its index in [`CHAMPIONS`].
+    Champion(usize),
+    Minion(Kind),
+}
+
+/// A champion's figure, or a minion's, frame to frame.
 #[derive(Clone, Copy, Debug)]
 pub struct Poser {
-    def: usize,
+    body: Body,
     kit: Kit,
     now: Playing,
     prev: Option<(Playing, f64)>,
@@ -349,9 +392,19 @@ pub struct Poser {
 
 impl Poser {
     pub fn new(def: usize) -> Self {
+        Self::of(Body::Champion(def), kit(def))
+    }
+
+    /// A minion's: its attack is its only action (it has no casts or dash of its own).
+    pub fn minion(kind: Kind) -> Self {
+        let attack = minion(kind).and_then(|m| m.1).unwrap_or(Clip::Slash);
+        Self::of(Body::Minion(kind), Kit { attack, casts: [attack; 4], dash: Clip::Hit })
+    }
+
+    fn of(body: Body, kit: Kit) -> Self {
         Self {
-            def,
-            kit: kit(def),
+            body,
+            kit,
             now: Playing { clip: Clip::Idle, start: 0.0, rate: 1.0, why: Why::State },
             prev: None,
             was_attacking: false,
@@ -371,8 +424,9 @@ impl Poser {
 
     /// It began casting ability `slot` (an event, or its record's cast rising).
     pub fn cast(&mut self, slot: u8, now: f64) {
+        let Body::Champion(def) = self.body else { return };
         let s = usize::from(slot.min(3));
-        let a = &CHAMPIONS[self.def % CHAMPIONS.len()].abilities[s];
+        let a = &CHAMPIONS[def % CHAMPIONS.len()].abilities[s];
         let clip = self.kit.casts[s];
         // Its release lands as the ability does; one with no windup is a flick of its clip's
         // gathering (a fifth of a second to the release).
@@ -386,7 +440,7 @@ impl Poser {
     }
 
     /// The windup its next attack is timed to (s): its own, known; else the last one seen; else
-    /// its champion's at its level with no attack speed bought.
+    /// its champion's at its level with no attack speed bought, or its kind of minion's.
     fn windup(&self, seen: &Seen) -> f32 {
         if let Some(w) = seen.windup_left {
             return w.max(1.0 / 30.0);
@@ -394,11 +448,24 @@ impl Poser {
         if self.measured > 0.0 {
             return self.measured;
         }
-        let d = &CHAMPIONS[self.def % CHAMPIONS.len()];
-        let lvl = f32::from(seen.level.max(1) - 1);
-        let aps = (d.base.attack_speed + d.growth.attack_speed * lvl).clamp(0.2, 2.5);
-        let period = (30.0 / aps + 0.5).floor().max(1.0);
-        ((period * d.windup + 0.5).floor().max(1.0)) / 30.0
+        let (aps, share) = match self.body {
+            Body::Champion(def) => {
+                let d = &CHAMPIONS[def % CHAMPIONS.len()];
+                let lvl = f32::from(seen.level.max(1) - 1);
+                (d.base.attack_speed + d.growth.attack_speed * lvl, d.windup)
+            }
+            Body::Minion(kind) => (minion_def(kind).stats.attack_speed, MINION_WINDUP),
+        };
+        let period = (30.0 / aps.clamp(0.2, 2.5) + 0.5).floor().max(1.0);
+        ((period * share + 0.5).floor().max(1.0)) / 30.0
+    }
+
+    /// How fast it moves at its run's own pace.
+    fn stride(&self) -> f32 {
+        match self.body {
+            Body::Champion(def) => stride(def),
+            Body::Minion(kind) => 6.0 * minion_def(kind).radius,
+        }
     }
 
     pub fn step(&mut self, now: f64, seen: &Seen) -> Pose {
@@ -450,8 +517,8 @@ impl Poser {
         } else if attacking || following(Why::Attack) {
             (self.kit.attack, self.attack_rate, Why::Attack)
         } else if moving {
-            (Clip::Run, (seen.speed / stride(self.def)).clamp(0.5, 2.0), Why::State)
-        } else if seen.won {
+            (Clip::Run, (seen.speed / self.stride()).clamp(0.5, 2.0), Why::State)
+        } else if seen.won && matches!(self.body, Body::Champion(_)) {
             (Clip::Victory, 1.0, Why::State)
         } else {
             (Clip::Idle, 1.0, Why::State)
@@ -514,16 +581,17 @@ mod tests {
 
     /// A model's clips and their lengths, from its glTF's JSON (an animation's input accessor
     /// carries its last time as its `max`).
-    fn model_clips(name: &str) -> Vec<(String, f32)> {
-        let path = root().join(format!("web/assets/models/champions/{name}.glb"));
+    fn model_clips(model: &str) -> Vec<(String, f32)> {
+        let path = root().join(format!("web/assets/models/{model}.glb"));
         let glb = std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         assert_eq!(&glb[..4], b"glTF");
         let len = u32::from_le_bytes([glb[12], glb[13], glb[14], glb[15]]) as usize;
         let json: serde_json::Value = serde_json::from_slice(&glb[20..20 + len]).unwrap();
         let accessors = json["accessors"].as_array().unwrap();
+        // A model with no clips (the cart) has no `animations` at all.
         json["animations"]
             .as_array()
-            .unwrap()
+            .map_or(&[][..], |a| a.as_slice())
             .iter()
             .map(|a| {
                 let input = a["samplers"][0]["input"].as_u64().unwrap() as usize;
@@ -536,7 +604,7 @@ mod tests {
     #[test]
     fn every_model_carries_its_clips_at_their_lengths() {
         for (d, c) in CHAMPIONS.iter().enumerate() {
-            let have = model_clips(&c.name.to_lowercase());
+            let have = model_clips(&format!("champions/{}", c.name.to_lowercase()));
             for clip in kit(d).clips() {
                 let i = clip.info();
                 let Some((_, end)) = have.iter().find(|(n, _)| n == i.name) else {
@@ -551,6 +619,53 @@ mod tests {
                     i.length
                 );
             }
+        }
+    }
+
+    #[test]
+    fn every_minion_model_carries_its_clips_and_the_cart_none() {
+        for &(kind, name, attack) in &MINIONS {
+            let have = model_clips(&format!("minions/{name}"));
+            assert_eq!(have.len(), minion_clips(kind).len(), "{name}: {have:?}");
+            assert_eq!(attack.is_none(), have.is_empty(), "{name}");
+            for clip in minion_clips(kind) {
+                let i = clip.info();
+                let Some((_, end)) = have.iter().find(|(n, _)| n == i.name) else {
+                    panic!("the {name} minion's model has no {}", i.name);
+                };
+                assert!(
+                    (end - i.length).abs() < 0.04,
+                    "the {name}'s {} is {end} s, not {}",
+                    i.name,
+                    i.length
+                );
+            }
+            // Dusk's colours beside it.
+            assert!(root().join(format!("web/assets/models/minions/{name}.dusk.jpg")).exists(), "{name}");
+        }
+        assert!(minion(Kind::Champion).is_none() && minion(Kind::Turret).is_none());
+    }
+
+    #[test]
+    fn a_minion_swings_as_its_windup_ends_and_does_nothing_else() {
+        // A melee minion: 0.8 attacks a second, a period of 38 ticks, 11 of them its windup (the
+        // sim's sum); a caster 0.67, 45 and 14.
+        for (kind, clip, ticks) in [(Kind::Melee, Clip::Slash, 11.0), (Kind::Caster, Clip::Flick, 14.0)] {
+            let mut p = Poser::minion(kind);
+            p.step(0.0, &seen());
+            let pose = p.step(1.0, &Seen { flags: flags::ATTACKING, ..seen() });
+            assert_eq!((pose.main.clip, pose.main.time), (clip, 0.0));
+            let first = clip.info().strike / p.attack_rate;
+            assert!((first - ticks / 30.0).abs() < 1e-3, "{kind:?}: {first}");
+            // No casts, no cheering: it stands when its side has won.
+            p.cast(0, 2.0);
+            assert!(p.casting.is_none());
+            let after = run(&mut p, 3.0, 3.0, |_| Seen { won: true, ..seen() });
+            assert_eq!(after.last().unwrap().1.main.clip, Clip::Idle);
+            // It walks at its own stride (a radius of 48, 325 units a second).
+            let walking = p.step(7.0, &Seen { speed: 325.0, ..seen() });
+            assert_eq!(walking.main.clip, Clip::Run);
+            assert!((p.now.rate - 325.0 / 288.0).abs() < 1e-3);
         }
     }
 

@@ -73,6 +73,23 @@ under [Meshy's terms](https://www.meshy.ai/terms-of-use).
 | `vessa.glb` | Vessa: crossbow |
 | `vire.glb` | Vire: greatsword |
 
+## The minions (`web/assets/models/minions/`)
+
+Made with Meshy (`art/meshy.json`, `minions`) as the champions are: the melee minion's and the
+caster's bodies by text-to-3D (`meshy-6-lite`, in an A-pose) from our own prompts, textured and
+rigged by Meshy, each its own run; the champions' shared clips retargeted onto them; the props
+the champions' (`art/champions.json`, `minions`), a band of each in its team's colour. The siege
+cart by text-to-3D and textured, not rigged. Each `<name>.dusk.jpg` is its texture with the blues
+turned red, by `art/tools/champions.mjs`, which puts them together. Ours: generated for this project
+on its Meshy account, under [Meshy's terms](https://www.meshy.ai/terms-of-use).
+
+| File | The minion, and what it holds |
+|---|---|
+| `melee.glb`, `melee.dusk.jpg` | a squat foot soldier: sword, kite shield |
+| `caster.glb`, `caster.dusk.jpg` | a hooded acolyte: walking staff |
+| `super.glb`, `super.dusk.jpg` | the foot soldier's body, bigger: forge hammer |
+| `siege.glb`, `siege.dusk.jpg` | a cannon on a four-wheeled cart |
+
 ## The sounds (`web/assets/audio/`)
 
 Made by `art/tools/sounds.py` from the lines of `manifest.json` (ours: written from
