@@ -272,7 +272,8 @@
             0.0
           ]
         ]
-      ]
+      ],
+      "flip": true
     },
     "crescent_blade": {
       "length": 0.6,
