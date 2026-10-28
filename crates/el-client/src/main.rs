@@ -27,6 +27,8 @@ mod input;
 #[cfg(target_arch = "wasm32")]
 mod look;
 #[cfg(target_arch = "wasm32")]
+mod minions;
+#[cfg(target_arch = "wasm32")]
 mod mips;
 #[cfg(target_arch = "wasm32")]
 mod models;

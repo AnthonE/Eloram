@@ -347,5 +347,31 @@
       "loop": true,
       "strike": 0.0
     }
+  },
+  "minions": {
+    "caster": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "flick"
+    ],
+    "melee": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "slash"
+    ],
+    "super": [
+      "idle",
+      "run",
+      "hit",
+      "death",
+      "airborne",
+      "smash"
+    ]
   }
 }

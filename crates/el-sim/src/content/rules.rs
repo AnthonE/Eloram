@@ -130,6 +130,9 @@ const fn minion(
     }
 }
 
+/// A minion's windup: this share of the time between its attacks.
+pub const MINION_WINDUP: f32 = 0.3;
+
 pub fn minion_def(kind: Kind) -> MinionDef {
     match kind {
         Kind::Caster => minion(296.0, 23.0, 0.0, 0.67, 550.0, 48.0, 650.0),

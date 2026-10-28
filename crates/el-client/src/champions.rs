@@ -371,7 +371,7 @@ fn animate(
         if let Some(p) = figure.player
             && let Ok(mut player) = players.get_mut(p)
         {
-            play(&mut player, art, pose.main, pose.fading);
+            play(&mut player, &art.nodes, pose.main, pose.fading);
         }
         // A hit: a white flash, fading in steps.
         let t = ((now - seat.flash_at) / FLASH) as f32;
@@ -392,9 +392,15 @@ fn animate(
 }
 
 /// Plays `main` (and what's fading) on the player at the times the pose says: the clock is the
-/// pose's, so each plays paused at its time.
-fn play(player: &mut AnimationPlayer, art: &Art, main: Layer, fading: Option<Layer>) {
-    let node = |c: Clip| art.nodes[Clip::ALL.iter().position(|&k| k == c).unwrap_or(0)];
+/// pose's, so each plays paused at its time. `nodes` is each clip's in the model's graph, in
+/// `Clip::ALL`'s order (the minions' too).
+pub(crate) fn play(
+    player: &mut AnimationPlayer,
+    nodes: &[Option<AnimationNodeIndex>; Clip::ALL.len()],
+    main: Layer,
+    fading: Option<Layer>,
+) {
+    let node = |c: Clip| nodes[Clip::ALL.iter().position(|&k| k == c).unwrap_or(0)];
     let want: Vec<(AnimationNodeIndex, Layer)> =
         [Some(main), fading].into_iter().flatten().filter_map(|l| node(l.clip).map(|n| (n, l))).collect();
     let stale: Vec<AnimationNodeIndex> =
