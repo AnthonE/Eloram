@@ -14,9 +14,10 @@
 
 use el_proto::event::WireEvent;
 use el_proto::quant::pos_from_code;
-use el_proto::unit::flags;
+use el_proto::unit::{QUnit, flags};
 use el_sim::content::champions::CHAMPIONS;
 use el_sim::content::rules;
+use el_sim::game::Match;
 use el_sim::missile::Source;
 use el_sim::units::{Kind, MAX_UNITS, SEATS, team_of_seat};
 use glam::Vec2;
@@ -26,6 +27,9 @@ use super::mix;
 use super::sound::{Part, Sfx};
 use super::voice::Announcer;
 use crate::client::{OWN_FEED, OwnEvent};
+use crate::interp::Sample;
+use crate::missiles::Shot;
+use crate::spectator::Spectator;
 use crate::{Client, client::FEED};
 
 /// "Not seen" on the wire.
@@ -157,6 +161,120 @@ pub struct Cue {
     pub own: bool,
 }
 
+/// What the director reads of a match: a player's client (the match as their team is told it,
+/// and their own champion predicted), or a match watched from its record, seen whole.
+pub trait Scene {
+    /// The match as known.
+    fn world(&self) -> &Match;
+    /// The events told, a ring of [`FEED`], and how many have been told in all.
+    fn feed(&self) -> (&[(u32, WireEvent)], u64);
+    /// The tick units are drawn at.
+    fn view_tick(&self, now: f64) -> f64;
+    fn started(&self) -> bool;
+    /// Unit `i` as it's drawn (not a player's own champion), if it's seen.
+    fn sample(&self, i: usize, now: f64) -> Option<Sample>;
+    /// Unit `i`'s newest record, seen or not, if there is one.
+    fn newest(&self, i: usize) -> Option<QUnit>;
+    /// Whether unit `i` is seen.
+    fn known(&self, i: usize) -> bool;
+    /// Missile `id` as told.
+    fn shot(&self, id: usize) -> Option<&Shot>;
+    /// The player whose champion this is, with its prediction; none for a match watched.
+    fn player(&self) -> Option<&Client>;
+}
+
+impl Scene for Client {
+    fn world(&self) -> &Match {
+        &self.world
+    }
+
+    fn feed(&self) -> (&[(u32, WireEvent)], u64) {
+        (&self.feed, self.feed_n)
+    }
+
+    fn view_tick(&self, now: f64) -> f64 {
+        self.clock.view_tick(now)
+    }
+
+    fn started(&self) -> bool {
+        Client::started(self)
+    }
+
+    fn sample(&self, i: usize, now: f64) -> Option<Sample> {
+        self.unit(i, now)
+    }
+
+    fn newest(&self, i: usize) -> Option<QUnit> {
+        self.tracks.get(i).and_then(|t| t.newest()).map(|(_, q)| q)
+    }
+
+    fn known(&self, i: usize) -> bool {
+        self.tracks.get(i).is_some_and(|t| t.known)
+    }
+
+    fn shot(&self, id: usize) -> Option<&Shot> {
+        self.missiles.shots.get(id)
+    }
+
+    fn player(&self) -> Option<&Client> {
+        Some(self)
+    }
+}
+
+/// A match watched: stepped from its record to `tick` (drawn `blend` of the way on from the tick
+/// before, where its units were at `prev`), and what it told.
+pub struct Watched<'a> {
+    pub m: &'a Match,
+    pub told: &'a Spectator,
+    pub prev: &'a [Vec2],
+    pub blend: f32,
+    /// The tick drawn (fractional).
+    pub at: f64,
+}
+
+impl Scene for Watched<'_> {
+    fn world(&self) -> &Match {
+        self.m
+    }
+
+    fn feed(&self) -> (&[(u32, WireEvent)], u64) {
+        (&self.told.feed, self.told.feed_n)
+    }
+
+    fn view_tick(&self, _now: f64) -> f64 {
+        self.at
+    }
+
+    fn started(&self) -> bool {
+        true
+    }
+
+    fn sample(&self, i: usize, _now: f64) -> Option<Sample> {
+        let u = self.m.units.get(i).filter(|u| u.alive)?;
+        let pos = self.prev.get(i).map_or(u.pos, |p| p.lerp(u.pos, self.blend));
+        Some(Sample { pos, facing: u.facing, q: self.m.quantize(i, 0) })
+    }
+
+    fn newest(&self, i: usize) -> Option<QUnit> {
+        (i < MAX_UNITS).then(|| self.m.quantize(i, 0))
+    }
+
+    fn known(&self, i: usize) -> bool {
+        self.m.units.get(i).is_some_and(|u| u.alive)
+    }
+
+    fn shot(&self, id: usize) -> Option<&Shot> {
+        self.told.missiles.shots.get(id)
+    }
+
+    fn player(&self) -> Option<&Client> {
+        None
+    }
+}
+
+/// No seat: the director of a match watched.
+pub const NO_SEAT: usize = usize::MAX;
+
 /// What the director remembers of a unit slot from the last frame.
 #[derive(Clone, Copy, Debug, Default)]
 struct Seen {
@@ -230,6 +348,12 @@ impl Director {
         }
     }
 
+    /// The director of a match watched: no champion its own, Dawn's side the near one (as the
+    /// match is drawn, each side in its own colour).
+    pub fn watching() -> Self {
+        Self { seat: NO_SEAT, team: 0, announcer: Announcer::watching(), ..Self::new(0) }
+    }
+
     fn side(&self, team: u8, unit: Option<usize>) -> Side {
         if unit == Some(self.seat) {
             Side::Own
@@ -241,42 +365,44 @@ impl Director {
     }
 
     /// Where unit `i` is drawn now (or was last).
-    fn pos(&self, c: &Client, i: usize, now: f64) -> Vec2 {
-        if i == self.seat {
-            return c.own_pos(now);
+    fn pos(&self, c: &dyn Scene, i: usize, now: f64) -> Vec2 {
+        if i == self.seat
+            && let Some(p) = c.player()
+        {
+            return p.own_pos(now);
         }
-        match c.unit(i, now) {
+        match c.sample(i, now) {
             Some(s) => s.pos,
             None if self.seen.get(i).is_some_and(|s| s.known) => self.seen[i].pos,
-            None => c.world.units.get(i).map_or(Vec2::ZERO, |u| u.pos),
+            None => c.world().units.get(i).map_or(Vec2::ZERO, |u| u.pos),
         }
     }
 
-    fn kind(&self, c: &Client, i: usize) -> Kind {
+    fn kind(&self, c: &dyn Scene, i: usize) -> Kind {
         if i < SEATS {
             return Kind::Champion;
         }
-        match c.tracks.get(i).and_then(|t| t.newest()) {
-            Some((_, q)) => Kind::from_u8(q.kind),
+        match c.newest(i) {
+            Some(q) => Kind::from_u8(q.kind),
             None if self.seen.get(i).is_some_and(|s| s.known) => Kind::from_u8(self.seen[i].kind),
-            None => c.world.units.get(i).map_or(Kind::Melee, |u| u.kind),
+            None => c.world().units.get(i).map_or(Kind::Melee, |u| u.kind),
         }
     }
 
-    fn team_of(&self, c: &Client, i: usize) -> u8 {
+    fn team_of(&self, c: &dyn Scene, i: usize) -> u8 {
         if i < SEATS {
             return team_of_seat(i);
         }
-        match c.tracks.get(i).and_then(|t| t.newest()) {
-            Some((_, q)) => q.team,
+        match c.newest(i) {
+            Some(q) => q.team,
             None if self.seen.get(i).is_some_and(|s| s.known) => self.seen[i].team,
-            None => c.world.units.get(i).map_or(0, |u| u.team),
+            None => c.world().units.get(i).map_or(0, |u| u.team),
         }
     }
 
     /// A champion's number, if slot `i` holds one.
-    fn champ(&self, c: &Client, i: usize) -> Option<u8> {
-        (i < SEATS).then(|| c.world.champs[i].def)
+    fn champ(&self, c: &dyn Scene, i: usize) -> Option<u8> {
+        (i < SEATS).then(|| c.world().champs[i].def)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -301,16 +427,17 @@ impl Director {
     }
 
     /// This frame's cues, into `out`.
-    pub fn frame(&mut self, c: &Client, now: f64, out: &mut Vec<Cue>) {
+    pub fn frame(&mut self, c: &dyn Scene, now: f64, out: &mut Vec<Cue>) {
         if !self.welcomed && c.started() {
             self.welcomed = true;
             self.announcer.welcome(now);
         }
         self.own(c, now, out);
         // The server's word, each when it should be seen.
-        let from = self.read.max(c.feed_n.saturating_sub(FEED as u64));
-        for n in from..c.feed_n {
-            let (tick, e) = c.feed[(n % FEED as u64) as usize];
+        let (feed, feed_n) = c.feed();
+        let from = self.read.max(feed_n.saturating_sub(FEED as u64));
+        for n in from..feed_n {
+            let (tick, e) = feed[(n % FEED as u64) as usize];
             if self.waits(&e) {
                 if self.held.len() < 256 {
                     self.held.push((tick, now, e));
@@ -319,8 +446,8 @@ impl Director {
                 self.event(c, tick, &e, now, out);
             }
         }
-        self.read = c.feed_n;
-        let view = c.clock.view_tick(now);
+        self.read = feed_n;
+        let view = c.view_tick(now);
         let mut k = 0;
         while k < self.held.len() {
             let (tick, got, e) = self.held[k];
@@ -365,12 +492,13 @@ impl Director {
     }
 
     /// The own champion's doings, from the prediction.
-    fn own(&mut self, c: &Client, now: f64, out: &mut Vec<Cue>) {
+    fn own(&mut self, c: &dyn Scene, now: f64, out: &mut Vec<Cue>) {
+        let Some(p) = c.player() else { return };
         let me = self.seat;
-        let def = c.pred.champs[me].def;
-        let from = self.own_read.max(c.own_feed_n.saturating_sub(OWN_FEED as u64));
-        for n in from..c.own_feed_n {
-            let (tick, e) = c.own_feed[(n % OWN_FEED as u64) as usize];
+        let def = p.pred.champs[me].def;
+        let from = self.own_read.max(p.own_feed_n.saturating_sub(OWN_FEED as u64));
+        for n in from..p.own_feed_n {
+            let (tick, e) = p.own_feed[(n % OWN_FEED as u64) as usize];
             match e {
                 OwnEvent::Cast { slot, at } => {
                     self.own_cast[usize::from(slot.min(5))] = tick;
@@ -392,14 +520,14 @@ impl Director {
                 OwnEvent::Nothing => {}
             }
         }
-        self.own_read = c.own_feed_n;
+        self.own_read = p.own_feed_n;
     }
 
     /// Champion `unit` (number `def`) began casting `slot` at `at`.
     #[allow(clippy::too_many_arguments)]
     fn cast(
         &mut self,
-        c: &Client,
+        c: &dyn Scene,
         unit: usize,
         def: u8,
         slot: u8,
@@ -433,7 +561,7 @@ impl Director {
     #[allow(clippy::too_many_arguments)]
     fn launch(
         &self,
-        c: &Client,
+        c: &dyn Scene,
         source: Source,
         owner: Option<usize>,
         from: Vec2,
@@ -460,12 +588,12 @@ impl Director {
     }
 
     /// Unit `unit` swung in melee.
-    fn swing(&self, c: &Client, unit: usize, now: f64, out: &mut Vec<Cue>) {
+    fn swing(&self, c: &dyn Scene, unit: usize, now: f64, out: &mut Vec<Cue>) {
         let kind = self.kind(c, unit);
         let team = self.team_of(c, unit);
         let (sound, l) = match kind {
             Kind::Champion => {
-                let def = c.world.champs[unit].def;
+                let def = c.world().champs[unit].def;
                 if CHAMPIONS[usize::from(def)].missile_speed > 0.0 {
                     return;
                 }
@@ -494,7 +622,7 @@ impl Director {
 
     /// Unit `unit` went from `from` to `to` at once: a blink of its own, or a shove.
     #[allow(clippy::too_many_arguments)]
-    fn blink(&self, c: &Client, unit: usize, from: Vec2, to: Vec2, tick: u32, out: &mut Vec<Cue>) {
+    fn blink(&self, c: &dyn Scene, unit: usize, from: Vec2, to: Vec2, tick: u32, out: &mut Vec<Cue>) {
         let team = self.team_of(c, unit);
         let side = self.side(team, Some(unit));
         let (t, slot) = if unit == self.seat {
@@ -551,7 +679,7 @@ impl Director {
         }
     }
 
-    fn event(&mut self, c: &Client, tick: u32, e: &WireEvent, now: f64, out: &mut Vec<Cue>) {
+    fn event(&mut self, c: &dyn Scene, tick: u32, e: &WireEvent, now: f64, out: &mut Vec<Cue>) {
         let me = self.seat;
         match *e {
             WireEvent::Cast { unit, slot, at } => {
@@ -564,7 +692,7 @@ impl Director {
                 if u == me && self.own_cast[usize::from(slot.min(5))].abs_diff(tick) <= OWN_MATCH {
                     return;
                 }
-                let def = c.world.champs[u].def;
+                let def = c.world().champs[u].def;
                 self.cast(c, u, def, slot, pos_from_code(at), now, u == me, out);
             }
             WireEvent::Attack { unit, .. } => {
@@ -599,7 +727,7 @@ impl Director {
             }
             WireEvent::MissileEnd { id, at, .. } => {
                 // A skillshot's end, drawn where it stopped (a hit is the Damage it does).
-                let Some(s) = c.missiles.shots.get(usize::from(id)) else { return };
+                let Some(s) = c.shot(usize::from(id)) else { return };
                 if s.homing {
                     return;
                 }
@@ -745,7 +873,7 @@ impl Director {
             WireEvent::LevelUp { unit, .. } => {
                 let u = usize::from(unit);
                 // Seen, or the viewer's own (anyone's level is on the scoreboard, not on the map).
-                if u != me && !c.tracks.get(u).is_some_and(|t| t.known) {
+                if u != me && !c.known(u) {
                     return;
                 }
                 let l = look::look(Source::Auto, self.champ(c, u), self.team_of(c, u));
@@ -808,7 +936,7 @@ impl Director {
                 out.push(cue);
             }
             WireEvent::Relic { pad, beam, .. } => {
-                let at = c.world.relics.get(usize::from(pad)).map_or(Vec2::ZERO, |r| r.pos);
+                let at = c.world().relics.get(usize::from(pad)).map_or(Vec2::ZERO, |r| r.pos);
                 let l = look::look(Source::Relic, None, self.team);
                 let sound = Some(if beam { Sfx::RelicBeam } else { Sfx::RelicTake });
                 let mut cue =
@@ -856,23 +984,26 @@ impl Director {
         }
     }
 
-    fn ui(&self, c: &Client, sfx: Sfx, now: f64) -> Cue {
+    fn ui(&self, c: &dyn Scene, sfx: Sfx, now: f64) -> Cue {
         let l = look::look(Source::Auto, None, self.team);
         self.cue(What::Ui, Source::Auto, l, self.pos(c, self.seat, now), None, Side::Own, true, Some(sfx))
     }
 
     /// The units' flags, where one rose since the last frame; and a turret turning on the viewer.
-    fn flags(&mut self, c: &Client, now: f64, out: &mut Vec<Cue>) {
+    fn flags(&mut self, c: &dyn Scene, now: f64, out: &mut Vec<Cue>) {
         let me = self.seat;
         for i in 0..MAX_UNITS {
-            let now_seen = if i == me {
-                let u = &c.pred.units[me];
-                u.alive.then(|| {
-                    let q = c.pred.quantize_teams(me)[usize::from(self.team)];
-                    (u.generation as u8, q.flags, q.target, q.kind, q.team, c.own_pos(now))
-                })
-            } else {
-                c.unit(i, now).map(|s| (s.q.generation, s.q.flags, s.q.target, s.q.kind, s.q.team, s.pos))
+            let now_seen = match c.player() {
+                Some(p) if i == me => {
+                    let u = &p.pred.units[me];
+                    u.alive.then(|| {
+                        let q = p.pred.quantize_teams(me)[usize::from(self.team)];
+                        (u.generation as u8, q.flags, q.target, q.kind, q.team, p.own_pos(now))
+                    })
+                }
+                _ => c
+                    .sample(i, now)
+                    .map(|s| (s.q.generation, s.q.flags, s.q.target, s.q.kind, s.q.team, s.pos)),
             };
             let Some((generation, f, target, kind, team, pos)) = now_seen else {
                 self.seen[i].known = false;
@@ -932,11 +1063,9 @@ impl Director {
 
     /// The own champion's interface: a point spent, an item bought or sold, the cards dealt, an
     /// augment taken, a reroll.
-    fn interface(&mut self, c: &Client, now: f64, out: &mut Vec<Cue>) {
-        if !c.started() {
-            return;
-        }
-        let ch = &c.pred.champs[self.seat];
+    fn interface(&mut self, c: &dyn Scene, now: f64, out: &mut Vec<Cue>) {
+        let Some(p) = c.player().filter(|_| c.started()) else { return };
+        let ch = &p.pred.champs[self.seat];
         let ui = Ui {
             points_spent: ch.ranks.iter().map(|&r| u16::from(r)).sum(),
             items: ch.items,
@@ -970,8 +1099,8 @@ impl Director {
     }
 
     /// What the match's clock calls for: the minions' march, an inhibitor standing again.
-    fn clock(&mut self, c: &Client, now: f64) {
-        let t = c.world.tick;
+    fn clock(&mut self, c: &dyn Scene, now: f64) {
+        let t = c.world().tick;
         let at = |s: f32| el_sim::ticks(s);
         let soon = at(rules::FIRST_WAVE - 30.0);
         let wave = at(rules::FIRST_WAVE);
@@ -983,7 +1112,7 @@ impl Director {
         }
         for team in 0..2u8 {
             let slot = el_sim::units::structure_slot(team, el_sim::units::structure::INHIBITOR);
-            let up = c.world.units.get(slot).is_some_and(|u| u.alive);
+            let up = c.world().units.get(slot).is_some_and(|u| u.alive);
             let k = usize::from(team);
             if up && !self.inhibitors[k] {
                 self.announcer.inhibitor_back(now);
@@ -1137,5 +1266,54 @@ mod tests {
         );
         d.frame(&c, 2.0, &mut out);
         assert_eq!(sounds(&out), [Sfx::BronzeImpact]);
+    }
+
+    #[test]
+    fn a_match_watched_shows_and_sounds_both_sides_and_owns_nothing() {
+        use el_sim::game::SeatInput;
+        use el_sim::path::PathScratch;
+        let mut m = Match::new(el_sim::map::Map::leaked(), 11, core::array::from_fn(|k| k as u8));
+        let mut scratch = PathScratch::new();
+        let mut told = Spectator::default();
+        let mut d = Director::watching();
+        let mut prev = vec![Vec2::ZERO; MAX_UNITS];
+        let mut out = Vec::new();
+        let mut cues = Vec::new();
+        let mut lines = Vec::new();
+        for _ in 0..el_sim::ticks(240.0) {
+            for (p, u) in prev.iter_mut().zip(m.units.iter()) {
+                *p = u.pos;
+            }
+            let mut inputs = [SeatInput::default(); SEATS];
+            for (seat, input) in inputs.iter_mut().enumerate() {
+                el_sim::bot::think(&m, seat, input);
+            }
+            m.step(&inputs, &mut scratch);
+            told.tell(&m, true);
+            let at = f64::from(m.tick);
+            let scene = Watched { m: &m, told: &told, prev: &prev, blend: 1.0, at };
+            out.clear();
+            let now = at / f64::from(el_sim::TICK_HZ);
+            d.frame(&scene, now, &mut out);
+            cues.extend_from_slice(&out);
+            lines.extend(d.announcer.next(now, false));
+        }
+        let n = |f: &dyn Fn(&Cue) -> bool| cues.iter().filter(|q| f(q)).count();
+        assert_eq!(n(&|q| q.own), 0, "a watcher has no champion of their own");
+        assert_eq!(n(&|q| q.side == Side::Own), 0);
+        for side in [Side::Ally, Side::Enemy] {
+            let casts = n(&|q| q.side == side && q.what == What::Part(Part::Cast) && q.sound.is_some());
+            assert!(casts > 10, "{side:?}'s casts heard: {casts}");
+            let hits = n(&|q| q.side == side && q.what == What::Part(Part::Impact));
+            assert!(hits > 100, "{side:?}'s hits: {hits}");
+        }
+        assert!(n(&|q| q.what == What::Part(Part::Launch)) > 50, "missiles and swings");
+        assert!(n(&|q| q.what == What::Death(Kind::Champion)) > 0, "a champion's fall");
+        assert!(n(&|q| matches!(q.what, What::Status(_))) > 0, "a status rising");
+        // Every cue is where the match is: on the map, not at its corner.
+        assert_eq!(n(&|q| q.at == Vec2::ZERO), 0);
+        // The announcer welcomes the watcher and calls the first blood.
+        assert!(lines.contains(&Sfx::VoiceWelcome), "{lines:?}");
+        assert!(lines.contains(&Sfx::VoiceFirstBlood), "{lines:?}");
     }
 }

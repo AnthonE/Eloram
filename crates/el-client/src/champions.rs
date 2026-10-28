@@ -65,6 +65,8 @@ struct Seats {
     /// The client's events read so far, and its own.
     feed_read: u64,
     own_read: u64,
+    /// Casts begun on the figures, all told.
+    casts: u64,
 }
 
 /// A figure's model, set up once its scene is in: what plays its clips, and its own materials
@@ -252,6 +254,7 @@ fn animate(
                 {
                     if let Some(p) = seats.seats[usize::from(unit)].poser.as_mut() {
                         p.cast(slot, now);
+                        seats.casts += 1;
                     }
                 }
                 WireEvent::Death { unit, .. } if usize::from(unit) < SEATS => {
@@ -272,9 +275,29 @@ fn animate(
                 && let Some(p) = seats.seats[c.seat].poser.as_mut()
             {
                 p.cast(slot, now);
+                seats.casts += 1;
             }
         }
         seats.own_read = c.own_feed_n;
+    }
+    // A match watched: what it told as it was stepped, already at the tick drawn.
+    if let Some(w) = watch {
+        let (feed, feed_n) = (&w.told.feed, w.told.feed_n);
+        for n in seats.feed_read.max(feed_n.saturating_sub(FEED as u64))..feed_n {
+            match feed[(n % FEED as u64) as usize].1 {
+                WireEvent::Cast { unit, slot, .. } if usize::from(unit) < SEATS => {
+                    if let Some(p) = seats.seats[usize::from(unit)].poser.as_mut() {
+                        p.cast(slot, now);
+                        seats.casts += 1;
+                    }
+                }
+                WireEvent::Damage { target, .. } if usize::from(target) < SEATS => {
+                    seats.seats[usize::from(target)].flash_at = now;
+                }
+                _ => {}
+            }
+        }
+        seats.feed_read = feed_n;
     }
     let outcome = match (watch, client) {
         (Some(w), _) => w.referee.m.outcome,
@@ -389,6 +412,7 @@ fn animate(
     }
     dev.set("champion_models", models.ready.iter().filter(|a| a.is_some()).count());
     dev.set("champion_poses", shown.join(","));
+    dev.set("champion_casts", seats.casts as f64);
 }
 
 /// Plays `main` (and what's fading) on the player at the times the pose says: the clock is the

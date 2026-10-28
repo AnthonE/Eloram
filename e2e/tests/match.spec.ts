@@ -22,6 +22,8 @@ const until = async (page: any, what: string, pred: (s: Record<string, any>) => 
 // an item bought, a skill levelled and cast, a ping, a walk down the lane predicted exactly (the
 // champion running), and fog that hides the enemy until someone of ours can see them.
 test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({ page }, info) => {
+  // Nine pictures at under a frame a second in SwiftShader: on a slow box it takes all of five minutes.
+  test.setTimeout(480_000);
   const logs = collectConsole(page);
   const shots = `artifacts/match-${info.project.name}`;
   await page.goto(`/?gfx=${info.project.name}&name=Tester`);

@@ -55,6 +55,11 @@ impl Announcer {
         }
     }
 
+    /// The announcer of a match watched: Dawn's side the near one, no champion its own.
+    pub fn watching() -> Self {
+        Self { seat: super::director::NO_SEAT, ..Self::new(0) }
+    }
+
     fn say(&mut self, line: Sfx, now: f64) {
         if self.queue.len() < 8 {
             self.queue.push((line, now));
@@ -133,7 +138,10 @@ impl Announcer {
         if surrendered {
             self.say(Sfx::VoiceSurrender, now);
         }
-        self.say(if winner == self.team { Sfx::VoiceVictory } else { Sfx::VoiceDefeat }, now);
+        // A match watched is no one's victory.
+        if self.seat != super::director::NO_SEAT {
+            self.say(if winner == self.team { Sfx::VoiceVictory } else { Sfx::VoiceDefeat }, now);
+        }
     }
 
     /// The next line to say, if the last one is done (`busy`: one is still being said). Stale ones

@@ -453,9 +453,14 @@ fn play(
     let (camera, view) = *cam;
     let ndc = |at: Vec2| camera.world_to_ndc(view, world(at, 1.0)).map_or(Vec2::splat(9.0), |n| n.truncate());
     // A match's families, once it's dealt.
-    if let Some(c) = session.client.as_deref() {
-        for s in 0..el_sim::units::SEATS {
-            e.family(Family::of(c.world.champs[s].def) as usize);
+    let champs = match (session.watch.as_deref(), session.client.as_deref()) {
+        (Some(w), _) => Some(&w.referee.m.champs),
+        (None, Some(c)) => Some(&c.world.champs),
+        (None, None) => None,
+    };
+    if let Some(champs) = champs {
+        for c in champs.iter().take(el_sim::units::SEATS) {
+            e.family(Family::of(c.def) as usize);
         }
     }
     let t = e.ctx.current_time();

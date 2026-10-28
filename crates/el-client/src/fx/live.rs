@@ -293,24 +293,32 @@ pub fn draw(
     mut q: Query<Parts<'_>, With<LiveView>>,
     mut marks: Local<Vec<(Mark, Transform)>>,
     mut last: Local<Vec<(usize, Vec2)>>,
+    mut dev: ResMut<crate::dev_hooks::DevStatus>,
 ) {
     let live = &mut *live;
-    let Some(c) = session.client.as_deref().filter(|_| session.watch.is_none()) else {
-        for e in live.heads.iter().chain(&live.trails).chain(&live.zones).chain(&live.marks) {
-            hide(&mut q, *e);
-        }
-        return;
-    };
     let now = now_s();
+    // The match played (missiles and zones on the own champion's clock) or watched (on the
+    // record's, all of it seen; Dawn the near side).
+    let watch = session.watch.as_deref();
+    let client = session.client.as_deref().filter(|_| watch.is_none());
+    let (missiles, zones, champs, at, team) = match (watch, client) {
+        (Some(w), _) => (&w.told.missiles, &w.told.zones, &w.referee.m.champs, w.at, 0),
+        (None, Some(c)) => (&c.missiles, &c.zones, &c.world.champs, c.missile_tick(now), c.team),
+        (None, None) => {
+            for e in live.heads.iter().chain(&live.trails).chain(&live.zones).chain(&live.marks) {
+                hide(&mut q, *e);
+            }
+            return;
+        }
+    };
     let clock = time.elapsed_secs_wrapped();
     let face = facing_camera();
     let flat = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     // Missiles: a head and a trail each.
-    let at = c.missile_tick(now);
     let mut k = 0;
     let mut seen_pos = std::mem::take(&mut *last);
     let mut next_pos = Vec::with_capacity(seen_pos.len());
-    for (id, s) in c.missiles.live() {
+    for (id, s) in missiles.live() {
         if k >= live.heads.len() {
             break;
         }
@@ -326,7 +334,7 @@ pub fn draw(
         };
         next_pos.push((id, pos));
         let owner = usize::from(s.owner);
-        let champ = (owner < SEATS).then(|| c.world.champs[owner].def);
+        let champ = (owner < SEATS).then(|| champs[owner].def);
         let l = look::look(s.source, champ, s.team);
         let pal = l.palette;
         let ck = key(pal.core, pal.edge);
@@ -375,44 +383,41 @@ pub fn draw(
         k += 1;
     }
     *last = next_pos;
+    dev.set("fx_missiles", k as u32);
     for i in k..live.heads.len() {
         hide(&mut q, live.heads[i]);
         hide(&mut q, live.trails[i]);
     }
     seen_pos.clear();
     // Zones: a telegraph filling toward its landing, or a field's churn and pulses.
-    let own_tick = c.clock.own_tick(now);
-    let secs = |tick: f64| clock + ((tick - own_tick) / f64::from(el_proto::TICK_HZ)) as f32;
+    let secs = |tick: f64| clock + ((tick - at) / f64::from(el_proto::TICK_HZ)) as f32;
+    let mut zones_shown = 0u32;
     for i in 0..MAX_ZONES {
-        let f = c.zones.fields[i];
+        let f = zones.fields[i];
         let lands = f.period == 0;
-        if !f.alive || (lands && f64::from(f.next) + 2.0 < own_tick) {
+        if !f.alive || (lands && f64::from(f.next) + 2.0 < at) {
             hide(&mut q, live.zones[i]);
             live.zone_for[i] = None;
             continue;
         }
         let owner = usize::from(f.owner);
-        let centre = if f.follows {
-            if owner == c.seat {
-                c.own_pos(now)
-            } else {
-                drawn.units.get(owner).copied().flatten().map_or(f.at, |d| d.pos)
-            }
-        } else {
-            f.at
+        let centre = match client {
+            _ if !f.follows => f.at,
+            Some(c) if owner == c.seat => c.own_pos(now),
+            _ => drawn.units.get(owner).copied().flatten().map_or(f.at, |d| d.pos),
         };
         let shape_now = if lands { shape::TELEGRAPH } else { shape::FIELD };
         let id = (f.generation, shape_now as u8);
         if live.zone_for[i] != Some(id) {
             live.zone_for[i] = Some(id);
-            let champ = (owner < SEATS).then(|| c.world.champs[owner].def);
+            let champ = (owner < SEATS).then(|| champs[owner].def);
             let l = look::look(f.source, champ, f.team);
-            let ours = f.team == c.team;
+            let ours = f.team == team;
             // An enemy's rim is hot and full; an ally's cool and fainter (Riot: it tells them less).
             let edge = if ours { v4(l.palette.edge, 0.55) } else { Vec4::new(3.4, 0.9, 0.25, 1.0) };
             let core = v4(l.palette.core, if ours { 0.25 } else { 0.45 });
             let p = if lands {
-                Vec4::new(shape::TELEGRAPH, secs(f64::from(c.zones.since[i])), secs(f64::from(f.next)), 0.0)
+                Vec4::new(shape::TELEGRAPH, secs(f64::from(zones.since[i])), secs(f64::from(f.next)), 0.0)
             } else {
                 Vec4::new(
                     shape::FIELD,
@@ -429,28 +434,34 @@ pub fn draw(
             .with_rotation(flat)
             .with_scale(Vec3::splat(f.radius * S));
         show(&mut q, live.zones[i], tf, &live.flat.clone(), &live.zone_mats[i].clone());
+        zones_shown += 1;
     }
+    dev.set("fx_zones", zones_shown);
     // Statuses: the marks each drawn unit's flags show.
     marks.clear();
     let mut list = Vec::with_capacity(4);
     for (i, d) in drawn.units.iter().enumerate().take(MAX_UNITS) {
         let Some(d) = d else { continue };
-        let f = if i == c.seat {
-            c.pred.quantize_teams(i)[usize::from(c.team)].flags
-        } else {
-            match c.unit(i, now) {
-                Some(s) => s.q.flags,
-                None => continue,
+        let (f, kind) = match (watch, client) {
+            (Some(w), _) => {
+                let u = &w.referee.m.units[i];
+                if !u.alive {
+                    continue;
+                }
+                (w.referee.m.quantize(i, 0).flags, u.kind)
             }
+            (None, Some(c)) if i == c.seat => {
+                (c.pred.quantize_teams(i)[usize::from(c.team)].flags, Kind::Champion)
+            }
+            (None, Some(c)) => match c.unit(i, now) {
+                Some(s) => (s.q.flags, Kind::from_u8(s.q.kind)),
+                None => continue,
+            },
+            (None, None) => continue,
         };
         if f == 0 {
             continue;
         }
-        let kind = if i < SEATS {
-            Kind::Champion
-        } else {
-            c.tracks[i].newest().map_or(Kind::Melee, |(_, q)| Kind::from_u8(q.kind))
-        };
         if kind.is_structure() {
             continue;
         }

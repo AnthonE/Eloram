@@ -172,6 +172,11 @@ state, not by a checksum, since "only the first divergence really matters".
 - A match that panics stops alone, no contest, its shard's others going on; a shard that stops
   ticking is taken as gone.
 
+Then the effects for a match watched (`FX.md`, "What landed"): a record stepped in the page tells
+what each tick did as a seat is told it, nothing in fog (`el_client_core::spectator`), and the
+director, the missiles, the telegraphs and the champions' casts read it as they read a client.
+A watched match had drawn no missiles and played no sound before.
+
 ## 7. The champions, drawn
 `CHAMPIONS.md` is the plan: what Riot's posts say makes a champion read (its silhouette and
 primary feature, animation as the game's tell timed to it, the hitbox as where the champion is),

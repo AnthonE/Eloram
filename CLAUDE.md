@@ -66,11 +66,12 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   (`seat:clip,...`), `minion_models`, `minions_drawn` and `minion_clips` (`clip:count,...`).
 - The effects and sounds (`docs/FX.md`): `el_client_core::fx` decides (the sound table, a look a
   source, the director's cues, the mixer, the announcer), `el-client/src/fx.rs` draws and
-  `audio.rs` plays (Web Audio). `python3 -I art/tools/sounds.py` remakes `web/assets/audio/` from
-  `manifest.json` (written by `cargo test -p el-client-core fx::sound -- --ignored write_manifest`
-  when the table changes) and Kenney's CC0 packs; the announcer's and the music's files are
-  optional, dropped in by name. `window.__el` has `fx_cues` and `audio_*`; the inbox takes
-  `{t:"volume",bus,v}` and `{t:"mute",on}`.
+  `audio.rs` plays (Web Audio); a match watched is told to them by `el_client_core::spectator`.
+  `python3 -I art/tools/sounds.py` remakes `web/assets/audio/` from `manifest.json` (written by
+  `cargo test -p el-client-core fx::sound -- --ignored write_manifest` when the table changes)
+  and Kenney's CC0 packs; the announcer's and the music's files are optional, dropped in by name.
+  `window.__el` has `fx_cues`, `fx_missiles`, `fx_zones`, `champion_casts` and `audio_*`; the
+  inbox takes `{t:"volume",bus,v}` and `{t:"mute",on}`.
 - `cargo test -p el-sim --test map -- --ignored --nocapture` prints the Causeway as text.
 - `cargo run -p el-sim --release --example headless -- [seed]`: ten bots play a whole match, minute
   by minute; `cargo bench -p el-sim --bench match_tick`: a match's ticks, p50/p99 and by phase.

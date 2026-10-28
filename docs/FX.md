@@ -307,6 +307,21 @@ numbers on a real GPU into `ROADMAP.md`, which has none yet.
     shield's bubble, glows at the feet for a slow, a haste, strength and Combo Breaker.
   - The camera shakes a little when something heavy lands on the viewer's champion.
   - `?quality=low` keeps half the particles.
+- A match watched or replayed (`?watch=`, `?replay=`) is shown and heard as it was played.
+  `el_client_core::spectator` reads each tick the page steps from the record as replication
+  reads it for a team, with every unit seen, into a feed, missiles and zones shaped as a
+  client's; the director reads either through its `Scene`, and the missiles, telegraphs,
+  fields, statuses and the champions' casts are drawn from it.
+  - The watcher has no champion: Dawn is the near side, as the match is drawn, and nothing is
+    the watcher's own. The announcer calls the fights from Dawn's side and says no victory. A
+    team's pings and its vote stay the team's.
+  - A tick stepped more than a second behind the one drawn (a live match caught up on) keeps its
+    missiles and zones and lets its events go. Over 2x a match is drawn and not heard: at 16x
+    its sounds filled all 32 voices.
+  - In the browser (`scripts/e2e.sh watch`): a live match watched a minute behind is shown and
+    heard within seconds of the fighting (one sample: 42 cues, 7 missiles in flight, a
+    telegraph, 9 casts posed, 30 sounds); its replay, run at 16x, had 163 cues and 12 casts by
+    1:49, every hash checked, none of its sounds failing.
 - The sound (`el-client/src/audio.rs`) is Web Audio through `web-sys`, with no decoder in the
   wasm.
   - Every effect is its own source, then a low pass, its gain, and an equal-power panner, into
@@ -346,8 +361,6 @@ Not yet:
 - Nobody has listened: the sounds were judged by their spectrograms and measures, not by ear. The
   look on a real GPU hasn't been seen either (SwiftShader draws a frame every two seconds, so a
   burst is seldom in a picture).
-- Effects for a match watched or replayed (the record's referee has the events; no director
-  reads them yet).
 - Step 4's practice mode and the `fx` suite's contact sheet.
 - A model's flash when hit.
 - The per-ability hand-tuning step 5 ends with (the derived looks are the base it tunes from).
