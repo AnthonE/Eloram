@@ -187,3 +187,11 @@ What landed:
   client knows; attacks strike as the windup ends, casts release as their ability does.
 - `el-client/src/champions.rs`: the models fetched as the match (or champion select) deals them,
   animated in their units' places; a body lies where it fell; a hit flashes.
+
+Measured: twenty models of 494 to 656 KiB (6.6 MiB brotli for all twenty, about 3.3 for a match's
+ten), 7,000 to 9,800 triangles each with its props, nine to eleven clips. In a browser match
+(`scripts/e2e.sh match`) eleven models in (the team's own and a benched one in champion select),
+the own champion standing, then running, attacking and casting as the pose says, the walk still
+predicted exactly, a fallen champion lying where it fell; in a replay (`watch`) all ten run.
+Headless Chromium draws 0.69 to 0.74 frames a second in SwiftShader (0.77 before). Not measured: a
+real GPU.
