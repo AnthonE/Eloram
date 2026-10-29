@@ -24,6 +24,8 @@ const push = (page: any, cmd: Record<string, unknown>) =>
 const MID = 1920;
 const ENEMY = { unit: 5, x: 7680 - 200, y: MID };
 const ALLY = { unit: 1 };
+// The champions cast, from `EL_FX_FROM` (0) up to `EL_FX_CHAMPIONS` (20, all of them).
+const FROM = Number(process.env.EL_FX_FROM || 0);
 const CHAMPIONS = Number(process.env.EL_FX_CHAMPIONS || 20);
 
 test("every ability of every champion, cast in practice", async ({ page, context }, info) => {
@@ -33,7 +35,7 @@ test("every ability of every champion, cast in practice", async ({ page, context
   const dir = `artifacts/fx-${info.project.name}`;
   // Smaller than the other suites' pages: a picture's cost is its pixels.
   await page.setViewportSize({ width: 800, height: 450 });
-  await page.goto(`/?gfx=${info.project.name}&practice=1&champ=0&name=Practice`);
+  await page.goto(`/?gfx=${info.project.name}&practice=1&champ=${FROM}&name=Practice`);
   try {
     // The first frames compile every pipeline: minutes on a CPU rasteriser.
     await until(page, "a practice match", (s) => s.phase === "playing" && s.started === true && s.practice === true, 600_000);
@@ -64,12 +66,12 @@ test("every ability of every champion, cast in practice", async ({ page, context
     await sheetPage.setContent(`<style>${css}</style>${tiles(rows, w)}`);
     await sheetPage.screenshot({ path: file, fullPage: true });
   };
-  for (let champ = 0; champ < CHAMPIONS; champ++) {
+  for (let champ = FROM; champ < CHAMPIONS; champ++) {
     const switched = (s: Record<string, any>) => s.champion_def === champ && s.started === true && s.practice === true;
     let s: Record<string, any> = {};
     // Asked again if it hasn't come (once a run, the page went on with the last match).
     for (let tries = 0; ; tries++) {
-      if (champ > 0) await push(page, { t: "practice_champ", champ });
+      if (champ > FROM) await push(page, { t: "practice_champ", champ });
       try {
         s = await until(page, `champion ${champ} in practice`, switched, 45_000);
         break;
@@ -107,9 +109,10 @@ test("every ability of every champion, cast in practice", async ({ page, context
       const a = `${dir}-${name}-${slot}-cast.png`;
       const heard = (s: Record<string, any>) =>
         s.champion_def === champ && s.fx_own_casts > before.fx_own_casts && s.audio_own_casts > before.audio_own_casts;
-      // Cast, and once more if the first was lost (a page that stalled and dialled again).
+      // Cast, and again if it was lost: in SwiftShader a new match's figures stall the page past
+      // the server's 20 s of quiet, and it dials again.
       let ok = false;
-      for (let tries = 0; tries < 2 && !ok; tries++) {
+      for (let tries = 0; tries < 3 && !ok; tries++) {
         await push(page, { t: "cast", slot, ...aim });
         await page.waitForTimeout(700);
         await page.screenshot({ path: a });
@@ -117,7 +120,11 @@ test("every ability of every champion, cast in practice", async ({ page, context
           await until(page, `${name}'s ${"QWER"[slot]} drawn and heard`, heard, 30_000);
           ok = true;
         } catch (e) {
-          if (tries === 1) missed.push(`${name} ${"QWER"[slot]} (${kit[slot]}): ${(e as Error).message.slice(0, 160)}`);
+          const now = await el(page);
+          const n = (s: Record<string, any>) =>
+            `def ${s.champion_def} drawn ${s.fx_own_casts} heard ${s.audio_own_casts} at ${Math.round(s.x)},${Math.round(s.y)} tick ${s.tick}`;
+          console.log(`${name} ${"QWER"[slot]}, try ${tries + 1}: before ${n(before)}, now ${n(now)}`);
+          if (tries === 2) missed.push(`${name} ${"QWER"[slot]} (${kit[slot]}): before ${n(before)}, then ${n(now)}`);
         }
       }
       await page.waitForTimeout(1_500);
@@ -131,7 +138,7 @@ test("every ability of every champion, cast in practice", async ({ page, context
   }
   const s = await el(page);
   console.log(`fx status: ${JSON.stringify(s)}`);
-  await write(sheet, 160, `${dir}-sheet.png`);
+  await write(sheet, 160, `${dir}-sheet-${FROM}-${CHAMPIONS}.png`);
   await sheetPage.close();
   // Every cast drawn and heard; no sound failed to load, and the voice cap never went past.
   expect(missed, missed.join("\n")).toEqual([]);

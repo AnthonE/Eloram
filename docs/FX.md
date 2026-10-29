@@ -367,8 +367,8 @@ numbers on a real GPU into `ROADMAP.md`, which has none yet.
   mana full (kept so at the end of every tick, the server's and the player's own prediction
   alike), with 50,000 gold. The other nine are dummies at the Causeway's middle, three of Dawn's
   beside the player and five of Dusk's across from it (`PLACES`): they stand, walk a loop, or
-  (seat 7) are shielded every four seconds; they never fight back, and no champion dies (brought to
-  nothing, it's made whole). The gates are open from the start and no minions march. Nothing in it
+  (seat 7) are shielded every four seconds; one pulled or knocked off its place walks back to it;
+  they never fight back, and no champion dies (brought to nothing, it's made whole). The gates are open from the start and no minions march. Nothing in it
   runs in a match that isn't practice: the golden hashes held, and a record's practice frame taken
   out makes the same inputs go astray (`el-sim/tests/practice.rs`).
 - `el-server --practice` holds them: the lobby's `ToServer::Practice { champ }` starts one at once
@@ -383,10 +383,21 @@ numbers on a real GPU into `ROADMAP.md`, which has none yet.
 - `scripts/e2e.sh fx`: every ability of every champion cast in practice at what it's for (the
   dummy in front, an ally, a point, itself), each counted as the player's own cast drawn
   (`fx_own_casts`) and heard (`audio_own_casts`), two pictures of each, and a contact sheet a
-  champion and one of all of them in `e2e/artifacts/`. About five minutes a champion in
-  SwiftShader.
-- From the sheets, the first tuning: a shield's bubble had a middle full enough to hide the unit
-  inside it; its middle is all but clear now, its rim tighter.
+  champion and one of all of them in `e2e/artifacts/` (`EL_FX_FROM` and `EL_FX_CHAMPIONS` take a
+  part of the pool). In SwiftShader, about four minutes a champion: all eighty casts drawn and
+  heard, in two runs of ten (39 and 33 minutes), no sound failed, at most 10 at once, none
+  dropped.
+  There, a new practice match's ten figures stall the page past the server's 20 s of quiet,
+  nearly every switch: the server lets the session go, and the page dials again and asks for the
+  champion it last asked for (so a champion's first cast, lost with the match it was cast in, is
+  cast again in the new one). Now and then a switch never reached the page at all (the server
+  seated it; the page went on with the last match), so the suite asks again after 45 s, casts
+  each ability up to three times, and the page logs each match it's seated in. Not yet known: why
+  a seated message was lost there.
+- From the sheets: a shield's bubble had a middle full enough to hide the unit inside it (its
+  middle is all but clear now, its rim tighter), and a dummy hooked to the player stayed there,
+  so what was cast at its place after hit nothing (dummies walk back now). Little else can be
+  judged from them: at a frame every two seconds most bursts fall between pictures.
 
 Not yet:
 - Nobody has listened: the sounds were judged by their spectrograms and measures, not by ear. The

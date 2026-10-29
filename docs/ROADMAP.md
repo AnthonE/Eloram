@@ -219,4 +219,6 @@ rank and nothing on cooldown, nine dummies, no minions, its record saying so; an
 fx`, every ability of every champion cast there, drawn and heard, with a contact sheet a champion.
 Measured: the golden hashes held (a checkpoint is a byte longer, `snapshot::VERSION` 2); in a
 browser match 149 minions flashed and the walk was still exact, 204 frames over the suite's main
-test against 208 before.
+test against 208 before; in practice all eighty of the champions' abilities drawn and heard, at
+most 10 sounds at once. A frame every two seconds in SwiftShader still stalls the page past the
+server's 20 s of quiet at each switch of practice champion, and the page dials again.

@@ -84,7 +84,7 @@ fn practise(champ: u8, secs: f32) -> (Match, Vec<Event>, Vec<u8>, [f32; SEATS]) 
 
 #[test]
 fn practice_casts_anything_at_dummies_that_never_die_or_fight() {
-    for champ in [0u8, 7, 13, 19] {
+    for champ in 0..CHAMPIONS.len() as u8 {
         let (m, events, _, far) = practise(champ, 4.0 * EACH + 5.0);
         let name = CHAMPIONS[usize::from(champ)].name;
         // Every rank open, at the top level.
@@ -116,13 +116,10 @@ fn practice_casts_anything_at_dummies_that_never_die_or_fight() {
             .filter(|e| matches!(e, Event::Shield { target, .. } if usize::from(*target) == SHIELDED))
             .count();
         assert!(shields >= 10, "the shielded dummy's shields: {shields}");
-        // The walkers walk their loops; the rest stand (a knock aside, a little).
+        // The walkers walk their loops.
         for (s, (_, d)) in PLACES.iter().enumerate().skip(1) {
-            match d {
-                Some(practice::Dummy::Walks) => {
-                    assert!(far[s] > 300.0, "{name}: dummy {s} walked {}", far[s])
-                }
-                _ => assert!(far[s] < 450.0, "{name}: dummy {s} stood, but went {}", far[s]),
+            if *d == Some(practice::Dummy::Walks) {
+                assert!(far[s] > 300.0, "{name}: dummy {s} walked {}", far[s]);
             }
         }
         // And a stander moved off its place (a pull, a knock) is back at it.
