@@ -48,7 +48,14 @@ fn main() {
         let secret = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
         shared
             .control
-            .push(Control::Start { m: m as u16, seed, picks, humans: (1 << SEATS) - 1, secret })
+            .push(Control::Start {
+                m: m as u16,
+                seed,
+                picks,
+                humans: (1 << SEATS) - 1,
+                secret,
+                practice: false,
+            })
             .unwrap();
     }
     let mut seats = vec![Loopback::default(); matches * SEATS];

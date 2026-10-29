@@ -26,6 +26,7 @@ pub mod math;
 pub mod missile;
 pub mod own;
 pub mod path;
+pub mod practice;
 pub mod record;
 pub mod snapshot;
 pub mod storage;

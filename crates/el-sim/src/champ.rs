@@ -344,7 +344,8 @@ impl Match {
 
     /// Before the gates open, a champion stays on its side of them.
     fn gate(&self, seat: usize, p: Vec2) -> Vec2 {
-        if self.tick >= ticks(rules::GATES_OPEN) {
+        // (Practice starts with the gates open.)
+        if self.tick >= ticks(rules::GATES_OPEN) || self.practice {
             return p;
         }
         let line = map::BASE.0.x + 900.0;
@@ -519,6 +520,8 @@ impl Match {
         }
         let range = self.units[seat].stats.range;
         match self.champs[seat].intent {
+            // A practice dummy never fights back.
+            Intent::Idle | Intent::Hold if self.is_dummy(seat) => {}
             Intent::Idle | Intent::Hold => {
                 if let Some(t) = self
                     .nearest_enemy(seat, range, true, true)

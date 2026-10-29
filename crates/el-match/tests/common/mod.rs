@@ -200,6 +200,15 @@ impl Rig {
     /// Match 0 of a one-match shard, `seed`, with these seats played over links; bots on the server
     /// play the rest.
     pub fn new(seed: u64, humans: Vec<(usize, LinkSpec, Brain)>) -> Rig {
+        Rig::with(seed, humans, false)
+    }
+
+    /// A practice match (`el_sim::practice`): the shard's bots are its dummies.
+    pub fn practice(seed: u64, humans: Vec<(usize, LinkSpec, Brain)>) -> Rig {
+        Rig::with(seed, humans, true)
+    }
+
+    fn with(seed: u64, humans: Vec<(usize, LinkSpec, Brain)>, practice: bool) -> Rig {
         let (shard, shared, leases, egress, records) = build(ShardConfig {
             matches: 1,
             map: map(),
@@ -209,13 +218,20 @@ impl Rig {
         let mask = humans.iter().fold(0u16, |m, (s, _, _)| m | 1 << s);
         // A secret for the offers, as the live server's matches have.
         let secret = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
-        shared.control.push(Control::Start { m: 0, seed, picks: picks(seed), humans: mask, secret }).unwrap();
+        shared
+            .control
+            .push(Control::Start { m: 0, seed, picks: picks(seed), humans: mask, secret, practice })
+            .unwrap();
         let mut players = Vec::new();
         for (seat, spec, brain) in humans {
             shared.control.push(Control::Seat { m: 0, seat: seat as u8, max_datagram: 1_100 }).unwrap();
+            let mut client = client(seat, seed);
+            if practice {
+                client.set_practice();
+            }
             players.push(Player {
                 seat,
-                client: client(seat, seed),
+                client,
                 up: Link::new(seed.wrapping_mul(31) + seat as u64, spec),
                 down: Link::new(seed.wrapping_mul(17) + seat as u64 + 1_000, spec),
                 brain,

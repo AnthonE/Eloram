@@ -127,7 +127,16 @@ than any champion, told apart at a glance by shape and by what they hold, and th
   strike lands as the minion's windup ends (a share of its time between attacks,
   `el_sim::content::rules::MINION_WINDUP`: 11 ticks for a melee minion, 14 for a caster), a run
   keeps its stride to the floor, states outrank the attack, and a minion never casts or cheers.
-  The cart rocks as it rolls and kicks back as its windup ends, when it fires.
+  The cart rocks as it rolls and kicks back as its windup ends, when it fires, and its wheels
+  turn as far as it rolled: `art/tools/champions.mjs` cuts them out of the cart (Meshy made it one
+  mesh, the wheels welded on) into four nodes, `wheel0` to `wheel3`, each turning on its own X
+  about its hub. A wheel is the triangles all within its radius (0.22 of the cart's height,
+  measured off the mesh: every rim within a tenth of it) of a hub a radius over where it touches
+  the floor; what reaches out of it, where the axle meets the bed, stays with the body
+  (`node art/tools/champions.mjs --wheels <glb>` does it to a cart already made).
+- **A hit flashes it** as a champion's does, fading in three steps: its materials are its kind's
+  and team's, shared, so each step is a material of its own made with them, and a minion hit
+  wears the step it's at.
 - **Fallen** (`el-client/src/minions.rs`): a minion seen to die (its death told, or watched) plays
   its death where it was drawn, lies a moment and sinks into the floor; a new minion in the slot
   cuts it short. The primitive stands in until its model is in.
@@ -177,9 +186,15 @@ Changed on the way:
   the stone; each is lit by its own texture at a fifth of its colour, as Riot's skinned meshes have
   an emissive of their own.
 
+- **A rim of its team's light** (`el-client/src/champions.rs`, `Rim`; `shaders/rim.wgsl`): each
+  champion's material is the standard one with a fresnel term added to its emissive, in its
+  team's light (Dawn's and Dusk's, `fx::look::world::TEAM`), brightest where its surface turns
+  from the camera and kept a little underneath. Riot inks its champions' outlines so a silhouette
+  reads; here the outline is lit, which needs no second pass and costs a few instructions a pixel
+  of champion.
+- The mode has no recall (`DESIGN.md`), so no champion needs one.
+
 Not yet:
 - Nobody has seen them on a real GPU, and the frame rate there isn't measured.
-- An outline (Riot's "inking") or a rim light; the clips' windows shared by every champion, not
-  tuned one by one; a recall.
-- A minion's flash when hit (their materials are shared a kind and team, so one can't be lit
-  alone), and the cart's wheels turning.
+- An outline drawn as a line (the rim stands in); the clips' windows shared by every champion, not
+  tuned one by one.

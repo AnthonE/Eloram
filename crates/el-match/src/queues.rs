@@ -29,7 +29,8 @@ pub enum Control {
     /// Starts match `m` over with `seed` and these champions. Seats in `humans` (a bit a seat)
     /// wait for their players; the rest are bots. `secret` draws its augment offers (0: the
     /// seed's), and goes nowhere else: the record gets each key as its screen opens.
-    Start { m: u16, seed: u64, picks: [u8; SEATS], humans: u16, secret: u64 },
+    /// `practice`: a practice match (`el_sim::practice`), its record saying so.
+    Start { m: u16, seed: u64, picks: [u8; SEATS], humans: u16, secret: u64, practice: bool },
     /// A player takes (or takes back) their seat: a new stream, everything resent whole.
     Seat { m: u16, seat: u8, max_datagram: u16 },
     /// A player left their seat: a bot plays it until they're back.

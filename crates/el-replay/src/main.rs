@@ -137,6 +137,7 @@ fn dump(path: &Path, all: bool) -> anyhow::Result<()> {
                     println!("tick {tick}: {}", seats.join("; "));
                 }
             }
+            Frame::Practice => println!("a practice match"),
             Frame::Hash { tick, hash } => println!("hash at {tick}: {hash:016x}"),
             Frame::Outcome { tick, winner } => println!("over at {tick}: team {winner} won"),
             Frame::Seat { tick, seat, joined } => {

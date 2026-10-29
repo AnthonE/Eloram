@@ -18,7 +18,14 @@ fn a_panicking_match_stops_and_the_shard_goes_on() {
         let seed = 40 + u64::from(m);
         shared
             .control
-            .push(Control::Start { m, seed, picks: common::picks(seed), humans: 0, secret: 1 })
+            .push(Control::Start {
+                m,
+                seed,
+                picks: common::picks(seed),
+                humans: 0,
+                secret: 1,
+                practice: false,
+            })
             .unwrap();
     }
     for t in 0..60 * 30 {

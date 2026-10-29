@@ -192,6 +192,16 @@ pub async fn run(
                                 break;
                             }
                         }
+                        Ok(ToServer::Practice { champ }) => {
+                            if let Some(s) = seated.take() {
+                                lobby.unseat(*s);
+                            }
+                            if !lobby.practice(session, &name, agent, max_datagram, events_tx.clone(), champ)
+                                && !post_lobby(&out, &ToClient::NoSeat)
+                            {
+                                break;
+                            }
+                        }
                         Err(_) => NetStats::add(&stats.malformed, 1),
                     },
                 },

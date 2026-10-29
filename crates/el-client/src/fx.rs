@@ -8,7 +8,7 @@ pub mod burst;
 pub mod live;
 
 use bevy::prelude::*;
-use el_client_core::fx::director::{Cue, Director, Status, What};
+use el_client_core::fx::director::{Cue, Director, NO_SEAT, Scene, Status, What};
 use el_client_core::fx::sound::Part;
 
 use crate::net::now_s;
@@ -19,11 +19,13 @@ use crate::session::Session;
 pub struct Cues {
     pub list: Vec<Cue>,
     director: Option<Director>,
-    /// The client the director was made for (its seat, and how much of its feed it had read).
+    /// The client the director was made for (its seat, or [`NO_SEAT`] for a match watched, and how
+    /// much of its feed it had read).
     of: Option<(usize, u64)>,
-    /// Cues all told, and those with a sound.
+    /// Cues all told, and those with a sound; the own champion's casts.
     total: u64,
     sounded: u64,
+    own_casts: u64,
 }
 
 impl Cues {
@@ -58,34 +60,55 @@ impl Plugin for FxPlugin {
     }
 }
 
-/// The director's cues for this frame (a new director for each match's client).
+/// The director's cues for this frame (a new director for each match's client, and one for a
+/// match watched).
 fn direct(session: Res<Session>, mut cues: ResMut<Cues>, mut status: ResMut<crate::dev_hooks::DevStatus>) {
     cues.list.clear();
-    let Some(c) = session.client.as_deref() else {
-        cues.director = None;
-        cues.of = None;
-        return;
+    let watched = session.watch.as_deref().map(|w| w.scene());
+    let (scene, seat): (&dyn Scene, usize) = match (&watched, session.client.as_deref()) {
+        (Some(w), _) => (w, NO_SEAT),
+        (None, Some(c)) => (c, c.seat),
+        (None, None) => {
+            cues.director = None;
+            cues.of = None;
+            return;
+        }
     };
+    let (_, feed_n) = scene.feed();
     // A client the director wasn't made for (another match, a reload): start over, from what this
-    // one has now (what came before it was the last client's).
-    let fresh = cues.of.is_none_or(|(seat, read)| seat != c.seat || c.feed_n < read);
+    // one has now (what came before it was the last client's). A match watched is shown from its
+    // start.
+    let fresh = cues.of.is_none_or(|(s, read)| s != seat || feed_n < read);
     if fresh {
-        let mut d = Director::new(c.seat);
-        let mut skip = Vec::new();
-        d.frame(c, now_s(), &mut skip);
+        let d = if seat == NO_SEAT {
+            Director::watching()
+        } else {
+            let mut d = Director::new(seat);
+            let mut skip = Vec::new();
+            d.frame(scene, now_s(), &mut skip);
+            d
+        };
         cues.director = Some(d);
     }
-    cues.of = Some((c.seat, c.feed_n));
+    cues.of = Some((seat, feed_n));
     let Cues { list, director, .. } = &mut *cues;
     if let Some(d) = director.as_mut()
-        && !fresh
+        && (!fresh || seat == NO_SEAT)
     {
-        d.frame(c, now_s(), list);
+        d.frame(scene, now_s(), list);
+    }
+    // Run fast, a match watched is drawn and not heard: its sounds would come many at once.
+    if session.watch.as_deref().is_some_and(|w| w.speed > 2.0) {
+        for q in list.iter_mut() {
+            q.sound = None;
+        }
     }
     cues.total += cues.list.len() as u64;
     cues.sounded += cues.list.iter().filter(|q| q.sound.is_some()).count() as u64;
+    cues.own_casts += cues.list.iter().filter(|q| q.own && q.what == What::Part(Part::Cast)).count() as u64;
     status.set("fx_cues", cues.total as f64);
     status.set("fx_sounded", cues.sounded as f64);
+    status.set("fx_own_casts", cues.own_casts as f64);
 }
 
 /// A little shake for the viewer's own champion when something heavy lands on it.

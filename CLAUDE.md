@@ -34,17 +34,19 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   bots in the other nine seats after 3 s (`EL_FILL`), then 20 s of champion select (`--select-secs`;
   it ends sooner once everyone seated is ready, and agents are ready at once). The server alone:
   `cargo run -p el-server --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
-- `scripts/e2e.sh spike|match|watch|login|art|recover [webgl2]`: Playwright against a real server
+- `scripts/e2e.sh spike|match|watch|login|art|recover|fx [webgl2]`: Playwright against a real server
   (`match`: queue, champion select (a reroll, the bench, ready), the headliner, augment, shop,
   Blink, a walk predicted exactly, the fog; and `?keys=wasd`'s keys walking the champion; `watch`:
   an agent's match watched live a minute behind from a checkpoint, then replayed; `recover`: the
   server SIGKILLed mid-match and started again, the page back in its seat; `login`: a stub wallet
   signing through `el-auth`'s `sign` example, `/online.json`, the resume token; `art`: the camera over each place on the map, the fog's darkness off (`{t:"camera"}`,
-  `{t:"fog"}`); screenshots in `e2e/artifacts/`). The `webgpu` project (`scripts/e2e.sh art
+  `{t:"fog"}`); `fx`: practice, every ability of every champion cast at a dummy, drawn and heard
+  as the player's own, and a contact sheet a champion (`EL_FX_FROM=10 EL_FX_CHAMPIONS=20` for
+  the last ten: about four minutes each); screenshots in `e2e/artifacts/`). The `webgpu` project (`scripts/e2e.sh art
   webgpu`) is headless WebGPU on SwiftShader's Vulkan. `scripts/e2e.sh` serves the `web/dist/` already
   built: rebuild it first. A test or the console drives the champion through `window.__elInbox`
   (`{t:"move",x,y}`, `cast`, `buy`, `pick`, `level`, `champ_reroll`, `champ_swap`, `ready`, `aim`, `drop_link`,
-  `ping`, `surrender`...:
+  `ping`, `surrender`, `practice_champ`...:
   `el-client/src/dev_hooks.rs`) and reads `window.__el`. Headless Chromium draws with
   SwiftShader at about a frame a second: its pictures are right, its frame rates mean nothing.
 - The map's art (`docs/ART.md`): `web/assets/` ships as it is (`scripts/build-web.sh` copies it);
@@ -66,11 +68,19 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   (`seat:clip,...`), `minion_models`, `minions_drawn` and `minion_clips` (`clip:count,...`).
 - The effects and sounds (`docs/FX.md`): `el_client_core::fx` decides (the sound table, a look a
   source, the director's cues, the mixer, the announcer), `el-client/src/fx.rs` draws and
-  `audio.rs` plays (Web Audio). `python3 -I art/tools/sounds.py` remakes `web/assets/audio/` from
-  `manifest.json` (written by `cargo test -p el-client-core fx::sound -- --ignored write_manifest`
-  when the table changes) and Kenney's CC0 packs; the announcer's and the music's files are
-  optional, dropped in by name. `window.__el` has `fx_cues` and `audio_*`; the inbox takes
-  `{t:"volume",bus,v}` and `{t:"mute",on}`.
+  `audio.rs` plays (Web Audio); a match watched is told to them by `el_client_core::spectator`.
+  `python3 -I art/tools/sounds.py` remakes `web/assets/audio/` from `manifest.json` (written by
+  `cargo test -p el-client-core fx::sound -- --ignored write_manifest` when the table changes)
+  and Kenney's CC0 packs; the announcer's and the music's files are optional, dropped in by name.
+  `window.__el` has `fx_cues`, `fx_own_casts`, `fx_missiles`, `fx_zones`, `champion_casts`,
+  `minion_flashes`, `wheels_turning` and `audio_*`; the inbox takes `{t:"volume",bus,v}` and
+  `{t:"mute",on}`.
+- Practice (`el_sim::practice`, `docs/FX.md` step 4): `el-server --practice` holds practice
+  matches, which the page asks for on `?practice=1` (`&champ=<number>`; `{t:"practice_champ",
+  champ}` again as another): seat 0 the player's at the top level with every rank, nothing on
+  cooldown, nine dummies at the Causeway's middle that stand, walk or are shielded and never die
+  or fight, no minions. Its record says so in a frame after the header, so it replays; nothing
+  in it runs in a match that isn't practice (the golden hashes hold).
 - `cargo test -p el-sim --test map -- --ignored --nocapture` prints the Causeway as text.
 - `cargo run -p el-sim --release --example headless -- [seed]`: ten bots play a whole match, minute
   by minute; `cargo bench -p el-sim --bench match_tick`: a match's ticks, p50/p99 and by phase.

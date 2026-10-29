@@ -24,7 +24,9 @@
 // 256 px texture), with their clips (art/clips.json, `minions`); a prop's band coloured "team" is
 // the material `team`, which the client colours. Each also gets <name>.dusk.jpg: its texture with
 // the blues (its team's colour as Meshy painted it) turned to Dusk's red. The siege cart has no rig
-// and no clips: it's only turned, stood and made small.
+// and no clips: it's turned, stood and made small, and its wheels are cut out to turn (`wheels`).
+//   node art/tools/champions.mjs --wheels web/assets/models/minions/siege.glb
+// cuts them out of a cart already made.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -393,6 +395,104 @@ async function dusk(jpeg) {
   return sharp(data, { raw: { width: info.width, height: info.height, channels: 3 } }).jpeg({ quality: 85 }).toBuffer();
 }
 
+/** A wheel's radius, of the cart's height (art/champions.json's cart, measured off its mesh). */
+const WHEEL = 0.22;
+
+/**
+ * The cart's wheels cut out of its body, each a node `wheel<k>` turning on its own X, its hub
+ * where it was: the client spins them as the cart rolls. Meshy made the cart one mesh, wheels
+ * welded on; a wheel is the triangles all within its radius of its hub, on one side of the cart
+ * (across its narrower width). Its hub is a radius over where it touches the floor; a triangle
+ * reaching out of it (where the axle meets the bed) stays with the body.
+ */
+function wheels(doc) {
+  const node = doc
+    .getRoot()
+    .listNodes()
+    .find((n) => n.getMesh());
+  const prim = node.getMesh().listPrimitives()[0];
+  const pos = prim.getAttribute('POSITION').getArray();
+  const idx = Array.from(prim.getIndices().getArray());
+  const n = pos.length / 3;
+  const at = (i, k) => pos[i * 3 + k];
+  const lo = [0, 1, 2].map((k) => Math.min(...Array.from({ length: n }, (_, i) => at(i, k))));
+  const hi = [0, 1, 2].map((k) => Math.max(...Array.from({ length: n }, (_, i) => at(i, k))));
+  // The axle runs across the narrower width; the wheel turns in the plane of the other and up.
+  const a = hi[0] - lo[0] < hi[2] - lo[2] ? 0 : 2;
+  const u = 2 - a;
+  const mid = (k) => (lo[k] + hi[k]) / 2;
+  const half = (hi[a] - lo[a]) / 2;
+  const r = WHEEL * (hi[1] - lo[1]);
+  const side = (i) => (at(i, a) - mid(a)) / half;
+  const hubs = [];
+  for (const s of [-1, 1]) {
+    for (const front of [false, true]) {
+      const here = (i) => side(i) * s > 0.5 && at(i, u) > mid(u) === front;
+      const ground = Array.from({ length: n }, (_, i) => i).filter((i) => here(i) && at(i, 1) < lo[1] + 0.02 * (hi[1] - lo[1]));
+      if (!ground.length) throw new Error('a wheel touches no floor');
+      const cu = ground.reduce((t, i) => t + at(i, u), 0) / ground.length;
+      hubs.push({ here, cu, cy: lo[1] + r });
+    }
+  }
+  const of = (i) => hubs.findIndex((h) => h.here(i) && Math.hypot(at(i, u) - h.cu, at(i, 1) - h.cy) <= r * 1.03);
+  const cut = hubs.map(() => []);
+  const body = [];
+  for (let t = 0; t < idx.length; t += 3) {
+    const w = of(idx[t]);
+    if (w >= 0 && of(idx[t + 1]) === w && of(idx[t + 2]) === w) cut[w].push(idx[t], idx[t + 1], idx[t + 2]);
+    else body.push(idx[t], idx[t + 1], idx[t + 2]);
+  }
+  // The axle in the mesh's frame: the scene's X (the cart faces +Z), back through the nodes above.
+  // (Column-major: the scene's X, back through the rotation, is the matrix's first row.)
+  const m = node.getWorldMatrix();
+  const axle = qnorm([m[0], m[4], m[8], 0]).slice(0, 3);
+  // The wheel's turn: its own X onto the axle (the shortest arc).
+  const dot = axle[0];
+  const turn = dot < -0.9999 ? [0, 1, 0, 0] : qnorm([0, -axle[2], axle[1], 1 + dot]);
+  const back = qinv(turn);
+  hubs.forEach((h, w) => {
+    const used = [...new Set(cut[w])];
+    const remap = new Map(used.map((v, k) => [v, k]));
+    const centre = [0, 0, 0];
+    centre[u] = h.cu;
+    centre[1] = h.cy;
+    centre[a] = used.reduce((t, i) => t + at(i, a), 0) / used.length;
+    const wp = doc.createPrimitive().setMaterial(prim.getMaterial());
+    for (const sem of prim.listSemantics()) {
+      const src = prim.getAttribute(sem);
+      const size = src.getElementSize();
+      const out = new Float32Array(used.length * size);
+      const el = [];
+      used.forEach((v, k) => {
+        src.getElement(v, el);
+        if (sem === 'POSITION' || sem === 'NORMAL') {
+          const p = sem === 'POSITION' ? el.map((x, j) => x - centre[j]) : el;
+          const q = qmul(qmul(back, [...p, 0]), turn);
+          out.set(q.slice(0, 3), k * size);
+        } else out.set(el, k * size);
+      });
+      wp.setAttribute(sem, doc.createAccessor().setType(src.getType()).setArray(out).setBuffer(src.getBuffer()));
+    }
+    const ia = new Uint16Array(cut[w].map((v) => remap.get(v)));
+    wp.setIndices(doc.createAccessor().setType('SCALAR').setArray(ia).setBuffer(prim.getIndices().getBuffer()));
+    const wm = doc.createMesh(`wheel${w}`).addPrimitive(wp);
+    node.addChild(doc.createNode(`wheel${w}`).setMesh(wm).setTranslation(centre).setRotation(turn));
+  });
+  // The body keeps only the vertices its triangles use.
+  const kept = [...new Set(body)];
+  const renum = new Map(kept.map((v, k) => [v, k]));
+  for (const sem of prim.listSemantics()) {
+    const src = prim.getAttribute(sem);
+    const size = src.getElementSize();
+    const out = new Float32Array(kept.length * size);
+    const el = [];
+    kept.forEach((v, k) => out.set(src.getElement(v, el), k * size));
+    src.setArray(out);
+  }
+  prim.getIndices().setArray(new Uint16Array(body.map((v) => renum.get(v))));
+  return { radius: r, triangles: cut.map((c) => c.length / 3), kept: body.length / 3 };
+}
+
 /** A minion: a rigged body with its clips and props, or the cart, turned and stood. */
 async function minion(io, dir, name, ref) {
   const def = DRESS.minions[name];
@@ -441,6 +541,7 @@ async function minion(io, dir, name, ref) {
     textureCompress({ encoder: sharp, targetFormat: 'jpeg', resize: [256, 256], quality: 85 }),
   );
   if (skinned) packSkin(skinned.getMesh().listPrimitives()[0]);
+  else console.log(`${name}'s wheels`, wheels(doc));
   shortRotations(doc);
   fs.mkdirSync(MINIONS, { recursive: true });
   const file = path.join(MINIONS, `${name}.glb`);
@@ -489,6 +590,13 @@ async function champion(io, dir, name, ref) {
 }
 
 const [dir, ...names] = process.argv.slice(2);
+if (dir === '--wheels') {
+  const io = new NodeIO();
+  const doc = await io.read(names[0]);
+  console.log(wheels(doc));
+  await io.write(names[0], doc);
+  process.exit(0);
+}
 if (!dir) {
   console.error('node art/tools/champions.mjs <dir> [name ...]');
   process.exit(1);

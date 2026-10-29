@@ -6,6 +6,7 @@
 #   scripts/e2e.sh login [project]   # wallet sign-in with a stub wallet, /online.json, the resume token
 #   scripts/e2e.sh art [project]     # the map's look: the camera over each place, pictures in artifacts/
 #   scripts/e2e.sh recover [project] # the server killed mid-match and started again: the page back in its seat
+#   scripts/e2e.sh fx [project]      # practice: every ability of every champion cast, drawn and heard, a contact sheet
 # Anything after the project goes to Playwright.
 # The server listens on EL_HTTP_PORT (8080) and EL_WT_PORT (UDP, 4433).
 set -euo pipefail
@@ -46,6 +47,11 @@ case "$suite" in
     # Bots take the empty seats a second after the first player queues. Champion select runs 45 s,
     # not 20 (it ends once everyone is ready): software rendering stalls on its first frames.
     server --mode game --fill-after 1 --select-secs 45 --http "127.0.0.1:${port}" --wt-port "$wt" &
+    pids+=($!)
+    ;;
+  fx)
+    # Practice matches: one seat, any champion, the dummies (`el_sim::practice`).
+    server --mode game --practice --http "127.0.0.1:${port}" --wt-port "$wt" &
     pids+=($!)
     ;;
   watch)

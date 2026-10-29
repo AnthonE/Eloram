@@ -282,6 +282,8 @@ pub struct Match {
     pub surrender: [crate::voice::Vote; 2],
     /// A* searches left this tick.
     pub(crate) path_budget: u8,
+    /// A practice match (`practice`): set after its reset, by its record.
+    pub practice: bool,
 }
 
 impl Match {
@@ -349,6 +351,7 @@ impl Match {
             seated: 0,
             surrender: [crate::voice::Vote::default(); 2],
             path_budget: PATH_BUDGET,
+            practice: false,
         };
         m.reset(seed, picks);
         m
@@ -389,6 +392,7 @@ impl Match {
         self.outcome = None;
         self.seated = 0;
         self.surrender = [crate::voice::Vote::default(); 2];
+        self.practice = false;
         for team in [map::DAWN, map::DUSK] {
             self.spawn_structures(team);
         }
@@ -609,6 +613,7 @@ impl Match {
         self.augment_ticks();
         self.economy_tick();
         self.world_tick();
+        self.practice_tick();
         mark(Phase::World);
         self.update_vision();
         mark(Phase::Vision);
@@ -624,6 +629,7 @@ impl Match {
         self.apply_input(seat, input, scratch);
         self.refresh_stats(seat);
         self.champion_tick(seat, scratch);
+        self.practice_seat(seat);
     }
 
     /// The seat whose champion holds unit `i` (champions are slots 0–9).

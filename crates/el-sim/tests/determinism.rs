@@ -24,7 +24,7 @@ fn two_minutes() -> u64 {
 
 /// The FNV-1a of a checkpoint taken a minute into `two_minutes`'s match: the same bytes native and
 /// wasm (update with the golden hash).
-const SNAPSHOT_GOLDEN: u64 = 0xe811_51f6_6f5e_7897;
+const SNAPSHOT_GOLDEN: u64 = 0xf417_a0d5_c256_78b6;
 
 /// `two_minutes`, read back from a checkpoint at one minute and stepped on from there: the same
 /// hash, and the checkpoint's bytes digested.

@@ -172,6 +172,11 @@ state, not by a checksum, since "only the first divergence really matters".
 - A match that panics stops alone, no contest, its shard's others going on; a shard that stops
   ticking is taken as gone.
 
+Then the effects for a match watched (`FX.md`, "What landed"): a record stepped in the page tells
+what each tick did as a seat is told it, nothing in fog (`el_client_core::spectator`), and the
+director, the missiles, the telegraphs and the champions' casts read it as they read a client.
+A watched match had drawn no missiles and played no sound before.
+
 ## 7. The champions, drawn
 `CHAMPIONS.md` is the plan: what Riot's posts say makes a champion read (its silhouette and
 primary feature, animation as the game's tell timed to it, the hitbox as where the champion is),
@@ -205,3 +210,15 @@ way, Brun's hammer turned the right way round. Measured: four models of 115 to 3
 as served with Dusk's textures, 2,000 to 3,000 triangles each; in a browser match twenty minions
 drawn at once, walking and swinging, the walk still exact, 0.69 frames a second in SwiftShader as
 before; 55 of Meshy's last 56 credits.
+
+Then the rest of what phases 6 and 7 left: a rim of each champion's team light where it turns from
+the camera (the outline Riot inks, lit instead); a minion's flash when hit, and the cart's wheels
+cut out of its mesh to turn as it rolls; the kill feed of a match watched. And practice
+(`FX.md`, step 4): `el-server --practice` and `?practice=1`, one seat as any champion with every
+rank and nothing on cooldown, nine dummies, no minions, its record saying so; and `scripts/e2e.sh
+fx`, every ability of every champion cast there, drawn and heard, with a contact sheet a champion.
+Measured: the golden hashes held (a checkpoint is a byte longer, `snapshot::VERSION` 2); in a
+browser match 149 minions flashed and the walk was still exact, 204 frames over the suite's main
+test against 208 before; in practice all eighty of the champions' abilities drawn and heard, at
+most 10 sounds at once. A frame every two seconds in SwiftShader still stalls the page past the
+server's 20 s of quiet at each switch of practice champion, and the page dials again.

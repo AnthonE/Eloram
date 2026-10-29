@@ -214,6 +214,8 @@ struct Selecting {
     players: Vec<(u8, Waiting)>,
     roster: Vec<Player>,
     ends: Instant,
+    /// A practice match (`el_sim::practice`).
+    practice: bool,
 }
 
 impl Selecting {
@@ -259,7 +261,16 @@ pub struct Lobby {
     select_for: Duration,
     /// Where each live match's lobby file goes (`{id}.live`), if anywhere.
     dir: Option<PathBuf>,
+    /// Practice matches may be asked for.
+    practice: std::sync::atomic::AtomicBool,
     inner: Mutex<Inner>,
+}
+
+/// A practice match's seats: the player's, and nine dummies.
+fn practice_roster(player: Player) -> Vec<Player> {
+    std::iter::once(player)
+        .chain((1..SEATS).map(|s| Player { name: format!("Dummy {s}"), agent: false, bot: true }))
+        .collect()
 }
 
 /// The seats with nobody in them, as the scoreboard names them.
@@ -304,6 +315,7 @@ impl Lobby {
             fill_after,
             select_for,
             dir,
+            practice: std::sync::atomic::AtomicBool::new(false),
             inner: Mutex::new(Inner {
                 next: seed,
                 live,
@@ -345,6 +357,63 @@ impl Lobby {
         let left = self.fill_after.saturating_sub(inner.since.map_or(Duration::ZERO, |s| s.elapsed()));
         for w in &inner.queue {
             let _ = w.tx.send(LobbyEvent::Queued { waiting, fill_in: left.as_secs_f32().ceil() as u32 });
+        }
+    }
+
+    /// Lets sessions ask for practice matches (`el-server --practice`).
+    pub fn allow_practice(&self) {
+        self.practice.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Starts a practice match for `session` as champion `champ` (`el_sim::practice`): seat 0 its,
+    /// the other nine dummies, no champion select. False if practice isn't allowed here or no
+    /// match is free.
+    #[allow(clippy::too_many_arguments)]
+    pub fn practice(
+        &self,
+        session: u32,
+        name: &str,
+        agent: bool,
+        max_datagram: u16,
+        tx: UnboundedSender<LobbyEvent>,
+        champ: u8,
+    ) -> bool {
+        if !self.practice.load(std::sync::atomic::Ordering::Relaxed) {
+            return false;
+        }
+        let mut inner = self.inner();
+        Self::out_of_select(&mut inner, session);
+        inner.queue.retain(|w| w.session != session);
+        let Some((shard, m)) = self.free_match(&inner) else { return false };
+        inner.next =
+            inner.next.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+        let seed = inner.next;
+        // The champion asked for in seat 0, the dummies dealt the rest (none twice).
+        let mut select = Select::new(seed);
+        let champ = champ % el_sim::content::champions::CHAMPIONS.len() as u8;
+        match select.picks.iter().position(|&c| c == champ) {
+            Some(k) => select.picks.swap(0, k),
+            None => select.picks[0] = champ,
+        }
+        let w = Waiting { session, name: name.to_string(), agent, max_datagram, tx, token: String::new() };
+        let roster = practice_roster(Player { name: name.to_string(), agent, bot: false });
+        let s = Selecting {
+            shard,
+            m,
+            seed,
+            select,
+            players: vec![(0, w)],
+            roster,
+            ends: Instant::now(),
+            practice: true,
+        };
+        match self.start(s) {
+            Some(live) => {
+                inner.live.push(live);
+                inner.started += 1;
+                true
+            }
+            None => false,
         }
     }
 
@@ -423,8 +492,9 @@ impl Lobby {
                 self.seat_in(l, seat, w);
             }
             if l.sessions.is_empty() && l.pending.is_empty() {
-                // A finished match goes now; a running one waits for its players a while.
-                end = l.over_at.is_some();
+                // A finished match goes now, and a practice one; a running one waits for its
+                // players a while.
+                end = l.over_at.is_some() || matches!(l.told, ToClient::Match { practice: true, .. });
                 l.empty_since.get_or_insert_with(Instant::now);
             }
         }
@@ -597,6 +667,7 @@ impl Lobby {
                 players,
                 roster,
                 ends: Instant::now() + self.select_for,
+                practice: false,
             };
             if !self.select_for.is_zero() {
                 s.announce(None);
@@ -661,14 +732,14 @@ impl Lobby {
     /// Starts the match its select ended on, its players seated; `None` if every one of them had
     /// gone.
     fn start(&self, s: Selecting) -> Option<Live> {
-        let Selecting { shard, m, seed, select, players, roster, .. } = s;
+        let Selecting { shard, m, seed, select, players, roster, practice, .. } = s;
         let picks = select.picks;
         let shared = self.game.shards[shard].shared.clone();
         let humans = players.iter().fold(0u16, |mask, (seat, _)| mask | 1 << seat);
         // The augment offers' secret: from the system's randomness, never in the record's header
         // or told to anyone (the record gets each screen's key as it opens).
         let secret = getrandom::u64().unwrap_or(seed.rotate_left(29) ^ 0x5EC2_E7C0_FFEE_D00D) | 1;
-        let _ = shared.control.push(Control::Start { m, seed, picks, humans, secret });
+        let _ = shared.control.push(Control::Start { m, seed, picks, humans, secret, practice });
         let mut sessions = Vec::new();
         let mut tokens = [[0u8; 32]; SEATS];
         // What a player is told of the match: never the seed, from which every seat's augment
@@ -680,6 +751,7 @@ impl Lobby {
             headliner: el_sim::game::headliner_for(seed),
             roster: roster.clone(),
             rejoin: String::new(),
+            practice,
         };
         for (seat, p) in players {
             let g = u32::from(m) * SEATS as u32 + u32::from(seat);

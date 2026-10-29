@@ -4,6 +4,9 @@
 //! start. The record is the truth (`docs/NETCODE.md`, "The record"): every hash in it is checked
 //! on the way, so what's watched is what was played.
 //!
+//! What the match does as it's stepped is told as a seat would be told it, with nothing in fog
+//! (`el_client_core::spectator`), so its effects, sounds and missiles are drawn as a player's are.
+//!
 //! A live match starts from the last checkpoint the server's referee verified
 //! (`/records/{id}/checkpoint`, as far behind as the record), not from the record's first tick: the
 //! frames before it are passed over, and the hashes after it checked.
@@ -11,6 +14,8 @@
 use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
+use el_client_core::fx::director::Watched;
+use el_client_core::spectator::Spectator;
 use el_sim::record::{Divergence, Frames, Referee};
 use el_sim::units::MAX_UNITS;
 use wasm_bindgen::JsCast;
@@ -26,9 +31,13 @@ type Fetched = Arc<Mutex<Option<Result<Vec<u8>, String>>>>;
 const REFETCH: f64 = 3.0;
 /// Ticks a frame may step to catch up (a twenty-minute match is caught up in under a minute).
 const CATCH_UP: u32 = 900;
+/// Ticks behind what's drawn past which a tick stepped is caught up on, not shown or heard.
+const SHOWN_BEHIND: u32 = el_sim::TICK_HZ;
 
 pub struct Watch {
     pub referee: Referee,
+    /// What the match told as it was stepped.
+    pub told: Spectator,
     pub live: bool,
     bytes: Vec<u8>,
     /// How far the frames have been taken.
@@ -56,6 +65,7 @@ impl Watch {
     pub fn new(map: &'static el_sim::map::Map, url: String, live: bool) -> Self {
         Self {
             referee: Referee::new(map),
+            told: Spectator::default(),
             live,
             bytes: Vec::new(),
             read: 0,
@@ -85,6 +95,11 @@ impl Watch {
         self.prev[i].lerp(self.referee.m.units[i].pos, self.blend())
     }
 
+    /// The match as the effects read it.
+    pub fn scene(&self) -> Watched<'_> {
+        Watched { m: &self.referee.m, told: &self.told, prev: &self.prev, blend: self.blend(), at: self.at }
+    }
+
     fn fetch(&mut self) {
         fetch_into(self.fetched.clone(), self.url.clone());
     }
@@ -98,6 +113,7 @@ impl Watch {
         match self.referee.resume(&ck) {
             Ok(()) => {
                 self.from = self.referee.m.tick;
+                self.told.restart();
                 for (p, u) in self.prev.iter_mut().zip(self.referee.m.units.iter()) {
                     *p = u.pos;
                 }
@@ -196,7 +212,13 @@ impl Watch {
                 }
                 budget -= 1;
             }
-            if let Err(d) = self.referee.take(&f) {
+            let before = self.referee.m.tick;
+            let took = self.referee.take(&f);
+            if self.referee.m.tick > before {
+                let behind = want.saturating_sub(self.referee.m.tick);
+                self.told.tell(&self.referee.m, behind <= SHOWN_BEHIND);
+            }
+            if let Err(d) = took {
                 self.error = Some(match d {
                     Divergence::Hash { tick, .. } => {
                         format!("the replay went astray of its record by tick {tick}")

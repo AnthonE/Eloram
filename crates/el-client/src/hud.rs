@@ -617,7 +617,7 @@ fn mmss(ticks: u32) -> String {
 }
 
 /// The HUD's words while watching a record.
-fn watching(label: Label, w: &crate::watch::Watch) -> String {
+fn watching(label: Label, w: &crate::watch::Watch, session: &Session, now: f64) -> String {
     let m = &w.referee.m;
     let kills = |team: u8| {
         (0..SEATS).filter(|&s| team_of_seat(s) == team).map(|s| u32::from(m.champs[s].kills)).sum::<u32>()
@@ -658,8 +658,14 @@ fn watching(label: Label, w: &crate::watch::Watch) -> String {
             }
             out
         }
+        Label::Feed => feed_text(session, now),
         _ => String::new(),
     }
+}
+
+/// The kill feed's lines of the last twelve seconds.
+fn feed_text(session: &Session, now: f64) -> String {
+    session.feed.iter().filter(|l| now - l.at < 12.0).map(|l| l.text.as_str()).collect::<Vec<_>>().join("\n")
 }
 
 fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &mut Text)>) {
@@ -667,7 +673,7 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
     let c = session.client.as_deref();
     for (label, mut t) in &mut q {
         if let Some(w) = session.watch.as_deref() {
-            let s = watching(*label, w);
+            let s = watching(*label, w, &session, now);
             if **t != s {
                 **t = s;
             }
@@ -728,13 +734,7 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
             (Label::Ping, Some(c)) => {
                 format!("{:.0} ms   seat {}   {}", c.clock.rtt * 1_000.0, c.seat, session.name(c.seat))
             }
-            (Label::Feed, _) => session
-                .feed
-                .iter()
-                .filter(|l| now - l.at < 12.0)
-                .map(|l| l.text.as_str())
-                .collect::<Vec<_>>()
-                .join("\n"),
+            (Label::Feed, _) => feed_text(&session, now),
             (Label::Stats, Some(c)) => {
                 let ch = &c.pred.champs[c.seat];
                 let (k, d) = session.kd[c.seat];

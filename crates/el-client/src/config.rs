@@ -14,6 +14,8 @@ pub struct LaunchConfig {
     pub echo: bool,
     /// Into the queue at once (`?queue=0`: not).
     pub queue: bool,
+    /// A practice match instead of the queue (`?practice=1`), as this champion (`&champ=`).
+    pub practice: Option<u8>,
     /// A record to watch instead of playing (`?watch=<id>`: a live match's, a minute behind;
     /// `?replay=<url>`: any), and whether it's live.
     pub record_url: Option<String>,
@@ -58,6 +60,8 @@ impl LaunchConfig {
             name: string("name"),
             echo: flag("echo"),
             queue: flag("queue"),
+            practice: flag("practice")
+                .then(|| get(&cfg, "practiceChamp").as_f64().unwrap_or(0.0).clamp(0.0, 255.0) as u8),
             record_url: get(&cfg, "recordUrl").as_string().filter(|s| !s.is_empty()),
             watch_live: flag("watchLive"),
             no_web_transport: flag("noWebTransport"),

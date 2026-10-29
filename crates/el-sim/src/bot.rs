@@ -65,6 +65,10 @@ fn unit_ref(m: &Match, i: usize) -> UnitRef {
 
 /// This tick's orders for `seat`'s bot, into `out` (nothing most ticks: orders persist).
 pub fn think(m: &Match, seat: usize, out: &mut SeatInput) {
+    // In practice the seats are dummies (`practice`).
+    if m.practice {
+        return crate::practice::think(m, seat, out);
+    }
     let now = m.tick;
     if !(now + seat as u32).is_multiple_of(THINK_EVERY) || m.outcome.is_some() {
         return;

@@ -148,6 +148,8 @@ struct Stats {
     peak: usize,
     lines: u32,
     last: &'static str,
+    /// The own champion's casts heard: their sounds started.
+    own_casts: u32,
 }
 
 fn js<T>(r: Result<T, JsValue>) -> Option<T> {
@@ -453,9 +455,14 @@ fn play(
     let (camera, view) = *cam;
     let ndc = |at: Vec2| camera.world_to_ndc(view, world(at, 1.0)).map_or(Vec2::splat(9.0), |n| n.truncate());
     // A match's families, once it's dealt.
-    if let Some(c) = session.client.as_deref() {
-        for s in 0..el_sim::units::SEATS {
-            e.family(Family::of(c.world.champs[s].def) as usize);
+    let champs = match (session.watch.as_deref(), session.client.as_deref()) {
+        (Some(w), _) => Some(&w.referee.m.champs),
+        (None, Some(c)) => Some(&c.world.champs),
+        (None, None) => None,
+    };
+    if let Some(champs) = champs {
+        for c in champs.iter().take(el_sim::units::SEATS) {
+            e.family(Family::of(c.def) as usize);
         }
     }
     let t = e.ctx.current_time();
@@ -509,6 +516,9 @@ fn play(
                 e.playing.push(Playing { id, src, gain, ends: t + secs });
                 e.stats.played += 1;
                 e.stats.last = d.name;
+                if q.own && q.what == el_client_core::fx::director::What::Part(Part::Cast) {
+                    e.stats.own_casts += 1;
+                }
             }
             None => e.stats.missing += 1,
         }
@@ -543,6 +553,7 @@ fn play(
     status.set("audio_missing", e.stats.missing);
     status.set("audio_peak", e.stats.peak as u32);
     status.set("audio_lines", e.stats.lines);
+    status.set("audio_own_casts", e.stats.own_casts);
     status.set("audio_last", e.stats.last);
     status.set("audio_unlocked", e.unlocked.get());
 }

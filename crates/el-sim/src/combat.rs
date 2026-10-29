@@ -87,7 +87,7 @@ impl Match {
             self.units[src].hit_champion_at = now;
         }
         self.event(Event::Damage { target: dst as u16, source: src as u16, amount, kind, from });
-        if self.units[dst].hp <= 0.0 {
+        if self.units[dst].hp <= 0.0 && !self.spared(dst) {
             self.kill(dst, src);
         }
         amount
@@ -106,7 +106,7 @@ impl Match {
         }
     }
 
-    fn shield(&mut self, dst: usize, amount: f32, secs: f32, from: Source) {
+    pub(crate) fn shield(&mut self, dst: usize, amount: f32, secs: f32, from: Source) {
         let now = self.tick;
         let u = &mut self.units[dst];
         u.shield = if u.shield_until > now { u.shield.max(amount) } else { amount };
