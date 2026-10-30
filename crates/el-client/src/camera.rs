@@ -121,7 +121,7 @@ pub struct View {
 
 const DEG: f32 = std::f32::consts::PI / 180.0;
 
-pub const VIEW: View = View { yaw: 45.0 * DEG, pitch: 58.0 * DEG, fov: 36.0 * DEG, distance: 30.0 };
+pub const VIEW: View = View { yaw: 45.0 * DEG, pitch: 52.0 * DEG, fov: 36.0 * DEG, distance: 30.0 };
 
 impl View {
     /// The screen's right and up, as directions on the map.
