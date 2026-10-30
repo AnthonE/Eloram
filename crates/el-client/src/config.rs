@@ -31,6 +31,9 @@ pub struct LaunchConfig {
     pub indicators: bool,
     /// League's WASD layout (`?keys=wasd`, remembered): the keys steer, the mouse and Shift cast.
     pub wasd: bool,
+    /// The camera starts locked on the champion (`?camera=locked`, remembered; Y changes it in a
+    /// match, and the memory with it). Free without it, as MOBA players keep it.
+    pub camera_locked: bool,
     /// The picture's tier (`?quality=low`, remembered; the default without a GPU): without HDR,
     /// bloom, shadows, multisampling or the braziers' lights, and the ground read from a few
     /// textures, for older machines.
@@ -72,6 +75,7 @@ impl LaunchConfig {
                 .and_then(|b| b.try_into().ok()),
             indicators: flag("indicators"),
             wasd: flag("wasd"),
+            camera_locked: flag("cameraLocked"),
             low: string("quality") == "low",
         }
     }
@@ -84,6 +88,13 @@ pub fn store_resume(token: Option<&[u8]>) {
         Some(t) => storage.set_item("el.resume", &t.iter().map(|b| format!("{b:02x}")).collect::<String>()),
         None => storage.remove_item("el.resume"),
     };
+}
+
+/// Remembers the camera locked or free for the next visit (`localStorage["el.camera"]`, which
+/// `web/loader.js` reads).
+pub fn store_camera(locked: bool) {
+    let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) else { return };
+    let _ = storage.set_item("el.camera", if locked { "locked" } else { "free" });
 }
 
 /// Keeps (or with `None`, forgets) this tab's rejoin token (`sessionStorage["el.rejoin"]`, never

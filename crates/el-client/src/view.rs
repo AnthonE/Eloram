@@ -151,10 +151,10 @@ fn radius_of(kind: Kind) -> f32 {
     }
 }
 
-/// Faces a flat thing lying in XY to the camera (which only ever moves, never turns).
+/// Faces a flat thing lying in XY to the camera (which moves but never turns), its +X to the
+/// screen's right.
 pub fn facing_camera() -> Quat {
-    let o = crate::camera::offset(1.0).normalize();
-    Quat::from_rotation_x(-o.y.atan2(o.z))
+    crate::camera::VIEW.facing()
 }
 
 pub struct ViewPlugin;
@@ -432,6 +432,7 @@ fn draw_units(
         return;
     }
     let (seat, my_team) = client.map_or((usize::MAX, u8::MAX), |c| (c.seat, c.team));
+    let face = facing_camera();
     for (mut uv, mut tf, mut vis) in &mut roots {
         let i = uv.slot;
         let unit = match (watch, client) {
@@ -560,10 +561,11 @@ fn draw_units(
             t.set_if_neq(n);
         }
         if let Ok((mut t, _, _)) = parts.get_mut(uv.fill) {
+            // Shrunk towards the bar's left end, and a hair in front of it, both as the camera sees.
             let f = hp.clamp(0.0, 1.0);
             let n = Transform {
                 scale: Vec3::new(w * f, 1.0, 1.0),
-                translation: Vec3::new(-(1.0 - f) * w * 0.5, h, 0.01),
+                translation: Vec3::new(0.0, h, 0.0) + face * Vec3::new(-(1.0 - f) * w * 0.5, 0.0, 0.01),
                 ..*t
             };
             t.set_if_neq(n);

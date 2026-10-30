@@ -26,7 +26,8 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   test.setTimeout(480_000);
   const logs = collectConsole(page);
   const shots = `artifacts/match-${info.project.name}`;
-  await page.goto(`/?gfx=${info.project.name}&name=Tester`);
+  // The camera locked on the champion (free is the default), so the pictures follow it down the lane.
+  await page.goto(`/?gfx=${info.project.name}&name=Tester&camera=locked`);
   let s: Record<string, any>;
   let chosen = "";
   try {
@@ -59,6 +60,7 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   expect(s.gold).toBeGreaterThanOrEqual(1400);
   expect(s.in_shop).toBe(true);
   expect(s.enemy_champions).toBe(0);
+  expect(s.camera_locked).toBe(true);
   // The match's headliner, shown as it starts.
   expect(s.headliner).toBeTruthy();
   // The champions drawn (docs/CHAMPIONS.md): the team's five fetched in champion select, the
@@ -166,14 +168,19 @@ test("WASD: the keys walk the champion", async ({ page }, info) => {
     throw e;
   }
   expect(s.keys).toBe("wasd");
+  // The camera is free unless asked (`?camera=locked`), and starts on the champion (within the
+  // edge it keeps off the map's ends).
+  expect(s.camera_locked).toBe(false);
+  expect(Math.abs(s.camera_x - s.x)).toBeLessThan(250);
   const before = s.x;
-  // Down the lane: D for Dawn, A for Dusk.
-  const key = s.team === 0 ? "d" : "a";
+  // Down the lane, which runs up the screen to the right (the camera looks across it diagonally):
+  // W and D for Dawn, S and A for Dusk. The keys are the screen's; the steer is the map's.
+  const keys = s.team === 0 ? ["w", "d"] : ["s", "a"];
   await page.click("canvas");
-  await page.keyboard.down(key);
+  for (const k of keys) await page.keyboard.down(k);
   s = await until(page, "steering", (s) => s.steer === (s.team === 0 ? 1 : 5));
   s = await until(page, "the walk", (s) => Math.abs(s.x - before) > 400, 60_000);
-  await page.keyboard.up(key);
+  for (const k of keys) await page.keyboard.up(k);
   s = await until(page, "the stop", (s) => s.steer === 0);
   const stopped = s.x;
   await page.waitForTimeout(3_000);

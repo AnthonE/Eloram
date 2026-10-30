@@ -20,7 +20,7 @@ use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::render::view::Msaa;
 
-use crate::camera::MainCamera;
+use crate::camera::{MainCamera, VIEW};
 use crate::net::LaunchConfigRes;
 
 /// The WebGPU build (Bevy picks its GPU API when it's compiled).
@@ -71,7 +71,12 @@ fn dress_camera(mut commands: Commands, look: Res<Look>, cam: Single<Entity, Wit
     let mut cam = commands.entity(*cam);
     cam.insert((
         Tonemapping::TonyMcMapface,
-        DistanceFog { color: HAZE, falloff: FogFalloff::Linear { start: 34.0, end: 120.0 }, ..default() },
+        // The haze from a little past what the camera looks at (at its widest zoom), into the chasm.
+        DistanceFog {
+            color: HAZE,
+            falloff: FogFalloff::Linear { start: VIEW.distance * 1.45, end: VIEW.distance * 5.2 },
+            ..default()
+        },
     ));
     // HDR is for the bloom: without it, the picture tonemaps in its shaders, with no float targets
     // and no pass of its own.
@@ -109,7 +114,9 @@ fn light(mut commands: Commands, look: Res<Look>) {
             overlap_proportion: 0.0,
         }
         .build(),
-        Transform::from_xyz(-20.0, 30.0, 7.0).looking_at(Vec3::ZERO, Vec3::Y),
+        // Turned with the camera, so the light falls the same way across the screen.
+        Transform::from_translation(crate::camera::VIEW.turn() * Vec3::new(-20.0, 30.0, 7.0))
+            .looking_at(Vec3::ZERO, Vec3::Y),
     ));
 }
 

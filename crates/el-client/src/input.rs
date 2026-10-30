@@ -98,8 +98,9 @@ pub fn key_names(wasd: bool) -> [&'static str; 6] {
     if wasd { ["RMB", "Shift", "E", "R", "Q", "F"] } else { ["Q", "W", "E", "R", "D", "F"] }
 }
 
-/// The steer W, A, S and D held make: the map's +y is up the screen and +x to the right, and
-/// `el_sim::steer_dir` counts from +x counter-clockwise by eighths.
+/// The steer W, A, S and D held make on the screen (up the screen and to its right, counted as
+/// `el_sim::steer_dir` counts on the map: from the right counter-clockwise by eighths); the camera
+/// turns it onto the map (`camera::steer_on_map`).
 fn steer(keys: &ButtonInput<KeyCode>) -> u8 {
     let x = i8::from(keys.pressed(KeyCode::KeyD)) - i8::from(keys.pressed(KeyCode::KeyA));
     let y = i8::from(keys.pressed(KeyCode::KeyW)) - i8::from(keys.pressed(KeyCode::KeyS));
@@ -188,7 +189,7 @@ fn read(
         return;
     };
     let wasd = c.wasd;
-    c.steer = if wasd { steer(&keys) } else { 0 };
+    c.steer = if wasd { crate::camera::steer_on_map(steer(&keys)) } else { 0 };
     let seat = client.seat;
     let team = client.team;
     let me = &client.pred;
