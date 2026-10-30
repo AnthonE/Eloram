@@ -173,13 +173,14 @@ test("WASD: the keys walk the champion", async ({ page }, info) => {
   expect(s.camera_locked).toBe(false);
   expect(Math.abs(s.camera_x - s.x)).toBeLessThan(250);
   const before = s.x;
-  // Down the lane: D for Dawn, A for Dusk.
-  const key = s.team === 0 ? "d" : "a";
+  // Down the lane, which runs up the screen to the right (the camera looks across it diagonally):
+  // W and D for Dawn, S and A for Dusk. The keys are the screen's; the steer is the map's.
+  const keys = s.team === 0 ? ["w", "d"] : ["s", "a"];
   await page.click("canvas");
-  await page.keyboard.down(key);
+  for (const k of keys) await page.keyboard.down(k);
   s = await until(page, "steering", (s) => s.steer === (s.team === 0 ? 1 : 5));
   s = await until(page, "the walk", (s) => Math.abs(s.x - before) > 400, 60_000);
-  await page.keyboard.up(key);
+  for (const k of keys) await page.keyboard.up(k);
   s = await until(page, "the stop", (s) => s.steer === 0);
   const stopped = s.x;
   await page.waitForTimeout(3_000);

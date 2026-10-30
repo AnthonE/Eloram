@@ -1,5 +1,6 @@
 //! The map in the scene: a game unit is a centimetre, a scene unit a metre (so the Causeway is
-//! 153.6 by 38.4), the lane along +X, the map's +y away from the camera (−Z).
+//! 153.6 by 38.4), the lane along +X, the map's +y the scene's −Z. The camera looks across it
+//! diagonally (`camera::VIEW`).
 
 use bevy::math::{Vec2, Vec3};
 use el_sim::MAP_W;

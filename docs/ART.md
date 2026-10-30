@@ -44,7 +44,7 @@ doesn't load: the current primitives stay as the fallback.
 - An HDR camera with `Tonemapping::TonyMcMapface` (or AgX; needs `tonemapping_luts`, which wants
   the ktx2 and zstd we already have), `Bloom::NATURAL`, MSAA 4× (FXAA on the low tier).
 - Moonlight: the directional light blue-white (≈ 7,500 K), from high behind the camera's left so
-  shapes keep their edges; one shadow cascade fitted to what the camera sees (it only ever looks
+  shapes keep their edges (turned with the camera, which looks across the lane diagonally); one shadow cascade fitted to what the camera sees (it only ever looks
   about 40 m across), soft (PCF).
 - Ambient tinted deep blue and lower; an `EnvironmentMapLight` from a CC0 snowy-night HDRI (Poly
   Haven), prefiltered to a small KTX2 cube, for the stone's and ice's highlights.

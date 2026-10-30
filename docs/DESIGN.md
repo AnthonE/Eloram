@@ -149,7 +149,10 @@ League's defaults, because that is what players' hands know:
   button that opens a vote to surrender, from 8:00; an open vote shows its yes and no).
 - **G** (or **Alt**) with a left click pings "look here", **Ctrl** with one "careful", on the unit
   under the cursor if there is one. Five at once, then one a second; the team alone sees them.
-- **The camera** is free to start, as MOBA players keep it: it pans at the screen's edge, with the
+- **The camera** looks across the lane diagonally, as ARAM's does: Dawn's end at the bottom left,
+  Dusk's at the top right, 58° down with a narrow lens (`el-client/src/camera.rs`, `VIEW`); the
+  screen's directions (the edges, the arrows, WASD) are turned onto the map with it. It is free to
+  start, as MOBA players keep it: it pans at the screen's edge, with the
   arrows, or dragged with the **middle button**; **Space** (or **F1**) held brings it to your
   champion, **F2** to **F5** held to each ally; a left click (or drag) on the minimap looks there;
   it comes back to your champion as the match starts and at each respawn. **Y** locks it on your

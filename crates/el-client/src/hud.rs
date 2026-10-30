@@ -11,7 +11,9 @@
 //! from the prediction, so it moves when the player does.
 
 use bevy::prelude::*;
-use bevy::ui::{BackgroundGradient, BoxShadow, LinearGradient, RelativeCursorPosition, UiGlobalTransform};
+use bevy::ui::{
+    BackgroundGradient, BoxShadow, LinearGradient, RelativeCursorPosition, UiGlobalTransform, UiTransform,
+};
 use el_client_core::lobby::ToServer;
 use el_client_core::tips;
 use el_proto::Order;
@@ -1838,14 +1840,15 @@ fn dots(
     }
 }
 
-/// The camera's view on the minimap: the ground under the window's middle row (its width) and
-/// middle column (its depth).
+/// The camera's view on the minimap: a box as wide as the ground under the window's middle row and
+/// as deep as the ground under its middle column, turned as the camera is (the minimap's scale is
+/// the same both ways, so a turn on the map is the same turn on it).
 fn view_box(
     window: Single<&Window>,
     camera: Single<(&Camera, &GlobalTransform), With<MainCamera>>,
-    mut q: Query<(&mut Node, &mut Visibility), With<ViewBox>>,
+    mut q: Query<(&mut Node, &mut UiTransform, &mut Visibility), With<ViewBox>>,
 ) {
-    let Ok((mut node, mut vis)) = q.single_mut() else { return };
+    let Ok((mut node, mut turn, mut vis)) = q.single_mut() else { return };
     let (cam, at) = *camera;
     let size = window.size();
     let ground = |p: Vec2| {
@@ -1864,13 +1867,12 @@ fn view_box(
         return;
     };
     vis.set_if_neq(Visibility::Inherited);
-    let lo = Vec2::new(l.x.max(0.0), b.y.max(0.0));
-    let hi = Vec2::new(r.x.min(MAP_W), t.y.min(MAP_H));
+    let (centre, wide, deep) = ((t + b) * 0.5, l.distance(r), t.distance(b));
     let (left, top, width, height) = (
-        percent(lo.x / MAP_W * 100.0),
-        percent((1.0 - hi.y / MAP_H) * 100.0),
-        percent(((hi.x - lo.x) / MAP_W * 100.0).max(0.0)),
-        percent(((hi.y - lo.y) / MAP_H * 100.0).max(0.0)),
+        percent((centre.x - wide * 0.5) / MAP_W * 100.0),
+        percent((1.0 - (centre.y + deep * 0.5) / MAP_H) * 100.0),
+        percent(wide / MAP_W * 100.0),
+        percent(deep / MAP_H * 100.0),
     );
     if node.left != left || node.top != top || node.width != width || node.height != height {
         node.left = left;
@@ -1878,6 +1880,11 @@ fn view_box(
         node.width = width;
         node.height = height;
     }
+    // The UI turns clockwise; the camera's yaw turns the screen's up clockwise on the map.
+    turn.set_if_neq(UiTransform {
+        rotation: Rot2::radians(crate::camera::VIEW.yaw),
+        ..UiTransform::IDENTITY
+    });
 }
 
 fn minimap(

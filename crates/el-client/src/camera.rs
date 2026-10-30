@@ -1,5 +1,6 @@
-//! The camera: high over the lane at a fixed pitch, as a MOBA's is, and moved the way League's
-//! hands know. Free to start (`?camera=locked` or Y the other way, remembered): it pans when the
+//! The camera: high over the lane at a fixed pitch, as a MOBA's is, and turned as League's ARAM's
+//! is, the lane running from the screen's bottom left to its top right ([`VIEW`]); and moved the
+//! way League's hands know. Free to start (`?camera=locked` or Y the other way, remembered): it pans when the
 //! cursor touches the window's edge, with the arrow keys, or dragged with the middle button; Space
 //! (or F1) held brings it to the champion, F2 to F5 held to each ally; a left click on the minimap
 //! (or a drag) looks there. Locked (Y), it rides the champion a little ahead, towards the enemy's
@@ -107,9 +108,57 @@ impl Plugin for CameraPlugin {
     }
 }
 
-/// The camera's distance from what it looks at (scene units), and its pitch below the horizon.
-const DISTANCE: f32 = 23.0;
-const PITCH: f32 = 56.0 * std::f32::consts::PI / 180.0;
+/// How the camera sees the map: turned about the vertical from looking straight up the map (+y),
+/// so the lane runs from the screen's bottom left to its top right as League's ARAM does; its pitch
+/// below the horizon; its vertical field of view; its distance (scene units) at zoom 1.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct View {
+    pub yaw: f32,
+    pub pitch: f32,
+    pub fov: f32,
+    pub distance: f32,
+}
+
+const DEG: f32 = std::f32::consts::PI / 180.0;
+
+pub const VIEW: View = View { yaw: 45.0 * DEG, pitch: 58.0 * DEG, fov: 36.0 * DEG, distance: 30.0 };
+
+impl View {
+    /// The screen's right and up, as directions on the map.
+    pub fn axes(&self) -> (Vec2, Vec2) {
+        let (s, c) = self.yaw.sin_cos();
+        (Vec2::new(c, -s), Vec2::new(s, c))
+    }
+
+    /// From what the camera looks at to the camera, at `zoom`.
+    pub fn offset(&self, zoom: f32) -> Vec3 {
+        let (_, up) = self.axes();
+        // Back down the screen, in the scene (the map's +y is the scene's −Z).
+        let back = Vec3::new(-up.x, 0.0, up.y);
+        (back * self.pitch.cos() + Vec3::Y * self.pitch.sin()) * self.distance * zoom
+    }
+
+    /// The turn that faces a flat thing lying in the scene's XY to the camera, its +X to the
+    /// screen's right.
+    pub fn facing(&self) -> Quat {
+        Quat::from_rotation_y(-self.yaw) * Quat::from_rotation_x(-self.pitch)
+    }
+
+    /// The scene's turn about the vertical that the camera has.
+    pub fn turn(&self) -> Quat {
+        Quat::from_rotation_y(-self.yaw)
+    }
+}
+
+/// A steer (`el_sim::steer_dir`: 0 none, 1 to 8 counter-clockwise by eighths from +x) given in the
+/// screen's directions, turned into the map's.
+pub fn steer_on_map(screen: u8) -> u8 {
+    if screen == 0 {
+        return 0;
+    }
+    let eighths = (VIEW.yaw / (std::f32::consts::PI / 4.0)).round() as i32;
+    ((i32::from(screen) - 1 - eighths).rem_euclid(8) + 1) as u8
+}
 /// Game units a second the camera pans at the edge or with the arrows (at zoom 1).
 const PAN: f32 = 2_600.0;
 /// Pixels from the window's edge that pan.
@@ -129,13 +178,10 @@ fn setup(mut commands: Commands, cfg: Res<crate::net::LaunchConfigRes>, mut rig:
     rig.locked = cfg.0.camera_locked;
     commands.spawn((
         Camera3d::default(),
+        Projection::Perspective(PerspectiveProjection { fov: VIEW.fov, ..default() }),
         MainCamera,
         Transform::from_xyz(0.0, 12.0, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
-}
-
-pub fn offset(zoom: f32) -> Vec3 {
-    Vec3::new(0.0, PITCH.sin(), PITCH.cos()) * DISTANCE * zoom
 }
 
 /// The function keys that look at a champion while held: F1 the player's own, F2 to F5 the
@@ -244,8 +290,10 @@ fn follow(
                     pan += d;
                 }
             }
+            // The screen's directions on the map.
+            let (right, up) = VIEW.axes();
             let speed = PAN * rig.zoom;
-            rig.focus += pan.normalize_or_zero() * speed * dt;
+            rig.focus += (right * pan.x + up * pan.y).normalize_or_zero() * speed * dt;
         }
     }
     if scroll.delta.y != 0.0 {
@@ -256,5 +304,6 @@ fn follow(
     controls.view = rig.focus;
     let target = world(rig.focus, 0.0);
     let jolt = shake.offset(crate::net::now_s());
-    **cam = Transform::from_translation(target + offset(rig.zoom) + jolt).looking_at(target + jolt, Vec3::Y);
+    **cam =
+        Transform::from_translation(target + VIEW.offset(rig.zoom) + jolt).looking_at(target + jolt, Vec3::Y);
 }
