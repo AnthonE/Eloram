@@ -305,7 +305,8 @@ fn inbox(
                 rig.locked = false;
                 rig.placed = true;
                 rig.focus = Vec2::new(x, y);
-                rig.zoom = zoom.unwrap_or(rig.zoom).clamp(0.35, 1.4);
+                let zoom = zoom.unwrap_or(rig.zoom_to).clamp(0.35, 1.4);
+                rig.set_zoom(zoom);
                 continue;
             }
             Cmd::Fog { on } => {
@@ -352,10 +353,15 @@ fn match_status(
     session: Res<crate::session::Session>,
     controls: Res<crate::input::Controls>,
     drawn: Res<crate::view::Drawn>,
+    rig: Res<crate::camera::Rig>,
     mut status: ResMut<DevStatus>,
     mut walk_max: Local<f32>,
     mut corrections: Local<(u64, u32)>,
 ) {
+    // The camera: locked on the champion or free, and where it looks.
+    status.set("camera_locked", rig.locked);
+    status.set("camera_x", rig.focus.x.round() as i32);
+    status.set("camera_y", rig.focus.y.round() as i32);
     // The kill feed: deaths it has told, and its newest line.
     status.set("feed_deaths", session.kd.iter().map(|&(_, d)| u32::from(d)).sum::<u32>());
     if let Some(l) = session.feed.last() {

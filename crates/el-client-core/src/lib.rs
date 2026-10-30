@@ -16,6 +16,7 @@ pub mod orders;
 pub mod pose;
 pub mod scenery;
 pub mod spectator;
+pub mod tips;
 pub mod zones;
 
 pub use client::{Cause, Client, Correction, Packets, Stats, Taken};

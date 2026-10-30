@@ -1,9 +1,14 @@
-//! The camera: high over the lane at a fixed pitch, as a MOBA's is. Y locks it to the champion (the
-//! default) or frees it; free, it pans when the cursor touches the window's edge or with the arrow
-//! keys; Space, held, brings it back to the champion. The wheel zooms a little.
+//! The camera: high over the lane at a fixed pitch, as a MOBA's is, and moved the way League's
+//! hands know. Free to start (`?camera=locked` or Y the other way, remembered): it pans when the
+//! cursor touches the window's edge, with the arrow keys, or dragged with the middle button; Space
+//! (or F1) held brings it to the champion, F2 to F5 held to each ally; a left click on the minimap
+//! (or a drag) looks there. Locked (Y), it rides the champion a little ahead, towards the enemy's
+//! end, and a look at the minimap lasts while the button is held. It comes back to the champion
+//! when the match starts and at each respawn. The wheel zooms a little, smoothly.
 
 use bevy::input::mouse::AccumulatedMouseScroll;
 use bevy::prelude::*;
+use el_sim::units::{SEATS, team_of_seat};
 use el_sim::{MAP_H, MAP_W};
 
 use crate::coords::world;
@@ -17,15 +22,46 @@ pub struct MainCamera;
 pub struct Rig {
     /// The map point the camera looks at.
     pub focus: Vec2,
+    /// The zoom drawn, and the one the wheel asks for (the first eases to the second).
     pub zoom: f32,
+    pub zoom_to: f32,
     pub locked: bool,
     /// It has been put on the champion once.
     pub placed: bool,
+    /// The minimap held this frame: the camera looks there (`hud.rs`).
+    pub peek: Option<Vec2>,
+    /// The middle button's drag: the map point it took hold of.
+    grab: Option<Vec2>,
+    /// The champion was alive last frame (a respawn brings the camera back).
+    alive: bool,
 }
 
 impl Default for Rig {
     fn default() -> Self {
-        Self { focus: Vec2::new(1_200.0, el_sim::map::MID_Y), zoom: 1.0, locked: true, placed: false }
+        Self {
+            focus: Vec2::new(1_200.0, el_sim::map::MID_Y),
+            zoom: 1.0,
+            zoom_to: 1.0,
+            locked: false,
+            placed: false,
+            peek: None,
+            grab: None,
+            alive: true,
+        }
+    }
+}
+
+impl Rig {
+    /// Locks the camera on the champion or frees it, and remembers which for the next visit.
+    pub fn set_locked(&mut self, on: bool) {
+        self.locked = on;
+        crate::config::store_camera(on);
+    }
+
+    /// Put at a zoom at once, not eased to it.
+    pub fn set_zoom(&mut self, zoom: f32) {
+        self.zoom = zoom;
+        self.zoom_to = zoom;
     }
 }
 
@@ -74,12 +110,23 @@ impl Plugin for CameraPlugin {
 /// The camera's distance from what it looks at (scene units), and its pitch below the horizon.
 const DISTANCE: f32 = 23.0;
 const PITCH: f32 = 56.0 * std::f32::consts::PI / 180.0;
-/// Game units a second the camera pans.
-const PAN: f32 = 2_400.0;
+/// Game units a second the camera pans at the edge or with the arrows (at zoom 1).
+const PAN: f32 = 2_600.0;
 /// Pixels from the window's edge that pan.
-const EDGE: f32 = 10.0;
+const EDGE: f32 = 12.0;
+/// How far ahead of the champion (game units, towards the enemy's end) the locked camera looks:
+/// League's "per-side offset", more of the lane ahead than behind.
+const AHEAD: f32 = 260.0;
+/// How quickly the locked camera catches the champion, and the zoom the wheel's (a second's
+/// exponent): quick enough to feel held, slow enough that a blink or a respawn glides.
+const CATCH: f32 = 18.0;
+const EASE_ZOOM: f32 = 12.0;
+/// The wheel's reach.
+const ZOOM_IN: f32 = 0.7;
+const ZOOM_OUT: f32 = 1.4;
 
-fn setup(mut commands: Commands) {
+fn setup(mut commands: Commands, cfg: Res<crate::net::LaunchConfigRes>, mut rig: ResMut<Rig>) {
+    rig.locked = cfg.0.camera_locked;
     commands.spawn((
         Camera3d::default(),
         MainCamera,
@@ -91,67 +138,120 @@ pub fn offset(zoom: f32) -> Vec3 {
     Vec3::new(0.0, PITCH.sin(), PITCH.cos()) * DISTANCE * zoom
 }
 
+/// The function keys that look at a champion while held: F1 the player's own, F2 to F5 the
+/// allies in seat order.
+const LOOK_AT: [KeyCode; 5] = [KeyCode::F1, KeyCode::F2, KeyCode::F3, KeyCode::F4, KeyCode::F5];
+
 #[allow(clippy::too_many_arguments)]
 fn follow(
     mut rig: ResMut<Rig>,
     keys: Res<ButtonInput<KeyCode>>,
+    mouse: Res<ButtonInput<MouseButton>>,
     scroll: Res<AccumulatedMouseScroll>,
     window: Single<&Window>,
     time: Res<Time>,
     session: Res<Session>,
+    drawn: Res<crate::view::Drawn>,
     shake: Res<Shake>,
     mut controls: ResMut<Controls>,
     mut cam: Single<&mut Transform, With<MainCamera>>,
 ) {
-    let me = session.client.as_ref().map(|c| c.own_pos(crate::net::now_s()));
+    let dt = time.delta_secs();
+    let client = session.client.as_deref();
+    let me = client.map(|c| c.own_pos(crate::net::now_s()));
     // Watching, there's no champion of one's own: the camera is free from the start.
     if session.watch.is_some() && !rig.placed {
         rig.locked = false;
         rig.placed = true;
         rig.focus = Vec2::new(MAP_W * 0.5, el_sim::map::MID_Y);
     }
-    if keys.just_pressed(KeyCode::KeyY) {
-        rig.locked = !rig.locked;
+    if keys.just_pressed(KeyCode::KeyY) && session.watch.is_none() {
+        let on = !rig.locked;
+        rig.set_locked(on);
     }
+    // Back on the champion at a respawn, as at the start.
+    let alive = client.is_none_or(|c| c.pred.units[c.seat].alive);
+    let respawned = alive && !rig.alive;
+    rig.alive = alive;
+    // A champion held to look at: Space or F1 the player's own, F2 to F5 an ally's.
+    let held = client.and_then(|c| {
+        if keys.pressed(KeyCode::Space) || keys.pressed(LOOK_AT[0]) {
+            return me;
+        }
+        let allies = (0..SEATS).filter(|&s| s != c.seat && team_of_seat(s) == c.team);
+        LOOK_AT[1..]
+            .iter()
+            .zip(allies)
+            .find(|(k, _)| keys.pressed(**k))
+            .and_then(|(_, s)| drawn.units[s].map(|d| d.pos))
+    });
     if let Some(me) = me
-        && (!rig.placed || rig.locked || keys.pressed(KeyCode::Space))
+        && (!rig.placed || respawned)
     {
         rig.focus = me;
         rig.placed = true;
     }
-    if !rig.locked {
-        let dt = time.delta_secs();
-        let mut pan = Vec2::ZERO;
-        if let Some(p) = window.cursor_position() {
-            let size = window.size();
-            if p.x <= EDGE {
-                pan.x -= 1.0;
-            }
-            if p.x >= size.x - EDGE {
-                pan.x += 1.0;
-            }
-            if p.y <= EDGE {
-                pan.y += 1.0;
-            }
-            if p.y >= size.y - EDGE {
-                pan.y -= 1.0;
-            }
+    if let Some(at) = rig.peek.take() {
+        // The minimap: a look while it's held.
+        rig.focus = at;
+        rig.grab = None;
+    } else if let Some(at) = held {
+        rig.focus = at;
+        rig.grab = None;
+    } else if rig.locked {
+        if let (Some(me), Some(c)) = (me, client) {
+            let ahead = if c.team == 0 { AHEAD } else { -AHEAD };
+            let want = me + Vec2::new(ahead, 0.0);
+            rig.focus = rig.focus.lerp(want, 1.0 - (-CATCH * dt).exp());
         }
-        for (k, d) in [
-            (KeyCode::ArrowLeft, Vec2::NEG_X),
-            (KeyCode::ArrowRight, Vec2::X),
-            (KeyCode::ArrowUp, Vec2::Y),
-            (KeyCode::ArrowDown, Vec2::NEG_Y),
-        ] {
-            if keys.pressed(k) {
-                pan += d;
-            }
+        rig.grab = None;
+    } else {
+        // Free: the middle button drags the map under the cursor, else the edges and the arrows.
+        if mouse.just_pressed(MouseButton::Middle) {
+            rig.grab = controls.cursor;
         }
-        rig.focus += pan.normalize_or_zero() * PAN * dt;
+        if !mouse.pressed(MouseButton::Middle) {
+            rig.grab = None;
+        }
+        if let (Some(grab), Some(at)) = (rig.grab, controls.cursor) {
+            // The cursor's ground point is read through last frame's camera, which already moved by
+            // last frame's drag: what's left is this frame's.
+            rig.focus += grab - at;
+        } else {
+            let mut pan = Vec2::ZERO;
+            if let Some(p) = window.cursor_position().filter(|_| window.focused) {
+                let size = window.size();
+                if p.x <= EDGE {
+                    pan.x -= 1.0;
+                }
+                if p.x >= size.x - EDGE {
+                    pan.x += 1.0;
+                }
+                if p.y <= EDGE {
+                    pan.y += 1.0;
+                }
+                if p.y >= size.y - EDGE {
+                    pan.y -= 1.0;
+                }
+            }
+            for (k, d) in [
+                (KeyCode::ArrowLeft, Vec2::NEG_X),
+                (KeyCode::ArrowRight, Vec2::X),
+                (KeyCode::ArrowUp, Vec2::Y),
+                (KeyCode::ArrowDown, Vec2::NEG_Y),
+            ] {
+                if keys.pressed(k) {
+                    pan += d;
+                }
+            }
+            let speed = PAN * rig.zoom;
+            rig.focus += pan.normalize_or_zero() * speed * dt;
+        }
     }
     if scroll.delta.y != 0.0 {
-        rig.zoom = (rig.zoom * (1.0 - 0.08 * scroll.delta.y.signum())).clamp(0.7, 1.4);
+        rig.zoom_to = (rig.zoom_to * (1.0 - 0.1 * scroll.delta.y.signum())).clamp(ZOOM_IN, ZOOM_OUT);
     }
+    rig.zoom += (rig.zoom_to - rig.zoom) * (1.0 - (-EASE_ZOOM * dt).exp());
     rig.focus = rig.focus.clamp(Vec2::new(600.0, 900.0), Vec2::new(MAP_W - 600.0, MAP_H - 900.0));
     controls.view = rig.focus;
     let target = world(rig.focus, 0.0);

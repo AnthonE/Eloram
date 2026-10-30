@@ -149,8 +149,18 @@ League's defaults, because that is what players' hands know:
   button that opens a vote to surrender, from 8:00; an open vote shows its yes and no).
 - **G** (or **Alt**) with a left click pings "look here", **Ctrl** with one "careful", on the unit
   under the cursor if there is one. Five at once, then one a second; the team alone sees them.
-- **Y** locks the camera on your champion (locked to start) or frees it; free, it pans at the
-  screen's edge and with the arrows, and **Space** held brings it back. The wheel zooms a little.
+- **The camera** is free to start, as MOBA players keep it: it pans at the screen's edge, with the
+  arrows, or dragged with the **middle button**; **Space** (or **F1**) held brings it to your
+  champion, **F2** to **F5** held to each ally; a left click (or drag) on the minimap looks there;
+  it comes back to your champion as the match starts and at each respawn. **Y** locks it on your
+  champion or frees it (`?camera=locked`, remembered); locked, it looks a little ahead, towards the
+  enemy's end (League's "per-side offset"), and the minimap's look lasts while the button is held.
+  The wheel zooms a little, eased. The minimap draws the camera's view.
+- **The HUD**: the portrait and level, the abilities (the key on each, the cooldown counted over
+  it, the ranks under it, a **+** over it while a point may go there, which a click spends too, a
+  blue border while the mana's short), health, mana, the items and the gold at the bottom; the
+  score and clock at the top; the allies down the left; a tooltip over an ability, an item or a
+  shop's item says what it does (`el_client_core::tips`, read from the same tables the sim plays).
 - **WASD** as an option (`?keys=wasd`, remembered), League's own layout for it (2025): **W, A, S,
   D** move; left click attacks what's under the cursor; the abilities are right click, **Shift**,
   **E** and **R**; the summoner spells **Q** and **F**; **C** calls an aimed cast off; **Ctrl** with

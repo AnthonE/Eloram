@@ -113,6 +113,18 @@ function keysSetting() {
   }
 }
 
+// The camera free (the default: the edges pan it, Space brings it back) or locked on the champion
+// (`?camera=locked`; `?camera=free` back). Remembered, and Y in a match changes it (and the memory).
+function cameraSetting() {
+  const asked = params.get("camera");
+  try {
+    if (asked === "locked" || asked === "free") localStorage.setItem("el.camera", asked);
+    return localStorage.getItem("el.camera") || "free";
+  } catch (_) {
+    return asked || "free";
+  }
+}
+
 // A browser drawing without a GPU (SwiftShader, llvmpipe): the low tier, unless asked otherwise.
 function softwareRenderer() {
   try {
@@ -154,6 +166,7 @@ async function main() {
     indicators: indicatorsSetting(),
     // League's WASD layout (`?keys=wasd`; `?keys=league` back to its default). Remembered.
     wasd: keysSetting() === "wasd",
+    cameraLocked: cameraSetting() === "locked",
     // The picture's tier (`?quality=low`: no HDR, bloom, shadows or multisampling, a few textures
     // read for the ground; `high` back). Remembered; without a GPU, low unless asked.
     quality: qualitySetting(),
