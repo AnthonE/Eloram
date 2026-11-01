@@ -160,9 +160,12 @@ League's defaults, because that is what players' hands know:
   enemy's end (League's "per-side offset"), and the minimap's look lasts while the button is held.
   The wheel zooms a little, eased. The minimap, a square at the bottom right, is the map turned as
   the camera turns it (the lane from its bottom left to its top right), with the camera's view on it.
-- **The HUD**: the portrait and level, the abilities (the key on each, the cooldown counted over
-  it, the ranks under it, a **+** over it while a point may go there, which a click spends too, a
-  blue border while the mana's short), health, mana, the items and the gold, in one panel at the
+- **The HUD**: the stats (attack damage, ability power, armour, magic resist, attack speed, haste,
+  move speed, range), the portrait (the champion's own model, drawn live: `el-client/src/portrait.rs`)
+  and level, the abilities (each with an icon painted from its look, `el_client_core::icons`: its
+  family's colours, a mark for how it reaches, a pip for its crowd control, a gold corner on an
+  ultimate; the key on each, the cooldown counted over it, the ranks under it, a **+** over it
+  while a point may go there, which a click spends too, a blue border while the mana's short), health, mana, the items and the gold, in one panel at the
   bottom's middle; the score and clock at the top; the allies down the left; a tooltip over an
   ability, an item or a shop's item says what it does (`el_client_core::tips`, read from the same
   tables the sim plays).

@@ -36,6 +36,8 @@ const PANEL_TOP: Color = Color::srgba(0.07, 0.085, 0.12, 0.94);
 const FRAME: Color = Color::srgb(0.47, 0.39, 0.24);
 const WELL: Color = Color::srgb(0.07, 0.08, 0.11);
 const TRIM: Color = Color::srgb(0.78, 0.64, 0.36);
+/// The bronze, faint, for what floats over the map rather than docks.
+const FRAME_SOFT: Color = Color::srgba(0.47, 0.39, 0.24, 0.55);
 const TEXT: Color = Color::srgb(0.92, 0.93, 0.96);
 const DIM: Color = Color::srgb(0.56, 0.59, 0.66);
 const GOLD: Color = Color::srgb(0.98, 0.82, 0.36);
@@ -49,6 +51,8 @@ const HEADLINER_SHOWN: u32 = 12;
 const MINI: f32 = 224.0;
 const MINI_W: f32 = MINI * std::f32::consts::SQRT_2 * 0.8;
 const MINI_H: f32 = MINI * std::f32::consts::SQRT_2 * 0.2;
+/// The stats beside the portrait: what each is called there.
+const STATS: [&str; 8] = ["AD", "AP", "AR", "MR", "AS", "AH", "MS", "RG"];
 /// Allies down the left.
 const ALLIES: usize = el_sim::units::TEAM_SIZE - 1;
 
@@ -96,6 +100,8 @@ enum Label {
     AllyInitials(usize),
     TipTitle,
     TipBody,
+    /// One of the stats beside the portrait ([`STATS`]).
+    Stat(usize),
 }
 
 /// A bar's fill.
@@ -159,6 +165,18 @@ struct Tint(Color);
 #[derive(Component)]
 struct AbilitySlot(usize);
 
+/// An ability's icon (`el_client_core::icons`), over its name.
+#[derive(Component)]
+struct AbilityIcon(usize);
+
+/// The icons painted so far, by champion and slot.
+#[derive(Resource, Default)]
+struct Icons(std::collections::HashMap<(u8, u8), Handle<Image>>);
+
+/// The portrait's live picture of the champion.
+#[derive(Component)]
+struct PortraitPicture;
+
 /// One of an ability's rank marks.
 #[derive(Component)]
 struct Pip(usize, u8);
@@ -202,13 +220,14 @@ pub struct HudPlugin;
 
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PostStartup, setup).add_systems(
+        app.init_resource::<Icons>().add_systems(PostStartup, setup).add_systems(
             Update,
             (
                 (press, minimap).after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send),
                 (texts, fills, panels, dots, bench_slots, view_box, tooltip).after(crate::net::NetSet::Send),
                 (scale, tints, slots, pips, level_ups, card_frames, portraits, ally_rows, colors)
                     .after(crate::net::NetSet::Send),
+                (ability_icons, portrait_picture).after(crate::net::NetSet::Send),
             ),
         );
     }
@@ -342,7 +361,7 @@ const BUTTON: Color = Color::srgb(0.11, 0.12, 0.16);
 const BUTTON_GOLD: Color = Color::srgb(0.30, 0.24, 0.10);
 
 #[allow(clippy::too_many_lines)]
-fn setup(mut commands: Commands, floor: Res<FloorImage>) {
+fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::portrait::PortraitImage>) {
     // The top: the kills each side of the clock.
     commands.spawn((
         Node {
@@ -359,11 +378,15 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>) {
                 align_items: AlignItems::Center,
                 column_gap: px(14),
                 padding: UiRect::axes(px(18), px(5)),
-                border: UiRect::new(px(1), px(1), px(0), px(1)),
+                border: UiRect::new(px(1), px(1), px(0), px(2)),
                 border_radius: BorderRadius::px(0.0, 0.0, 10.0, 10.0),
                 ..default()
             },
-            framed(),
+            // Docked at the top: its bright edge is its bottom.
+            BorderColor { bottom: TRIM, ..BorderColor::all(FRAME) },
+            down(PANEL_TOP, PANEL),
+            shadow(),
+            Interaction::None,
             children![
                 (text("DAWN", 11.0, TEAM[0]), Node { margin: UiRect::top(px(4)), ..default() }),
                 (text("0", 22.0, TEAM[0]), outline(), Label::KillsDawn),
@@ -399,11 +422,13 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>) {
             (
                 Node {
                     padding: UiRect::axes(px(10), px(6)),
+                    border: UiRect::all(px(1)),
                     border_radius: BorderRadius::all(px(6)),
                     max_width: px(360),
                     display: Display::None,
                     ..default()
                 },
+                BorderColor::all(FRAME_SOFT),
                 BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.62)),
                 Panel::Feed,
                 children![(
@@ -431,7 +456,7 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>) {
             Label::Center
         )],
     ));
-    bottom(&mut commands);
+    bottom(&mut commands, &portrait);
     allies(&mut commands);
     // The minimap, bottom right, in a square frame: the map turned as the camera turns it, the lane
     // from the bottom left to the top right as ARAM's is. A 4:1 strip turned 45° fills a square.
@@ -636,7 +661,7 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>) {
 }
 
 /// The bottom: the portrait and level, the abilities, health and mana, the items and the gold.
-fn bottom(commands: &mut Commands) {
+fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
     // The portrait, its level on a badge, the experience under it.
     let badge = commands
         .spawn((
@@ -657,24 +682,40 @@ fn bottom(commands: &mut Commands) {
             children![(text("1", 12.0, TEXT), Label::Level)],
         ))
         .id();
-    let portrait = commands
+    // The champion's initials, and over them its model drawn live (`portrait.rs`), cut to the
+    // frame; the badge sits over the frame's corner, outside the cut.
+    let face = commands
         .spawn((
             Node {
-                width: px(66),
-                height: px(66),
+                width: percent(100),
+                height: percent(100),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 border: UiRect::all(px(2)),
                 border_radius: BorderRadius::all(px(8)),
+                overflow: Overflow::clip(),
                 ..default()
             },
             BorderColor::all(GOLD),
             BackgroundColor(WELL),
             Portrait(None),
-            children![(text("", 26.0, TEXT), outline(), Label::Initials)],
+            children![
+                (text("", 26.0, TEXT), outline(), Label::Initials),
+                (
+                    Node {
+                        position_type: PositionType::Absolute,
+                        width: percent(100),
+                        height: percent(100),
+                        ..default()
+                    },
+                    ImageNode::new(portrait.0.clone()),
+                    PortraitPicture,
+                ),
+            ],
         ))
-        .add_child(badge)
         .id();
+    let portrait =
+        commands.spawn(Node { width: px(66), height: px(66), ..default() }).add_children(&[face, badge]).id();
     let xp = bar(
         commands,
         px(66),
@@ -691,6 +732,42 @@ fn bottom(commands: &mut Commands) {
             ..default()
         })
         .add_children(&[portrait, xp])
+        .id();
+    // The stats, two columns of four, at the panel's left as League's are.
+    let cells: Vec<Entity> = STATS
+        .iter()
+        .enumerate()
+        .map(|(i, name)| {
+            commands
+                .spawn(Node {
+                    width: px(54),
+                    column_gap: px(4),
+                    align_items: AlignItems::Baseline,
+                    ..default()
+                })
+                .with_children(|cell| {
+                    cell.spawn((text(name, 9.0, DIM), Node { width: px(16), ..default() }));
+                    cell.spawn((text("", 11.0, TEXT), Label::Stat(i)));
+                })
+                .id()
+        })
+        .collect();
+    let stats = commands
+        .spawn((
+            Node {
+                display: Display::Grid,
+                grid_template_columns: RepeatedGridTrack::auto(2),
+                column_gap: px(4),
+                row_gap: px(5),
+                padding: UiRect::axes(px(8), px(7)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(6)),
+                ..default()
+            },
+            BorderColor::all(FRAME_SOFT),
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.3)),
+        ))
+        .add_children(&cells)
         .id();
     // The abilities: Q, W, E and R, then the summoner spells a little apart and smaller.
     let slots: Vec<Entity> = (0..6).map(|k| ability_slot(commands, k)).collect();
@@ -785,7 +862,7 @@ fn bottom(commands: &mut Commands) {
             },
             docked(),
         ))
-        .add_children(&[left, middle, right])
+        .add_children(&[stats, left, middle, right])
         .id();
     commands
         .spawn((
@@ -848,6 +925,17 @@ fn ability_slot(commands: &mut Commands, k: usize) -> Entity {
             Tip::Ability(k),
             children![
                 (text("", 9.0, DIM), TextLayout::justify(Justify::Center), Label::AbilityName(k)),
+                (
+                    Node {
+                        position_type: PositionType::Absolute,
+                        width: percent(100),
+                        height: percent(100),
+                        ..default()
+                    },
+                    ImageNode::default(),
+                    Visibility::Hidden,
+                    AbilityIcon(k),
+                ),
                 (
                     Node {
                         position_type: PositionType::Absolute,
@@ -976,10 +1064,18 @@ fn allies(commands: &mut Commands) {
                         align_items: AlignItems::Center,
                         column_gap: px(10),
                         padding: UiRect::new(px(6), px(10), px(6), px(6)),
+                        border: UiRect::new(px(0), px(1), px(1), px(1)),
                         border_radius: BorderRadius::px(0.0, 8.0, 8.0, 0.0),
                         ..default()
                     },
-                    BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.62)),
+                    BorderColor::all(FRAME_SOFT),
+                    BackgroundGradient(vec![
+                        LinearGradient::to_right(vec![
+                            Color::srgba(0.05, 0.06, 0.09, 0.85).into(),
+                            Color::srgba(0.02, 0.03, 0.05, 0.6).into(),
+                        ])
+                        .into(),
+                    ]),
                     Interaction::None,
                     AllyRow(i),
                 ))
@@ -1442,6 +1538,19 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
             }
             (Label::Level, Some(c)) => c.pred.champs[c.seat].level.to_string(),
             (Label::Initials, Some(c)) => initials(c.pred.champs[c.seat].def),
+            (Label::Stat(i), Some(c)) => {
+                let st = &c.pred.units[c.seat].stats;
+                match i {
+                    0 => format!("{:.0}", st.ad),
+                    1 => format!("{:.0}", st.ap),
+                    2 => format!("{:.0}", st.armor),
+                    3 => format!("{:.0}", st.mr),
+                    4 => format!("{:.2}", st.attack_speed),
+                    5 => format!("{:.0}", st.haste),
+                    6 => format!("{:.0}", st.move_speed),
+                    _ => format!("{:.0}", st.range),
+                }
+            }
             (Label::Gold | Label::ShopGold, Some(c)) => {
                 format!("{:.0} g", c.pred.champs[c.seat].gold.floor())
             }
@@ -1699,6 +1808,66 @@ fn portraits(session: Res<Session>, mut q: Query<(&Portrait, &mut BackgroundColo
         bg.set_if_neq(BackgroundColor(want));
         if p.0.is_some() {
             border.set_if_neq(BorderColor::all(if alive { FRAME } else { Color::srgb(0.25, 0.10, 0.10) }));
+        }
+    }
+}
+
+/// Each ability slot's icon, for the champion played: dim while it has no rank.
+fn ability_icons(
+    session: Res<Session>,
+    mut icons: ResMut<Icons>,
+    mut images: ResMut<Assets<Image>>,
+    mut q: Query<(&AbilityIcon, &mut ImageNode, &mut Visibility)>,
+) {
+    let Some(c) = session.client.as_deref() else { return };
+    let ch = &c.pred.champs[c.seat];
+    for (icon, mut node, mut vis) in &mut q {
+        let k = icon.0;
+        let h = icons
+            .0
+            .entry((ch.def, k as u8))
+            .or_insert_with(|| {
+                use bevy::asset::RenderAssetUsages;
+                use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+                let side = el_client_core::icons::ICON as u32;
+                images.add(Image::new(
+                    Extent3d { width: side, height: side, depth_or_array_layers: 1 },
+                    TextureDimension::D2,
+                    el_client_core::icons::ability_icon(ch.def, k as u8),
+                    TextureFormat::Rgba8UnormSrgb,
+                    RenderAssetUsages::default(),
+                ))
+            })
+            .clone();
+        if node.image != h {
+            node.image = h;
+        }
+        let learned = k >= 4 || ch.ranks[k] > 0;
+        let tint = if learned { Color::WHITE } else { Color::srgb(0.32, 0.32, 0.36) };
+        if node.color != tint {
+            node.color = tint;
+        }
+        vis.set_if_neq(Visibility::Inherited);
+    }
+}
+
+/// The portrait's picture: grey while the champion's dead; the initials only while it isn't drawn.
+fn portrait_picture(
+    session: Res<Session>,
+    shown: Res<crate::portrait::PortraitShown>,
+    mut q: Query<&mut ImageNode, With<PortraitPicture>>,
+    mut labels: Query<(&Label, &mut Visibility)>,
+) {
+    for (l, mut v) in &mut labels {
+        if *l == Label::Initials {
+            v.set_if_neq(if shown.0 { Visibility::Hidden } else { Visibility::Inherited });
+        }
+    }
+    let Some(c) = session.client.as_deref() else { return };
+    let tint = if c.pred.units[c.seat].alive { Color::WHITE } else { Color::srgb(0.35, 0.35, 0.38) };
+    for mut node in &mut q {
+        if node.color != tint {
+            node.color = tint;
         }
     }
 }

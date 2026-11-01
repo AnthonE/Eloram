@@ -35,6 +35,8 @@ mod models;
 #[cfg(target_arch = "wasm32")]
 mod net;
 #[cfg(target_arch = "wasm32")]
+mod portrait;
+#[cfg(target_arch = "wasm32")]
 mod scenery;
 #[cfg(target_arch = "wasm32")]
 mod session;

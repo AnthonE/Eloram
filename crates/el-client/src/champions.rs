@@ -10,6 +10,7 @@
 //! `shaders/rim.wgsl`), so its silhouette reads against the stone: Riot inks its champions'
 //! outlines; here the outline is lit.
 
+use bevy::camera::visibility::RenderLayers;
 use bevy::gltf::Gltf;
 use bevy::pbr::{ExtendedMaterial, MaterialExtension};
 use bevy::prelude::*;
@@ -26,6 +27,7 @@ use crate::coords::S;
 use crate::dev_hooks::DevStatus;
 use crate::look::Look;
 use crate::net::now_s;
+use crate::portrait::PortraitSubject;
 use crate::session::Session;
 use crate::view::{Drawn, UnitView, ViewSet};
 
@@ -233,6 +235,8 @@ fn ready(
     materials: Res<Assets<StandardMaterial>>,
     mut rims: ResMut<Assets<RimMat>>,
     mut figures: Query<&mut Figure>,
+    session: Res<Session>,
+    shapes: Query<(), With<Mesh3d>>,
 ) {
     let e = event.event_target();
     let Some((seat, d)) =
@@ -242,7 +246,15 @@ fn ready(
     };
     let Some(art) = &models.ready[d] else { return };
     let Ok(mut figure) = figures.get_mut(e) else { return };
+    // The player's own champion is in the portrait too (`portrait.rs`).
+    let own = session.watch.is_none() && session.client.as_deref().is_some_and(|c| c.seat == seat);
+    if own {
+        commands.entity(e).insert(PortraitSubject);
+    }
     for c in children.iter_descendants(e) {
+        if own && shapes.contains(c) {
+            commands.entity(c).insert(RenderLayers::from_layers(&[0, crate::portrait::LAYER]));
+        }
         if players.contains(c) {
             commands.entity(c).insert(AnimationGraphHandle(art.graph.clone()));
             figure.player = Some(c);

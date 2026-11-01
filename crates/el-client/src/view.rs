@@ -180,20 +180,42 @@ fn floor_image() -> Image {
     const H: usize = 240;
     let mut data = vec![0u8; W * H * 4];
     let brushes = map::brushes();
+    let at = |px: usize, py: usize| {
+        Vec2::new((px as f32 + 0.5) * MAP_W / W as f32, MAP_H - (py as f32 + 0.5) * MAP_H / H as f32)
+    };
+    // Where the floor is, a pixel at a time, to find its edges.
+    let floor: Vec<bool> = (0..W * H).map(|k| map::on_floor(at(k % W, k / W), 0.0)).collect();
+    let on = |x: isize, y: isize| {
+        x >= 0 && y >= 0 && (x as usize) < W && (y as usize) < H && floor[y as usize * W + x as usize]
+    };
     for py in 0..H {
         for px in 0..W {
-            let p =
-                Vec2::new((px as f32 + 0.5) * MAP_W / W as f32, MAP_H - (py as f32 + 0.5) * MAP_H / H as f32);
-            let n = (el_sim::math::hash01(px as u32, py as u32) - 0.5) * 0.05;
-            let (r, g, b) = if !map::on_floor(p, 0.0) {
-                (0.03, 0.04, 0.07)
-            } else if brushes.iter().any(|r| r.contains(p, 0.0)) {
-                (0.16 + n, 0.30 + n, 0.14 + n)
+            let p = at(px, py);
+            let n = (el_sim::math::hash01(px as u32, py as u32) - 0.5) * 0.04;
+            // Each end a little its team's colour, more so in the bases.
+            let side = ((p.x / MAP_W) - 0.5) * 2.0;
+            let base = ((side.abs() - 0.7) / 0.3).clamp(0.0, 1.0);
+            let (tr, tb) = (side.max(0.0) * (0.06 + 0.10 * base), (-side).max(0.0) * (0.06 + 0.10 * base));
+            let (x, y) = (px as isize, py as isize);
+            let (r, g, b) = if !floor[py * W + px] {
+                // The abyss: deep blue-black, lighter where it meets the floor.
+                let near = (1..=8).find(|&d| on(x - d, y) || on(x + d, y) || on(x, y - d) || on(x, y + d));
+                let lift = near.map_or(0.0, |d| 0.08 / d as f32);
+                (0.015 + n * 0.3 + lift * 0.6, 0.025 + n * 0.3 + lift * 0.8, 0.05 + n * 0.3 + lift * 1.2)
             } else {
-                // Each side's stone a little its colour, the middle neutral.
-                let side = ((p.x / MAP_W) - 0.5) * 2.0;
-                let (tr, tb) = (side.max(0.0) * 0.05, (-side).max(0.0) * 0.05);
-                (0.36 + n + tr, 0.35 + n, 0.33 + n + tb)
+                // Three pixels deep, so it holds when the minimap draws this at a quarter of its size.
+                let edge = (1..=3).any(|d| !(on(x - d, y) && on(x + d, y) && on(x, y - d) && on(x, y + d)));
+                if edge {
+                    // The rim: the lane's edge picked out, as the walls catch the light.
+                    (0.70, 0.74, 0.80)
+                } else if brushes.iter().any(|r| r.contains(p, 0.0)) {
+                    (0.10 + n, 0.24 + n, 0.16 + n)
+                } else {
+                    // Cool slate, the lane's middle a little lighter where it's walked.
+                    let mid = 1.0 - ((p.y - map::MID_Y).abs() / (MAP_H * 0.25)).clamp(0.0, 1.0);
+                    let l = 0.27 + 0.05 * mid + n;
+                    (l + tr, l + 0.02, l + 0.07 + tb)
+                }
             };
             let k = (py * W + px) * 4;
             data[k] = (r.clamp(0.0, 1.0) * 255.0) as u8;
