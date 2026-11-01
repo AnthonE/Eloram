@@ -35,6 +35,7 @@ const PANEL_TOP: Color = Color::srgba(0.07, 0.085, 0.12, 0.94);
 /// The frames' bronze, and a slot's well.
 const FRAME: Color = Color::srgb(0.47, 0.39, 0.24);
 const WELL: Color = Color::srgb(0.07, 0.08, 0.11);
+const TRIM: Color = Color::srgb(0.78, 0.64, 0.36);
 const TEXT: Color = Color::srgb(0.92, 0.93, 0.96);
 const DIM: Color = Color::srgb(0.56, 0.59, 0.66);
 const GOLD: Color = Color::srgb(0.98, 0.82, 0.36);
@@ -43,6 +44,11 @@ const SHORT: Color = Color::srgb(0.90, 0.40, 0.36);
 const HP: [Color; 2] = [Color::srgb(0.20, 0.62, 0.24), Color::srgb(0.38, 0.86, 0.36)];
 /// Seconds the headliner stays in the middle of the screen as a match starts.
 const HEADLINER_SHOWN: u32 = 12;
+/// The minimap's square, and the map strip turned in it (the map's 4:1 turned 45° spans the
+/// square: (w + h) / √2 = side).
+const MINI: f32 = 224.0;
+const MINI_W: f32 = MINI * std::f32::consts::SQRT_2 * 0.8;
+const MINI_H: f32 = MINI * std::f32::consts::SQRT_2 * 0.2;
 /// Allies down the left.
 const ALLIES: usize = el_sim::units::TEAM_SIZE - 1;
 
@@ -232,6 +238,17 @@ fn framed() -> (BorderColor, BackgroundGradient, BoxShadow, Interaction) {
     (BorderColor::all(FRAME), down(PANEL_TOP, PANEL), shadow(), Interaction::None)
 }
 
+/// A framed panel docked at the screen's bottom: its top edge brighter, so the bottom's panels
+/// read as one set.
+fn docked() -> (BorderColor, BackgroundGradient, BoxShadow, Interaction) {
+    (
+        BorderColor { top: TRIM, ..BorderColor::all(FRAME) },
+        down(PANEL_TOP, PANEL),
+        shadow(),
+        Interaction::None,
+    )
+}
+
 /// A colour a little lighter (`by` > 0) or darker.
 fn shade(c: Color, by: f32) -> Color {
     let s = c.to_srgba();
@@ -416,10 +433,19 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>) {
     ));
     bottom(&mut commands);
     allies(&mut commands);
-    // The minimap, bottom right, in a frame.
+    // The minimap, bottom right, in a square frame: the map turned as the camera turns it, the lane
+    // from the bottom left to the top right as ARAM's is. A 4:1 strip turned 45° fills a square.
     let mini = commands
         .spawn((
-            Node { width: px(320), height: px(80), overflow: Overflow::clip(), ..default() },
+            Node {
+                position_type: PositionType::Absolute,
+                left: px((MINI - MINI_W) * 0.5),
+                top: px((MINI - MINI_H) * 0.5),
+                width: px(MINI_W),
+                height: px(MINI_H),
+                ..default()
+            },
+            UiTransform { rotation: Rot2::radians(-crate::camera::VIEW.yaw), ..UiTransform::IDENTITY },
             ImageNode::new(floor.0.clone()),
             Button,
             RelativeCursorPosition::default(),
@@ -462,20 +488,28 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>) {
         ))
         .id();
     commands.entity(mini).add_child(view);
+    // The square the turned map sits in, its corners the abyss's dark; the view box is cut at it.
+    let square = commands
+        .spawn((
+            Node { width: px(MINI), height: px(MINI), overflow: Overflow::clip(), ..default() },
+            BackgroundColor(Color::srgb(0.02, 0.03, 0.05)),
+        ))
+        .add_child(mini)
+        .id();
     commands
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                bottom: px(6),
-                right: px(6),
+                bottom: px(0),
+                right: px(0),
                 padding: UiRect::all(px(4)),
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(6)),
+                border: UiRect::new(px(2), px(0), px(2), px(0)),
+                border_radius: BorderRadius::px(10.0, 0.0, 0.0, 0.0),
                 ..default()
             },
-            framed(),
+            docked(),
         ))
-        .add_child(mini);
+        .add_child(square);
     cards(&mut commands);
     shop(&mut commands);
     // The scoreboard.
@@ -745,22 +779,22 @@ fn bottom(commands: &mut Commands) {
                 align_items: AlignItems::Center,
                 column_gap: px(14),
                 padding: UiRect::new(px(14), px(14), px(10), px(10)),
-                border: UiRect::new(px(1), px(1), px(1), px(0)),
+                border: UiRect::new(px(1), px(1), px(2), px(0)),
                 border_radius: BorderRadius::px(12.0, 12.0, 0.0, 0.0),
                 ..default()
             },
-            framed(),
+            docked(),
         ))
         .add_children(&[left, middle, right])
         .id();
     commands
         .spawn((
-            // Centred in what the minimap leaves.
+            // Centred on the screen, as League's is: the eye rests on the abilities.
             Node {
                 position_type: PositionType::Absolute,
                 bottom: px(0),
                 left: px(0),
-                right: px(340),
+                right: px(0),
                 justify_content: JustifyContent::Center,
                 display: Display::None,
                 ..default()

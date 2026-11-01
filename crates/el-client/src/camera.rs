@@ -121,7 +121,9 @@ pub struct View {
 
 const DEG: f32 = std::f32::consts::PI / 180.0;
 
-pub const VIEW: View = View { yaw: 45.0 * DEG, pitch: 52.0 * DEG, fov: 36.0 * DEG, distance: 30.0 };
+/// League's numbers: about 56° down through a 40° lens, the champion in the middle of the screen
+/// with the HUD under it. The distance keeps as much of the lane on screen as before.
+pub const VIEW: View = View { yaw: 45.0 * DEG, pitch: 56.0 * DEG, fov: 40.0 * DEG, distance: 27.0 };
 
 impl View {
     /// The screen's right and up, as directions on the map.
