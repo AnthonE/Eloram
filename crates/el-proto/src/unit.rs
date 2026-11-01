@@ -31,7 +31,7 @@ pub const MAX_HP_BITS: u32 = 14;
 pub const MANA_BITS: u32 = 7;
 pub const SHIELD_BITS: u32 = 11;
 pub const LEVEL_BITS: u32 = 5;
-pub const FLAG_BITS: u32 = 12;
+pub const FLAG_BITS: u32 = 13;
 pub const CAST_BITS: u32 = 3;
 /// "No target".
 pub const NO_TARGET: u8 = u8::MAX;
@@ -55,6 +55,9 @@ pub mod flags {
     pub const EMPOWERED: u32 = 1 << 10;
     /// A buff to its move speed.
     pub const HASTED: u32 = 1 << 11;
+    /// A champion's ultimate is learned and off cooldown. Its own team's alone: the record its
+    /// enemies are sent never has it (`el_sim::wire`).
+    pub const ULT_READY: u32 = 1 << 12;
 }
 
 /// A unit's record as codes.

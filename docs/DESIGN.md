@@ -165,13 +165,24 @@ League's defaults, because that is what players' hands know:
   `el-client/src/portrait.rs`; the allies' down the left are drawn the same way, a turn each a
   frame) and level, the abilities (each with an icon painted from its look, `el_client_core::icons`:
   its family's colours, a mark for how it reaches, a pip for its crowd control, a gold corner on an
-  ultimate; the key on each, the cooldown counted over it, the ranks under it, a **+** over it while
-  a point may go there, which a click spends too, a blue border while the mana's short), health,
-  mana, the items (each with an icon: the mark of what it gives most of, a badge for the next, a
-  gold rim on a finished item; the shop's rows too) and the gold, in one panel at the bottom's
-  middle; the score and clock at the top; the allies down the left; a tooltip over an ability, an
-  item or a shop's item says what it does (`el_client_core::tips`, read from the same tables the sim
-  plays).
+  ultimate; the key on each, the cooldown swept away clockwise with its seconds counted over it and
+  a flash as it comes back, the ranks under it, a **+** over it while a point may go there, which a
+  click spends too, a blue border while the mana's short), health, mana, the items (each with an
+  icon: the mark of what it gives most of, a badge for the next, a gold rim on a finished item) and
+  the gold, in one panel at the bottom's middle; the score and clock at the top; the allies down the
+  left (each one's ultimate an orb on its portrait, lit while it's ready: only its team is told);
+  the target frame at the top left (the unit last clicked or attacked: its name, level, health and
+  shield, mana and what holds it, `hud_target.rs`); a tooltip over an ability, an item or a shop's
+  item says what it does (`el_client_core::tips`, read from the same tables the sim plays). Every
+  champion's health bar in the world has a mark each hundred and a heavier one each thousand, a
+  shield a white stretch past the health. The shop (P) opens in the middle: a Recommended row for
+  the champion's role (`el_client_core::tips::recommended`, starred wherever the item shows), then
+  the components and the finished items, each a tile with its icon. Dying greys the screen, puts the
+  seconds to respawn over the portrait and shows the death recap: who killed the champion and what
+  hurt it in the last fifteen seconds, each line split physical, magic and true
+  (`el_client_core::recap`, `hud_death.rs`). The scoreboard (Tab) has a row a player: the portrait,
+  the player and the champion, the level, kills and deaths, and the items (the player's own;
+  everyone's watching a record).
 - **WASD** as an option (`?keys=wasd`, remembered), League's own layout for it (2025): **W, A, S,
   D** move; left click attacks what's under the cursor; the abilities are right click, **Shift**,
   **E** and **R**; the summoner spells **Q** and **F**; **C** calls an aimed cast off; **Ctrl** with

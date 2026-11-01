@@ -40,6 +40,8 @@ pub struct Controls {
     pub cursor: Option<Vec2>,
     /// The unit under the cursor.
     pub hovered: Option<usize>,
+    /// The unit last clicked or ordered attacked, for the target frame (`hud_target.rs`).
+    pub selected: Option<usize>,
     /// Where the last move was ordered, when, and whether it was to fight on the way.
     pub marker: Option<(Vec2, f64, bool)>,
     /// Where the camera looks (the server sends what's near it first).
@@ -219,6 +221,14 @@ fn read(
         c.aiming = None;
     }
     let enemy_hovered = c.hovered.filter(|&i| drawn.units[i].is_some_and(|d| d.team != team));
+    // The target frame: a left click picks what's under it (nothing, on bare ground), as an attack
+    // ordered on a unit does below; Escape lets it go.
+    if mouse.just_pressed(MouseButton::Left) && !over_ui && c.armed.is_none() {
+        c.selected = c.hovered;
+    }
+    if keys.just_pressed(KeyCode::Escape) {
+        c.selected = None;
+    }
     // A ping: G or Alt with a left click says "look here", Ctrl with one "careful", on the unit
     // under the cursor if there is one. The click is the ping's alone.
     let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
@@ -237,6 +247,7 @@ fn read(
             && let Some(i) = enemy_hovered
         {
             c.pending.push(Order::Attack { unit: unit_ref(i) });
+            c.selected = Some(i);
         }
     } else {
         if keys.just_pressed(KeyCode::KeyA) {
@@ -247,7 +258,10 @@ fn read(
             c.aiming = None;
             if let Some(at) = c.cursor {
                 match enemy_hovered {
-                    Some(i) => c.pending.push(Order::Attack { unit: unit_ref(i) }),
+                    Some(i) => {
+                        c.pending.push(Order::Attack { unit: unit_ref(i) });
+                        c.selected = Some(i);
+                    }
                     None => {
                         c.pending.push(Order::Move { to: at });
                         c.marker = Some((at, now, false));

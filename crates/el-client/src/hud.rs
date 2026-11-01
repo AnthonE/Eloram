@@ -12,7 +12,8 @@
 
 use bevy::prelude::*;
 use bevy::ui::{
-    BackgroundGradient, BoxShadow, LinearGradient, RelativeCursorPosition, UiGlobalTransform, UiTransform,
+    AngularColorStop, BackgroundGradient, BoxShadow, ConicGradient, LinearGradient, RelativeCursorPosition,
+    UiGlobalTransform, UiPosition, UiTransform,
 };
 use el_client_core::lobby::ToServer;
 use el_client_core::tips;
@@ -30,17 +31,17 @@ use crate::input::Controls;
 use crate::session::{Phase, Session};
 use crate::view::{CHAMPION, Drawn, FloorImage, TEAM};
 
-const PANEL: Color = Color::srgba(0.035, 0.045, 0.07, 0.90);
-const PANEL_TOP: Color = Color::srgba(0.07, 0.085, 0.12, 0.94);
+pub(crate) const PANEL: Color = Color::srgba(0.035, 0.045, 0.07, 0.90);
+pub(crate) const PANEL_TOP: Color = Color::srgba(0.07, 0.085, 0.12, 0.94);
 /// The frames' bronze, and a slot's well.
-const FRAME: Color = Color::srgb(0.47, 0.39, 0.24);
-const WELL: Color = Color::srgb(0.07, 0.08, 0.11);
-const TRIM: Color = Color::srgb(0.78, 0.64, 0.36);
+pub(crate) const FRAME: Color = Color::srgb(0.47, 0.39, 0.24);
+pub(crate) const WELL: Color = Color::srgb(0.07, 0.08, 0.11);
+pub(crate) const TRIM: Color = Color::srgb(0.78, 0.64, 0.36);
 /// The bronze, faint, for what floats over the map rather than docks.
-const FRAME_SOFT: Color = Color::srgba(0.47, 0.39, 0.24, 0.55);
-const TEXT: Color = Color::srgb(0.92, 0.93, 0.96);
-const DIM: Color = Color::srgb(0.56, 0.59, 0.66);
-const GOLD: Color = Color::srgb(0.98, 0.82, 0.36);
+pub(crate) const FRAME_SOFT: Color = Color::srgba(0.47, 0.39, 0.24, 0.55);
+pub(crate) const TEXT: Color = Color::srgb(0.92, 0.93, 0.96);
+pub(crate) const DIM: Color = Color::srgb(0.56, 0.59, 0.66);
+pub(crate) const GOLD: Color = Color::srgb(0.98, 0.82, 0.36);
 const MANA: Color = Color::srgb(0.30, 0.55, 0.98);
 const SHORT: Color = Color::srgb(0.90, 0.40, 0.36);
 const HP: [Color; 2] = [Color::srgb(0.20, 0.62, 0.24), Color::srgb(0.38, 0.86, 0.36)];
@@ -84,7 +85,8 @@ enum Label {
     ShopCost(usize),
     ShopGold,
     ScoreHead,
-    ScoreTeam(u8),
+    /// A scoreboard row's words: team, row, and which.
+    Score(u8, usize, ScoreField),
     SelectTitle,
     SelectMine,
     SelectTeam,
@@ -102,6 +104,10 @@ enum Label {
     TipBody,
     /// One of the stats beside the portrait ([`STATS`]).
     Stat(usize),
+    /// The seconds to respawn, over the portrait.
+    Respawn,
+    /// The Recommended row's title.
+    ShopRec,
 }
 
 /// A bar's fill.
@@ -110,7 +116,6 @@ enum Fill {
     Hp,
     Mana,
     Xp,
-    Cooldown(usize),
     AllyHp(usize),
 }
 
@@ -173,12 +178,35 @@ struct AbilityIcon(usize);
 #[derive(Resource, Default)]
 struct Icons(std::collections::HashMap<(u8, u8), Handle<Image>>);
 
-/// An item's icon: in an inventory slot, or on the shop's row for it.
+/// An item's icon: in an inventory slot, on the shop's tile for it, or on a scoreboard row (team,
+/// row, slot).
 #[derive(Component, Clone, Copy)]
 enum ItemIcon {
     Held(usize),
     Shop(usize),
+    Score(u8, usize, usize),
 }
+
+/// A scoreboard row's portrait: in its champion's colour, grey while it's dead.
+#[derive(Component)]
+struct ScoreBadge(u8, usize);
+
+/// A scoreboard row's item slot, shown only where the items are known.
+#[derive(Component)]
+struct ScoreWell(u8, usize);
+
+/// A tile of the shop's Recommended row: which of the four, and its icon, name and cost.
+#[derive(Component)]
+struct RecTile {
+    j: usize,
+    icon: Entity,
+    name: Entity,
+    cost: Entity,
+}
+
+/// The gold mark on item `.0`'s tile while it's recommended.
+#[derive(Component)]
+struct RecMark(usize);
 
 /// The items' icons painted so far, in `ITEMS`' order.
 #[derive(Resource, Default)]
@@ -187,6 +215,14 @@ struct ItemIcons(Vec<Option<Handle<Image>>>);
 /// A portrait's live picture of its champion (`portrait.rs`'s view: 0 the player's, then the allies).
 #[derive(Component)]
 struct PortraitPicture(usize);
+
+/// An ability's cooldown's sweep.
+#[derive(Component)]
+struct Sweep(usize);
+
+/// The flash over an ability as it comes off cooldown.
+#[derive(Component)]
+struct ReadyFlash(usize);
 
 /// One of an ability's rank marks.
 #[derive(Component)]
@@ -203,6 +239,10 @@ struct CardFrame(usize);
 /// The player's portrait (`None`) or an ally's, in the champion's colour.
 #[derive(Component)]
 struct Portrait(Option<usize>);
+
+/// An ally's ultimate's orb.
+#[derive(Component)]
+struct AllyUlt(usize);
 
 /// An ally's row, shown while there's an ally for it.
 #[derive(Component)]
@@ -242,39 +282,40 @@ impl Plugin for HudPlugin {
                         .after(crate::net::NetSet::Send),
                     (scale, tints, slots, pips, level_ups, card_frames, portraits, ally_rows, colors)
                         .after(crate::net::NetSet::Send),
-                    (ability_icons, item_icons, portrait_picture).after(crate::net::NetSet::Send),
+                    (ability_icons, item_icons, portrait_picture, rec_tiles, ally_ults, sweeps, score_badges)
+                        .after(crate::net::NetSet::Send),
                 ),
             );
     }
 }
 
-fn text(s: &str, size: f32, color: Color) -> impl Bundle {
+pub(crate) fn text(s: &str, size: f32, color: Color) -> impl Bundle {
     (Text::new(s), TextFont { font_size: FontSize::Px(size), ..default() }, TextColor(color))
 }
 
 /// A tight shadow under words, to read them over the bright ground.
-fn outline() -> TextShadow {
+pub(crate) fn outline() -> TextShadow {
     TextShadow { offset: Vec2::splat(1.0), color: Color::srgba(0.0, 0.0, 0.0, 0.85) }
 }
 
 /// A soft shadow under a panel.
-fn shadow() -> BoxShadow {
+pub(crate) fn shadow() -> BoxShadow {
     BoxShadow::new(Color::srgba(0.0, 0.0, 0.0, 0.55), px(0), px(4), px(0), px(14))
 }
 
 /// A vertical gradient, `top` to `bottom`.
-fn down(top: Color, bottom: Color) -> BackgroundGradient {
+pub(crate) fn down(top: Color, bottom: Color) -> BackgroundGradient {
     BackgroundGradient(vec![LinearGradient::to_bottom(vec![top.into(), bottom.into()]).into()])
 }
 
 /// A framed panel's look. It takes the cursor: a click on it is the HUD's, not the map's.
-fn framed() -> (BorderColor, BackgroundGradient, BoxShadow, Interaction) {
+pub(crate) fn framed() -> (BorderColor, BackgroundGradient, BoxShadow, Interaction) {
     (BorderColor::all(FRAME), down(PANEL_TOP, PANEL), shadow(), Interaction::None)
 }
 
 /// A framed panel docked at the screen's bottom: its top edge brighter, so the bottom's panels
 /// read as one set.
-fn docked() -> (BorderColor, BackgroundGradient, BoxShadow, Interaction) {
+pub(crate) fn docked() -> (BorderColor, BackgroundGradient, BoxShadow, Interaction) {
     (
         BorderColor { top: TRIM, ..BorderColor::all(FRAME) },
         down(PANEL_TOP, PANEL),
@@ -563,17 +604,18 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
                         padding: UiRect::all(px(10)),
                         border: UiRect::left(px(3)),
                         border_radius: BorderRadius::all(px(4)),
-                        min_width: px(330),
+                        min_width: px(420),
                         ..default()
                     },
                     BorderColor::all(TEAM[usize::from(t)]),
                     BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.3)),
-                    children![
-                        text(if t == 0 { "DAWN" } else { "DUSK" }, 14.0, TEAM[usize::from(t)]),
-                        text(&format!("{:<14} {:<10} {:>2}   K/D", "Name", "Champion", "Lv"), 13.0, DIM),
-                        (text("", 13.0, TEXT), Label::ScoreTeam(t)),
-                    ],
+                    children![text(if t == 0 { "DAWN" } else { "DUSK" }, 14.0, TEAM[usize::from(t)])],
                 ))
+                .with_children(|team| {
+                    for j in 0..el_sim::units::TEAM_SIZE {
+                        score_row(team, t, j);
+                    }
+                })
                 .id()
         })
         .collect();
@@ -716,6 +758,23 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
             Portrait(None),
             children![
                 (text("", 26.0, TEXT), outline(), Label::Initials),
+                (
+                    // The time to respawn, over the portrait while dead, as League's.
+                    Node {
+                        position_type: PositionType::Absolute,
+                        width: percent(100),
+                        height: percent(100),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    GlobalZIndex(1),
+                    children![(
+                        text("", 30.0, TEXT),
+                        TextShadow { offset: Vec2::splat(2.0), color: Color::srgba(0.0, 0.0, 0.0, 0.95) },
+                        Label::Respawn
+                    )],
+                ),
                 (
                     Node {
                         position_type: PositionType::Absolute,
@@ -965,16 +1024,26 @@ fn ability_slot(commands: &mut Commands, k: usize) -> Entity {
                     AbilityIcon(k),
                 ),
                 (
+                    // The cooldown: a shade swept away clockwise from twelve, as League's.
                     Node {
                         position_type: PositionType::Absolute,
-                        bottom: px(0),
-                        left: px(0),
                         width: percent(100),
-                        height: percent(0),
+                        height: percent(100),
                         ..default()
                     },
-                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.66)),
-                    Fill::Cooldown(k),
+                    BackgroundGradient::default(),
+                    Sweep(k),
+                ),
+                (
+                    // A flash as it comes back.
+                    Node {
+                        position_type: PositionType::Absolute,
+                        width: percent(100),
+                        height: percent(100),
+                        ..default()
+                    },
+                    BackgroundColor(Color::NONE),
+                    ReadyFlash(k),
                 ),
                 (
                     Node {
@@ -1095,9 +1164,29 @@ fn allies(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                     children![(text("", 9.0, TEXT), Label::AllyLevel(i))],
                 ))
                 .id();
+            // The ultimate: an orb at the top right, lit while it's ready, as League's team frames.
+            let ult = commands
+                .spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        right: px(-4),
+                        top: px(-4),
+                        width: px(11),
+                        height: px(11),
+                        border: UiRect::all(px(1)),
+                        border_radius: BorderRadius::all(percent(50)),
+                        ..default()
+                    },
+                    BorderColor::all(Color::srgba(0.0, 0.0, 0.0, 0.9)),
+                    BackgroundColor(Color::srgb(0.18, 0.18, 0.2)),
+                    BoxShadow::new(Color::NONE, px(0), px(0), px(0), px(6)),
+                    Visibility::Hidden,
+                    AllyUlt(i),
+                ))
+                .id();
             let portrait = commands
                 .spawn(Node { width: px(38), height: px(38), ..default() })
-                .add_children(&[face, level])
+                .add_children(&[face, level, ult])
                 .id();
             let name = commands.spawn((text("", 11.0, TEXT), outline(), Label::AllyName(i))).id();
             let hp = bar(commands, px(86), 6.0, HP, Fill::AllyHp(i), None);
@@ -1217,53 +1306,96 @@ fn cards(commands: &mut Commands) {
 }
 
 /// The shop: the items in two columns, each with its price, the gold at the top.
+/// A tile of the shop: the item's icon, its name and its cost; a click buys it, a gold mark in its
+/// corner while it's one recommended for the champion (`Label::ShopRec`).
+fn shop_tile(commands: &mut Commands, k: usize) -> (Entity, [Entity; 3]) {
+    let icon = commands
+        .spawn((
+            Node { width: px(44), height: px(44), border_radius: BorderRadius::all(px(4)), ..default() },
+            ImageNode::default(),
+            Visibility::Hidden,
+            ItemIcon::Shop(k),
+        ))
+        .id();
+    let name =
+        commands.spawn((text("", 10.0, TEXT), TextLayout::justify(Justify::Center), Label::Shop(k))).id();
+    let cost = commands.spawn((text("", 11.0, GOLD), Label::ShopCost(k))).id();
+    let mark = commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                top: px(3),
+                right: px(3),
+                width: px(8),
+                height: px(8),
+                border_radius: BorderRadius::all(px(1)),
+                ..default()
+            },
+            UiTransform { rotation: Rot2::degrees(45.0), ..UiTransform::IDENTITY },
+            BackgroundColor(GOLD),
+            Visibility::Hidden,
+            RecMark(k),
+        ))
+        .id();
+    let tile = commands
+        .spawn((
+            Button,
+            Node {
+                width: px(86),
+                height: px(92),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                row_gap: px(3),
+                padding: UiRect::all(px(4)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(5)),
+                ..default()
+            },
+            BorderColor::all(Color::srgb(0.22, 0.21, 0.18)),
+            BackgroundColor(BUTTON),
+            Tint(BUTTON),
+            Act::Buy(k as u8),
+            Tip::Shop(k),
+        ))
+        .add_children(&[icon, name, cost, mark])
+        .id();
+    (tile, [icon, name, cost])
+}
+
+/// A titled row of tiles.
+fn shop_section(commands: &mut Commands, title: Entity, tiles: &[Entity]) -> Entity {
+    let row = commands
+        .spawn(Node { flex_wrap: FlexWrap::Wrap, column_gap: px(6), row_gap: px(6), ..default() })
+        .add_children(tiles)
+        .id();
+    commands
+        .spawn(Node { flex_direction: FlexDirection::Column, row_gap: px(6), ..default() })
+        .add_children(&[title, row])
+        .id()
+}
+
+/// The shop (P), in the middle of the screen as League's: what's recommended for the champion's
+/// role first, then every item, the parts and the finished ones apart.
 fn shop(commands: &mut Commands) {
-    let shop_items: Vec<Entity> = (0..ITEMS.len())
-        .map(|k| {
-            commands
-                .spawn((
-                    Button,
-                    Node {
-                        width: px(176),
-                        height: px(32),
-                        padding: UiRect::new(px(4), px(8), px(0), px(0)),
-                        justify_content: JustifyContent::SpaceBetween,
-                        align_items: AlignItems::Center,
-                        border: UiRect::all(px(1)),
-                        border_radius: BorderRadius::all(px(5)),
-                        ..default()
-                    },
-                    BorderColor::all(Color::srgb(0.22, 0.21, 0.18)),
-                    BackgroundColor(BUTTON),
-                    Tint(BUTTON),
-                    Act::Buy(k as u8),
-                    Tip::Shop(k),
-                    children![
-                        (
-                            Node { column_gap: px(7), align_items: AlignItems::Center, ..default() },
-                            children![
-                                (
-                                    Node {
-                                        width: px(24),
-                                        height: px(24),
-                                        border_radius: BorderRadius::all(px(3)),
-                                        ..default()
-                                    },
-                                    ImageNode::default(),
-                                    Visibility::Hidden,
-                                    ItemIcon::Shop(k),
-                                ),
-                                (text("", 12.0, TEXT), Label::Shop(k)),
-                            ],
-                        ),
-                        (text("", 12.0, GOLD), Label::ShopCost(k))
-                    ],
-                ))
-                .id()
+    let rec: Vec<Entity> = (0..4)
+        .map(|j| {
+            let (tile, [icon, name, cost]) = shop_tile(commands, 0);
+            commands.entity(tile).insert(RecTile { j, icon, name, cost });
+            tile
         })
         .collect();
-    let title = commands.spawn(text("SHOP", 15.0, GOLD)).id();
-    let gold = commands.spawn((text("", 14.0, GOLD), Label::ShopGold)).id();
+    let (parts, done): (Vec<usize>, Vec<usize>) = (0..ITEMS.len()).partition(|&k| ITEMS[k].cost < 1_000);
+    let parts: Vec<Entity> = parts.into_iter().map(|k| shop_tile(commands, k).0).collect();
+    let done: Vec<Entity> = done.into_iter().map(|k| shop_tile(commands, k).0).collect();
+    let rec_title = commands.spawn((text("", 12.0, GOLD), Label::ShopRec)).id();
+    let parts_title = commands.spawn(text("COMPONENTS", 12.0, DIM)).id();
+    let done_title = commands.spawn(text("FINISHED ITEMS", 12.0, DIM)).id();
+    let rec = shop_section(commands, rec_title, &rec);
+    let parts = shop_section(commands, parts_title, &parts);
+    let done = shop_section(commands, done_title, &done);
+    let title = commands.spawn(text("SHOP", 16.0, GOLD)).id();
+    let gold = commands.spawn((text("", 15.0, GOLD), outline(), Label::ShopGold)).id();
     let head = commands
         .spawn(Node {
             justify_content: JustifyContent::SpaceBetween,
@@ -1272,35 +1404,44 @@ fn shop(commands: &mut Commands) {
         })
         .add_children(&[title, gold])
         .id();
-    let hint = commands.spawn(text("P closes. Click an item you hold to sell it.", 11.0, DIM)).id();
-    let grid = commands
-        .spawn(Node {
-            flex_wrap: FlexWrap::Wrap,
-            width: px(358),
-            column_gap: px(6),
-            row_gap: px(6),
-            ..default()
-        })
-        .add_children(&shop_items)
+    let hint =
+        commands.spawn(text("Click to buy. Click an item you hold to sell it. P closes.", 11.0, DIM)).id();
+    let rule = || {
+        (
+            Node { height: px(1), width: percent(100), ..default() },
+            BackgroundColor(Color::srgba(0.47, 0.39, 0.24, 0.4)),
+        )
+    };
+    let rule_a = commands.spawn(rule()).id();
+    let rule_b = commands.spawn(rule()).id();
+    let body = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: px(10),
+                width: px(7.0 * 92.0 + 24.0),
+                padding: UiRect::all(px(14)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(10)),
+                ..default()
+            },
+            framed(),
+        ))
+        .add_children(&[head, hint, rec, rule_a, parts, rule_b, done])
         .id();
     commands
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                top: px(60),
-                left: px(10),
-                flex_direction: FlexDirection::Column,
-                row_gap: px(8),
-                padding: UiRect::all(px(12)),
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(8)),
+                top: percent(9),
+                width: percent(100),
+                justify_content: JustifyContent::Center,
                 display: Display::None,
                 ..default()
             },
-            framed(),
             Panel::Shop,
         ))
-        .add_children(&[head, hint, grid]);
+        .add_child(body);
 }
 
 /// Champion select: your champion, your team's, the bench, a reroll, ready.
@@ -1435,27 +1576,91 @@ struct Row {
     level: u8,
     kills: u16,
     deaths: u16,
-    you: bool,
 }
 
-/// A team's rows on the scoreboard: name, champion, level, kills and deaths.
-fn score_rows(team: u8, row: impl Fn(usize) -> Row) -> String {
-    (0..SEATS)
-        .filter(|&s| team_of_seat(s) == team)
-        .map(|s| {
-            let r = row(s);
-            let you = if r.you { "  <" } else { "" };
-            format!(
-                "{:<14} {:<10} {:>2}   {}/{}{you}",
-                r.name.chars().take(14).collect::<String>(),
-                champ_name(r.def % CHAMPIONS.len() as u8),
-                r.level,
-                r.kills,
-                r.deaths
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+/// What a scoreboard row's words say.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ScoreField {
+    Initials,
+    Name,
+    Champion,
+    Level,
+    Kd,
+}
+
+/// The seat of row `j` of team `t`'s on the scoreboard.
+fn score_seat(t: u8, j: usize) -> Option<usize> {
+    (0..SEATS).filter(|&s| team_of_seat(s) == t).nth(j)
+}
+
+/// A scoreboard row's words.
+fn score_text(f: ScoreField, r: &Row) -> String {
+    match f {
+        ScoreField::Initials => initials(r.def),
+        ScoreField::Name => r.name.chars().take(16).collect(),
+        ScoreField::Champion => champ_name(r.def % CHAMPIONS.len() as u8).into(),
+        ScoreField::Level => r.level.to_string(),
+        ScoreField::Kd => format!("{} / {}", r.kills, r.deaths),
+    }
+}
+
+/// A scoreboard row: the champion's portrait, the player and the champion, the level, kills and
+/// deaths, and the items (the player's own, or everyone's watching a record: nothing else tells a
+/// team what the others hold).
+fn score_row(team: &mut ChildSpawnerCommands, t: u8, j: usize) {
+    let f = |field| Label::Score(t, j, field);
+    team.spawn(Node { align_items: AlignItems::Center, column_gap: px(10), height: px(36), ..default() })
+        .with_children(|row| {
+            row.spawn((
+                Node {
+                    width: px(32),
+                    height: px(32),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(px(2)),
+                    border_radius: BorderRadius::all(px(5)),
+                    ..default()
+                },
+                BorderColor::all(FRAME),
+                BackgroundColor(WELL),
+                ScoreBadge(t, j),
+                children![(text("", 12.0, TEXT), outline(), f(ScoreField::Initials))],
+            ));
+            row.spawn(Node { flex_direction: FlexDirection::Column, width: px(130), ..default() })
+                .with_children(|who| {
+                    who.spawn((text("", 13.0, TEXT), f(ScoreField::Name)));
+                    who.spawn((text("", 11.0, DIM), f(ScoreField::Champion)));
+                });
+            row.spawn((
+                Node { width: px(24), justify_content: JustifyContent::Center, ..default() },
+                children![(text("", 13.0, GOLD), f(ScoreField::Level))],
+            ));
+            row.spawn((
+                Node { width: px(56), justify_content: JustifyContent::Center, ..default() },
+                children![(text("", 13.0, TEXT), f(ScoreField::Kd))],
+            ));
+            row.spawn(Node { column_gap: px(2), ..default() }).with_children(|items_row| {
+                for k in 0..items::SLOTS {
+                    items_row.spawn((
+                        Node {
+                            width: px(22),
+                            height: px(22),
+                            border_radius: BorderRadius::all(px(3)),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
+                        Visibility::Hidden,
+                        ScoreWell(t, j),
+                        children![(
+                            Node { width: percent(100), height: percent(100), ..default() },
+                            ImageNode::default(),
+                            Visibility::Hidden,
+                            ItemIcon::Score(t, j, k),
+                        )],
+                    ));
+                }
+            });
+        });
 }
 
 /// The HUD's words while watching a record.
@@ -1487,16 +1692,16 @@ fn watching(label: Label, w: &crate::watch::Watch, session: &Session, now: f64) 
             let h = m.headliner();
             format!("{}: {}", h.name, h.blurb)
         }
-        Label::ScoreTeam(t) => score_rows(t, |s| {
+        Label::Score(t, j, f) => score_seat(t, j).map_or(String::new(), |s| {
             let ch = &m.champs[s];
-            Row {
+            let r = Row {
                 name: session.name(s).to_string(),
                 def: ch.def,
                 level: ch.level,
                 kills: ch.kills,
                 deaths: ch.deaths,
-                you: false,
-            }
+            };
+            score_text(f, &r)
         }),
         Label::Feed => feed_text(session, now),
         _ => String::new(),
@@ -1564,10 +1769,9 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                 },
                 Phase::Playing => match c {
                     Some(c) if !c.started() => "Taking the field...".into(),
-                    Some(c) if !c.pred.units[c.seat].alive => {
-                        let left = c.pred.champs[c.seat].dead_until.saturating_sub(c.pred.tick);
-                        format!("Back in {} s", left.div_ceil(TICK_HZ))
-                    }
+                    // Dead: the time is over the portrait, and the recap says the rest
+                    // (`hud_death.rs`).
+                    Some(c) if !c.pred.units[c.seat].alive => String::new(),
                     // The headliner, as the match starts.
                     Some(c) if c.world.tick < HEADLINER_SHOWN * TICK_HZ => {
                         let h = c.pred.headliner();
@@ -1601,6 +1805,17 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
             }
             (Label::Level, Some(c)) => c.pred.champs[c.seat].level.to_string(),
             (Label::Initials, Some(c)) => initials(c.pred.champs[c.seat].def),
+            (Label::ShopRec, Some(c)) => format!(
+                "RECOMMENDED FOR {}",
+                el_sim::content::champions::CHAMPIONS[usize::from(c.pred.champs[c.seat].def) % 20]
+                    .role
+                    .name()
+                    .to_uppercase()
+            ),
+            (Label::Respawn, Some(c)) if !c.pred.units[c.seat].alive => {
+                let left = c.pred.champs[c.seat].dead_until.saturating_sub(c.pred.tick);
+                if left > 0 { left.div_ceil(TICK_HZ).to_string() } else { String::new() }
+            }
             (Label::Stat(i), Some(c)) => {
                 let st = &c.pred.units[c.seat].stats;
                 match i {
@@ -1682,17 +1897,21 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                 let h = c.pred.headliner();
                 format!("{}: {}", h.name, h.blurb)
             }
-            (Label::ScoreTeam(t), Some(c)) => score_rows(t, |s| {
+            (Label::Score(t, j, f), Some(c)) => score_seat(t, j).map_or(String::new(), |s| {
                 let (kills, deaths) = session.kd[s];
                 let m = if s == c.seat { &c.pred } else { &c.world };
-                Row {
-                    name: session.name(s).to_string(),
+                let r = Row {
+                    name: if s == c.seat {
+                        format!("{} (you)", session.name(s))
+                    } else {
+                        session.name(s).to_string()
+                    },
                     def: m.champs[s].def,
                     level: m.champs[s].level,
                     kills,
                     deaths,
-                    you: s == c.seat,
-                }
+                };
+                score_text(f, &r)
             }),
             (Label::AllyName(i), Some(c)) => match ally_seats(c).nth(i) {
                 Some(s) => {
@@ -1777,17 +1996,6 @@ fn fills(session: Res<Session>, mut q: Query<(&Fill, &mut Node)>) {
             Fill::Hp => u.hp / u.stats.max_hp.max(1.0),
             Fill::Mana => u.mana / u.stats.max_mana.max(1.0),
             Fill::Xp => ch.xp / rules::xp_to_next(ch.level).max(1.0),
-            Fill::Cooldown(k) => {
-                let rank = if k < 4 { ch.ranks[k] } else { 1 };
-                let left = ch.ready[k].saturating_sub(c.pred.tick) as f32;
-                if rank == 0 {
-                    1.0
-                } else {
-                    let a = ability(ch.def, k as u8);
-                    let full = a.cooldown[usize::from(rank.max(1) - 1).min(4)] * TICK_HZ as f32;
-                    (left / full.max(1.0)).clamp(0.0, 1.0)
-                }
-            }
             Fill::AllyHp(i) => match ally_seats(c).nth(i) {
                 Some(s) if c.world.units[s].alive => {
                     c.world.units[s].hp / c.world.units[s].stats.max_hp.max(1.0)
@@ -1797,11 +2005,8 @@ fn fills(session: Res<Session>, mut q: Query<(&Fill, &mut Node)>) {
         };
         // Written only when the percent moves: a node changed is a layout done again.
         let pct = percent((share.clamp(0.0, 1.0) * 100.0) as i32);
-        match *f {
-            Fill::Cooldown(_) if node.height != pct => node.height = pct,
-            Fill::Cooldown(_) => {}
-            _ if node.width != pct => node.width = pct,
-            _ => {}
+        if node.width != pct {
+            node.width = pct;
         }
     }
 }
@@ -1928,10 +2133,19 @@ fn item_icons(
         icons.0 = vec![None; ITEMS.len()];
     }
     let held = session.client.as_deref().map(|c| c.pred.champs[c.seat].items);
+    let own = session.client.as_deref().map(|c| c.seat);
+    let watched = session.watch.as_deref().map(|w| &w.referee.m);
     for (icon, mut node, mut vis) in &mut q {
         let item = match *icon {
             ItemIcon::Shop(k) => Some(k),
             ItemIcon::Held(k) => held.map(|h| h[k]).filter(|&i| i != items::NONE).map(usize::from),
+            ItemIcon::Score(t, j, k) => score_seat(t, j)
+                .and_then(|s| match watched {
+                    Some(m) => Some(m.champs[s].items[k]),
+                    None => held.filter(|_| own == Some(s)).map(|h| h[k]),
+                })
+                .filter(|&i| i != items::NONE)
+                .map(usize::from),
         };
         let Some(item) = item.filter(|&i| i < ITEMS.len()) else {
             vis.set_if_neq(Visibility::Hidden);
@@ -1944,6 +2158,160 @@ fn item_icons(
             node.image = h;
         }
         vis.set_if_neq(Visibility::Inherited);
+    }
+}
+
+/// The scoreboard's portraits: each champion's colour, grey while it's dead (by its death timer:
+/// an enemy out of sight isn't dead); and the item slots where the items are known (the player's
+/// own, or everyone's watching a record).
+fn score_badges(
+    session: Res<Session>,
+    mut q: Query<(&ScoreBadge, &mut BackgroundColor)>,
+    mut wells: Query<(&ScoreWell, &mut Visibility)>,
+) {
+    let (m, own) = match (session.watch.as_deref(), session.client.as_deref()) {
+        (Some(w), _) => (&w.referee.m, None),
+        (None, Some(c)) => (&c.world, Some(c.seat)),
+        (None, None) => return,
+    };
+    for (b, mut bg) in &mut q {
+        let Some(s) = score_seat(b.0, b.1) else { continue };
+        let base = CHAMPION[usize::from(m.champs[s].def) % CHAMPION.len()];
+        let dead = m.champs[s].dead_until > m.tick;
+        let want = if dead { Color::srgb(0.14, 0.14, 0.16) } else { shade(base, -0.25) };
+        bg.set_if_neq(BackgroundColor(want));
+    }
+    for (w, mut v) in &mut wells {
+        let known = own.is_none() || score_seat(w.0, w.1) == own;
+        v.set_if_neq(if known { Visibility::Inherited } else { Visibility::Hidden });
+    }
+}
+
+/// How long a flash lasts as an ability comes back (s).
+const FLASH_SECS: f64 = 0.45;
+
+/// Each ability's cooldown as a shade swept away clockwise, and a flash as it comes back. The
+/// whole of a cooldown is the most left seen since it began, so haste is in it.
+fn sweeps(
+    session: Res<Session>,
+    mut full: Local<[u32; 6]>,
+    mut back_at: Local<[f64; 6]>,
+    mut q: Query<(&Sweep, &mut BackgroundGradient)>,
+    mut flashes: Query<(&ReadyFlash, &mut BackgroundColor)>,
+) {
+    let Some(c) = session.client.as_deref() else { return };
+    let ch = &c.pred.champs[c.seat];
+    let now = crate::net::now_s();
+    let mut share = [0.0f32; 6];
+    for k in 0..6 {
+        let rank = if k < 4 { ch.ranks[k] } else { 1 };
+        let left = if rank == 0 { 0 } else { ch.ready[k].saturating_sub(c.pred.tick) };
+        if left == 0 {
+            if full[k] > 0 {
+                back_at[k] = now;
+            }
+            full[k] = 0;
+        } else {
+            full[k] = full[k].max(left);
+            share[k] = left as f32 / full[k] as f32;
+        }
+    }
+    for (s, mut g) in &mut q {
+        let left = share[s.0];
+        // Quantised to a degree, so it's written only when it moves.
+        let gone = ((1.0 - left) * 360.0).round() / 360.0 * std::f32::consts::TAU;
+        let want = if left <= 0.0 {
+            BackgroundGradient::default()
+        } else {
+            let shade = Color::srgba(0.0, 0.0, 0.0, 0.62);
+            BackgroundGradient(vec![
+                ConicGradient::new(
+                    UiPosition::CENTER,
+                    vec![
+                        AngularColorStop::new(Color::NONE, 0.0),
+                        AngularColorStop::new(Color::NONE, gone),
+                        AngularColorStop::new(shade, gone),
+                        AngularColorStop::new(shade, std::f32::consts::TAU),
+                    ],
+                )
+                .into(),
+            ])
+        };
+        if *g != want {
+            *g = want;
+        }
+    }
+    for (f, mut bg) in &mut flashes {
+        let t = ((now - back_at[f.0]) / FLASH_SECS) as f32;
+        let a = if (0.0..1.0).contains(&t) { (1.0 - t) * 0.6 } else { 0.0 };
+        bg.set_if_neq(BackgroundColor(Color::srgba(1.0, 0.97, 0.85, a)));
+    }
+}
+
+/// Each ally's ultimate's orb: shown from the level it may be learned, lit while it's ready
+/// (`flags::ULT_READY`, which only the ally's team is sent).
+fn ally_ults(
+    session: Res<Session>,
+    mut q: Query<(&AllyUlt, &mut BackgroundColor, &mut BoxShadow, &mut Visibility)>,
+) {
+    let Some(c) = session.client.as_deref() else { return };
+    let now = crate::net::now_s();
+    for (a, mut bg, mut glow, mut vis) in &mut q {
+        let Some(s) = ally_seats(c).nth(a.0) else {
+            vis.set_if_neq(Visibility::Hidden);
+            continue;
+        };
+        let learnable = c.world.champs[s].level >= 6;
+        vis.set_if_neq(if learnable { Visibility::Inherited } else { Visibility::Hidden });
+        let ready = c.world.units[s].alive
+            && c.unit(s, now).is_some_and(|u| u.q.flags & el_proto::unit::flags::ULT_READY != 0);
+        let (fill, halo) = if ready {
+            (Color::srgb(1.0, 0.82, 0.35), Color::srgba(1.0, 0.75, 0.25, 0.8))
+        } else {
+            (Color::srgb(0.18, 0.18, 0.2), Color::NONE)
+        };
+        bg.set_if_neq(BackgroundColor(fill));
+        let want = BoxShadow::new(halo, px(0), px(0), px(0), px(6));
+        if *glow != want {
+            *glow = want;
+        }
+    }
+}
+
+/// The Recommended row's tiles, for the champion's role, and the gold mark on every tile that's
+/// recommended.
+#[allow(clippy::type_complexity)]
+fn rec_tiles(
+    session: Res<Session>,
+    mut tiles: Query<(&RecTile, &mut Act, &mut Tip)>,
+    mut icons: Query<&mut ItemIcon>,
+    mut labels: Query<&mut Label>,
+    mut marks: Query<(&RecMark, &mut Visibility)>,
+) {
+    let Some(c) = session.client.as_deref() else { return };
+    let def = usize::from(c.pred.champs[c.seat].def) % el_sim::content::champions::CHAMPIONS.len();
+    let rec = tips::recommended(el_sim::content::champions::CHAMPIONS[def].role);
+    for (t, mut act, mut tip) in &mut tiles {
+        let k = usize::from(rec[t.j]);
+        if *act != Act::Buy(k as u8) {
+            *act = Act::Buy(k as u8);
+        }
+        if *tip != Tip::Shop(k) {
+            *tip = Tip::Shop(k);
+        }
+        if let Ok(mut i) = icons.get_mut(t.icon) {
+            *i = ItemIcon::Shop(k);
+        }
+        for (e, want) in [(t.name, Label::Shop(k)), (t.cost, Label::ShopCost(k))] {
+            if let Ok(mut l) = labels.get_mut(e)
+                && *l != want
+            {
+                *l = want;
+            }
+        }
+    }
+    for (m, mut v) in &mut marks {
+        v.set_if_neq(if rec.contains(&(m.0 as u8)) { Visibility::Inherited } else { Visibility::Hidden });
     }
 }
 
@@ -2024,9 +2392,15 @@ fn panels(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Panel, 
             (Panel::Top, _) if watching => true,
             (Panel::Score, _) if watching => controls.scoreboard,
             (Panel::Top | Panel::Bottom, Some(_)) => true,
-            // The shop opens where the allies are.
-            (Panel::Allies, Some(c)) => !(controls.shop_open && c.pred.in_shop(c.seat)),
-            (Panel::Cards, Some(c)) => c.pred.champs[c.seat].screen.open && c.pred.in_shop(c.seat),
+            (Panel::Allies, Some(_)) => true,
+            // The augment cards, the shop and the scoreboard share the middle: the shop or the
+            // scoreboard, while it's open, has it.
+            (Panel::Cards, Some(c)) => {
+                c.pred.champs[c.seat].screen.open
+                    && c.pred.in_shop(c.seat)
+                    && !controls.shop_open
+                    && !controls.scoreboard
+            }
             (Panel::Shop, Some(c)) => controls.shop_open && c.pred.in_shop(c.seat),
             (Panel::Score, Some(_)) => controls.scoreboard,
             (Panel::Vote, Some(c)) => c.world.surrender[usize::from(c.team)].open(),

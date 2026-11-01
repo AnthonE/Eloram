@@ -420,7 +420,7 @@ fn animate(
         }
         let lying = !alive && seat.fell.is_some_and(|t| now - t < CORPSE) && seat.last.is_some();
         let parts_shown = if lying { Visibility::Hidden } else { Visibility::Inherited };
-        for e in [view.ring, view.bar, view.fill] {
+        for e in [view.ring, view.bar, view.fill, view.shield, view.ticks] {
             if let Ok(mut v) = parts.get_mut(e) {
                 v.set_if_neq(parts_shown);
             }

@@ -173,6 +173,26 @@ pub fn mods_lines(m: &StatMods) -> Vec<String> {
 }
 
 /// Item `i` in the shop's words.
+/// The shop's Recommended row for a role (`ITEMS`' indices), as League's shop recommends a
+/// champion's build: the finished items its role wants most, then the part it wants first.
+pub fn recommended(role: el_sim::content::Role) -> [u8; 4] {
+    use el_sim::content::Role;
+    match role {
+        // Stormcaller, Lifedrinker, Warblade, Road Boots.
+        Role::Marksman => [11, 12, 8, 6],
+        // Witchwood Staff, Spellguard, Still Water, Spell Primer.
+        Role::Mage => [9, 13, 7, 1],
+        // Rampart, Spellguard, Red Bloom, Road Boots.
+        Role::Tank => [10, 13, 4, 6],
+        // Warblade, Rampart, Lifedrinker, Road Boots.
+        Role::Fighter => [8, 10, 12, 6],
+        // Warblade, Lifedrinker, Road Boots, Iron Knife.
+        Role::Assassin => [8, 12, 6, 0],
+        // Witchwood Staff, Spellguard, Still Water, Road Boots.
+        Role::Enchanter => [9, 13, 7, 6],
+    }
+}
+
 pub fn item_tip(i: u8) -> String {
     let Some(it) = ITEMS.get(usize::from(i)) else { return String::new() };
     let mut out = format!("{}\n{} gold", it.name, it.cost);
@@ -250,6 +270,18 @@ mod tests {
         }
         for a in 0..AUGMENTS.len() as u8 {
             assert!(!augment_text(a).is_empty(), "{}", AUGMENTS[usize::from(a)].name);
+        }
+    }
+
+    #[test]
+    fn every_role_recommends_four_different_items() {
+        use el_sim::content::Role;
+        for role in [Role::Marksman, Role::Mage, Role::Tank, Role::Fighter, Role::Assassin, Role::Enchanter] {
+            let r = recommended(role);
+            for (i, a) in r.iter().enumerate() {
+                assert!(usize::from(*a) < ITEMS.len());
+                assert!(!r[i + 1..].contains(a), "{role:?} recommends item {a} twice");
+            }
         }
     }
 }

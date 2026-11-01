@@ -97,6 +97,9 @@ pub(crate) struct UnitView {
     pub(crate) ring: Entity,
     pub(crate) bar: Entity,
     pub(crate) fill: Entity,
+    /// The shield's white stretch after the health, and a champion's ticks over both.
+    pub(crate) shield: Entity,
+    pub(crate) ticks: Entity,
     shown: Option<(Kind, u8, u8)>,
 }
 
@@ -298,6 +301,7 @@ fn setup_pools(
         opaque(&mut materials, Color::srgb(0.30, 0.66, 1.0)),
         opaque(&mut materials, Color::srgb(0.95, 0.28, 0.24)),
     ];
+    let shield = opaque(&mut materials, Color::srgb(0.92, 0.94, 0.97));
     let bar_bg = unlit(&mut materials, Color::srgba(0.0, 0.0, 0.0, 0.75));
     let ring_mesh = meshes.add(Annulus::new(0.85, 1.0));
     let bar_mesh = meshes.add(Rectangle::new(1.0, 0.13));
@@ -328,13 +332,38 @@ fn setup_pools(
                 Transform::from_xyz(0.0, 2.4, 0.01).with_rotation(face),
             ))
             .id();
+        let shield_e = commands
+            .spawn((
+                Mesh3d(bar_mesh.clone()),
+                MeshMaterial3d(shield.clone()),
+                Transform::from_xyz(0.0, 2.4, 0.012).with_rotation(face),
+                Visibility::Hidden,
+            ))
+            .id();
+        let ticks = commands
+            .spawn((
+                Mesh3d(bar_mesh.clone()),
+                MeshMaterial3d(bar_bg.clone()),
+                Transform::from_xyz(0.0, 2.4, 0.014).with_rotation(face),
+                Visibility::Hidden,
+            ))
+            .id();
         commands
             .spawn((
                 Transform::default(),
                 Visibility::Hidden,
-                UnitView { slot, body, ring: ring_e, bar, fill: fill_e, shown: None },
+                UnitView {
+                    slot,
+                    body,
+                    ring: ring_e,
+                    bar,
+                    fill: fill_e,
+                    shield: shield_e,
+                    ticks,
+                    shown: None,
+                },
             ))
-            .add_children(&[body, ring_e, bar, fill_e]);
+            .add_children(&[body, ring_e, bar, fill_e, shield_e, ticks]);
     }
     let relic = materials.add(StandardMaterial {
         base_color: Color::srgb(0.4, 1.0, 0.5),
@@ -427,10 +456,43 @@ fn structure_models(
     }
 }
 
-#[allow(clippy::type_complexity)]
+/// A champion's bar's ticks for `hundreds` hundred health: a thin dark mark each hundred, from
+/// the top two thirds down; a full, thicker one each thousand.
+fn tick_image(hundreds: u32) -> Image {
+    const W: usize = 512;
+    const H: usize = 8;
+    let mut data = vec![0u8; W * H * 4];
+    for k in 1..hundreds {
+        let x = k as f32 / hundreds as f32 * W as f32;
+        let heavy = k % 10 == 0;
+        let (half, rows) = if heavy { (1.5, H) } else { (0.75, H * 2 / 3) };
+        for px in 0..W {
+            let cover = (half + 0.5 - (px as f32 + 0.5 - x).abs()).clamp(0.0, 1.0);
+            if cover <= 0.0 {
+                continue;
+            }
+            for py in 0..rows {
+                let i = (py * W + px) * 4;
+                data[i + 3] = data[i + 3].max((cover * if heavy { 235.0 } else { 190.0 }) as u8);
+            }
+        }
+    }
+    Image::new(
+        Extent3d { width: W as u32, height: H as u32, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
+    )
+}
+
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn draw_units(
     session: Res<Session>,
     kit: Res<Kit>,
+    mut tick_mats: Local<std::collections::HashMap<u32, Handle<StandardMaterial>>>,
+    mut images: ResMut<Assets<Image>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     mut drawn: ResMut<Drawn>,
     mut roots: Query<(&mut UnitView, &mut Transform, &mut Visibility)>,
     mut bodies: Query<
@@ -462,14 +524,25 @@ fn draw_units(
                 let u = &w.referee.m.units[i];
                 u.alive.then(|| {
                     let frac = u.hp / u.stats.max_hp.max(1.0);
-                    (w.pos(i), u.facing, u.kind, u.team, u.generation as u8, frac)
+                    let sh = if u.shield_until > w.referee.m.tick { u.shield } else { 0.0 };
+                    (w.pos(i), u.facing, u.kind, u.team, u.generation as u8, frac, u.stats.max_hp, sh)
                 })
             }
             (None, Some(c)) if i == seat => {
                 let u = &c.pred.units[seat];
                 u.alive.then(|| {
                     let frac = u.hp / u.stats.max_hp.max(1.0);
-                    (c.own_pos(now), u.facing, Kind::Champion, u.team, u.generation as u8, frac)
+                    let sh = if u.shield_until > c.pred.tick { u.shield } else { 0.0 };
+                    (
+                        c.own_pos(now),
+                        u.facing,
+                        Kind::Champion,
+                        u.team,
+                        u.generation as u8,
+                        frac,
+                        u.stats.max_hp,
+                        sh,
+                    )
                 })
             }
             (None, Some(c)) => match c.unit(i, now) {
@@ -480,6 +553,8 @@ fn draw_units(
                     s.q.team,
                     s.q.generation,
                     s.q.hp as f32 / 1_023.0,
+                    s.q.max_hp as f32,
+                    s.q.shield as f32,
                 )),
                 None => {
                     // A structure no record has come for yet: where the map puts it.
@@ -491,6 +566,8 @@ fn draw_units(
                         u.team,
                         u.generation as u8,
                         1.0,
+                        u.stats.max_hp,
+                        0.0,
                     ))
                 }
             },
@@ -498,7 +575,7 @@ fn draw_units(
         };
         // Only what changed is written: a component written is a component changed, and changed
         // ones are walked, propagated and extracted again.
-        let Some((pos, facing, kind, team, generation, hp)) = unit else {
+        let Some((pos, facing, kind, team, generation, hp, max_hp, shield)) = unit else {
             drawn.units[i] = None;
             // A structure that fell leaves its ruin (only when the match says it fell: never for
             // what the fog hides).
@@ -523,7 +600,7 @@ fn draw_units(
                 t.scale.y *= 0.4;
                 uv.shown = uv.shown.map(|(k, tm, d)| (k, tm, d.wrapping_add(128)));
             }
-            for e in [uv.ring, uv.bar, uv.fill] {
+            for e in [uv.ring, uv.bar, uv.fill, uv.shield, uv.ticks] {
                 if let Ok((_, _, mut v)) = parts.get_mut(e) {
                     v.set_if_neq(Visibility::Hidden);
                 }
@@ -582,15 +659,54 @@ fn draw_units(
             n.rotation = Quat::from_rotation_y(facing);
             t.set_if_neq(n);
         }
+        // A shield past the health's end, the bar's scale taking in both when they pass the
+        // maximum, as League's does.
+        let max_hp = max_hp.max(1.0);
+        let total = max_hp.max(hp.clamp(0.0, 1.0) * max_hp + shield);
+        let f = (hp.clamp(0.0, 1.0) * max_hp / total).clamp(0.0, 1.0);
+        let sf = (shield / total).clamp(0.0, 1.0 - f);
+        // A stretch from `from` to `from + share` of the bar, as the camera sees it, `z` in front.
+        let stretch = |from: f32, share: f32, z: f32| {
+            Vec3::new(0.0, h, 0.0) + face * Vec3::new((from + share * 0.5 - 0.5) * w, 0.0, z)
+        };
         if let Ok((mut t, _, _)) = parts.get_mut(uv.fill) {
-            // Shrunk towards the bar's left end, and a hair in front of it, both as the camera sees.
-            let f = hp.clamp(0.0, 1.0);
+            let n = Transform { scale: Vec3::new(w * f, 1.0, 1.0), translation: stretch(0.0, f, 0.01), ..*t };
+            t.set_if_neq(n);
+        }
+        if let Ok((mut t, _, mut v)) = parts.get_mut(uv.shield) {
+            v.set_if_neq(if sf > 0.001 { Visibility::Inherited } else { Visibility::Hidden });
             let n = Transform {
-                scale: Vec3::new(w * f, 1.0, 1.0),
-                translation: Vec3::new(0.0, h, 0.0) + face * Vec3::new(-(1.0 - f) * w * 0.5, 0.0, 0.01),
+                scale: Vec3::new(w * sf.max(0.001), 1.0, 1.0),
+                translation: stretch(f, sf, 0.012),
                 ..*t
             };
             t.set_if_neq(n);
+        }
+        // A champion's ticks: a mark each hundred, a heavy one each thousand.
+        if let Ok((mut t, mut m, mut v)) = parts.get_mut(uv.ticks) {
+            let champ = kind == Kind::Champion;
+            v.set_if_neq(if champ { Visibility::Inherited } else { Visibility::Hidden });
+            if champ {
+                let hundreds = (total / 100.0).round().clamp(1.0, 200.0) as u32;
+                let mat = tick_mats
+                    .entry(hundreds)
+                    .or_insert_with(|| {
+                        let tex = images.add(tick_image(hundreds));
+                        materials.add(StandardMaterial {
+                            base_color_texture: Some(tex),
+                            unlit: true,
+                            alpha_mode: AlphaMode::Blend,
+                            ..default()
+                        })
+                    })
+                    .clone();
+                if m.0 != mat {
+                    m.0 = mat;
+                }
+                let n =
+                    Transform { scale: Vec3::new(w, 1.0, 1.0), translation: stretch(0.0, 1.0, 0.014), ..*t };
+                t.set_if_neq(n);
+            }
         }
     }
 }

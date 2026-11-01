@@ -15,6 +15,7 @@ pub mod lobby;
 pub mod missiles;
 pub mod orders;
 pub mod pose;
+pub mod recap;
 pub mod scenery;
 pub mod spectator;
 pub mod tips;

@@ -9,6 +9,8 @@ use crate::edges::EdgesPlugin;
 use crate::fx::FxPlugin;
 use crate::ground::GroundPlugin;
 use crate::hud::HudPlugin;
+use crate::hud_death::DeathPlugin;
+use crate::hud_target::TargetPlugin;
 use crate::input::InputPlugin;
 use crate::look::LookPlugin;
 use crate::minions::MinionsPlugin;
@@ -62,6 +64,6 @@ pub fn run() {
             WatchPlugin,
         ))
         // Past the sixteen a tuple of plugins takes.
-        .add_plugins((ChampionsPlugin, MinionsPlugin, PortraitPlugin))
+        .add_plugins((ChampionsPlugin, MinionsPlugin, PortraitPlugin, DeathPlugin, TargetPlugin))
         .run();
 }
