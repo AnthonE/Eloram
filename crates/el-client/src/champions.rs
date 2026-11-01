@@ -246,14 +246,25 @@ fn ready(
     };
     let Some(art) = &models.ready[d] else { return };
     let Ok(mut figure) = figures.get_mut(e) else { return };
-    // The player's own champion is in the portrait too (`portrait.rs`).
-    let own = session.watch.is_none() && session.client.as_deref().is_some_and(|c| c.seat == seat);
-    if own {
-        commands.entity(e).insert(PortraitSubject);
+    // The player's own champion and each ally are in a portrait too (`portrait.rs`): the own
+    // first, then the allies in seat order.
+    let view = session.client.as_deref().filter(|_| session.watch.is_none()).and_then(|c| {
+        if c.seat == seat {
+            Some(0)
+        } else if team_of_seat(seat) == c.team {
+            Some(1 + (0..seat).filter(|&s| s != c.seat && team_of_seat(s) == c.team).count())
+        } else {
+            None
+        }
+    });
+    if let Some(v) = view {
+        commands.entity(e).insert(PortraitSubject(v));
     }
     for c in children.iter_descendants(e) {
-        if own && shapes.contains(c) {
-            commands.entity(c).insert(RenderLayers::from_layers(&[0, crate::portrait::LAYER]));
+        if let Some(v) = view
+            && shapes.contains(c)
+        {
+            commands.entity(c).insert(RenderLayers::from_layers(&[0, crate::portrait::layer(v)]));
         }
         if players.contains(c) {
             commands.entity(c).insert(AnimationGraphHandle(art.graph.clone()));

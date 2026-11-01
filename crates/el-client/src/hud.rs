@@ -173,9 +173,20 @@ struct AbilityIcon(usize);
 #[derive(Resource, Default)]
 struct Icons(std::collections::HashMap<(u8, u8), Handle<Image>>);
 
-/// The portrait's live picture of the champion.
+/// An item's icon: in an inventory slot, or on the shop's row for it.
+#[derive(Component, Clone, Copy)]
+enum ItemIcon {
+    Held(usize),
+    Shop(usize),
+}
+
+/// The items' icons painted so far, in `ITEMS`' order.
+#[derive(Resource, Default)]
+struct ItemIcons(Vec<Option<Handle<Image>>>);
+
+/// A portrait's live picture of its champion (`portrait.rs`'s view: 0 the player's, then the allies).
 #[derive(Component)]
-struct PortraitPicture;
+struct PortraitPicture(usize);
 
 /// One of an ability's rank marks.
 #[derive(Component)]
@@ -220,16 +231,20 @@ pub struct HudPlugin;
 
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Icons>().add_systems(PostStartup, setup).add_systems(
-            Update,
-            (
-                (press, minimap).after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send),
-                (texts, fills, panels, dots, bench_slots, view_box, tooltip).after(crate::net::NetSet::Send),
-                (scale, tints, slots, pips, level_ups, card_frames, portraits, ally_rows, colors)
-                    .after(crate::net::NetSet::Send),
-                (ability_icons, portrait_picture).after(crate::net::NetSet::Send),
-            ),
-        );
+        app.init_resource::<Icons>()
+            .init_resource::<ItemIcons>()
+            .add_systems(PostStartup, setup)
+            .add_systems(
+                Update,
+                (
+                    (press, minimap).after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send),
+                    (texts, fills, panels, dots, bench_slots, view_box, tooltip)
+                        .after(crate::net::NetSet::Send),
+                    (scale, tints, slots, pips, level_ups, card_frames, portraits, ally_rows, colors)
+                        .after(crate::net::NetSet::Send),
+                    (ability_icons, item_icons, portrait_picture).after(crate::net::NetSet::Send),
+                ),
+            );
     }
 }
 
@@ -457,7 +472,7 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
         )],
     ));
     bottom(&mut commands, &portrait);
-    allies(&mut commands);
+    allies(&mut commands, &portrait);
     // The minimap, bottom right, in a square frame: the map turned as the camera turns it, the lane
     // from the bottom left to the top right as ARAM's is. A 4:1 strip turned 45° fills a square.
     let mini = commands
@@ -708,8 +723,8 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                         height: percent(100),
                         ..default()
                     },
-                    ImageNode::new(portrait.0.clone()),
-                    PortraitPicture,
+                    ImageNode::new(portrait.0[0].clone()),
+                    PortraitPicture(0),
                 ),
             ],
         ))
@@ -819,7 +834,20 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                     Tint(WELL),
                     Act::Sell(k as u8),
                     Tip::Item(k),
-                    children![(text("", 9.0, TEXT), TextLayout::justify(Justify::Center), Label::Item(k))],
+                    children![
+                        (text("", 9.0, TEXT), TextLayout::justify(Justify::Center), Label::Item(k)),
+                        (
+                            Node {
+                                position_type: PositionType::Absolute,
+                                width: percent(100),
+                                height: percent(100),
+                                ..default()
+                            },
+                            ImageNode::default(),
+                            Visibility::Hidden,
+                            ItemIcon::Held(k),
+                        ),
+                    ],
                 ))
                 .id()
         })
@@ -1013,18 +1041,21 @@ fn ability_slot(commands: &mut Commands, k: usize) -> Entity {
 }
 
 /// The allies down the left: a portrait with the level, the name, the health; F2 to F5 look.
-fn allies(commands: &mut Commands) {
+fn allies(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
     let rows: Vec<Entity> = (0..ALLIES)
         .map(|i| {
-            let portrait = commands
+            // The initials, and over them the ally's model drawn live, cut to the frame; the level
+            // over the frame's corner, outside the cut.
+            let face = commands
                 .spawn((
                     Node {
-                        width: px(38),
-                        height: px(38),
+                        width: percent(100),
+                        height: percent(100),
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
                         border: UiRect::all(px(2)),
                         border_radius: BorderRadius::all(px(6)),
+                        overflow: Overflow::clip(),
                         ..default()
                     },
                     BorderColor::all(FRAME),
@@ -1035,22 +1066,38 @@ fn allies(commands: &mut Commands) {
                         (
                             Node {
                                 position_type: PositionType::Absolute,
-                                right: px(-5),
-                                bottom: px(-5),
-                                min_width: px(16),
-                                height: px(16),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                border: UiRect::all(px(1)),
-                                border_radius: BorderRadius::all(percent(50)),
+                                width: percent(100),
+                                height: percent(100),
                                 ..default()
                             },
-                            BorderColor::all(FRAME),
-                            BackgroundColor(Color::srgb(0.06, 0.07, 0.10)),
-                            children![(text("", 9.0, TEXT), Label::AllyLevel(i))],
+                            ImageNode::new(portrait.0[1 + i].clone()),
+                            PortraitPicture(1 + i),
                         ),
                     ],
                 ))
+                .id();
+            let level = commands
+                .spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        right: px(-5),
+                        bottom: px(-5),
+                        min_width: px(16),
+                        height: px(16),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(px(1)),
+                        border_radius: BorderRadius::all(percent(50)),
+                        ..default()
+                    },
+                    BorderColor::all(FRAME),
+                    BackgroundColor(Color::srgb(0.06, 0.07, 0.10)),
+                    children![(text("", 9.0, TEXT), Label::AllyLevel(i))],
+                ))
+                .id();
+            let portrait = commands
+                .spawn(Node { width: px(38), height: px(38), ..default() })
+                .add_children(&[face, level])
                 .id();
             let name = commands.spawn((text("", 11.0, TEXT), outline(), Label::AllyName(i))).id();
             let hp = bar(commands, px(86), 6.0, HP, Fill::AllyHp(i), None);
@@ -1179,7 +1226,7 @@ fn shop(commands: &mut Commands) {
                     Node {
                         width: px(176),
                         height: px(32),
-                        padding: UiRect::horizontal(px(8)),
+                        padding: UiRect::new(px(4), px(8), px(0), px(0)),
                         justify_content: JustifyContent::SpaceBetween,
                         align_items: AlignItems::Center,
                         border: UiRect::all(px(1)),
@@ -1192,7 +1239,23 @@ fn shop(commands: &mut Commands) {
                     Act::Buy(k as u8),
                     Tip::Shop(k),
                     children![
-                        (text("", 12.0, TEXT), Label::Shop(k)),
+                        (
+                            Node { column_gap: px(7), align_items: AlignItems::Center, ..default() },
+                            children![
+                                (
+                                    Node {
+                                        width: px(24),
+                                        height: px(24),
+                                        border_radius: BorderRadius::all(px(3)),
+                                        ..default()
+                                    },
+                                    ImageNode::default(),
+                                    Visibility::Hidden,
+                                    ItemIcon::Shop(k),
+                                ),
+                                (text("", 12.0, TEXT), Label::Shop(k)),
+                            ],
+                        ),
                         (text("", 12.0, GOLD), Label::ShopCost(k))
                     ],
                 ))
@@ -1826,18 +1889,7 @@ fn ability_icons(
         let h = icons
             .0
             .entry((ch.def, k as u8))
-            .or_insert_with(|| {
-                use bevy::asset::RenderAssetUsages;
-                use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-                let side = el_client_core::icons::ICON as u32;
-                images.add(Image::new(
-                    Extent3d { width: side, height: side, depth_or_array_layers: 1 },
-                    TextureDimension::D2,
-                    el_client_core::icons::ability_icon(ch.def, k as u8),
-                    TextureFormat::Rgba8UnormSrgb,
-                    RenderAssetUsages::default(),
-                ))
-            })
+            .or_insert_with(|| images.add(icon_image(el_client_core::icons::ability_icon(ch.def, k as u8))))
             .clone();
         if node.image != h {
             node.image = h;
@@ -1851,21 +1903,74 @@ fn ability_icons(
     }
 }
 
-/// The portrait's picture: grey while the champion's dead; the initials only while it isn't drawn.
+/// An icon's picture, `ICON` square, from its painted pixels.
+fn icon_image(pixels: Vec<u8>) -> Image {
+    use bevy::asset::RenderAssetUsages;
+    use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+    let side = el_client_core::icons::ICON as u32;
+    Image::new(
+        Extent3d { width: side, height: side, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        pixels,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
+    )
+}
+
+/// Each held item's icon, and the shop's; an empty slot shows nothing.
+fn item_icons(
+    session: Res<Session>,
+    mut icons: ResMut<ItemIcons>,
+    mut images: ResMut<Assets<Image>>,
+    mut q: Query<(&ItemIcon, &mut ImageNode, &mut Visibility)>,
+) {
+    if icons.0.is_empty() {
+        icons.0 = vec![None; ITEMS.len()];
+    }
+    let held = session.client.as_deref().map(|c| c.pred.champs[c.seat].items);
+    for (icon, mut node, mut vis) in &mut q {
+        let item = match *icon {
+            ItemIcon::Shop(k) => Some(k),
+            ItemIcon::Held(k) => held.map(|h| h[k]).filter(|&i| i != items::NONE).map(usize::from),
+        };
+        let Some(item) = item.filter(|&i| i < ITEMS.len()) else {
+            vis.set_if_neq(Visibility::Hidden);
+            continue;
+        };
+        let h = icons.0[item]
+            .get_or_insert_with(|| images.add(icon_image(el_client_core::icons::item_icon(item as u8))))
+            .clone();
+        if node.image != h {
+            node.image = h;
+        }
+        vis.set_if_neq(Visibility::Inherited);
+    }
+}
+
+/// The portraits' pictures: grey while their champion's dead; the initials only while it isn't
+/// drawn.
 fn portrait_picture(
     session: Res<Session>,
     shown: Res<crate::portrait::PortraitShown>,
-    mut q: Query<&mut ImageNode, With<PortraitPicture>>,
+    mut q: Query<(&PortraitPicture, &mut ImageNode)>,
     mut labels: Query<(&Label, &mut Visibility)>,
 ) {
     for (l, mut v) in &mut labels {
-        if *l == Label::Initials {
-            v.set_if_neq(if shown.0 { Visibility::Hidden } else { Visibility::Inherited });
-        }
+        let view = match *l {
+            Label::Initials => 0,
+            Label::AllyInitials(i) => 1 + i,
+            _ => continue,
+        };
+        let drawn = shown.0.get(view).copied().unwrap_or(false);
+        v.set_if_neq(if drawn { Visibility::Hidden } else { Visibility::Inherited });
     }
     let Some(c) = session.client.as_deref() else { return };
-    let tint = if c.pred.units[c.seat].alive { Color::WHITE } else { Color::srgb(0.35, 0.35, 0.38) };
-    for mut node in &mut q {
+    for (p, mut node) in &mut q {
+        let alive = match p.0 {
+            0 => c.pred.units[c.seat].alive,
+            v => ally_seats(c).nth(v - 1).is_some_and(|s| c.world.units[s].alive),
+        };
+        let tint = if alive { Color::WHITE } else { Color::srgb(0.35, 0.35, 0.38) };
         if node.color != tint {
             node.color = tint;
         }
