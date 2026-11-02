@@ -75,6 +75,10 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `window.__el` has `fx_cues`, `fx_own_casts`, `fx_missiles`, `fx_zones`, `champion_casts`,
   `minion_flashes`, `wheels_turning` and `audio_*`; the inbox takes `{t:"volume",bus,v}` and
   `{t:"mute",on}`.
+- The HUD (`docs/DESIGN.md`, "The HUD"): `hud.rs`, `hud_death.rs` (the grey, the recap), `hud_target.rs`
+  (the target frame), `portrait.rs` (the live portraits); the icons are painted by
+  `el_client_core::icons`. `window.__el` has `portrait`, `ally_portraits`, `death_screen` and
+  `recap_lines`.
 - Practice (`el_sim::practice`, `docs/FX.md` step 4): `el-server --practice` holds practice
   matches, which the page asks for on `?practice=1` (`&champ=<number>`; `{t:"practice_champ",
   champ}` again as another): seat 0 the player's at the top level with every rank, nothing on

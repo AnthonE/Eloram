@@ -10,6 +10,7 @@
 //! `shaders/rim.wgsl`), so its silhouette reads against the stone: Riot inks its champions'
 //! outlines; here the outline is lit.
 
+use bevy::camera::visibility::RenderLayers;
 use bevy::gltf::Gltf;
 use bevy::pbr::{ExtendedMaterial, MaterialExtension};
 use bevy::prelude::*;
@@ -26,6 +27,7 @@ use crate::coords::S;
 use crate::dev_hooks::DevStatus;
 use crate::look::Look;
 use crate::net::now_s;
+use crate::portrait::PortraitSubject;
 use crate::session::Session;
 use crate::view::{Drawn, UnitView, ViewSet};
 
@@ -233,6 +235,8 @@ fn ready(
     materials: Res<Assets<StandardMaterial>>,
     mut rims: ResMut<Assets<RimMat>>,
     mut figures: Query<&mut Figure>,
+    session: Res<Session>,
+    shapes: Query<(), With<Mesh3d>>,
 ) {
     let e = event.event_target();
     let Some((seat, d)) =
@@ -242,7 +246,26 @@ fn ready(
     };
     let Some(art) = &models.ready[d] else { return };
     let Ok(mut figure) = figures.get_mut(e) else { return };
+    // The player's own champion and each ally are in a portrait too (`portrait.rs`): the own
+    // first, then the allies in seat order.
+    let view = session.client.as_deref().filter(|_| session.watch.is_none()).and_then(|c| {
+        if c.seat == seat {
+            Some(0)
+        } else if team_of_seat(seat) == c.team {
+            Some(1 + (0..seat).filter(|&s| s != c.seat && team_of_seat(s) == c.team).count())
+        } else {
+            None
+        }
+    });
+    if let Some(v) = view {
+        commands.entity(e).insert(PortraitSubject(v));
+    }
     for c in children.iter_descendants(e) {
+        if let Some(v) = view
+            && shapes.contains(c)
+        {
+            commands.entity(c).insert(RenderLayers::from_layers(&[0, crate::portrait::layer(v)]));
+        }
         if players.contains(c) {
             commands.entity(c).insert(AnimationGraphHandle(art.graph.clone()));
             figure.player = Some(c);
@@ -397,7 +420,7 @@ fn animate(
         }
         let lying = !alive && seat.fell.is_some_and(|t| now - t < CORPSE) && seat.last.is_some();
         let parts_shown = if lying { Visibility::Hidden } else { Visibility::Inherited };
-        for e in [view.ring, view.bar, view.fill] {
+        for e in [view.ring, view.bar, view.fill, view.shield, view.ticks] {
             if let Ok(mut v) = parts.get_mut(e) {
                 v.set_if_neq(parts_shown);
             }

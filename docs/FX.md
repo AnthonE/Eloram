@@ -257,7 +257,7 @@ numbers on a real GPU into `ROADMAP.md`, which has none yet.
   `apply_ops` and `deal` take the `Source` they act for where they took a flag. `Area` names its
   zone, source and owner, and whether it follows them; a zone has a generation.
 - On the wire: `ZoneSpawn` and `ZoneEnd` (reliable), `Shield` (not), `Damage` with its kind and
-  source, `Heal` and `Area` with theirs, and two flags, empowered and hasted (`FLAG_BITS` 12). A
+  source, `Heal` and `Area` with theirs, and two flags, empowered and hasted (`FLAG_BITS` 12; 13 since the ally frames' `ULT_READY`). A
   zone's next pulse and end go as ticks either side of the snapshot's.
 - Replication tells a zone when the team first sees its ground, or, for one that follows its owner,
   the owner; and ends it when it ends or that owner goes out of sight. A following zone's pulse

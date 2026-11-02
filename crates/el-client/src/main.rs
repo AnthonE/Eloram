@@ -23,6 +23,10 @@ mod ground;
 #[cfg(target_arch = "wasm32")]
 mod hud;
 #[cfg(target_arch = "wasm32")]
+mod hud_death;
+#[cfg(target_arch = "wasm32")]
+mod hud_target;
+#[cfg(target_arch = "wasm32")]
 mod input;
 #[cfg(target_arch = "wasm32")]
 mod look;
@@ -34,6 +38,8 @@ mod mips;
 mod models;
 #[cfg(target_arch = "wasm32")]
 mod net;
+#[cfg(target_arch = "wasm32")]
+mod portrait;
 #[cfg(target_arch = "wasm32")]
 mod scenery;
 #[cfg(target_arch = "wasm32")]

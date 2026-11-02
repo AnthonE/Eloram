@@ -431,3 +431,19 @@ fn a_team_surrenders_with_four_of_five_of_its_players_and_only_from_eight_minute
     assert_eq!(m.outcome, Some(DUSK));
     assert!(events(&m).iter().any(|e| matches!(e, Event::Outcome { winner: DUSK })));
 }
+
+#[test]
+fn only_a_champions_own_team_is_told_its_ultimate_is_ready() {
+    use el_proto::unit::flags::ULT_READY;
+    let (mut m, mut s) = quiet([0; SEATS]);
+    idle(&mut m, &mut s, 1);
+    // Not learned: no one is told.
+    assert_eq!(m.quantize(0, 0).flags & ULT_READY, 0);
+    m.champs[0].ranks[3] = 1;
+    m.champs[0].ready[3] = 0;
+    assert_ne!(m.quantize(0, 0).flags & ULT_READY, 0, "its own team knows it's up");
+    assert_eq!(m.quantize(0, 1).flags & ULT_READY, 0, "its enemies are never told");
+    // On cooldown: dark for its team too.
+    m.champs[0].ready[3] = m.tick + 100;
+    assert_eq!(m.quantize(0, 0).flags & ULT_READY, 0);
+}

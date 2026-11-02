@@ -179,6 +179,8 @@ standby takes a room over on the old clock's timeline. Riot built the same thing
   goes out.
 - **Every event has a team rule, with no catch-all.** A missile from a caster you can't see first
   appears where it enters your vision, with no owner, so it cannot place its caster.
+- **A team's cooldowns are its own.** Whether a champion's ultimate is ready (`flags::ULT_READY`,
+  for the ally frames) is set only in the record its own team is sent.
 - **A team's word is its own.** A ping goes to the pinger's team, naming a unit only if the team
   sees it (when it's given, and when it's sent); a vote to surrender, as it stands and as it
   closes, to the voting team. The enemy hears only the outcome. Who may vote is who holds a seat,

@@ -18,7 +18,7 @@ impl Match {
     }
 
     /// Unit `i`'s record as each team may have it, worked out once: the two differ only in what
-    /// it's attacking.
+    /// it's attacking, and a champion's ultimate being ready, which its own team alone is told.
     pub fn quantize_teams(&self, i: usize) -> [QUnit; 2] {
         let now = self.tick;
         let u = &self.units[i];
@@ -60,11 +60,13 @@ impl Match {
                 f |= bit;
             }
         }
+        let mut ult_ready = false;
         let (level, cast) = if i < SEATS {
             let c = &self.champs[i];
             if c.dash.active {
                 f |= flags::DASHING;
             }
+            ult_ready = u.alive && c.ranks[3] > 0 && c.ready[3] <= now;
             (u32::from(c.level), if c.cast.slot == NO_SLOT { 0 } else { u32::from(c.cast.slot) + 1 })
         } else {
             (0, 0)
@@ -94,7 +96,10 @@ impl Match {
         let seen = |team: usize| {
             let target =
                 target.filter(|&t| self.vision.units[team].get(t)).map_or(unit::NO_TARGET, |t| t as u8);
-            QUnit { target, ..q }
+            // Whether its ultimate is up is its own team's to know.
+            let flags =
+                if ult_ready && team == usize::from(u.team) { q.flags | flags::ULT_READY } else { q.flags };
+            QUnit { target, flags, ..q }
         };
         [seen(0), seen(1)]
     }
