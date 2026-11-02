@@ -11,9 +11,9 @@ use el_sim::ticks;
 
 /// Hash after two minutes of a bot match: the first waves, the first fights (update deliberately
 /// when the sim changes).
-const GOLDEN: u64 = 0xfbbb_a1c4_0f55_8d59;
+const GOLDEN: u64 = 0x1757_0517_549a_010f;
 /// Hash of a whole bot match, at the tick its nexus fell, and that tick.
-const MATCH_GOLDEN: (u64, u32) = (0x3755_20b5_e563_07d6, 41_999);
+const MATCH_GOLDEN: (u64, u32) = (0xd3e7_d44b_8f04_1aed, 27_137);
 
 fn two_minutes() -> u64 {
     let (mut m, mut s) = common::bot_match(7);

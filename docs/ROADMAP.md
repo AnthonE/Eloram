@@ -268,8 +268,13 @@ First the rules `DESIGN.md` described that the sim didn't keep (`CONTENT_VERSION
   earned a match finished; a guest one a select), kept in the records directory.
 - The decals ART.md left (cracks across the paving, snow drifted across the seams, in the
   ground's shader on the high tier) and the brush's sway.
-Measured: the golden bot match (seed 11) now ends at 23:19 (14:00 before: treats and the actives
-keep champions in the lane), its tick 55 µs on average; the golden hashes hold native and wasm.
+Measured: with them alone the bots' matches ran longer and wider (12 seeds: a median of about 19
+minutes, three past 28, and one still going at 40, everyone level 18 with six items and nothing to
+spend on, the team ahead by 31 kills never ending it). The bots only ever pushed behind their
+wave; now, two or more champions up (or the enemy's all down), they press on to the enemy's
+foremost structure that can be hit, wave or not. Over 24 seeds every match ends, from 10:43 to
+31:45, a median about 15 minutes; the golden bot match (seed 11) ends at 15:04. The golden hashes
+hold native and wasm.
 
 Left, in no order:
 - **A real GPU.** Nobody has seen the game on one: the frame rate on either tier (the target is 60

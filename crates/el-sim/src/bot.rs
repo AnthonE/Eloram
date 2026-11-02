@@ -176,6 +176,27 @@ pub fn think(m: &Match, seat: usize, out: &mut SeatInput) {
             return;
         }
     }
+    // Up two champions or more (or the enemy's all down): press on to their foremost structure
+    // that can be hit, wave or not, as players end a won fight. (Deaths are everyone's news.)
+    let alive = |t: u8| (0..SEATS).filter(|&s| team_of_seat(s) == t && m.units[s].alive).count();
+    let (ours, theirs) = (alive(team), alive(1 - team));
+    if theirs == 0 || ours >= theirs + 2 {
+        let target = [
+            structure::OUTER,
+            structure::INHIB_TURRET,
+            structure::INHIBITOR,
+            structure::NEXUS_TURRET_A,
+            structure::NEXUS_TURRET_B,
+            structure::NEXUS,
+        ]
+        .into_iter()
+        .map(|k| structure_slot(1 - team, k))
+        .find(|&i| m.units[i].alive && m.exposed(i));
+        if let Some(i) = target {
+            out.push(Order::AttackMove { to: m.map.snap(m.units[i].pos) }.quantized());
+            return;
+        }
+    }
     // No fight: behind the wave's front, or at the turret waiting for one.
     let front = (FIRST_MINION..MAX_UNITS)
         .filter(|&i| m.units[i].alive && m.units[i].team == team)
