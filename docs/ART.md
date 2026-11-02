@@ -222,6 +222,13 @@ Changed on the way:
   a mesh each (about ten draws, and as many again in each shadow cascade); the health bars' backs,
   see-through, so sorted among the rings and drawn one a unit. Now a burst slot is drawn while its
   burst lasts, the plinths are one mesh scaled, and the bars' backs are opaque: 125 to 141 draws on
-  the low tier, 181 to 193 on the high. The HUD is most of what's left (about seventy: bevy_ui
-  breaks a batch at each image and between its gradients and its plain nodes).
+  the low tier, 181 to 193 on the high. Then the HUD, about ninety of those: bevy_ui draws plain
+  nodes with whatever is being drawn, and starts a new call at each texture (a glyph atlas for each
+  size of text, an icon, a portrait) and at each gradient or shadow (a pipeline each). The stats
+  grid alternated two sizes of text, sixteen calls; each ability slot drew a gradient and a name
+  under its opaque icon; the thin bars filled with gradients. Now the stats' names are all drawn
+  before their values (placed on the grid, the same look), the slots are flat under their icons,
+  and a bar 8 px tall or less fills in two bands: 92 to 108 draws on the low tier, 146 to 159 on
+  the high, about half of where it started. What's left in the HUD is mostly its icons, portraits
+  and panels' gradients, each a call.
 - Not done: decals (cracks, scorch, drifts over seams).
