@@ -34,13 +34,14 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   bots in the other nine seats after 3 s (`EL_FILL`), then 20 s of champion select (`--select-secs`;
   it ends sooner once everyone seated is ready, and agents are ready at once). The server alone:
   `cargo run -p el-server --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
-- `scripts/e2e.sh spike|match|watch|login|art|recover|fx [webgl2]`: Playwright against a real server
+- `scripts/e2e.sh spike|match|watch|login|art|recover|fx|draws [webgl2]`: Playwright against a real server
   (`match`: queue, champion select (a reroll, the bench, ready), the headliner, augment, shop,
   Blink, a walk predicted exactly, the fog; and `?keys=wasd`'s keys walking the champion; `watch`:
   an agent's match watched live a minute behind from a checkpoint, then replayed; `recover`: the
   server SIGKILLed mid-match and started again, the page back in its seat; `login`: a stub wallet
   signing through `el-auth`'s `sign` example, `/online.json`, the resume token; `art`: the camera over each place on the map, the fog's darkness off (`{t:"camera"}`,
-  `{t:"fog"}`); `fx`: practice, every ability of every champion cast at a dummy, drawn and heard
+  `{t:"fog"}`); `draws`: WebGL2's draw calls a frame on each tier, by shader program and mesh
+  (`e2e/artifacts/draws-<tier>.json`); `fx`: practice, every ability of every champion cast at a dummy, drawn and heard
   as the player's own, and a contact sheet a champion (`EL_FX_FROM=10 EL_FX_CHAMPIONS=20` for
   the last ten: about four minutes each); screenshots in `e2e/artifacts/`). The `webgpu` project (`scripts/e2e.sh art
   webgpu`) is headless WebGPU on SwiftShader's Vulkan. `scripts/e2e.sh` serves the `web/dist/` already

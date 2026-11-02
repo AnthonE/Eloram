@@ -212,7 +212,16 @@ Changed on the way:
   add view textures that took the ground's material to 17 sampled textures, past WebGPU's 16:
   Bevy quit on the first frame. Not taken: Bevy's GPU mip generator (it writes storage textures,
   which can't be sRGB) and its runtime environment-map filter (no cube map to give it yet).
-- Not measured: the frame rate on a real GPU, so neither tier's number is known; the draw-call
-  count.
-- Not done: decals (cracks, scorch, drifts over seams); merging the static props into a few meshes
-  (each is its own draw: about seventy props and rocks, three edge meshes, six brushes).
+- Not measured: the frame rate on a real GPU, so neither tier's number is known.
+- **Draw calls** (`scripts/e2e.sh draws`: WebGL2's draws counted a frame in the page, by shader
+  and mesh, the fog off, the camera over the base, the outer turret and the middle; a draw's count
+  doesn't depend on the GPU). Before: 189 to 217 a frame on the low tier, 289 to 316 on the high.
+  The props were never the cost: the same model with the same material is binned and drawn
+  together, so the seventy props and rocks are a draw or two a model. What was: the bursts' pool,
+  every slot drawn every frame live or not (52 draws on the low tier, 96 on the high); the plinths,
+  a mesh each (about ten draws, and as many again in each shadow cascade); the health bars' backs,
+  see-through, so sorted among the rings and drawn one a unit. Now a burst slot is drawn while its
+  burst lasts, the plinths are one mesh scaled, and the bars' backs are opaque: 125 to 141 draws on
+  the low tier, 181 to 193 on the high. The HUD is most of what's left (about seventy: bevy_ui
+  breaks a batch at each image and between its gradients and its plain nodes).
+- Not done: decals (cracks, scorch, drifts over seams).
