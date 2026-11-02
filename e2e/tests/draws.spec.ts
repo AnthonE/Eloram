@@ -35,7 +35,26 @@ const PROBE = () => {
     return [...fns].slice(-4).join(",");
   };
   let prog: unknown = null;
-  let cur: { draws: number; instances: number; by: Record<string, number> } | null = null;
+  // The texture last bound, by a number of its own: what tells one UI image's batch from the next.
+  const texIds = new Map<unknown, number>();
+  const texSize = new Map<number, string>();
+  let tex = 0;
+  const bind = P.bindTexture;
+  P.bindTexture = function (target: number, t: unknown) {
+    if (t && !texIds.has(t)) texIds.set(t, texIds.size + 1);
+    tex = t ? (texIds.get(t) as number) : 0;
+    return bind.call(this, target, t);
+  };
+  // Each texture's size as it's made: a 1×1 is a plain fill's, a glyph atlas is square and big.
+  for (const name of ["texStorage2D", "texImage2D"]) {
+    const f = P[name];
+    P[name] = function (...a: any[]) {
+      if (tex && !texSize.has(tex) && typeof a[3] === "number") texSize.set(tex, `${a[3]}x${a[4]}`);
+      return f.apply(this, a);
+    };
+  }
+  (window as any).__drawTextures = () => Object.fromEntries(texSize);
+  let cur: { draws: number; instances: number; by: Record<string, number>; seq: string[] } | null = null;
   const frames: (typeof cur)[] = [];
   const use = P.useProgram;
   P.useProgram = function (p: unknown) {
@@ -54,6 +73,7 @@ const PROBE = () => {
         cur.instances += instAt >= 0 ? a[instAt] : 1;
         const key = `p${ids.get(prog)}:${a[countAt]}${instAt >= 0 ? "x" + a[instAt] : ""}`;
         cur.by[key] = (cur.by[key] ?? 0) + 1;
+        cur.seq.push(`${key}:t${tex}`);
       }
       return f.apply(this, a);
     };
@@ -66,7 +86,7 @@ const PROBE = () => {
   // A frame is what's drawn between two of the page's animation frames.
   const tick = () => {
     if (cur) frames.push(cur);
-    cur = { draws: 0, instances: 0, by: {} };
+    cur = { draws: 0, instances: 0, by: {}, seq: [] };
     if (frames.length > 64) frames.shift();
     requestAnimationFrame(tick);
   };
@@ -97,7 +117,7 @@ const SPOTS: [string, number, number][] = [
   ["base", 2300, MID],
   ["outer-turret", 5200, MID],
   ["middle", 7680, MID],
-];
+].slice(0, Number(process.env.EL_DRAWS_SPOTS ?? 3)) as [string, number, number][];
 
 for (const tier of (process.env.EL_DRAWS_TIERS ?? "low,high").split(",")) {
   test(`draw calls a frame, ${tier}`, async ({ page }, info) => {
@@ -120,7 +140,7 @@ for (const tier of (process.env.EL_DRAWS_TIERS ?? "low,high").split(",")) {
       await page.waitForTimeout(6_000);
       await page.evaluate(() => (window as any).__drawsReset());
       await page.waitForTimeout(8_000);
-      const frames: { draws: number; instances: number; by: Record<string, number> }[] = await page.evaluate(
+      const frames: { draws: number; instances: number; by: Record<string, number>; seq: string[] }[] = await page.evaluate(
         () => (window as any).__draws(),
       );
       const full = frames.filter((f) => f.draws > 0);
@@ -138,7 +158,8 @@ for (const tier of (process.env.EL_DRAWS_TIERS ?? "low,high").split(",")) {
       const programs: Record<string, string> = await page.evaluate(() => (window as any).__drawPrograms());
       const used = new Set(keys.slice(0, 12).map(([k]) => k.split(":")[0].slice(1)));
       console.log([...used].map((p) => `  p${p}: ${programs[p]}`).join("\n"));
-      out[name] = { draws, last: last.by, programs };
+      const textures = await page.evaluate(() => (window as any).__drawTextures());
+      out[name] = { draws, last: last.by, programs, seq: last.seq, textures };
     }
     const fs = await import("node:fs");
     fs.mkdirSync("artifacts", { recursive: true });
