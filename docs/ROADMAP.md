@@ -222,3 +222,14 @@ browser match 149 minions flashed and the walk was still exact, 204 frames over 
 test against 208 before; in practice all eighty of the champions' abilities drawn and heard, at
 most 10 sounds at once. A frame every two seconds in SwiftShader still stalls the page past the
 server's 20 s of quiet at each switch of practice champion, and the page dials again.
+
+Then the switch the fx suite now and then lost (`FX.md`, step 4): not a lost message but the last
+match's snapshots, queued behind a slow frame and fed to the new match's client, which took its
+clock (and at times its champion) from them and sent every command far into the server's future.
+Each seating now has a stream of its own, named by the lobby in its `Match`, and the client takes
+no other; a snapshot that doesn't decode moves nothing. An agent that stalls two seconds before
+each switch (`el-bot/tests/online.rs`) dropped 60 of the last match's snapshots a switch and was in
+the new match with the champion it asked for; without the fix the first switch went on as the old
+champion, the server standing in for every command. The golden hashes don't move (nothing in the
+sim changed); the wire has a field more in the `Match` message and nothing more in a snapshot,
+and an older page or server simply takes any stream, as before.

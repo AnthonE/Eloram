@@ -393,7 +393,7 @@ fn talk(
                 Ok(m @ ToClient::Match { .. }) => {
                     if let (
                         Some(picks),
-                        ToClient::Match { seat, tiers, headliner, roster, rejoin, practice, .. },
+                        ToClient::Match { seat, tiers, headliner, roster, rejoin, practice, stream, .. },
                     ) = (m.picks(), &m)
                     {
                         crate::config::store_rejoin(Some(rejoin.as_str()).filter(|r| !r.is_empty()));
@@ -406,6 +406,9 @@ fn talk(
                             if *practice { ", practice" } else { "" }
                         );
                         let mut c = Client::new(map.0, seat, picks, *tiers, *headliner);
+                        // The last match's snapshots, still queued from a slow frame or in
+                        // flight, are on another stream: none of them is taken for this one.
+                        c.set_stream(*stream);
                         if *practice {
                             c.set_practice();
                         }

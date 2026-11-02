@@ -112,6 +112,9 @@ pub struct Stats {
     pub datagrams: u64,
     pub bytes: u64,
     pub stale: u64,
+    /// Datagrams on a stream other than the one this seating was told of: an earlier seating's,
+    /// still in flight (dropped, as stale ones are).
+    pub foreign: u64,
     pub errors: u64,
     pub no_baseline: u64,
     pub records: u64,
@@ -183,6 +186,9 @@ pub struct Client {
     pub stats: Stats,
     /// The match is over (the snapshot said so).
     pub over: bool,
+    /// The stream this seating's snapshots come on (its `ToClient::Match` said), 0 if it wasn't
+    /// told: any other is an earlier seating's.
+    stream: u8,
 }
 
 fn ms(now: f64) -> u16 {
@@ -241,10 +247,23 @@ impl Client {
             last_n: 0,
             stats: Stats::default(),
             over: false,
+            stream: 0,
         }
     }
 
-    /// Whether the own champion's state has come (before it, there's nothing to predict or send).
+    /// Takes snapshots on `stream` alone, the one its `ToClient::Match` named (0: any). A player
+    /// seated from one match straight into another (a practice champion switched) can still have
+    /// the last match's snapshots in flight, or queued behind a slow frame; taken here, one would
+    /// set the clock to that match's tick, and every snapshot of this one would be stale after it.
+    pub fn set_stream(&mut self, stream: u8) {
+        self.stream = stream;
+    }
+
+    /// The stream it takes snapshots on (0: any).
+    pub fn stream(&self) -> u8 {
+        self.stream
+    }
+
     /// Makes the client's copies of the match a practice one's, as the server's is (its
     /// `ToClient::Match` said so): the prediction keeps practice's rules for the own champion.
     pub fn set_practice(&mut self) {
@@ -252,6 +271,7 @@ impl Client {
         self.pred.set_practice();
     }
 
+    /// Whether the own champion's state has come (before it, there's nothing to predict or send).
     pub fn started(&self) -> bool {
         self.started
     }
@@ -282,6 +302,10 @@ impl Client {
                 return Err(e);
             }
         };
+        if self.stream != 0 && h.stream != self.stream {
+            self.stats.foreign += 1;
+            return Ok(Taken::Stale);
+        }
         let verdict = self.acks.check(h.stream, h.seq, h.tick);
         let new_stream = match verdict {
             Verdict::Stale => {
@@ -314,6 +338,9 @@ impl Client {
             }
         };
         self.acks.commit(h.stream, verdict, h.tick);
+        // Only a snapshot taken moves the clock: one that didn't decode (a baseline missing, or
+        // another match's) would leave the prediction stepping on from a tick the match isn't at.
+        self.world.tick = self.world.tick.max(h.tick);
         if let Some(s) = self.own_new.take() {
             self.own_kept[h.tick as usize % OWN_BASELINES] = (h.tick, s);
         }
@@ -369,7 +396,6 @@ impl Client {
         once: &mut [WireEvent; MAX_LIST],
         recs: &mut [QUnit; MAX_UNITS],
     ) -> Result<(u16, usize, usize, usize), DecodeError> {
-        self.world.tick = self.world.tick.max(h.tick);
         self.own_new = None;
         if h.flags & snap_flags::OWN != 0 {
             let kept = &self.own_kept;

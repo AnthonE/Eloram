@@ -31,8 +31,11 @@ pub enum Control {
     /// seed's), and goes nowhere else: the record gets each key as its screen opens.
     /// `practice`: a practice match (`el_sim::practice`), its record saying so.
     Start { m: u16, seed: u64, picks: [u8; SEATS], humans: u16, secret: u64, practice: bool },
-    /// A player takes (or takes back) their seat: a new stream, everything resent whole.
-    Seat { m: u16, seat: u8, max_datagram: u16 },
+    /// A player takes (or takes back) their seat: a new stream, everything resent whole. The
+    /// lobby names the `stream` (and tells the player, who takes no other): never the one their
+    /// last seating had, so nothing still in flight from that seating's match is taken for this
+    /// one's (0: the seat's next).
+    Seat { m: u16, seat: u8, max_datagram: u16, stream: u8 },
     /// A player left their seat: a bot plays it until they're back.
     Unseat { m: u16, seat: u8 },
     /// Match `m` is done with: its place is free.

@@ -200,15 +200,21 @@ impl Rig {
     /// Match 0 of a one-match shard, `seed`, with these seats played over links; bots on the server
     /// play the rest.
     pub fn new(seed: u64, humans: Vec<(usize, LinkSpec, Brain)>) -> Rig {
-        Rig::with(seed, humans, false)
+        Rig::with(seed, humans, false, 1)
     }
 
     /// A practice match (`el_sim::practice`): the shard's bots are its dummies.
     pub fn practice(seed: u64, humans: Vec<(usize, LinkSpec, Brain)>) -> Rig {
-        Rig::with(seed, humans, true)
+        Rig::with(seed, humans, true, 1)
     }
 
-    fn with(seed: u64, humans: Vec<(usize, LinkSpec, Brain)>, practice: bool) -> Rig {
+    /// A practice match whose players are seated on streams `first`, `first + 1`... as the lobby
+    /// names them (each client told its own).
+    pub fn practice_streams(seed: u64, humans: Vec<(usize, LinkSpec, Brain)>, first: u8) -> Rig {
+        Rig::with(seed, humans, true, first)
+    }
+
+    fn with(seed: u64, humans: Vec<(usize, LinkSpec, Brain)>, practice: bool, first: u8) -> Rig {
         let (shard, shared, leases, egress, records) = build(ShardConfig {
             matches: 1,
             map: map(),
@@ -223,9 +229,14 @@ impl Rig {
             .push(Control::Start { m: 0, seed, picks: picks(seed), humans: mask, secret, practice })
             .unwrap();
         let mut players = Vec::new();
-        for (seat, spec, brain) in humans {
-            shared.control.push(Control::Seat { m: 0, seat: seat as u8, max_datagram: 1_100 }).unwrap();
+        for (k, (seat, spec, brain)) in humans.into_iter().enumerate() {
+            let stream = first.wrapping_add(k as u8).max(1);
+            shared
+                .control
+                .push(Control::Seat { m: 0, seat: seat as u8, max_datagram: 1_100, stream })
+                .unwrap();
             let mut client = client(seat, seed);
+            client.set_stream(stream);
             if practice {
                 client.set_practice();
             }

@@ -390,10 +390,16 @@ numbers on a real GPU into `ROADMAP.md`, which has none yet.
   There, a new practice match's ten figures stall the page past the server's 20 s of quiet,
   nearly every switch: the server lets the session go, and the page dials again and asks for the
   champion it last asked for (so a champion's first cast, lost with the match it was cast in, is
-  cast again in the new one). Now and then a switch never reached the page at all (the server
+  cast again in the new one). Now and then a switch seemed never to reach the page (the server
   seated it; the page went on with the last match), so the suite asks again after 45 s, casts
-  each ability up to three times, and the page logs each match it's seated in. Not yet known: why
-  a seated message was lost there.
+  each ability up to three times, and the page logs each match it's seated in. The seated message
+  wasn't lost: the page took it, then fed the new match's client the last match's snapshots that
+  had queued behind the slow frame. Those set its clock to the old match's minute (even the ones
+  that didn't decode), or its champion back to the old one, so every command it sent was for a tick
+  far in the server's future, and with datagrams still coming it never dialled again. It showed
+  only when a switch didn't also stall past the 20 s, since the redial after a stall started
+  clean. Each seating's snapshots now come on a stream the lobby names, and the client takes no
+  other (`NETCODE.md`, "Many matches a process").
 - From the sheets: a shield's bubble had a middle full enough to hide the unit inside it (its
   middle is all but clear now, its rim tighter), and a dummy hooked to the player stayed there,
   so what was cast at its place after hit nothing (dummies walk back now). Little else can be

@@ -135,3 +135,55 @@ async fn a_dropped_agent_rejoins_its_seat() {
     assert!(stray.no_seat);
     h.shutdown();
 }
+
+/// Practice champions switched one after another, as the fx suite switches them in the page: each
+/// switch seats the agent in a new match while the last one's snapshots are still in flight. None
+/// of those is taken for the new match (it once set the new client's clock to the old match's
+/// tick, or its own champion to the old one, and the page sat there seeing nothing new): the new
+/// match's client is at the new match's tick, with the champion asked for.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn practice_switches_take_nothing_of_the_last_match() {
+    let cfg = el_server::Config {
+        wt_port: 0,
+        http_addr: "127.0.0.1:0".parse().unwrap(),
+        web_dir: None,
+        matches_per_shard: 4,
+        practice: true,
+        ..el_server::Config::default()
+    };
+    let h = el_server::start(cfg).await.expect("the server starts");
+    let server = format!("http://{}", h.http_addr);
+    let mut bot =
+        BotClient::connect(&BotConfig { server: server.clone(), name: "Practice".into(), key: None })
+            .await
+            .unwrap();
+    let mut idle = |_: &el_sim::Match, _: usize, _: u32, _: &mut el_sim::game::SeatInput| {};
+    bot.practice(3).await.unwrap();
+    bot.wait_match(Duration::from_secs(10)).await.unwrap();
+    bot.play(Duration::from_secs(8), &mut idle).await.unwrap();
+    let mut streams = vec![bot.client.as_ref().unwrap().stream()];
+    let mut foreign = 0;
+    for champ in [7u8, 11, 2, 16] {
+        // A slow frame (the page in SwiftShader draws one every two seconds): the last match's
+        // snapshots wait unread, and the switch is asked for straight after.
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        bot.practice(champ).await.unwrap();
+        bot.wait_match(Duration::from_secs(10)).await.unwrap();
+        bot.play(Duration::from_secs(3), &mut idle).await.unwrap();
+        let c = bot.client.as_ref().unwrap();
+        assert!(c.started(), "champion {champ}: never started, {:?}", c.stats);
+        assert_eq!(c.world.champs[c.seat].def, champ, "champion {champ}: {:?}", c.stats);
+        // Three seconds in (the last match was eight or more): the new match's clock.
+        assert!(c.world.tick < 5 * 30, "champion {champ}: at tick {}, {:?}", c.world.tick, c.stats);
+        assert_eq!((c.stats.errors, c.stats.no_baseline), (0, 0), "champion {champ}: {:?}", c.stats);
+        assert!(c.stats.datagrams > 60, "champion {champ}: {:?}", c.stats);
+        assert!(!streams.contains(&c.stream()), "champion {champ}: stream {} again", c.stream());
+        streams.push(c.stream());
+        foreign += c.stats.foreign;
+        println!("champion {champ}: stream {}, {:?}", c.stream(), c.stats);
+    }
+    println!("{foreign} snapshots of an earlier match dropped");
+    assert!(foreign > 0, "no switch had the last match's snapshots waiting: the test tests nothing");
+    bot.close().await;
+    h.shutdown();
+}

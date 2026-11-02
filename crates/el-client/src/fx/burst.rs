@@ -7,6 +7,10 @@
 //!
 //! How big and bright a burst is follows the cue's rating for this viewer (Riot: attention as
 //! importance); `?quality=low` halves the particles.
+//!
+//! A slot is drawn only while its burst lasts: each is its own mesh, so a pool drawn whole was a
+//! draw call a slot every frame (52 of a frame's 200 on the low tier, 96 of 300 on the high,
+//! `scripts/e2e.sh draws`), nearly all of them of particles long dead.
 
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::NoFrustumCulling;
@@ -92,9 +96,14 @@ mod shape {
 
 struct Slot {
     mesh: Handle<Mesh>,
+    entity: Entity,
     /// When its burst is over (the shader's clock).
     ends: f32,
 }
+
+/// How far ahead (s) a burst's end may be and the burst still live: far longer than any lasts, so
+/// a slot whose end is further off was written before the clock wrapped (an hour) and is over.
+const LONGEST: f32 = 600.0;
 
 #[derive(Resource)]
 pub struct Bursts {
@@ -135,14 +144,18 @@ pub fn setup(
         (0..n)
             .map(|_| {
                 let mesh = meshes.add(empty_mesh());
-                commands.spawn((
-                    Mesh3d(mesh.clone()),
-                    MeshMaterial3d(mat.clone()),
-                    Transform::default(),
-                    NoFrustumCulling,
-                    bevy::light::NotShadowCaster,
-                ));
-                Slot { mesh, ends: 0.0 }
+                let entity = commands
+                    .spawn((
+                        Mesh3d(mesh.clone()),
+                        MeshMaterial3d(mat.clone()),
+                        Transform::default(),
+                        // Drawn only while it holds a burst (`spawn`).
+                        Visibility::Hidden,
+                        NoFrustumCulling,
+                        bevy::light::NotShadowCaster,
+                    ))
+                    .id();
+                Slot { mesh, entity, ends: 0.0 }
             })
             .collect::<Vec<_>>()
     };
@@ -323,8 +336,14 @@ impl Make<'_> {
     }
 }
 
-/// The bursts of this frame's cues.
-pub fn spawn(time: Res<Time>, cues: Res<Cues>, mut bursts: ResMut<Bursts>, mut meshes: ResMut<Assets<Mesh>>) {
+/// The bursts of this frame's cues; each slot drawn while its burst lasts, and only then.
+pub fn spawn(
+    time: Res<Time>,
+    cues: Res<Cues>,
+    mut bursts: ResMut<Bursts>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut shown: Query<&mut Visibility>,
+) {
     let now = time.elapsed_secs_wrapped();
     let keep = if bursts.low { 0.5 } else { 1.0 };
     for q in &cues.list {
@@ -333,6 +352,12 @@ pub fn spawn(time: Res<Time>, cues: Res<Cues>, mut bursts: ResMut<Bursts>, mut m
         let (glow, smoke) = (std::mem::take(&mut m.glow), std::mem::take(&mut m.smoke));
         bursts.put(&glow, false, now, &mut meshes);
         bursts.put(&smoke, true, now, &mut meshes);
+    }
+    for slot in bursts.glow.iter().chain(&bursts.smoke) {
+        let live = slot.ends > now && slot.ends - now < LONGEST;
+        if let Ok(mut v) = shown.get_mut(slot.entity) {
+            v.set_if_neq(if live { Visibility::Inherited } else { Visibility::Hidden });
+        }
     }
 }
 

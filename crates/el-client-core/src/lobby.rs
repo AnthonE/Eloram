@@ -65,6 +65,10 @@ pub enum ToClient {
         /// A practice match (`el_sim::practice`): the client makes its copy one too.
         #[serde(default)]
         practice: bool,
+        /// The stream this seating's snapshots come on (`Client::set_stream`): the client takes
+        /// no other, so nothing of a match it was in before is taken for this one. 0: not told.
+        #[serde(default)]
+        stream: u8,
     },
     /// A rejoin found no seat: the match is over, or the token isn't one.
     NoSeat,
@@ -97,6 +101,7 @@ mod tests {
             roster: vec![Player { name: "Ash".into(), agent: false, bot: false }],
             rejoin: "00ff".into(),
             practice: false,
+            stream: 12,
         };
         let text = serde_json::to_string(&m).unwrap();
         assert!(text.starts_with(r#"{"t":"match","seat":3,"picks":[0,1,2"#), "{text}");

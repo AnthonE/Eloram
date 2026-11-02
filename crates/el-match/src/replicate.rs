@@ -189,7 +189,12 @@ fn set(words: &mut [u64], i: usize, on: bool) {
 impl Replica {
     /// A new stream for a player (re)taking the seat: everything is told again, whole.
     pub fn reset(&mut self) {
-        let stream = ack::next_stream(self.stream);
+        self.reset_to(0);
+    }
+
+    /// [`reset`](Self::reset), on `stream` (the lobby's; 0: the next after this seat's last).
+    pub fn reset_to(&mut self, stream: u8) {
+        let stream = if stream == 0 { ack::next_stream(self.stream) } else { stream };
         *self = Replica { stream, ..Replica::default() };
     }
 

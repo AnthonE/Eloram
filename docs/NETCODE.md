@@ -315,6 +315,16 @@ Before Colony's, sized for a match:
   connection still holds the seat it is replaced; until then the server's bot plays the seat. A
   match with nobody connected waits 60 s for its players. The page redials on its own when the
   link closes or goes quiet for 4 s, and a reload rejoins with the token the tab kept.
+- A seating's snapshots are its own. The lobby gives each seating a stream (1 to 255 in turn
+  across the server), the shard sends the seat's snapshots on it, and the `Match` names it; the
+  client takes no other (`Client::set_stream`), and moves its clock only on a snapshot it took. A
+  player seated from one match straight into another (a practice champion switched) still has the
+  last one's snapshots in flight, or queued behind a slow frame: one of those taken for the new
+  match set the client's clock to the old match's tick, or its champion back to the old one, and
+  the page sat in the new match with every command far in the server's future, while datagrams
+  kept coming so it never dialled again (`el-match/tests/switch.rs`, and an agent switching after
+  a two-second stall in `el-bot/tests/online.rs`: 60 of the last match's snapshots dropped a
+  switch).
 - Empty seats take bots. A bot is the client's own netcode with a brain, so it plays through the
   same orders, sees the same team's view, and is in the record like anyone. The store is for
   people and agents equally.

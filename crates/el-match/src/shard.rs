@@ -193,14 +193,14 @@ impl Shard {
                 self.reported[m] = false;
                 self.shared.states[m].store(MatchState::Running as u32, Ordering::Release);
             }
-            Control::Seat { m, seat, max_datagram } => {
+            Control::Seat { m, seat, max_datagram, stream } => {
                 let g = usize::from(m) * SEATS + usize::from(seat);
                 if g < self.seats.len() {
                     // What the seat's last player sent and the shard hasn't taken goes: their
                     // orders aren't this player's.
                     while self.ends.inputs[g].pop().is_ok() {}
                     self.seats[g].seat(max_datagram);
-                    self.replicas[g].reset();
+                    self.replicas[g].reset_to(stream);
                     let (m, tick) = (usize::from(m), self.matches[usize::from(m)].tick);
                     self.matches[m].set_seated(usize::from(seat), true);
                     let n = record::write_seat(&mut self.frame, tick, seat, true);

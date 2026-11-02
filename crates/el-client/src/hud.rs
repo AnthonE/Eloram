@@ -342,6 +342,9 @@ fn initials(def: u8) -> String {
         .map_or(String::new(), |d| d.name.chars().take(2).collect::<String>().to_uppercase())
 }
 
+/// A bar this tall (px) or less is filled in two bands, not a gradient (`bar`).
+const THIN: f32 = 8.0;
+
 /// A bar: its well, its fill and, if any, the words on it.
 fn bar(
     commands: &mut Commands,
@@ -367,20 +370,25 @@ fn bar(
             BackgroundColor(Color::srgb(0.05, 0.06, 0.08)),
         ))
         .id();
-    let f = commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: px(0),
-                top: px(0),
-                height: percent(100),
-                width: percent(100),
-                ..default()
-            },
-            down(fill_color[1], fill_color[0]),
-            fill,
-        ))
-        .id();
+    let node = Node {
+        position_type: PositionType::Absolute,
+        left: px(0),
+        top: px(0),
+        height: percent(100),
+        width: percent(100),
+        ..default()
+    };
+    let f = if h <= THIN {
+        // A thin bar's gradient is a few rows: two bands of it, its top quarter's and its bottom
+        // quarter's, look the same and are drawn with the plain nodes round them (a gradient is
+        // a pipeline of its own, so a draw call, and the next node another).
+        let (top, bottom) =
+            (fill_color[1].mix(&fill_color[0], 0.25), fill_color[1].mix(&fill_color[0], 0.75));
+        let band = Node { border: UiRect::top(px((h * 0.5).round())), ..node };
+        commands.spawn((band, BorderColor::all(top), BackgroundColor(bottom), fill)).id()
+    } else {
+        commands.spawn((node, down(fill_color[1], fill_color[0]), fill)).id()
+    };
     commands.entity(e).add_child(f);
     if let Some((l, size)) = label {
         let t = commands.spawn((text("", size, TEXT), outline(), l)).id();
@@ -807,30 +815,34 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
         })
         .add_children(&[portrait, xp])
         .id();
-    // The stats, two columns of four, at the panel's left as League's are.
-    let cells: Vec<Entity> = STATS
+    // The stats, two columns of four, at the panel's left as League's are: a name and its value
+    // each, placed on the grid. Every name is spawned before every value, so each size of text
+    // is drawn at once (a glyph atlas a size: name, value, name... was a draw call each).
+    let place = |i: usize, value: bool| Node {
+        grid_row: GridPlacement::start(i as i16 / 2 + 1),
+        grid_column: GridPlacement::start((i as i16 % 2) * 2 + 1 + i16::from(value)),
+        ..default()
+    };
+    let names = STATS
         .iter()
         .enumerate()
-        .map(|(i, name)| {
-            commands
-                .spawn(Node {
-                    width: px(54),
-                    column_gap: px(4),
-                    align_items: AlignItems::Baseline,
-                    ..default()
-                })
-                .with_children(|cell| {
-                    cell.spawn((text(name, 9.0, DIM), Node { width: px(16), ..default() }));
-                    cell.spawn((text("", 11.0, TEXT), Label::Stat(i)));
-                })
-                .id()
-        })
-        .collect();
+        .map(|(i, name)| commands.spawn((text(name, 9.0, DIM), place(i, false))).id());
+    let mut cells: Vec<Entity> = names.collect();
+    cells.extend(
+        (0..STATS.len()).map(|i| commands.spawn((text("", 11.0, TEXT), Label::Stat(i), place(i, true))).id()),
+    );
     let stats = commands
         .spawn((
             Node {
                 display: Display::Grid,
-                grid_template_columns: RepeatedGridTrack::auto(2),
+                // A name's 16 px and its value's 34, twice: the cells of 54 they were.
+                grid_template_columns: vec![
+                    GridTrack::px(16.0),
+                    GridTrack::px(34.0),
+                    GridTrack::px(16.0),
+                    GridTrack::px(34.0),
+                ],
+                align_items: AlignItems::Baseline,
                 column_gap: px(4),
                 row_gap: px(5),
                 padding: UiRect::axes(px(8), px(7)),
@@ -1006,7 +1018,9 @@ fn ability_slot(commands: &mut Commands, k: usize) -> Entity {
                 ..default()
             },
             BorderColor::all(FRAME),
-            down(Color::srgb(0.16, 0.18, 0.24), Color::srgb(0.07, 0.08, 0.11)),
+            // Flat: the icon is opaque and covers it all, and a gradient is a draw call of its
+            // own.
+            BackgroundColor(Color::srgb(0.11, 0.12, 0.17)),
             Interaction::None,
             AbilitySlot(k),
             Tip::Ability(k),
@@ -2086,9 +2100,17 @@ fn ability_icons(
     mut icons: ResMut<Icons>,
     mut images: ResMut<Assets<Image>>,
     mut q: Query<(&AbilityIcon, &mut ImageNode, &mut Visibility)>,
+    mut names: Query<(&Label, &mut Visibility), Without<AbilityIcon>>,
 ) {
     let Some(c) = session.client.as_deref() else { return };
     let ch = &c.pred.champs[c.seat];
+    // The name is for a slot without its icon: under the icon (opaque) it's never seen, but it
+    // would still be drawn, a glyph atlas between two icons, so a draw call a slot.
+    for (label, mut vis) in &mut names {
+        if matches!(label, Label::AbilityName(_)) {
+            vis.set_if_neq(Visibility::Hidden);
+        }
+    }
     for (icon, mut node, mut vis) in &mut q {
         let k = icon.0;
         let h = icons
