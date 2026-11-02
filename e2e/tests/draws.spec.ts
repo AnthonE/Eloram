@@ -10,12 +10,39 @@ const PROBE = () => {
   const P = (window as any).WebGL2RenderingContext?.prototype;
   if (!P) return;
   const ids = new Map<unknown, number>();
+  // Each program's name: the functions its shaders define (naga keeps WGSL's names), so a key
+  // can be told for the ground's, a unit's, the UI's.
+  const names = new Map<unknown, string>();
+  const shaders = new Map<unknown, string>();
+  const attached = new Map<unknown, unknown[]>();
+  const source = P.shaderSource;
+  P.shaderSource = function (sh: unknown, src: string) {
+    shaders.set(sh, src);
+    return source.call(this, sh, src);
+  };
+  const attach = P.attachShader;
+  P.attachShader = function (p: unknown, sh: unknown) {
+    attached.set(p, [...(attached.get(p) ?? []), sh]);
+    return attach.call(this, p, sh);
+  };
+  const label = (p: unknown) => {
+    const fns = new Set<string>();
+    for (const sh of attached.get(p) ?? []) {
+      for (const m of (shaders.get(sh) ?? "").matchAll(/^\s*[\w<>]+\s+(\w+)\s*\([^;{]*\)\s*\{/gm)) {
+        if (m[1] !== "main") fns.add(m[1]);
+      }
+    }
+    return [...fns].slice(-4).join(",");
+  };
   let prog: unknown = null;
   let cur: { draws: number; instances: number; by: Record<string, number> } | null = null;
   const frames: (typeof cur)[] = [];
   const use = P.useProgram;
   P.useProgram = function (p: unknown) {
-    if (p && !ids.has(p)) ids.set(p, ids.size + 1);
+    if (p && !ids.has(p)) {
+      ids.set(p, ids.size + 1);
+      names.set(ids.size, label(p));
+    }
     prog = p;
     return use.call(this, p);
   };
@@ -45,6 +72,7 @@ const PROBE = () => {
   };
   requestAnimationFrame(tick);
   (window as any).__draws = () => frames.slice();
+  (window as any).__drawPrograms = () => Object.fromEntries(names);
   (window as any).__drawsReset = () => frames.splice(0);
 };
 
@@ -107,7 +135,10 @@ for (const tier of (process.env.EL_DRAWS_TIERS ?? "low,high").split(",")) {
             .map(([k, n]) => `${k}×${n}`)
             .join(" ")}`,
       );
-      out[name] = { draws, last: last.by };
+      const programs: Record<string, string> = await page.evaluate(() => (window as any).__drawPrograms());
+      const used = new Set(keys.slice(0, 12).map(([k]) => k.split(":")[0].slice(1)));
+      console.log([...used].map((p) => `  p${p}: ${programs[p]}`).join("\n"));
+      out[name] = { draws, last: last.by, programs };
     }
     const fs = await import("node:fs");
     fs.mkdirSync("artifacts", { recursive: true });
