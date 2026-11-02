@@ -3,7 +3,9 @@
 
 use crate::content::augments::{AUGMENTS, Trigger};
 use crate::content::items::{self, ITEMS};
-use crate::content::rules::{self, AUGMENT_LEVELS, MAX_LEVEL, PASSIVE_GOLD_FROM, PASSIVE_GOLD_PER_SEC};
+use crate::content::rules::{
+    self, AUGMENT_LEVELS, MAX_LEVEL, MAX_SCREENS, PASSIVE_GOLD_FROM, PASSIVE_GOLD_PER_SEC,
+};
 use crate::content::{Op, StatMods};
 use crate::events::Event;
 use crate::game::Match;
@@ -129,6 +131,50 @@ impl Match {
         self.recompute_mods(seat);
     }
 
+    /// Uses what's in inventory slot `inv` (its active), or eats a treat from the trinket's slot
+    /// (`el_proto::order::TRINKET`). Not while stunned or in the air; silence doesn't stop it.
+    pub(crate) fn use_item(&mut self, seat: usize, inv: u8) {
+        let now = self.tick;
+        let c = &self.champs[seat];
+        if !self.units[seat].alive || self.units[seat].cc.disabled(now) {
+            return;
+        }
+        let (active, from) = if inv == el_proto::order::TRINKET {
+            if c.treats == 0 || c.treat_ready > now {
+                return;
+            }
+            let c = &mut self.champs[seat];
+            c.treats -= 1;
+            c.treat_ready = now + ticks(items::TREAT.cd);
+            (items::TREAT, Source::Treat)
+        } else {
+            let k = usize::from(inv);
+            let Some(&it) = c.items.get(k) else { return };
+            let Some(active) = ITEMS.get(usize::from(it)).and_then(|d| d.active) else { return };
+            if c.active_ready[k] > now {
+                return;
+            }
+            self.champs[seat].active_ready[k] = now + ticks(active.cd);
+            (active, Source::Item(it))
+        };
+        self.apply_ops(seat, seat, active.ops, 0, from);
+        if active.hits.is_empty() {
+            return;
+        }
+        let team = team_of_seat(seat);
+        let at = self.units[seat].pos;
+        for j in 0..self.units.len() {
+            let u = &self.units[j];
+            let reach = active.radius + u.radius;
+            if !u.kind.is_structure()
+                && (u.pos - at).length_squared() <= reach * reach
+                && self.attackable(team, j)
+            {
+                self.apply_ops(seat, j, active.hits, 0, from);
+            }
+        }
+    }
+
     pub(crate) fn sell(&mut self, seat: usize, inv: u8) {
         if usize::from(inv) >= items::SLOTS || !self.in_shop(seat) {
             return;
@@ -150,10 +196,10 @@ impl Match {
     /// happened in the match moves it.
     fn draw_offer(&self, seat: usize, card: usize, salt: u32) -> u8 {
         let c = &self.champs[seat];
-        let screen = usize::from(c.screens_done);
-        let tier = self.aug_tiers[screen.min(3)];
+        let screen = usize::from(c.screens_done).min(MAX_SCREENS - 1);
+        let tier = self.screen_tier(screen);
         let taken = |a: u8| c.augments().contains(&a) || (c.screen.open && c.screen.offers.contains(&a));
-        let key = self.offer_key(seat, screen.min(3));
+        let key = self.offer_key(seat, screen);
         let n = AUGMENTS.len();
         let start = math::hash32(key, (screen as u32) << 8 | (card as u32) << 4 | salt) as usize % n;
         let fits =
@@ -203,7 +249,7 @@ impl Match {
     /// A key the record gives: `seat`'s offers on `screen` are drawn from `key`.
     pub fn give_offer_key(&mut self, seat: u8, screen: u8, key: u32) {
         let (seat, screen) = (usize::from(seat), usize::from(screen));
-        if seat < SEATS && screen < 4 {
+        if seat < SEATS && screen < MAX_SCREENS {
             self.offer_keys[seat][screen] = key;
             self.offer_known[seat] |= 1 << screen;
         }
@@ -216,16 +262,13 @@ impl Match {
 
     fn open_screen(&mut self, seat: usize) {
         let c = self.champs[seat];
-        if c.screen.open
-            || c.screens_done >= c.screens_earned
-            || usize::from(c.screens_done) >= AUGMENT_LEVELS.len()
-        {
+        if c.screen.open || c.screens_done >= c.screens_earned || usize::from(c.screens_done) >= MAX_SCREENS {
             return;
         }
         self.settle_offer_key(seat, usize::from(c.screens_done));
         self.champs[seat].screen = crate::game::Screen {
             open: true,
-            tier: self.aug_tiers[usize::from(c.screens_done)],
+            tier: self.screen_tier(usize::from(c.screens_done)),
             offers: [crate::content::augments::NONE; 3],
             rerolled: 0,
         };
@@ -246,6 +289,9 @@ impl Match {
         c.n_aug += 1;
         c.screen.open = false;
         c.screens_done += 1;
+        if AUGMENTS[usize::from(a)].trigger == Trigger::Encore {
+            c.screens_earned = (c.screens_earned + 1).min(MAX_SCREENS as u8);
+        }
         self.recompute_mods(seat);
         self.event(Event::Augment { unit: seat as u16, augment: a });
         self.open_screen(seat);

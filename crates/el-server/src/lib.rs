@@ -8,6 +8,7 @@ pub mod net;
 pub mod records;
 pub mod recover;
 pub mod referee;
+pub mod rerolls;
 pub mod signin;
 pub mod telemetry;
 

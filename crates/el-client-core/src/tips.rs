@@ -4,7 +4,7 @@
 
 use el_sim::content::augments::{AUGMENTS, Tier, Trigger};
 use el_sim::content::champions::ability;
-use el_sim::content::items::ITEMS;
+use el_sim::content::items::{self, ITEMS};
 use el_sim::content::{DmgKind, Effect, Filter, Op, StatMods, Target};
 use el_sim::units::BuffKind;
 
@@ -178,18 +178,18 @@ pub fn mods_lines(m: &StatMods) -> Vec<String> {
 pub fn recommended(role: el_sim::content::Role) -> [u8; 4] {
     use el_sim::content::Role;
     match role {
-        // Stormcaller, Lifedrinker, Warblade, Road Boots.
-        Role::Marksman => [11, 12, 8, 6],
-        // Witchwood Staff, Spellguard, Still Water, Spell Primer.
-        Role::Mage => [9, 13, 7, 1],
-        // Rampart, Spellguard, Red Bloom, Road Boots.
-        Role::Tank => [10, 13, 4, 6],
+        // Stormcaller, Lifedrinker, Warblade, Windstride.
+        Role::Marksman => [11, 12, 8, 15],
+        // Witchwood Staff, Thunder Censer, Spellguard, Spell Primer.
+        Role::Mage => [9, 16, 13, 1],
+        // Rampart, Bulwark Charm, Spellguard, Road Boots.
+        Role::Tank => [10, 14, 13, 6],
         // Warblade, Rampart, Lifedrinker, Road Boots.
         Role::Fighter => [8, 10, 12, 6],
         // Warblade, Lifedrinker, Road Boots, Iron Knife.
         Role::Assassin => [8, 12, 6, 0],
-        // Witchwood Staff, Spellguard, Still Water, Road Boots.
-        Role::Enchanter => [9, 13, 7, 6],
+        // Mending Chalice, Witchwood Staff, Spellguard, Road Boots.
+        Role::Enchanter => [17, 9, 13, 6],
     }
 }
 
@@ -200,7 +200,33 @@ pub fn item_tip(i: u8) -> String {
         out.push('\n');
         out.push_str(&l);
     }
+    if let Some(a) = it.active {
+        out.push_str("\nActive: ");
+        out.push_str(&active_text(&a));
+    }
     out
+}
+
+/// What an active does, and its cooldown.
+pub fn active_text(a: &items::Active) -> String {
+    let mut parts = Vec::new();
+    if !a.ops.is_empty() {
+        parts.push(ops(a.ops, 1));
+    }
+    if !a.hits.is_empty() {
+        parts.push(format!("enemies within {}: {}", num(a.radius), ops(a.hits, 1)));
+    }
+    format!("{}. Cooldown {} s.", parts.join("; "), num(a.cd))
+}
+
+/// The trinket's slot: its treats, how many, and what one does.
+pub fn treat_tip(charges: u8) -> String {
+    format!(
+        "{}\n{charges} of {}\nEat one (4): {}\nOne more for each enemy turret your team destroys.",
+        items::TREAT_NAME,
+        items::TREATS_MAX,
+        active_text(&items::TREAT),
+    )
 }
 
 pub fn tier_name(t: Tier) -> &'static str {
@@ -230,6 +256,10 @@ pub fn augment_text(a: u8) -> String {
         Trigger::Pulse { period, radius, ops: o } => {
             Some(format!("Every {} s, enemies within {}: {}", num(period), num(radius), ops(o, 1)))
         }
+        Trigger::Encore => Some(format!(
+            "One more augment screen, the fifth: {}, after the four the levels bring",
+            tier_name(el_sim::content::augments::FIFTH_TIER)
+        )),
     };
     lines.extend(on.map(|mut s| {
         s.push('.');

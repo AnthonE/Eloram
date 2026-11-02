@@ -168,6 +168,10 @@ enum Cmd {
     Sell {
         inv: u8,
     },
+    /// An inventory slot's active (0 to 5), or a treat (6).
+    Use {
+        inv: u8,
+    },
     Shop {
         open: bool,
     },
@@ -282,6 +286,7 @@ fn inbox(
             Cmd::Pick { card } => Order::PickAugment { card },
             Cmd::Reroll { card } => Order::Reroll { card },
             Cmd::Buy { item } => Order::Buy { item },
+            Cmd::Use { inv } => Order::Use { inv },
             Cmd::Sell { inv } => Order::Sell { inv },
             Cmd::Ping { x, y, kind, unit: u } => {
                 Order::Ping { kind: kind.unwrap_or(0), at: Vec2::new(x, y), unit: u.map(unit) }
@@ -457,6 +462,8 @@ fn match_status(
     status.set("level", u32::from(ch.level));
     status.set("gold", ch.gold);
     status.set("items", items.join(","));
+    status.set("treats", u32::from(ch.treats));
+    status.set("screens_earned", u32::from(ch.screens_earned));
     status.set("augments", u32::from(ch.n_aug));
     status.set("screen_open", ch.screen.open);
     status.set("in_shop", c.pred.in_shop(s));

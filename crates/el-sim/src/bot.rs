@@ -23,10 +23,11 @@ const RETREAT: f32 = 0.25;
 /// What each champion builds, in order (items' indices), by its role: its big items, one of each.
 fn build(def: u8) -> &'static [u8] {
     match crate::content::champions::CHAMPIONS[usize::from(def)].role {
-        Role::Marksman => &[11, 8, 12, 6, 10, 13],
-        Role::Mage | Role::Enchanter => &[9, 13, 6, 10, 8, 11],
-        Role::Tank => &[10, 13, 6, 12, 8, 11],
-        Role::Fighter | Role::Assassin => &[8, 12, 6, 11, 10, 13],
+        Role::Marksman => &[11, 8, 12, 15, 10, 13],
+        Role::Mage => &[9, 16, 13, 6, 10, 17],
+        Role::Enchanter => &[9, 17, 13, 6, 14, 10],
+        Role::Tank => &[10, 14, 13, 6, 12, 8],
+        Role::Fighter | Role::Assassin => &[8, 12, 15, 11, 14, 13],
     }
 }
 
@@ -50,12 +51,34 @@ fn shop(m: &Match, seat: usize) -> Option<Order> {
     let empty = c.items.iter().filter(|&&it| it == items::NONE).count();
     let part = match next {
         8 | 11 | 12 => 0,
-        9 => 1,
-        10 => 2,
+        9 | 16 => 1,
+        10 | 14 => 2,
         13 => 3,
+        15 => 5,
+        17 => 7,
         _ => 4,
     };
     (empty > 2 && c.gold >= cost(part)).then_some(Order::Buy { item: part })
+}
+
+/// An item's active worth using now, if one is ready: a shield or a heal when hurt, speed when
+/// fleeing, a blast with enemies close.
+fn active(m: &Match, seat: usize) -> Option<Order> {
+    let now = m.tick;
+    let c = &m.champs[seat];
+    let me = &m.units[seat];
+    let hurt = me.hp < me.stats.max_hp * 0.4;
+    let team = team_of_seat(seat);
+    (0..items::SLOTS).find_map(|k| {
+        let a = ITEMS.get(usize::from(c.items[k]))?.active?;
+        if c.active_ready[k] > now {
+            return None;
+        }
+        let near =
+            |r: f32| (0..SEATS).any(|e| m.attackable(team, e) && math::distance(me.pos, m.units[e].pos) <= r);
+        let worth = if a.hits.is_empty() { hurt && near(ENGAGE) } else { near(a.radius) };
+        worth.then_some(Order::Use { inv: k as u8 })
+    })
 }
 
 /// The unit as an order names it.
@@ -109,6 +132,17 @@ pub fn think(m: &Match, seat: usize, out: &mut SeatInput) {
         };
         m.units[structure_slot(team, k)].pos
     };
+    // A treat when hurt (one at a time, saving the last for worse), and an item's active when it
+    // answers what's going on.
+    if me.hp < me.stats.max_hp * 0.5
+        && c.treat_ready <= now
+        && c.treats > u8::from(me.hp > me.stats.max_hp * RETREAT)
+    {
+        out.push(Order::Use { inv: el_proto::order::TRINKET });
+    }
+    if let Some(o) = active(m, seat) {
+        out.push(o);
+    }
     if me.hp < me.stats.max_hp * RETREAT {
         // Nothing heals at the fountain in ARAM: a relic on our side if one is up, else behind our
         // turret, out of the fight but near enough to share the wave's experience.
@@ -139,6 +173,27 @@ pub fn think(m: &Match, seat: usize, out: &mut SeatInput) {
         let braver = me.hp / me.stats.max_hp >= them.hp / them.stats.max_hp - 0.15;
         if braver || dist <= me.stats.range + me.radius + them.radius {
             out.push(Order::Attack { unit: unit_ref(m, e) });
+            return;
+        }
+    }
+    // Up two champions or more (or the enemy's all down): press on to their foremost structure
+    // that can be hit, wave or not, as players end a won fight. (Deaths are everyone's news.)
+    let alive = |t: u8| (0..SEATS).filter(|&s| team_of_seat(s) == t && m.units[s].alive).count();
+    let (ours, theirs) = (alive(team), alive(1 - team));
+    if theirs == 0 || ours >= theirs + 2 {
+        let target = [
+            structure::OUTER,
+            structure::INHIB_TURRET,
+            structure::INHIBITOR,
+            structure::NEXUS_TURRET_A,
+            structure::NEXUS_TURRET_B,
+            structure::NEXUS,
+        ]
+        .into_iter()
+        .map(|k| structure_slot(1 - team, k))
+        .find(|&i| m.units[i].alive && m.exposed(i));
+        if let Some(i) = target {
+            out.push(Order::AttackMove { to: m.map.snap(m.units[i].pos) }.quantized());
             return;
         }
     }

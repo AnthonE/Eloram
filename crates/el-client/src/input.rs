@@ -77,6 +77,17 @@ impl Press {
     }
 }
 
+/// The keys that use an inventory slot (0 to 5) or the trinket (`el_proto::order::TRINKET`).
+pub const ITEM_KEYS: [(KeyCode, u8); 7] = [
+    (KeyCode::Digit1, 0),
+    (KeyCode::Digit2, 1),
+    (KeyCode::Digit3, 2),
+    (KeyCode::Digit5, 3),
+    (KeyCode::Digit6, 4),
+    (KeyCode::Digit7, 5),
+    (KeyCode::Digit4, el_proto::order::TRINKET),
+];
+
 /// What casts each slot (Q, W, E, R, D, F), in League's default layout and in its WASD one.
 const CAST: [(Press, u8); 6] = [
     (Press::Key(KeyCode::KeyQ), slot::Q),
@@ -316,9 +327,17 @@ fn read(
     }
     // A card's reroll: Shift with its number, or Ctrl where Shift casts.
     let reroll = if wasd { ctrl } else { shift };
+    let screen = me.champs[seat].screen.open;
     for (key, card) in [(KeyCode::Digit1, 0u8), (KeyCode::Digit2, 1), (KeyCode::Digit3, 2)] {
-        if keys.just_pressed(key) && me.champs[seat].screen.open {
+        if keys.just_pressed(key) && screen {
             c.pending.push(if reroll { Order::Reroll { card } } else { Order::PickAugment { card } });
+        }
+    }
+    // League's item keys: 1, 2, 3, 5, 6, 7 the inventory (1 to 3 the cards' while a screen is
+    // open), 4 the trinket.
+    for (key, inv) in ITEM_KEYS {
+        if keys.just_pressed(key) && !(screen && inv < 3) {
+            c.pending.push(Order::Use { inv });
         }
     }
     if keys.just_pressed(KeyCode::KeyP) {

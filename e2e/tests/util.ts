@@ -16,6 +16,22 @@ export function luminanceStdDev(png: Buffer): number {
   return Math.sqrt(Math.max(0, sumSq / n - mean * mean));
 }
 
+/** The median luminance (0 to 255) of the picture's middle, a box a fifth of its width and height:
+ * where the camera looks. */
+export function centreLuminance(png: Buffer): number {
+  const img = PNG.sync.read(png);
+  const [w, h] = [img.width, img.height];
+  const ls: number[] = [];
+  for (let y = Math.floor(h * 0.4); y < Math.floor(h * 0.6); y++) {
+    for (let x = Math.floor(w * 0.4); x < Math.floor(w * 0.6); x++) {
+      const i = (y * w + x) * 4;
+      ls.push(0.2126 * img.data[i] + 0.7152 * img.data[i + 1] + 0.0722 * img.data[i + 2]);
+    }
+  }
+  ls.sort((a, b) => a - b);
+  return ls[Math.floor(ls.length / 2)];
+}
+
 /** Reads the client's `window.__el` status object. */
 export async function el(page: Page): Promise<Record<string, any>> {
   return (await page.evaluate(() => (window as any).__el ?? {})) as Record<string, any>;

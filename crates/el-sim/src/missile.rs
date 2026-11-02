@@ -14,7 +14,7 @@ use crate::math;
 pub const MAX_MISSILES: usize = 512;
 /// Bits a [`Source::code`] takes on the wire.
 pub const CODE_BITS: u32 = el_proto::event::SOURCE_BITS;
-const _: () = assert!(Source::Augment(u8::MAX).code() < 1 << CODE_BITS);
+const _: () = assert!(Source::Item(u8::MAX).code() < 1 << CODE_BITS);
 
 /// Where a missile (or a zone) came from: what it does when it lands.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -30,6 +30,10 @@ pub enum Source {
     },
     Relic,
     Augment(u8),
+    /// An item's active (the item's number).
+    Item(u8),
+    /// A treat from the trinket's slot.
+    Treat,
 }
 
 impl Source {
@@ -47,6 +51,8 @@ impl Source {
             1 => Source::Turret,
             2 => Source::Fountain,
             3 => Source::Relic,
+            4 => Source::Treat,
+            c if c & 0x400 != 0 => Source::Item((c & 0xFF) as u8),
             c if c & 0x200 != 0 => Source::Augment((c & 0xFF) as u8),
             c if c & 0x100 != 0 => Source::Ability { champ: ((c >> 3) & 0x1F) as u8, slot: (c & 0x7) as u8 },
             _ => Source::Auto,
@@ -63,6 +69,8 @@ impl Source {
             Source::Ability { champ, slot } => 0x100 | ((champ & 0x1F) as u32) << 3 | (slot & 0x7) as u32,
             Source::Relic => 3,
             Source::Augment(a) => 0x200 | a as u32,
+            Source::Item(i) => 0x400 | i as u32,
+            Source::Treat => 4,
         }
     }
 }
@@ -307,13 +315,20 @@ mod tests {
     #[test]
     fn every_source_has_its_own_code() {
         const SLOTS: usize = MARK_SLOT as usize + 1;
-        let mut all = [Source::Auto; 4 + CHAMPIONS.len() * SLOTS + 256];
-        all[..4].copy_from_slice(&[Source::Auto, Source::Turret, Source::Fountain, Source::Relic]);
-        for (k, s) in all[4..4 + CHAMPIONS.len() * SLOTS].iter_mut().enumerate() {
+        const FIXED: usize = 5;
+        let mut all = [Source::Auto; FIXED + CHAMPIONS.len() * SLOTS + 512];
+        all[..FIXED].copy_from_slice(&[
+            Source::Auto,
+            Source::Turret,
+            Source::Fountain,
+            Source::Relic,
+            Source::Treat,
+        ]);
+        for (k, s) in all[FIXED..FIXED + CHAMPIONS.len() * SLOTS].iter_mut().enumerate() {
             *s = Source::Ability { champ: (k / SLOTS) as u8, slot: (k % SLOTS) as u8 };
         }
-        for (a, s) in all[4 + CHAMPIONS.len() * SLOTS..].iter_mut().enumerate() {
-            *s = Source::Augment(a as u8);
+        for (a, s) in all[FIXED + CHAMPIONS.len() * SLOTS..].iter_mut().enumerate() {
+            *s = if a < 256 { Source::Augment(a as u8) } else { Source::Item((a - 256) as u8) };
         }
         let mut codes = all.map(Source::code);
         for (s, &c) in all.iter().zip(&codes) {

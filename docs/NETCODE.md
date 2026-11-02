@@ -130,10 +130,10 @@ standby takes a room over on the old clock's timeline. Riot built the same thing
   its oldest, which on a slow frame is already the server's past.
 - **Orders** are what a MOBA player gives: move, attack-move, attack a unit, cast a slot (pressed
   and released, at a point, a unit or a direction), stop, hold, level a skill, pick an augment,
-  reroll one, buy, sell; and to the team, a ping and a vote to surrender (`el_sim::voice`). Each
-  carries a sequence number and repeats in every packet until
-  acked, and the server applies each exactly once, at its stamped tick or the next. A stalled
-  client's champion keeps doing what it was last told, because intent (where to go, whom to hit)
+  reroll one, buy, sell, use an item or a treat; and to the team, a ping and a vote to surrender
+  (`el_sim::voice`). Each carries a sequence number and repeats in every packet until acked, and
+  the server applies each exactly once, at its stamped tick or the next. A stalled client's
+  champion keeps doing what it was last told, because intent (where to go, whom to hit)
   lives in the sim, not in the input.
 - **A missing command** is stood in for by repeating the steer and nothing else, fading out after a
   few ticks (Gates' decay). An order is never repeated by the server.

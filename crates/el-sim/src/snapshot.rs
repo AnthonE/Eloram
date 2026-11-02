@@ -31,7 +31,7 @@ use crate::zone::Zone;
 
 pub const MAGIC: [u8; 4] = *b"ELS1";
 /// Bumped whenever the layout changes (a field added, a width changed).
-pub const VERSION: u16 = 2;
+pub const VERSION: u16 = 3;
 /// Magic, version, content version, tick, and the three pools' sizes.
 const HEAD: usize = 4 + 2 + 4 + 4 + 3 * 2;
 /// The FNV-1a digest of everything before it.
@@ -372,6 +372,9 @@ snap_struct!(Champ {
     points,
     ready,
     items,
+    active_ready,
+    treats,
+    treat_ready,
     augments,
     n_aug,
     screen,
@@ -451,6 +454,8 @@ impl Source {
             Source::Ability { champ, slot } => [3, champ, slot],
             Source::Relic => [4, 0, 0],
             Source::Augment(a) => [5, a, 0],
+            Source::Item(i) => [6, i, 0],
+            Source::Treat => [7, 0, 0],
         }
     }
     fn decode(b: [u8; 3]) -> Result<Self, SnapError> {
@@ -461,6 +466,8 @@ impl Source {
             3 => Source::Ability { champ: b[1], slot: b[2] },
             4 => Source::Relic,
             5 => Source::Augment(b[1]),
+            6 => Source::Item(b[1]),
+            7 => Source::Treat,
             _ => return Err(SnapError::Bad),
         })
     }

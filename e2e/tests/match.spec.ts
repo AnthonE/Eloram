@@ -88,6 +88,11 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   await page.screenshot({ path: `${shots}-shop.png` });
   await push(page, { t: "shop", open: false });
 
+  // The trinket: one treat to start, eaten (4).
+  expect(s.treats).toBe(1);
+  await push(page, { t: "use", inv: 6 });
+  s = await until(page, "a treat eaten", (s) => s.treats === 0);
+
   // A skill point into Q; Blink (D) down the lane.
   await push(page, { t: "level", slot: 0 });
   s = await until(page, "Q levelled", (s) => s.ranks.startsWith("1,"));

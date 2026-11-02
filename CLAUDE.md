@@ -46,7 +46,7 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   the last ten: about four minutes each); screenshots in `e2e/artifacts/`). The `webgpu` project (`scripts/e2e.sh art
   webgpu`) is headless WebGPU on SwiftShader's Vulkan. `scripts/e2e.sh` serves the `web/dist/` already
   built: rebuild it first. A test or the console drives the champion through `window.__elInbox`
-  (`{t:"move",x,y}`, `cast`, `buy`, `pick`, `level`, `champ_reroll`, `champ_swap`, `ready`, `aim`, `drop_link`,
+  (`{t:"move",x,y}`, `cast`, `buy`, `use`, `pick`, `level`, `champ_reroll`, `champ_swap`, `ready`, `aim`, `drop_link`,
   `ping`, `surrender`, `practice_champ`...:
   `el-client/src/dev_hooks.rs`) and reads `window.__el`. Headless Chromium draws with
   SwiftShader at about a frame a second: its pictures are right, its frame rates mean nothing.
@@ -114,7 +114,8 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   for `eloram`): the page signs in on `?signin=1` (`web/wallet.js`), agents with a key
   (`BotConfig::key`, `el-swarm --sign-in` with throwaway test keys). The server names
   `--siwe-domain` hosts (default: its own address), `--require-sign-in` turns guests away, and
-  `/online.json` lists the signed-in wallets for the store's playtime.
+  `/online.json` lists the signed-in wallets for the store's playtime. A wallet's champion-select
+  rerolls are banked across matches (`el-server/src/rerolls.rs`, `rerolls.json` in `--records`).
 - `scripts/publish-web.sh --server host:port --http url`: the page onto the Elo Pros origin
   (`elopros.com/games/eloram/play/`), refused if the live server's `/status.json` speaks another
   protocol.

@@ -1,5 +1,5 @@
-//! Mayhem's augments: picked on the screens at the start and at levels 7, 11 and 15, three offers
-//! a screen, one tier a screen (`docs/DESIGN.md`, "Mayhem: augments"). An augment is stat changes
+//! Mayhem's augments: picked on the screens at the start and at levels 7, 11 and 15 (and a fifth
+//! for whoever takes [`Trigger::Encore`]), three offers a screen, one tier a screen (`docs/DESIGN.md`, "Mayhem: augments"). An augment is stat changes
 //! and, for some, ops on a trigger.
 
 use super::{DmgKind, Op, StatMods, flat};
@@ -49,7 +49,13 @@ pub enum Trigger {
         radius: f32,
         ops: &'static [Op],
     },
+    /// Nothing runs: taking it earns one more augment screen, the fifth ([`FIFTH_TIER`]), opened
+    /// after the four the levels bring.
+    Encore,
 }
+
+/// The tier of the screen an [`Trigger::Encore`] earns.
+pub const FIFTH_TIER: Tier = Tier::Prismatic;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AugmentDef {
@@ -85,7 +91,7 @@ const fn self_buff(kind: BuffKind, secs: f32, value: f32) -> Op {
 
 /// The pool, in the order augments are numbered (the numbers are in the record: add at the end of
 /// a tier's run only with `CONTENT_VERSION` bumped).
-pub const AUGMENTS: [AugmentDef; 41] = [
+pub const AUGMENTS: [AugmentDef; 42] = [
     // Silver
     stat("Keen Edge", Tier::Silver, mods(15.0, 0.0, 0.0, 0.0, 0.0)),
     stat("Spark Plug", Tier::Silver, mods(0.0, 25.0, 0.0, 0.0, 0.0)),
@@ -238,6 +244,8 @@ pub const AUGMENTS: [AugmentDef; 41] = [
     ),
     stat("Grand Design", Tier::Prismatic, StatMods { ap: 120.0, mana: 500.0, ..StatMods::ZERO }),
     on("Stormbrand", Tier::Prismatic, Trigger::AutoHit { every: 2, ops: &[magic(80.0, 0.4, 0.4)] }),
+    // Gold, the third set
+    on("Encore", Tier::Gold, Trigger::Encore),
 ];
 
 /// "No augment".

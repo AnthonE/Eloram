@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { collectConsole, el, luminanceStdDev } from "./util";
+import { centreLuminance, collectConsole, el, luminanceStdDev } from "./util";
 
 const push = (page: any, cmd: Record<string, unknown>) =>
   page.evaluate((c: Record<string, unknown>) => {
@@ -21,6 +21,9 @@ const until = async (page: any, what: string, pred: (s: Record<string, any>) => 
 // each place worth looking at, the fog's darkness off so the whole of it shows, and one look with
 // the fog on. Pictures to e2e/artifacts/art-*.png, to put beside the references.
 const MID = 1920;
+// The spots whose middle is the lane's floor, which must be drawn there (a shader that fails to
+// compile draws nothing, and the chasm's dark shows through).
+const ON_FLOOR = ["inhibitor", "outer-turret", "middle"];
 const SPOTS: [string, number, number, number][] = [
   ["fountain", 1000, MID, 1.0],
   ["nexus", 2300, MID, 1.0],
@@ -60,9 +63,12 @@ test("the map's look", async ({ page }, info) => {
       await page.waitForTimeout(5_000);
       const png = await page.screenshot({ path: `${shots}-${name}.png` });
       expect(luminanceStdDev(png), name).toBeGreaterThan(8);
+      if (ON_FLOOR.includes(name)) expect(centreLuminance(png), `${name}: the floor drawn`).toBeGreaterThan(24);
     }
   } finally {
-    const errors = logs.filter((l) => l.startsWith("[error]") || l.startsWith("[pageerror]"));
+    const errors = logs.filter(
+      (l) => l.startsWith("[error]") || l.startsWith("[pageerror]") || /shader|pipeline/i.test(l),
+    );
     if (errors.length) console.log(errors.join("\n"));
   }
 });

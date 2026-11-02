@@ -151,6 +151,11 @@ pub struct Champ {
     /// The tick each of Q, W, E, R, D, F is ready.
     pub ready: [u32; 6],
     pub items: [u8; crate::content::items::SLOTS],
+    /// The tick each inventory slot's active is ready.
+    pub active_ready: [u32; crate::content::items::SLOTS],
+    /// Treats in the trinket's slot, and the tick the next may be eaten.
+    pub treats: u8,
+    pub treat_ready: u32,
     pub augments: [u8; 5],
     pub n_aug: u8,
     pub screen: Screen,
@@ -190,6 +195,9 @@ impl Champ {
             points: START_LEVEL,
             ready: [0; 6],
             items: [crate::content::items::NONE; crate::content::items::SLOTS],
+            active_ready: [0; crate::content::items::SLOTS],
+            treats: crate::content::items::TREATS_START,
+            treat_ready: 0,
             augments: [crate::content::augments::NONE; 5],
             n_aug: 0,
             screen: Screen::default(),
@@ -267,7 +275,7 @@ pub struct Match {
     /// keys come from the record, or else from the seed. Never hashed, never in a record's header.
     pub offer_secret: Option<u64>,
     /// Each seat's key for each augment screen, once known: a bit a screen in `offer_known`.
-    pub(crate) offer_keys: [[u32; 4]; SEATS],
+    pub(crate) offer_keys: [[u32; rules::MAX_SCREENS]; SEATS],
     pub(crate) offer_known: [u8; SEATS],
     /// The keys this tick drew from the secret, for the record: seat, screen, key.
     pub(crate) keys_drawn: [(u8, u8, u32); 2 * SEATS],
@@ -290,6 +298,15 @@ impl Match {
     /// The match's headliner.
     pub fn headliner(&self) -> &'static crate::content::headliners::HeadlinerDef {
         &crate::content::headliners::HEADLINERS[usize::from(self.headliner)]
+    }
+
+    /// The tier of augment screen `screen` (0 to 4): the four the match drew, and the fifth an
+    /// Encore earns.
+    pub fn screen_tier(&self, screen: usize) -> u8 {
+        match self.aug_tiers.get(screen) {
+            Some(&t) => t,
+            None => crate::content::augments::FIFTH_TIER as u8,
+        }
     }
 }
 
@@ -341,7 +358,7 @@ impl Match {
             aug_tiers: [0; 4],
             headliner: 0,
             offer_secret: None,
-            offer_keys: [[0; 4]; SEATS],
+            offer_keys: [[0; rules::MAX_SCREENS]; SEATS],
             offer_known: [0; SEATS],
             keys_drawn: [(0, 0, 0); 2 * SEATS],
             keys_drawn_n: 0,
@@ -408,7 +425,7 @@ impl Match {
         self.aug_tiers = tiers_for(seed);
         self.headliner = headliner_for(seed);
         self.offer_secret = None;
-        self.offer_keys = [[0; 4]; SEATS];
+        self.offer_keys = [[0; rules::MAX_SCREENS]; SEATS];
         self.offer_known = [0; SEATS];
         self.keys_drawn_n = 0;
         for seat in 0..SEATS {
@@ -696,6 +713,10 @@ impl Match {
             for it in c.items {
                 h.u32(u32::from(it));
             }
+            for r in c.active_ready {
+                h.u32(r);
+            }
+            h.u32(u32::from(c.treats) | c.treat_ready << 8);
             for a in c.augments() {
                 h.u32(u32::from(*a));
             }
@@ -708,6 +729,7 @@ impl Match {
                 c.screen.offers[2],
                 c.screens_done,
             ]));
+            h.u32(u32::from(c.screens_earned));
             h.u32(c.dead_until);
             h.u32(u32::from(c.cast.slot) | u32::from(c.cast.left) << 8);
             h.u32(u32::from(c.dash.active));

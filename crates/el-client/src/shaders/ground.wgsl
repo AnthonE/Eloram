@@ -1,8 +1,10 @@
 // The Causeway's stone (`ground.rs`): the floor, and the cliffs and parapets at its edges.
 //
 // Mode 0, the floor: three tiled layers (paving, snow, gravel) blended by the splat baked from the
-// map's shapes, each by its height so snow fills the joints first; the runner inlaid down the
-// lane's middle and the rings round the bases, cut from one tile, their grooves lit with the
+// map's shapes, each by its height so snow fills the joints first; on the high tier, the decals
+// worked out here rather than read (no texture more: a stage's 16 are near spent): cracks across
+// the paving in patches, and snow drifted in streaks across the seams. Then the runner inlaid down
+// the lane's middle and the rings round the bases, cut from one tile, their grooves lit with the
 // team's colour. Modes 1 and 2, the edges: cliff rock or dressed slabs, projected from the sides
 // and the top (triplanar), snow on what faces up, darkening into the chasm's haze with depth.
 // Every mode lies under the fog of war.
@@ -49,6 +51,81 @@ const ROCK: i32 = 4;
 const TAU: f32 = 6.2831853;
 // The chasm's haze, linear (`look::HAZE`).
 const HAZE: vec3<f32> = vec3(0.0027, 0.0050, 0.0130);
+
+// ---- The decals: noise and cracks, in world space (m) --------------------------------------------
+
+fn hash2(p: vec2<f32>) -> vec2<f32> {
+    let q = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+    return fract(sin(q) * 43758.5453);
+}
+
+// Value noise, 0 to 1.
+fn vnoise(p: vec2<f32>) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = hash2(i).x;
+    let b = hash2(i + vec2(1.0, 0.0)).x;
+    let c = hash2(i + vec2(0.0, 1.0)).x;
+    let d = hash2(i + vec2(1.0, 1.0)).x;
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+// How far `p` is from the nearest edge between two cells of a Voronoi pattern (in cells): where the
+// stone split.
+fn crack_dist(p: vec2<f32>) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    var near = vec2(0.0);
+    var cell = vec2(0.0);
+    var best = 8.0;
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            let g = vec2(f32(x), f32(y));
+            let r = g + hash2(i + g) - f;
+            let d = dot(r, r);
+            if d < best {
+                best = d;
+                near = r;
+                cell = g;
+            }
+        }
+    }
+    best = 8.0;
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            let g = cell + vec2(f32(x), f32(y));
+            let r = g + hash2(i + g) - f;
+            let e = r - near;
+            if dot(e, e) > 1e-5 {
+                best = min(best, dot(0.5 * (near + r), normalize(e)));
+            }
+        }
+    }
+    return best;
+}
+
+// Cracks: thin dark lines in patches over the paving (0 to 1), fewer near the lane's middle where
+// the runner is.
+fn cracks(xz: vec2<f32>) -> f32 {
+    let spots = smoothstep(0.58, 0.78, vnoise(xz * 0.13 + vec2(7.3, 1.9)));
+    if spots <= 0.0 {
+        return 0.0;
+    }
+    // A wobble, so a crack wanders rather than runs straight.
+    let w = vec2(vnoise(xz * 2.7), vnoise(xz * 2.7 + vec2(4.1, 9.2))) - 0.5;
+    let d = crack_dist(xz / 1.6 + w * 0.12);
+    let width = 0.012 + 0.012 * vnoise(xz * 1.3);
+    return (1.0 - smoothstep(width * 0.4, width, d)) * spots;
+}
+
+// Snow drifted by the wind in long streaks across the seams (0 to 1).
+fn drifts(xz: vec2<f32>) -> f32 {
+    // Along the wind, from the far side of the lane a little across it.
+    let a = vec2(xz.x * 0.96 + xz.y * 0.28, xz.y * 0.96 - xz.x * 0.28);
+    let n = vnoise(a * vec2(0.3, 2.4)) * 0.7 + vnoise(a * vec2(0.9, 6.0)) * 0.3;
+    return smoothstep(0.6, 0.78, n);
+}
 
 struct Surf {
     col: vec3<f32>,
@@ -176,10 +253,20 @@ fn floor_surface(wp: vec3<f32>) -> Lit {
     }
     let sp = textureSample(splat, splat_s, map_uv(wp));
     // Snow settles in the joints first, then over the stones; gravel the same, less.
-    let w_snow = clamp(sp.r * 2.0 - pav.height * 1.1 + (snow.height - 0.5) * 0.4, 0.0, 1.0);
+    var w_snow = clamp(sp.r * 2.0 - pav.height * 1.1 + (snow.height - 0.5) * 0.4, 0.0, 1.0);
     let w_grav = clamp(sp.g * 1.8 - pav.height * 0.7, 0.0, 1.0);
+    var crack = 0.0;
+    if !low {
+        // The streaks fill the joints and the low stones first, and thicken toward the edges.
+        let drift = drifts(wp.xz) * clamp(1.0 - pav.height * 1.2 + sp.r, 0.0, 1.0);
+        w_snow = max(w_snow, drift * 0.85);
+        crack = cracks(wp.xz) * (1.0 - w_snow) * (1.0 - w_grav * 0.5);
+    }
     var s = mix_surf(pav, grav, w_grav);
     s = mix_surf(s, snow, w_snow);
+    s.col *= 1.0 - 0.7 * crack;
+    s.ao *= 1.0 - 0.5 * crack;
+    s.rough = mix(s.rough, 1.0, crack);
     var o: Lit;
     o.col = s.col;
     o.n = floor_normal(s.n, 1.0);

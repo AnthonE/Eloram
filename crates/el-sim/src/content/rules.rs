@@ -190,6 +190,8 @@ pub const RELIC_BEAM: f32 = 0.22;
 
 /// The levels each augment screen opens at (the first is the start).
 pub const AUGMENT_LEVELS: [u8; 4] = [3, 7, 11, 15];
+/// Screens a champion may have at most: the four, and the fifth an Encore earns.
+pub const MAX_SCREENS: usize = 5;
 /// Combo Breaker: immobilised for this many of the last [`COMBO_WINDOW`] seconds cleanses, and
 /// crowd control can't land for [`COMBO_IMMUNE`] seconds.
 pub const COMBO_IMMOBILE: f32 = 5.0;

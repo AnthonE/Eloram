@@ -279,7 +279,9 @@ impl Match {
             Kind::Turret => {
                 for s in 0..SEATS {
                     if team_of_seat(s) == enemy {
-                        self.champs[s].gold += rules::TURRET_GOLD;
+                        let c = &mut self.champs[s];
+                        c.gold += rules::TURRET_GOLD;
+                        c.treats = (c.treats + 1).min(crate::content::items::TREATS_MAX);
                     }
                 }
             }

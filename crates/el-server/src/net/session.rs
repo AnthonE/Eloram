@@ -176,7 +176,7 @@ pub async fn run(
                             if let Some(s) = seated.take() {
                                 lobby.unseat(*s);
                             }
-                            lobby.enqueue(session, &name, agent, max_datagram, events_tx.clone());
+                            lobby.enqueue(session, &name, agent, max_datagram, events_tx.clone(), address);
                         }
                         Ok(ToServer::Leave) => lobby.leave(session),
                         Ok(ToServer::Reroll) => lobby.reroll(session),
@@ -186,8 +186,15 @@ pub async fn run(
                             if let Some(s) = seated.take() {
                                 lobby.unseat(*s);
                             }
-                            if !lobby.rejoin(session, &name, agent, max_datagram, events_tx.clone(), &token)
-                                && !post_lobby(&out, &ToClient::NoSeat)
+                            if !lobby.rejoin(
+                                session,
+                                &name,
+                                agent,
+                                max_datagram,
+                                events_tx.clone(),
+                                &token,
+                                address,
+                            ) && !post_lobby(&out, &ToClient::NoSeat)
                             {
                                 break;
                             }
