@@ -86,6 +86,7 @@ impl Match {
                 }
             }
             Order::Cast { slot, aim } => self.order_cast(seat, slot, aim, scratch),
+            Order::Use { inv } => self.use_item(seat, inv),
             Order::Stop => {
                 self.champs[seat].intent = Intent::Idle;
                 self.units[seat].path.clear();

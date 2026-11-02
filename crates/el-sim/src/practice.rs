@@ -86,16 +86,18 @@ impl Match {
     }
 
     /// The player's own rules, at the end of each tick it's stepped (the server's step and the
-    /// player's own prediction alike): nothing on cooldown, mana full.
+    /// player's own prediction alike): nothing on cooldown, mana full, the trinket full.
     pub(crate) fn practice_seat(&mut self, seat: usize) {
         if !self.practice || seat != PLAYER {
             return;
         }
         let now = self.tick;
         let c = &mut self.champs[seat];
-        for r in c.ready.iter_mut() {
+        for r in c.ready.iter_mut().chain(c.active_ready.iter_mut()) {
             *r = (*r).min(now);
         }
+        c.treat_ready = c.treat_ready.min(now);
+        c.treats = crate::content::items::TREATS_MAX;
         let u = &mut self.units[seat];
         u.mana = u.stats.max_mana;
     }

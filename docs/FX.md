@@ -9,7 +9,9 @@ when those are, in ticks. Animation will be timed to the windup this builds on, 
 Riot's posts are the source on what makes League's effects read (sources at the end). Nothing of
 theirs is traced, sampled or named (`CLAUDE.md`, "Every name is the game's own").
 
-## Where it stands
+## Where it started
+
+As it was before this pass ("What landed", below, is where it stands now).
 
 The sim has an effect system and the client draws almost none of it.
 

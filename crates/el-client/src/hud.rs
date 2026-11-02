@@ -36,6 +36,8 @@ pub(crate) const PANEL_TOP: Color = Color::srgba(0.07, 0.085, 0.12, 0.94);
 /// The frames' bronze, and a slot's well.
 pub(crate) const FRAME: Color = Color::srgb(0.47, 0.39, 0.24);
 pub(crate) const WELL: Color = Color::srgb(0.07, 0.08, 0.11);
+/// The trinket's well: a little warmer than an item's.
+const TREAT_WELL: Color = Color::srgb(0.16, 0.11, 0.07);
 pub(crate) const TRIM: Color = Color::srgb(0.78, 0.64, 0.36);
 /// The bronze, faint, for what floats over the map rather than docks.
 pub(crate) const FRAME_SOFT: Color = Color::srgba(0.47, 0.39, 0.24, 0.55);
@@ -81,6 +83,12 @@ enum Label {
     CardKey(usize),
     CardReroll,
     Item(usize),
+    /// An inventory slot's active's seconds left (0 to 5), or the trinket's (6).
+    ItemCd(usize),
+    /// The key over an inventory slot whose item has an active.
+    ItemKey(usize),
+    /// The trinket's treats.
+    Treats,
     Shop(usize),
     ShopCost(usize),
     ShopGold,
@@ -160,6 +168,7 @@ enum Tip {
     Ability(usize),
     Item(usize),
     Shop(usize),
+    Trinket,
 }
 
 /// A button's colour at rest: lighter hovered, darker pressed.
@@ -294,6 +303,21 @@ pub(crate) fn text(s: &str, size: f32, color: Color) -> impl Bundle {
 }
 
 /// A tight shadow under words, to read them over the bright ground.
+/// An item slot's cooldown: its seconds over a shade, both empty while it's ready (`Label::ItemCd`).
+fn item_cd(k: usize) -> impl Bundle {
+    (
+        Node {
+            position_type: PositionType::Absolute,
+            width: percent(100),
+            height: percent(100),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            ..default()
+        },
+        children![(text("", 15.0, TEXT), outline(), Label::ItemCd(k))],
+    )
+}
+
 pub(crate) fn outline() -> TextShadow {
     TextShadow { offset: Vec2::splat(1.0), color: Color::srgba(0.0, 0.0, 0.0, 0.85) }
 }
@@ -918,6 +942,16 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                             Visibility::Hidden,
                             ItemIcon::Held(k),
                         ),
+                        item_cd(k),
+                        (
+                            Node {
+                                position_type: PositionType::Absolute,
+                                left: px(2),
+                                bottom: px(0),
+                                ..default()
+                            },
+                            children![(text("", 9.0, GOLD), outline(), Label::ItemKey(k))],
+                        ),
                     ],
                 ))
                 .id()
@@ -937,6 +971,7 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
         .spawn((
             Node {
                 justify_content: JustifyContent::Center,
+                flex_grow: 1.0,
                 padding: UiRect::axes(px(6), px(3)),
                 border_radius: BorderRadius::all(px(4)),
                 ..default()
@@ -944,6 +979,38 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
             children![(text("", 15.0, GOLD), outline(), Label::Gold)],
         ))
+        .id();
+    // The trinket's slot beside the gold: its treats, and the key that eats one.
+    let trinket = commands
+        .spawn((
+            Button,
+            Node {
+                width: px(38),
+                height: px(26),
+                padding: UiRect::left(px(8)),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(5)),
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BorderColor::all(Color::srgb(0.42, 0.32, 0.18)),
+            BackgroundColor(TREAT_WELL),
+            Tip::Trinket,
+            children![
+                (text("", 11.0, TEXT), outline(), Label::Treats),
+                item_cd(el_proto::order::TRINKET as usize),
+                (
+                    Node { position_type: PositionType::Absolute, left: px(3), top: px(1), ..default() },
+                    children![(text("4", 9.0, GOLD), outline())],
+                ),
+            ],
+        ))
+        .id();
+    let gold = commands
+        .spawn(Node { column_gap: px(4), align_items: AlignItems::Center, ..default() })
+        .add_children(&[trinket, gold])
         .id();
     let right = commands
         .spawn(Node { flex_direction: FlexDirection::Column, row_gap: px(5), ..default() })
@@ -1889,6 +1956,18 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                 let it = c.pred.champs[c.seat].items[k];
                 if it == items::NONE { String::new() } else { ITEMS[usize::from(it)].name.into() }
             }
+            (Label::ItemCd(k), Some(c)) => {
+                let ch = &c.pred.champs[c.seat];
+                let ready = if k < items::SLOTS { ch.active_ready[k] } else { ch.treat_ready };
+                let left = ready.saturating_sub(c.pred.tick);
+                if left > 0 { format!("{:.0}", (left as f32 / TICK_HZ as f32).ceil()) } else { String::new() }
+            }
+            (Label::ItemKey(k), Some(c)) => {
+                let it = c.pred.champs[c.seat].items[k];
+                let active = ITEMS.get(usize::from(it)).is_some_and(|d| d.active.is_some());
+                if active { ["1", "2", "3", "5", "6", "7"][k].into() } else { String::new() }
+            }
+            (Label::Treats, Some(c)) => format!("×{}", c.pred.champs[c.seat].treats),
             (Label::Shop(k), _) => ITEMS[k].name.into(),
             (Label::ShopCost(k), _) => ITEMS[k].cost.to_string(),
             (Label::Vote, Some(c)) => {
@@ -2471,6 +2550,7 @@ fn tooltip(
             }
             Tip::Item(_) => String::new(),
             Tip::Shop(k) => tips::item_tip(k as u8),
+            Tip::Trinket => tips::treat_tip(ch.treats),
         }
     });
     let said = said.filter(|s| !s.is_empty());

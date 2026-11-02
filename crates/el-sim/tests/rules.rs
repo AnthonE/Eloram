@@ -447,3 +447,125 @@ fn only_a_champions_own_team_is_told_its_ultimate_is_ready() {
     m.champs[0].ready[3] = m.tick + 100;
     assert_eq!(m.quantize(0, 0).flags & ULT_READY, 0);
 }
+
+fn item(name: &str) -> u8 {
+    el_sim::content::items::ITEMS.iter().position(|i| i.name == name).expect("an item") as u8
+}
+
+#[test]
+fn a_treat_heals_costs_a_charge_and_each_enemy_turret_down_adds_one() {
+    use el_proto::order::TRINKET;
+    use el_sim::content::items::{TREAT, TREATS_MAX, TREATS_START};
+    let (mut m, mut s) = quiet([0; SEATS]);
+    m.tick = ticks(16.0);
+    bench_others(&mut m, &[0]);
+    place(&mut m, 0, Vec2::new(6_000.0, MID_Y));
+    assert_eq!(m.champs[0].treats, TREATS_START);
+    m.units[0].hp = 200.0;
+    order(&mut m, &mut s, 0, Order::Use { inv: TRINKET });
+    assert!(m.units[0].hp > 200.0, "healed: {}", m.units[0].hp);
+    assert!(m.units[0].buff(BuffKind::MoveSpeed, m.tick) > 0.0, "and a moment's speed");
+    assert_eq!(m.champs[0].treats, TREATS_START - 1);
+    assert!(events(&m).iter().any(|e| matches!(
+        e,
+        el_sim::events::Event::Heal { target: 0, from: el_sim::missile::Source::Treat, .. }
+    )));
+    // None left: nothing.
+    let hp = m.units[0].hp;
+    order(&mut m, &mut s, 0, Order::Use { inv: TRINKET });
+    assert!(m.units[0].hp - hp < 1.0, "no heal but regeneration's");
+    // Dusk's outer turret falls to Dawn: every Dawn champion gets one more, and only Dawn's.
+    let outer = structure_slot(DUSK, structure::OUTER);
+    let before_dusk = m.champs[5].treats;
+    m.units[outer].hp = 1.0;
+    let at = m.units[outer].pos - Vec2::new(300.0, 0.0);
+    place(&mut m, 0, at);
+    let target = unit_ref(&m, outer);
+    for _ in 0..ticks(5.0) {
+        order(&mut m, &mut s, 0, Order::Attack { unit: target });
+        if !m.units[outer].alive {
+            break;
+        }
+    }
+    assert!(!m.units[outer].alive, "the turret fell");
+    assert_eq!(m.champs[0].treats, 1, "the one who ate theirs has one again");
+    assert!((1..5).all(|k| m.champs[k].treats == TREATS_START + 1), "Dawn's each got one");
+    assert_eq!(m.champs[5].treats, before_dusk, "Dusk got none");
+    // And on a cooldown between treats, up to the most.
+    idle(&mut m, &mut s, ticks(TREAT.cd));
+    m.champs[0].treats = TREATS_MAX;
+    m.units[0].hp = 200.0;
+    order(&mut m, &mut s, 0, Order::Use { inv: TRINKET });
+    order(&mut m, &mut s, 0, Order::Use { inv: TRINKET });
+    assert_eq!(m.champs[0].treats, TREATS_MAX - 1, "the second waits {} s", TREAT.cd);
+    idle(&mut m, &mut s, ticks(TREAT.cd));
+    order(&mut m, &mut s, 0, Order::Use { inv: TRINKET });
+    assert_eq!(m.champs[0].treats, TREATS_MAX - 2);
+}
+
+#[test]
+fn an_items_active_works_from_its_slot_and_waits_its_cooldown() {
+    let (mut m, mut s) = quiet([0; SEATS]);
+    m.tick = ticks(16.0);
+    bench_others(&mut m, &[0, 5]);
+    m.champs[0].gold = 5_000.0;
+    place(&mut m, 0, map::spawn_point(DAWN, 0));
+    order(&mut m, &mut s, 0, Order::Buy { item: 0 });
+    order(&mut m, &mut s, 0, Order::Buy { item: item("Bulwark Charm") });
+    order(&mut m, &mut s, 0, Order::Buy { item: item("Thunder Censer") });
+    // An item with no active does nothing.
+    order(&mut m, &mut s, 0, Order::Use { inv: 0 });
+    assert_eq!(m.champs[0].active_ready[0], 0);
+    // The charm: a shield on its holder.
+    order(&mut m, &mut s, 0, Order::Use { inv: 1 });
+    assert!(m.units[0].shield > 0.0, "shielded");
+    let ready = m.champs[0].active_ready[1];
+    assert!(ready > m.tick);
+    m.units[0].shield = 0.0;
+    order(&mut m, &mut s, 0, Order::Use { inv: 1 });
+    assert_eq!(m.units[0].shield, 0.0, "not again until it's ready");
+    // The censer: a blast on the enemies near, none farther.
+    place(&mut m, 0, Vec2::new(6_000.0, MID_Y));
+    place(&mut m, 5, Vec2::new(6_300.0, MID_Y));
+    idle(&mut m, &mut s, 1);
+    let hp = m.units[5].hp;
+    order(&mut m, &mut s, 0, Order::Use { inv: 2 });
+    assert!(m.units[5].hp < hp, "the enemy near is hit");
+    assert!(m.units[5].cc.slow > 0.0, "and slowed");
+    // Stunned: no items.
+    m.units[0].cc.stun = m.tick + ticks(1.0);
+    m.champs[0].active_ready = [0; 6];
+    m.units[0].shield = 0.0;
+    order(&mut m, &mut s, 0, Order::Use { inv: 1 });
+    assert_eq!(m.units[0].shield, 0.0, "not while stunned");
+}
+
+#[test]
+fn encore_earns_a_fifth_screen_and_it_is_prismatic() {
+    use el_sim::content::augments::{FIFTH_TIER, Tier};
+    let (mut m, mut s) = quiet([0; SEATS]);
+    idle(&mut m, &mut s, 1);
+    let encore = augment("Encore");
+    assert_eq!(AUGMENTS[usize::from(encore)].tier, Tier::Gold);
+    // Four screens done the usual way, Encore among them.
+    m.champs[0].level = 15;
+    m.champs[0].screens_earned = 4;
+    for screen in 0..4 {
+        idle(&mut m, &mut s, 1);
+        assert!(m.champs[0].screen.open, "screen {screen}");
+        if screen == 1 {
+            m.champs[0].screen.offers[0] = encore;
+        }
+        order(&mut m, &mut s, 0, Order::PickAugment { card: 0 });
+    }
+    assert!(m.champs[0].augments().contains(&encore));
+    idle(&mut m, &mut s, 1);
+    let c = m.champs[0];
+    assert!(c.screen.open, "the fifth screen");
+    assert_eq!(c.screen.tier, FIFTH_TIER as u8);
+    assert!(c.screen.offers.iter().all(|&a| AUGMENTS[usize::from(a)].tier == FIFTH_TIER && a != encore));
+    order(&mut m, &mut s, 0, Order::PickAugment { card: 2 });
+    assert_eq!(m.champs[0].n_aug, 5);
+    idle(&mut m, &mut s, 1);
+    assert!(!m.champs[0].screen.open, "and no sixth");
+}

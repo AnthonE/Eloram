@@ -108,13 +108,19 @@ units, of either team, gets 16% of missing health and mana (Mayhem: 22%).
 
 - **Gold**: passive income from 1:00; minion kills (last hits), champion kills and assists, turrets
   (shared by the team). Shared experience from deaths within range.
-- **Items**: bought in the shop while it is open, six slots and a trinket. The trinket slot holds
-  Poro-Snax-like treats, with one more charge for each enemy turret destroyed.
+- **Items**: bought in the shop while it is open, six slots and a trinket. Four of the finished
+  items have an active, used from their slot's key and then on a cooldown of their own (ability
+  haste doesn't shorten it): Bulwark Charm a shield, Windstride a burst of speed, Thunder Censer a
+  blast that slows the enemies near, Mending Chalice a heal. Not while stunned or in the air;
+  silence doesn't stop one. `el_sim::content::items` is their numbers.
+- **The trinket** holds treats (Hearthbread): one to start, one more for every champion of a team
+  each time it destroys an enemy turret, six at most. Eating one heals a little (halved, as all
+  healing is) and gives a moment's speed, then 10 s before the next.
 
 ## Mayhem: augments
 
-- **Four augment screens**: at the start (level 3), and at levels 7, 11 and 15. Some augments grant
-  a fifth.
+- **Four augment screens**: at the start (level 3), and at levels 7, 11 and 15. One augment, Encore
+  (Gold), earns a fifth: Prismatic, opened after the four (at once, if they're all done).
 - **Three offers** a screen, and each offer can be rerolled once.
 - **Tiers**: Silver, Gold and Prismatic. Everyone gets the same tier on a given screen, and the
   first two screens are never both Silver.
@@ -144,8 +150,9 @@ League's defaults, because that is what players' hands know:
   indicator"), a held key shows the ability's range and its shape where it would land (a
   skillshot's lane, an area's circle kept in range, a dash's path, a blink's landing) and letting go
   casts; **Esc** or a right click calls it off. **Ctrl** with an ability's key levels it.
-- **1, 2, 3** take an augment card while a screen is open, **Shift** with one rerolls it (items have
-  no actives yet, so the number keys are free). **P** the shop, **Tab** the scoreboard (with the
+- **1, 2, 3, 5, 6, 7** use the items in the six slots, **4** eats a treat (League's item keys).
+  While an augment screen is open, **1, 2, 3** take its cards instead, and **Shift** with one
+  rerolls it. **P** the shop, **Tab** the scoreboard (with the
   button that opens a vote to surrender, from 8:00; an open vote shows its yes and no).
 - **G** (or **Alt**) with a left click pings "look here", **Ctrl** with one "careful", on the unit
   under the cursor if there is one. Five at once, then one a second; the team alone sees them.
@@ -168,8 +175,9 @@ League's defaults, because that is what players' hands know:
   ultimate; the key on each, the cooldown swept away clockwise with its seconds counted over it and
   a flash as it comes back, the ranks under it, a **+** over it while a point may go there, which a
   click spends too, a blue border while the mana's short), health, mana, the items (each with an
-  icon: the mark of what it gives most of, a badge for the next, a gold rim on a finished item) and
-  the gold, in one panel at the bottom's middle; the score and clock at the top; the allies down the
+  icon: the mark of what it gives most of, a badge for the next, a gold rim on a finished item; an
+  active's key at its corner and its seconds over it while it cools down), the trinket's treats
+  beside the gold, in one panel at the bottom's middle; the score and clock at the top; the allies down the
   left (each one's ultimate an orb on its portrait, lit while it's ready: only its team is told);
   the target frame at the top left (the unit last clicked or attacked: its name, level, health and
   shield, mana and what holds it, `hud_target.rs`); a tooltip over an ability, an item or a shop's

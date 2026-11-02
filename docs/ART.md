@@ -6,7 +6,9 @@ structures with their team's light in them. The pictures we're aiming at are the
 nothing of Riot's is traced, sampled or named (`CLAUDE.md`, "Every name is the game's own"). The UI
 is not part of this pass.
 
-## Where it stands
+## Where it started
+
+As it was before this pass ("What landed", below, is where it stands now).
 
 `el-client/src/view.rs` draws the Causeway from the map's own shapes, and nothing else:
 - the floor is one plane with a 960×240 texture coloured per pixel (stone, a tint each side, green

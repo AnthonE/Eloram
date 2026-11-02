@@ -71,10 +71,11 @@ experience, gold, items, the kill feed, a minimap, the augment cards, the shop, 
 Chromium (queue, augment, shop, a skill, Blink, a walk with no correction at all, the enemy seen
 only once the waves meet).
 
-Not yet: champion art (Phase 5 gave each role a figure built from primitives, in its champion's
-colour: `el-client/src/models.rs`), WASD bound on the page (the champion select, five more
-champions and cast indicators came with Phase 5). Not measured: the frame
-rate on a real GPU (headless Chromium here draws in software, about a frame a second at 960×540).
+Left then, and done since: champion art (Phase 5 gave each role a figure built from primitives,
+`el-client/src/models.rs`, still the stand-in while a model loads; the models came in Phase 7), WASD
+bound on the page (`?keys=wasd`, League's layout), the champion select, five more champions and
+cast indicators (Phase 5). Still not measured: the frame rate on a real GPU (headless Chromium here
+draws in software, about a frame a second at 960×540).
 
 ## 5. Mayhem, the record, spectating, Elo Pros
 The augment set across four screens, Combo Breaker, headliners, more champions. The referee,
@@ -233,3 +234,50 @@ the new match with the champion it asked for; without the fix the first switch w
 champion, the server standing in for every command. The golden hashes don't move (nothing in the
 sim changed); the wire has a field more in the `Match` message and nothing more in a snapshot,
 and an older page or server simply takes any stream, as before.
+
+Then the camera and the HUD, as MOBA players know them (`DESIGN.md`, "Controls" and "The HUD"): the
+camera across the lane diagonally as ARAM's is, 56° down through a 40° lens, free to start and
+locked with Y; the HUD in one panel at the bottom's middle, with abilities' painted icons and their
+cooldowns swept clockwise, the champion's live portrait and stats, item icons, the allies' live
+portraits down the left with their ultimates' orbs, a target frame, tooltips read from the sim's
+tables, health bars ticked by the hundred, the shop in the middle with a Recommended row, the
+death screen's grey and recap, and a square minimap turned as the camera turns.
+
+Then the draw calls (`ART.md`, "What landed"; `scripts/e2e.sh draws` counts WebGL2's a frame, by
+shader and mesh, which doesn't depend on the GPU): 189 to 217 a frame on the low tier and 289 to
+316 on the high, to 92 to 108 and 146 to 159, about half. The bursts' pool drawn only while a burst
+lasts, the plinths one mesh, health bars' backs opaque, and the HUD's text, slots and thin bars
+drawn in fewer calls with the same look. What's left in the HUD is mostly its icons, portraits and
+panels' gradients.
+
+## 8. What the design said and the game didn't have, and what's left
+
+First the rules `DESIGN.md` described that the sim didn't keep (`CONTENT_VERSION` 4,
+`snapshot::VERSION` 3, protocol unchanged but for an order):
+- **The trinket**: treats (Hearthbread), one to start and one more for each enemy turret the team
+  destroys, six at most, eaten on 4: a little health and a moment's speed, 10 s apart.
+- **Item actives**: four finished items with one (a shield, a burst of speed, a blast that slows, a
+  heal), used on 1, 2, 3, 5, 6 and 7 as League's, their cooldowns their own. One order says both,
+  `Order::Use { inv }` (the trinket is slot 6), predicted with the rest of the champion; what they
+  do goes out as heals, shields and damage from `Source::Item` and `Source::Treat`, under the same
+  per-team rules as every other source's. The HUD shows a slot's key and its seconds, and the
+  treats beside the gold.
+- **A fifth augment screen**: Encore (Gold) earns one, Prismatic, after the four.
+- The server's bots eat treats when hurt and use the actives they buy.
+Measured: the golden bot match (seed 11) now ends at 23:19 (14:00 before: treats and the actives
+keep champions in the lane), its tick 55 µs on average; the golden hashes hold native and wasm.
+
+Left, in no order:
+- **A real GPU.** Nobody has seen the game on one: the frame rate on either tier (the target is 60
+  fps at 1080p on integrated graphics, and a ten-way fight at 60 on `high`), and the effects'
+  share of the frame (`FX.md`, step 6).
+- **Listening.** The sounds were judged by their spectrograms and measures, not by ear.
+- **Tuning by hand**: each ability's look (`FX.md`, step 5, from the contact sheets), each
+  champion's clip windows (`CHAMPIONS.md`).
+- **Art**: decals (cracks, scorch, drifts over seams) and the brush's sway (`ART.md`); an outline
+  drawn as a line, where the rim stands in (`CHAMPIONS.md`); the HUD's last draw calls.
+- **The announcer's and the music's files**: wired, optional, dropped in by name (`FX.md`).
+- **Rerolls banked across games** (League's), which needs an account the server keeps; and the
+  agents' own team-view bots in the empty seats, where the server's bots sit now.
+- **The operator's**: where the game server runs (`--server`, `--http`, `--siwe-domain`), the
+  store's route to the page, and the listing.

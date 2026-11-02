@@ -15,7 +15,7 @@ use crate::path::MAX_WAYPOINTS;
 use crate::units::{Buff, Kind, Unit};
 
 /// Fields of the own champion's state.
-pub const OWN_FIELDS: usize = 159;
+pub const OWN_FIELDS: usize = 167;
 /// Bits of the own state's baseline's age: 1 to 15 ticks before the snapshot's, 0 for none (it
 /// goes whole). The server takes one only that young, so the client keeps the last 16 it took.
 pub const OWN_BACK_BITS: u32 = 4;
@@ -184,6 +184,11 @@ fn visit(u: &mut Unit, c: &mut Champ, f: &mut impl Fields) {
     for it in &mut c.items {
         narrow(f, it, 8);
     }
+    for t in &mut c.active_ready {
+        word(f, t);
+    }
+    narrow(f, &mut c.treats, 3);
+    word(f, &mut c.treat_ready);
     narrow(f, &mut c.n_aug, 3);
     for a in &mut c.augments {
         narrow(f, a, 8);

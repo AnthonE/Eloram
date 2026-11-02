@@ -56,6 +56,9 @@ pub mod slot {
     pub const COUNT: usize = 6;
 }
 
+/// The trinket's slot, after the six of the inventory ([`Order::Use`]).
+pub const TRINKET: u8 = 6;
+
 /// What a ping says ([`Order::Ping`]).
 pub mod ping {
     /// Look here.
@@ -102,6 +105,8 @@ pub enum Order {
     Ping { kind: u8, at: Vec2, unit: Option<UnitRef> },
     /// Vote to surrender (or not): a yes opens a vote when none is.
     Surrender { yes: bool },
+    /// Use what's in an inventory slot (0 to 5: its active), or the trinket ([`TRINKET`]).
+    Use { inv: u8 },
 }
 
 const TAG_BITS: u32 = 4;
@@ -135,6 +140,7 @@ impl Order {
             Order::Sell { .. } => 10,
             Order::Ping { .. } => 11,
             Order::Surrender { .. } => 12,
+            Order::Use { .. } => 13,
         }
     }
 
@@ -171,6 +177,7 @@ impl Order {
                 }
             }
             Order::Surrender { yes } => w.write_bool(yes),
+            Order::Use { inv } => w.write_bits(u32::from(inv), 3),
         }
     }
 
@@ -209,6 +216,13 @@ impl Order {
                 Order::Ping { kind, at, unit }
             }
             12 => Order::Surrender { yes: r.read_bool() },
+            13 => {
+                let inv = r.read_bits(3) as u8;
+                if inv > TRINKET {
+                    return Err(DecodeError::Invalid);
+                }
+                Order::Use { inv }
+            }
             _ => return Err(DecodeError::Invalid),
         };
         if r.overflowed() { Err(DecodeError::Truncated) } else { Ok(o) }
@@ -238,6 +252,7 @@ impl Order {
                 Order::Sell { .. } => 3,
                 Order::Ping { unit, .. } => 3 + 32 + 1 + if unit.is_some() { UnitRef::BITS } else { 0 },
                 Order::Surrender { .. } => 1,
+                Order::Use { .. } => 3,
             }
     }
 }
@@ -246,7 +261,7 @@ impl Order {
 mod tests {
     use super::*;
 
-    fn every() -> [Order; 16] {
+    fn every() -> [Order; 18] {
         let u = UnitRef { slot: 37, generation: 200 };
         let p = Vec2::new(7_123.4, 1_901.2);
         [
@@ -266,6 +281,8 @@ mod tests {
             Order::Ping { kind: ping::DANGER, at: p, unit: None },
             Order::Ping { kind: ping::BACK, at: p, unit: Some(u) },
             Order::Surrender { yes: true },
+            Order::Use { inv: 2 },
+            Order::Use { inv: TRINKET },
         ]
     }
 

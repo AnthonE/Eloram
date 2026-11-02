@@ -210,6 +210,10 @@ fn with(from: Source) -> String {
         Source::Ability { champ, slot } => ability(champ, slot).name.into(),
         Source::Relic => "A relic".into(),
         Source::Augment(a) => AUGMENTS.get(usize::from(a)).map_or("An augment", |d| d.name).into(),
+        Source::Item(i) => {
+            el_sim::content::items::ITEMS.get(usize::from(i)).map_or("An item", |d| d.name).into()
+        }
+        Source::Treat => el_sim::content::items::TREAT_NAME.into(),
     }
 }
 

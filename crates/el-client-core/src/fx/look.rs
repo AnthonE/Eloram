@@ -10,6 +10,7 @@
 //! place on the mixer's ladder, and whether a part is drawn for that viewer at all.
 
 use el_sim::content::champions::{BLINK_SLOT, CHAMPIONS, MARK_SLOT, ability};
+use el_sim::content::items::ITEMS;
 use el_sim::content::{AbilityDef, Effect, Filter, Op, Role, Target};
 use el_sim::missile::Source;
 
@@ -128,6 +129,11 @@ pub mod world {
         Palette { core: [1.0, 4.0, 1.6], edge: [0.3, 1.6, 0.6], smoke: [0.4, 0.6, 0.5] };
     pub const AUGMENT: Palette =
         Palette { core: [3.2, 1.8, 4.0], edge: [1.2, 0.5, 1.6], smoke: [0.4, 0.3, 0.5] };
+    /// An item's active: the shop's gold; a treat: the hearth's warm crumb.
+    pub const ITEM: Palette =
+        Palette { core: [4.2, 3.2, 1.2], edge: [1.8, 1.2, 0.3], smoke: [0.6, 0.5, 0.35] };
+    pub const TREAT: Palette =
+        Palette { core: [3.6, 2.4, 1.4], edge: [1.4, 0.8, 0.4], smoke: [0.55, 0.45, 0.35] };
     /// A team's own light (its turrets' lanterns, its minions'), Dawn's and Dusk's.
     pub const TEAM: [Palette; 2] = [
         Palette { core: [1.1, 2.4, 4.6], edge: [0.25, 0.7, 2.0], smoke: [0.35, 0.45, 0.6] },
@@ -470,6 +476,16 @@ pub fn look(source: Source, champ: Option<u8>, team: u8) -> Look {
             sounds[Part::Impact as usize] = Some(Sfx::AugmentProc);
             Look { sounds, ..none(world::AUGMENT, Ratings::new(3, 2, 3), Reach::World) }
         }
+        Source::Item(i) => {
+            let blast = ITEMS.get(usize::from(i)).and_then(|d| d.active).is_some_and(|a| !a.hits.is_empty());
+            sounds[Part::Impact as usize] = Some(if blast { Sfx::AugmentProc } else { Sfx::Empowered });
+            sounds[Part::Buff as usize] = Some(Sfx::Empowered);
+            Look { sounds, friendly: !blast, ..none(world::ITEM, Ratings::new(4, 2, 4), Reach::World) }
+        }
+        Source::Treat => {
+            sounds[Part::Buff as usize] = Some(Sfx::Heal);
+            Look { sounds, friendly: true, ..none(world::TREAT, Ratings::new(2, 2, 2), Reach::World) }
+        }
     }
 }
 
@@ -540,7 +556,18 @@ mod tests {
     #[test]
     fn every_source_has_a_look() {
         for team in 0..2 {
-            for s in [Source::Auto, Source::Turret, Source::Fountain, Source::Relic, Source::Augment(3)] {
+            let items = (0..ITEMS.len() as u8).map(Source::Item);
+            for s in [
+                Source::Auto,
+                Source::Turret,
+                Source::Fountain,
+                Source::Relic,
+                Source::Augment(3),
+                Source::Treat,
+            ]
+            .into_iter()
+            .chain(items)
+            {
                 let _ = look(s, None, team);
             }
             for c in 0..CHAMPIONS.len() as u8 {
