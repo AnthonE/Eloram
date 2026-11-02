@@ -114,7 +114,8 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   for `eloram`): the page signs in on `?signin=1` (`web/wallet.js`), agents with a key
   (`BotConfig::key`, `el-swarm --sign-in` with throwaway test keys). The server names
   `--siwe-domain` hosts (default: its own address), `--require-sign-in` turns guests away, and
-  `/online.json` lists the signed-in wallets for the store's playtime.
+  `/online.json` lists the signed-in wallets for the store's playtime. A wallet's champion-select
+  rerolls are banked across matches (`el-server/src/rerolls.rs`, `rerolls.json` in `--records`).
 - `scripts/publish-web.sh --server host:port --http url`: the page onto the Elo Pros origin
   (`elopros.com/games/eloram/play/`), refused if the live server's `/status.json` speaks another
   protocol.

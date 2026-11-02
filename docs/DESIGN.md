@@ -15,7 +15,10 @@ change to a golden hash.
   same orders as people.
 - **The draw**: ten different champions are dealt from the pool, one a seat, and a champion select
   of 20 s follows (`--select-secs`). A reroll sends yours to your team's bench and deals you one no
-  one holds; two a seat (League banks rerolls across games; nothing persists here yet). Anyone on
+  one holds. Rerolls are banked across matches, as League's are: a signed-in wallet holds two at
+  most (a new one starts with two), spends one on each reroll, and earns one back for each match
+  it's still seated in when the match ends; a guest gets one each select (`el-server`'s
+  `rerolls.rs`, kept in the records directory's `rerolls.json`). Anyone on
   the team can take a champion off its bench, leaving their own in its place. You see your own
   team's champions and bench only. The match starts when the time is up or everyone seated is
   ready, with the picks the select ended on; the server's bots keep what they were dealt.

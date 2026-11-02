@@ -23,6 +23,7 @@ use std::time::{Duration, Instant};
 
 use el_client_core::lobby::{Player, ToClient, UNSEEN};
 use el_match::{Control, MatchState, Outcome, SeatLease, ShardShared};
+use el_proto::auth::Address;
 use el_sim::content::champions::CHAMPIONS;
 use el_sim::math::Rng;
 use el_sim::units::{SEATS, team_of_seat};
@@ -30,6 +31,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::game::Game;
 use crate::recover::{LiveFile, Recovered};
+use crate::rerolls::Bank;
 
 /// The winner a match that couldn't go on is given: neither team (the page says no contest).
 pub const NO_CONTEST: u8 = 2;
@@ -45,8 +47,9 @@ pub const REJOIN_FOR: Duration = Duration::from_secs(60);
 const SEAT_ORDER: [u8; SEATS] = [0, 5, 1, 6, 2, 7, 3, 8, 4, 9];
 /// How long champion select lasts, unless everyone seated is ready sooner.
 pub const SELECT_FOR: Duration = Duration::from_secs(20);
-/// Rerolls a seat has in a select (League banks them across games; nothing persists here yet).
-pub const REROLLS: u8 = 2;
+/// Rerolls a seat has in a select until its player's are known: a signed-in player's are their
+/// wallet's bank, banked across matches as League's are, and a guest's a few (`crate::rerolls`).
+pub const REROLLS: u8 = crate::rerolls::BANK_MAX;
 
 /// What the lobby tells a session.
 pub enum LobbyEvent {
@@ -83,6 +86,8 @@ struct Waiting {
     tx: UnboundedSender<LobbyEvent>,
     /// The rejoin token it came with (rejoining; empty in the queue).
     token: String,
+    /// Its wallet, signed in (a guest: none).
+    wallet: Option<Address>,
 }
 
 struct Live {
@@ -99,6 +104,9 @@ struct Live {
     tokens: [[u8; 32]; SEATS],
     /// Rejoins waiting for their seat's old session to hand its lease back.
     pending: Vec<(u8, Waiting)>,
+    /// The wallet in each seat (a guest's, a bot's: none): those still seated as it ends each earn
+    /// a reroll.
+    wallets: [Option<Address>; SEATS],
 }
 
 /// What a match tells `seat`: `told`, with the seat, its rejoin token and its stream.
@@ -269,6 +277,8 @@ pub struct Lobby {
     dir: Option<PathBuf>,
     /// Practice matches may be asked for.
     practice: std::sync::atomic::AtomicBool,
+    /// Signed-in players' rerolls, banked across matches.
+    pub rerolls: Bank,
     /// Seatings so far: each one's snapshots go on a stream of its own ([`Lobby::next_stream`]).
     seatings: std::sync::atomic::AtomicU32,
     inner: Mutex<Inner>,
@@ -315,8 +325,10 @@ impl Lobby {
                 tokens: r.live.token_hashes(),
                 told: r.live.told,
                 pending: Vec::new(),
+                wallets: [None; SEATS],
             })
             .collect();
+        let rerolls = dir.as_ref().map_or_else(Bank::default, |d| Bank::kept(d.join("rerolls.json")));
         let shards = game.shards.len();
         Arc::new(Lobby {
             game,
@@ -324,6 +336,7 @@ impl Lobby {
             select_for,
             dir,
             practice: std::sync::atomic::AtomicBool::new(false),
+            rerolls,
             seatings: std::sync::atomic::AtomicU32::new(0),
             inner: Mutex::new(Inner {
                 next: seed,
@@ -347,7 +360,8 @@ impl Lobby {
         self.inner.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// Puts a session in the queue (again, if it was; out of a select it was in).
+    /// Puts a session in the queue (again, if it was; out of a select it was in); `wallet` is
+    /// its player's, signed in.
     pub fn enqueue(
         &self,
         session: u32,
@@ -355,6 +369,7 @@ impl Lobby {
         agent: bool,
         max_datagram: u16,
         tx: UnboundedSender<LobbyEvent>,
+        wallet: Option<Address>,
     ) {
         let mut inner = self.inner();
         Self::out_of_select(&mut inner, session);
@@ -366,6 +381,7 @@ impl Lobby {
             max_datagram,
             tx,
             token: String::new(),
+            wallet,
         });
         if inner.since.is_none() {
             inner.since = Some(Instant::now());
@@ -412,7 +428,15 @@ impl Lobby {
             Some(k) => select.picks.swap(0, k),
             None => select.picks[0] = champ,
         }
-        let w = Waiting { session, name: name.to_string(), agent, max_datagram, tx, token: String::new() };
+        let w = Waiting {
+            session,
+            name: name.to_string(),
+            agent,
+            max_datagram,
+            tx,
+            token: String::new(),
+            wallet: None,
+        };
         let roster = practice_roster(Player { name: name.to_string(), agent, bot: false });
         let s = Selecting {
             shard,
@@ -461,9 +485,18 @@ impl Lobby {
         }
     }
 
-    /// In champion select: `session`'s champion rerolled.
+    /// In champion select: `session`'s champion rerolled, a reroll spent from its wallet's bank.
     pub fn reroll(&self, session: u32) {
-        self.choose(session, |sel, seat| sel.reroll(seat));
+        let mut inner = self.inner();
+        let Some(s) = inner.selecting.iter_mut().find(|s| s.seat_of(session).is_some()) else { return };
+        let Some((seat, w)) = s.players.iter().find(|(_, w)| w.session == session) else { return };
+        let (seat, wallet) = (usize::from(*seat), w.wallet);
+        if s.select.reroll(seat) {
+            if let Some(a) = wallet {
+                self.rerolls.spend(a);
+            }
+            s.announce(Some(team_of_seat(seat)));
+        }
     }
 
     /// In champion select: `champ` off the team's bench for `session`.
@@ -533,6 +566,7 @@ impl Lobby {
         max_datagram: u16,
         tx: UnboundedSender<LobbyEvent>,
         token: &str,
+        wallet: Option<Address>,
     ) -> bool {
         let Some(token) = u128::from_str_radix(token, 16).ok().filter(|&t| t != 0 && token.len() == 32)
         else {
@@ -547,7 +581,7 @@ impl Lobby {
             return false;
         };
         let Some(seat) = l.tokens.iter().position(|t| *t == hash).map(|s| s as u8) else { return false };
-        let w = Waiting { session, name: name.to_string(), agent, max_datagram, tx, token };
+        let w = Waiting { session, name: name.to_string(), agent, max_datagram, tx, token, wallet };
         l.pending.retain(|(st, _)| *st != seat);
         if let Some((_, _, old)) = l.sessions.iter().find(|(_, st, _)| *st == seat) {
             if old.send(LobbyEvent::Replaced).is_ok() {
@@ -578,6 +612,7 @@ impl Lobby {
             return false;
         }
         tracing::info!(shard, m, seat, session = w.session, "rejoined");
+        l.wallets[usize::from(seat)] = w.wallet;
         l.sessions.push((w.session, seat, w.tx));
         l.empty_since = None;
         true
@@ -620,7 +655,7 @@ impl Lobby {
                         (m, NO_CONTEST)
                     }
                 };
-                Self::over(&mut inner, k, m, winner);
+                self.over(&mut inner, k, m, winner);
             }
         }
         // A shard whose thread has stopped ticking (it panicked outside a match): its matches are
@@ -638,7 +673,7 @@ impl Lobby {
                 inner.dead[k] = true;
                 let ms: Vec<u16> = inner.live.iter().filter(|l| l.shard == k).map(|l| l.m).collect();
                 for m in ms {
-                    Self::over(&mut inner, k, m, NO_CONTEST);
+                    self.over(&mut inner, k, m, NO_CONTEST);
                 }
             }
         }
@@ -677,11 +712,16 @@ impl Lobby {
                     (seat, w)
                 })
                 .collect();
+            // Each player's rerolls: their wallet's bank, or a guest's.
+            let mut select = Select::new(seed);
+            for (seat, w) in &players {
+                select.rerolls[usize::from(*seat)] = self.rerolls.balance(w.wallet);
+            }
             let s = Selecting {
                 shard,
                 m,
                 seed,
-                select: Select::new(seed),
+                select,
                 players,
                 roster,
                 ends: Instant::now() + self.select_for,
@@ -696,12 +736,18 @@ impl Lobby {
         self.start_due(&mut inner);
     }
 
-    /// Match `m` of shard `k` is over: its players told who won.
-    fn over(inner: &mut Inner, k: usize, m: u16, winner: u8) {
+    /// Match `m` of shard `k` is over: its players told who won, and each signed-in one still
+    /// seated earns a reroll (a match that couldn't go on earns none).
+    fn over(&self, inner: &mut Inner, k: usize, m: u16, winner: u8) {
         if let Some(l) = inner.live.iter_mut().find(|l| l.shard == k && l.m == m && l.over_at.is_none()) {
             l.over_at = Some(Instant::now());
-            for (_, _, tx) in &l.sessions {
+            for (_, seat, tx) in &l.sessions {
                 let _ = tx.send(LobbyEvent::Over { winner });
+                if winner != NO_CONTEST
+                    && let Some(a) = l.wallets[usize::from(*seat)]
+                {
+                    self.rerolls.earn(a);
+                }
             }
         }
     }
@@ -760,6 +806,7 @@ impl Lobby {
         let _ = shared.control.push(Control::Start { m, seed, picks, humans, secret, practice });
         let mut sessions = Vec::new();
         let mut tokens = [[0u8; 32]; SEATS];
+        let mut wallets = [None; SEATS];
         // What a player is told of the match: never the seed, from which every seat's augment
         // offers follow.
         let told = ToClient::Match {
@@ -798,6 +845,7 @@ impl Lobby {
                 }
                 continue;
             }
+            wallets[usize::from(seat)] = p.wallet;
             sessions.push((p.session, seat, p.tx));
         }
         if sessions.is_empty() {
@@ -810,13 +858,66 @@ impl Lobby {
             let file = LiveFile { told: told.clone(), tokens: tokens.iter().map(hex).collect() };
             file.write(dir, &format!("{seed:016x}"));
         }
-        Some(Live { shard, m, sessions, over_at: None, empty_since: None, told, tokens, pending: Vec::new() })
+        Some(Live {
+            shard,
+            m,
+            sessions,
+            over_at: None,
+            empty_since: None,
+            told,
+            tokens,
+            pending: Vec::new(),
+            wallets,
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A signed-in player's rerolls are its wallet's bank: spent in the select, earned back as a
+    /// match it's still in ends. A guest's are a few each select.
+    #[test]
+    fn a_signed_in_players_rerolls_are_its_wallets_bank() {
+        use crate::rerolls::{BANK_MAX, GUEST_REROLLS};
+        let (game, _) = Game::start(1, 2, el_sim::map::Map::leaked(), None, false, 0).unwrap();
+        let lobby = Lobby::new(game, Duration::ZERO, Duration::from_secs(60));
+        let wallet = Address([7; 20]);
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx2, _rx2) = tokio::sync::mpsc::unbounded_channel();
+        lobby.enqueue(1, "Signed", false, 1_200, tx, Some(wallet));
+        lobby.enqueue(2, "Guest", false, 1_200, tx2, None);
+        lobby.pass();
+        {
+            let inner = lobby.inner();
+            let r = inner.selecting[0].select.rerolls;
+            assert_eq!((r[0], r[5]), (BANK_MAX, GUEST_REROLLS), "the wallet's bank, a guest's few");
+        }
+        lobby.reroll(1);
+        lobby.reroll(2);
+        assert_eq!(lobby.rerolls.balance(Some(wallet)), BANK_MAX - 1, "spent from the bank");
+        assert_eq!(lobby.inner().selecting[0].select.rerolls[5], GUEST_REROLLS - 1);
+        lobby.ready(1);
+        lobby.ready(2);
+        let (k, m) = {
+            let inner = lobby.inner();
+            assert!(inner.selecting.is_empty(), "everyone ready: started");
+            (inner.live[0].shard, inner.live[0].m)
+        };
+        // A match that couldn't go on earns nothing; one that ends earns one back.
+        {
+            let mut inner = lobby.inner();
+            lobby.over(&mut inner, k, m, NO_CONTEST);
+        }
+        assert_eq!(lobby.rerolls.balance(Some(wallet)), BANK_MAX - 1);
+        lobby.inner().live[0].over_at = None;
+        {
+            let mut inner = lobby.inner();
+            lobby.over(&mut inner, k, m, 0);
+        }
+        assert_eq!(lobby.rerolls.balance(Some(wallet)), BANK_MAX, "earned back");
+    }
 
     #[test]
     fn a_match_draws_ten_different_champions() {

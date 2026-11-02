@@ -264,6 +264,8 @@ First the rules `DESIGN.md` described that the sim didn't keep (`CONTENT_VERSION
   treats beside the gold.
 - **A fifth augment screen**: Encore (Gold) earns one, Prismatic, after the four.
 - The server's bots eat treats when hurt and use the actives they buy.
+- Rerolls banked across matches for signed-in wallets (two at most, one spent a reroll, one
+  earned a match finished; a guest one a select), kept in the records directory.
 - The decals ART.md left (cracks across the paving, snow drifted across the seams, in the
   ground's shader on the high tier) and the brush's sway.
 Measured: the golden bot match (seed 11) now ends at 23:19 (14:00 before: treats and the actives
@@ -279,7 +281,6 @@ Left, in no order:
 - **Art**: an outline drawn as a line, where the rim stands in (`CHAMPIONS.md`); the HUD's last
   draw calls.
 - **The announcer's and the music's files**: wired, optional, dropped in by name (`FX.md`).
-- **Rerolls banked across games** (League's), which needs an account the server keeps; and the
-  agents' own team-view bots in the empty seats, where the server's bots sit now.
+- The agents' own team-view bots in the empty seats, where the server's bots sit now.
 - **The operator's**: where the game server runs (`--server`, `--http`, `--siwe-domain`), the
   store's route to the page, and the listing.
