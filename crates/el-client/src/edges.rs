@@ -58,12 +58,15 @@ fn edges(
             bevy::light::NotShadowCaster,
         ));
     }
-    // The rock under the props that stand off the edge.
+    // The rock under the props that stand off the edge: one column, as wide as each one needs (the
+    // same mesh and material, so they're drawn together, in the shadows' passes too).
+    let column = meshes.add(plinth(1.0));
     for d in el_client_core::scenery::plinths() {
+        let r = d.1 * S;
         commands.spawn((
-            Mesh3d(meshes.add(plinth(d.1 * S))),
+            Mesh3d(column.clone()),
             MeshMaterial3d(rock.clone()),
-            Transform::from_translation(world(d.0, 0.0)),
+            Transform::from_translation(world(d.0, 0.0)).with_scale(Vec3::new(r, 1.0, r)),
         ));
     }
     // Mist over the chasm: long soft sheets beside the lane, a little below the floor.
@@ -209,7 +212,8 @@ fn cliff(l: &[Vec2], rim: &[(Vec2, f32)]) -> Mesh {
     s.mesh()
 }
 
-/// A rough column of rock from the chasm up to the floor, `r` metres across the top.
+/// A rough column of rock from the chasm up to the floor, `r` metres across the top. Its width is
+/// `r` throughout and its heights aren't, so `plinth(1.0)` scaled by `r` across is `plinth(r)`.
 fn plinth(r: f32) -> Mesh {
     let segs = 9;
     let mut s = Strips::new();
