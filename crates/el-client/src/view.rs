@@ -302,7 +302,9 @@ fn setup_pools(
         opaque(&mut materials, Color::srgb(0.95, 0.28, 0.24)),
     ];
     let shield = opaque(&mut materials, Color::srgb(0.92, 0.94, 0.97));
-    let bar_bg = unlit(&mut materials, Color::srgba(0.0, 0.0, 0.0, 0.75));
+    // Opaque too: see-through, each bar's back was sorted among the rings and drawn alone, a draw
+    // call a unit on screen.
+    let bar_bg = opaque(&mut materials, Color::srgb(0.03, 0.035, 0.05));
     let ring_mesh = meshes.add(Annulus::new(0.85, 1.0));
     let bar_mesh = meshes.add(Rectangle::new(1.0, 0.13));
     let flat = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
