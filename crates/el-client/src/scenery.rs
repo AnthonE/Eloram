@@ -22,7 +22,7 @@ use el_sim::map;
 use el_sim::math::hash01;
 
 use crate::coords::{S, world};
-use crate::ground::{FogTex, FoggedMat, FoggedParams};
+use crate::ground::{BrushMat, FogTex, FoggedMat, FoggedParams};
 use crate::look::Look;
 
 pub struct SceneryPlugin;
@@ -318,14 +318,15 @@ fn report(
 }
 
 /// The brush: frosted thickets, a few dozen clumps a brush, each two crossed cards from the
-/// sprite atlas (`web/assets/brush.png`, three plants), merged into one mesh a brush.
+/// sprite atlas (`web/assets/brush.png`, three plants), merged into one mesh a brush, swaying in
+/// the wind (`shaders/brush.wgsl`).
 fn brush(
     mut commands: Commands,
     look: Res<Look>,
     server: Res<AssetServer>,
     fog: Res<FogTex>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut mats: ResMut<Assets<FoggedMat>>,
+    mut mats: ResMut<Assets<BrushMat>>,
 ) {
     if !look.art {
         return;
@@ -334,7 +335,7 @@ fn brush(
         .load_builder()
         .with_settings(|s: &mut bevy::image::ImageLoaderSettings| s.sampler = crate::mips::sampler(false))
         .load("brush.png");
-    let mat = mats.add(fog.fogged(
+    let mat = mats.add(fog.brush(
         StandardMaterial {
             base_color_texture: Some(tex),
             base_color: Color::srgb(0.86, 0.92, 1.0),

@@ -19,6 +19,7 @@ use crate::coords::{S, world};
 
 pub type GroundMat = ExtendedMaterial<StandardMaterial, Ground>;
 pub type FoggedMat = ExtendedMaterial<StandardMaterial, Fogged>;
+pub type BrushMat = ExtendedMaterial<StandardMaterial, Brush>;
 
 /// The ground's stone (`shaders/ground.wgsl`).
 #[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
@@ -91,6 +92,25 @@ impl MaterialExtension for Fogged {
     }
 }
 
+/// The brush's thickets: [`Fogged`]'s look, the cards swaying in the wind (`shaders/brush.wgsl`).
+#[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
+pub struct Brush {
+    #[uniform(100)]
+    pub params: FoggedParams,
+    #[texture(101)]
+    #[sampler(102)]
+    pub fog: Handle<Image>,
+}
+
+impl MaterialExtension for Brush {
+    fn vertex_shader() -> ShaderRef {
+        "embedded://el_client/shaders/brush.wgsl".into()
+    }
+    fn fragment_shader() -> ShaderRef {
+        "embedded://el_client/shaders/fogged.wgsl".into()
+    }
+}
+
 /// The fog of war's texture: a texel a vision cell, its darkness in red (0 seen, up to 0.58
 /// unseen), the map's far side the top row.
 #[derive(Resource, Clone)]
@@ -100,6 +120,11 @@ impl FogTex {
     /// A material for something standing in the fog.
     pub fn fogged(&self, base: StandardMaterial, params: FoggedParams) -> FoggedMat {
         ExtendedMaterial { base, extension: Fogged { params, fog: self.0.clone() } }
+    }
+
+    /// The brush's material: fogged as anything else, swaying.
+    pub fn brush(&self, base: StandardMaterial, params: FoggedParams) -> BrushMat {
+        ExtendedMaterial { base, extension: Brush { params, fog: self.0.clone() } }
     }
 
     /// The plain kind: no glow, no snow.
@@ -155,7 +180,12 @@ impl Plugin for GroundPlugin {
         bevy::shader::load_shader_library!(app, "shaders/fog.wgsl");
         bevy::asset::embedded_asset!(app, "shaders/ground.wgsl");
         bevy::asset::embedded_asset!(app, "shaders/fogged.wgsl");
-        app.add_plugins((MaterialPlugin::<GroundMat>::default(), MaterialPlugin::<FoggedMat>::default()));
+        bevy::asset::embedded_asset!(app, "shaders/brush.wgsl");
+        app.add_plugins((
+            MaterialPlugin::<GroundMat>::default(),
+            MaterialPlugin::<FoggedMat>::default(),
+            MaterialPlugin::<BrushMat>::default(),
+        ));
         let fog = {
             let mut images = app.world_mut().resource_mut::<Assets<Image>>();
             let mut img = Image::new(

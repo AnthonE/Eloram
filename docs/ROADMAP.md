@@ -264,6 +264,8 @@ First the rules `DESIGN.md` described that the sim didn't keep (`CONTENT_VERSION
   treats beside the gold.
 - **A fifth augment screen**: Encore (Gold) earns one, Prismatic, after the four.
 - The server's bots eat treats when hurt and use the actives they buy.
+- The decals ART.md left (cracks across the paving, snow drifted across the seams, in the
+  ground's shader on the high tier) and the brush's sway.
 Measured: the golden bot match (seed 11) now ends at 23:19 (14:00 before: treats and the actives
 keep champions in the lane), its tick 55 µs on average; the golden hashes hold native and wasm.
 
@@ -274,8 +276,8 @@ Left, in no order:
 - **Listening.** The sounds were judged by their spectrograms and measures, not by ear.
 - **Tuning by hand**: each ability's look (`FX.md`, step 5, from the contact sheets), each
   champion's clip windows (`CHAMPIONS.md`).
-- **Art**: decals (cracks, scorch, drifts over seams) and the brush's sway (`ART.md`); an outline
-  drawn as a line, where the rim stands in (`CHAMPIONS.md`); the HUD's last draw calls.
+- **Art**: an outline drawn as a line, where the rim stands in (`CHAMPIONS.md`); the HUD's last
+  draw calls.
 - **The announcer's and the music's files**: wired, optional, dropped in by name (`FX.md`).
 - **Rerolls banked across games** (League's), which needs an account the server keeps; and the
   agents' own team-view bots in the empty seats, where the server's bots sit now.

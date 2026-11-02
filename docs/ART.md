@@ -233,4 +233,14 @@ Changed on the way:
   and a bar 8 px tall or less fills in two bands: 92 to 108 draws on the low tier, 146 to 159 on
   the high, about half of where it started. What's left in the HUD is mostly its icons, portraits
   and panels' gradients, each a call.
-- Not done: decals (cracks, scorch, drifts over seams).
+- **Decals, worked out in the ground's shader** (`shaders/ground.wgsl`, the high tier), not read
+  from textures, since a stage's 16 sampled textures are nearly spent: cracks across the paving in
+  patches (the edges of a Voronoi pattern, wobbled), and snow drifted in long streaks across the
+  seams along the wind, filling the joints first. No scorch: nothing on the Causeway burns where
+  it would leave one.
+- **The brush sways** (`shaders/brush.wgsl`): its own material, the fogged look with a vertex
+  shader that bends each card's top in the wind (a sway from where it stands, a slow gust over
+  the whole; its foot stays put). Its shadow doesn't sway.
+- The `art` suite checks that the floor is drawn in the middle of the spots that look at it (a
+  ground shader that fails to compile draws nothing, and the chasm's dark shows through: it
+  happened once on the way, to a word WGSL keeps for itself).
