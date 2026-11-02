@@ -101,20 +101,26 @@ struct Live {
     pending: Vec<(u8, Waiting)>,
 }
 
+/// What a match tells `seat`: `told`, with the seat, its rejoin token and its stream.
+fn seat_msg(told: &ToClient, seat: u8, token: &str, stream: u8) -> ToClient {
+    let mut msg = told.clone();
+    if let ToClient::Match { seat: s, rejoin, stream: st, .. } = &mut msg {
+        *s = seat;
+        *rejoin = token.to_string();
+        *st = stream;
+    }
+    msg
+}
+
 /// What a rejoin token is kept as.
 fn token_hash(token: &str) -> [u8; 32] {
     el_auth::keccak256(token.as_bytes())
 }
 
 impl Live {
-    /// What `seat` is told of the match: everything, and its rejoin token.
-    fn match_msg(&self, seat: u8, token: &str) -> ToClient {
-        let mut msg = self.told.clone();
-        if let ToClient::Match { seat: s, rejoin, .. } = &mut msg {
-            *s = seat;
-            *rejoin = token.to_string();
-        }
-        msg
+    /// What `seat` is told of the match: everything, its rejoin token and its stream.
+    fn match_msg(&self, seat: u8, token: &str, stream: u8) -> ToClient {
+        seat_msg(&self.told, seat, token, stream)
     }
 }
 
@@ -263,6 +269,8 @@ pub struct Lobby {
     dir: Option<PathBuf>,
     /// Practice matches may be asked for.
     practice: std::sync::atomic::AtomicBool,
+    /// Seatings so far: each one's snapshots go on a stream of its own ([`Lobby::next_stream`]).
+    seatings: std::sync::atomic::AtomicU32,
     inner: Mutex<Inner>,
 }
 
@@ -316,6 +324,7 @@ impl Lobby {
             select_for,
             dir,
             practice: std::sync::atomic::AtomicBool::new(false),
+            seatings: std::sync::atomic::AtomicU32::new(0),
             inner: Mutex::new(Inner {
                 next: seed,
                 live,
@@ -324,6 +333,14 @@ impl Lobby {
                 ..Inner::default()
             }),
         })
+    }
+
+    /// The stream for a new seating: 1 to 255 in turn across the server, so a session seated twice
+    /// in a row (a practice champion switched, a rejoin) is never told the stream it had, and
+    /// takes nothing of the match it left for the one it's in (`Client::set_stream`).
+    fn next_stream(&self) -> u8 {
+        let n = self.seatings.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        (n % u32::from(el_proto::ack::MAX_STREAM)) as u8 + 1
     }
 
     fn inner(&self) -> std::sync::MutexGuard<'_, Inner> {
@@ -549,9 +566,10 @@ impl Lobby {
         let g = u32::from(m) * SEATS as u32 + u32::from(seat);
         let Some(lease) = self.game.take_lease(shard, g) else { return false };
         let shared = self.game.shards[shard].shared.clone();
-        let _ = shared.control.push(Control::Seat { m, seat, max_datagram: w.max_datagram });
-        let seating =
-            Seating { shard, m, seat, g, msg: l.match_msg(seat, &w.token), lease, shared: shared.clone() };
+        let stream = self.next_stream();
+        let _ = shared.control.push(Control::Seat { m, seat, max_datagram: w.max_datagram, stream });
+        let msg = l.match_msg(seat, &w.token, stream);
+        let seating = Seating { shard, m, seat, g, msg, lease, shared: shared.clone() };
         if let Err(e) = w.tx.send(LobbyEvent::Seated(Box::new(seating))) {
             if let LobbyEvent::Seated(s) = e.0 {
                 let _ = shared.control.push(Control::Unseat { m, seat });
@@ -752,6 +770,7 @@ impl Lobby {
             roster: roster.clone(),
             rejoin: String::new(),
             practice,
+            stream: 0,
         };
         for (seat, p) in players {
             let g = u32::from(m) * SEATS as u32 + u32::from(seat);
@@ -759,7 +778,8 @@ impl Lobby {
                 tracing::error!(shard, m, seat, "a seat's lease is held elsewhere");
                 continue;
             };
-            let _ = shared.control.push(Control::Seat { m, seat, max_datagram: p.max_datagram });
+            let stream = self.next_stream();
+            let _ = shared.control.push(Control::Seat { m, seat, max_datagram: p.max_datagram, stream });
             let mut buf = [0u8; 16];
             let token = match getrandom::fill(&mut buf) {
                 Ok(()) => format!("{:032x}", u128::from_le_bytes(buf).max(1)),
@@ -768,11 +788,7 @@ impl Lobby {
             if !token.is_empty() {
                 tokens[usize::from(seat)] = token_hash(&token);
             }
-            let mut msg = told.clone();
-            if let ToClient::Match { seat: s, rejoin, .. } = &mut msg {
-                *s = seat;
-                *rejoin = token;
-            }
+            let msg = seat_msg(&told, seat, &token, stream);
             let seating = Seating { shard, m, seat, g, msg, lease, shared: shared.clone() };
             if let Err(e) = p.tx.send(LobbyEvent::Seated(Box::new(seating))) {
                 // The session went as its match was made: its seat goes back to the bots.

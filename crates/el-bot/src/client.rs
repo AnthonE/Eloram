@@ -157,6 +157,18 @@ impl BotClient {
         self.send_lobby(&ToServer::Rejoin { token: token.to_string() }).await
     }
 
+    /// Asks for a practice match as champion `champ` (a server with `--practice`), out of the
+    /// match it's in if it's in one, as the page's `{t:"practice_champ"}` does; [`wait_match`]
+    /// waits for it.
+    ///
+    /// [`wait_match`]: Self::wait_match
+    pub async fn practice(&mut self, champ: u8) -> anyhow::Result<()> {
+        self.over = None;
+        self.no_seat = false;
+        self.client = None;
+        self.send_lobby(&ToServer::Practice { champ }).await
+    }
+
     /// Drops the connection without a goodbye, as a lost link would.
     pub fn drop_link(self) {
         self.conn.close(0u32.into(), b"");
@@ -167,12 +179,18 @@ impl BotClient {
             Incoming::Lobby(bytes) => match serde_json::from_slice::<ToClient>(&bytes)? {
                 m @ ToClient::Match { .. } => {
                     let picks = m.picks();
-                    let ToClient::Match { seat, tiers, headliner, roster, rejoin, .. } = m else {
+                    let ToClient::Match { seat, tiers, headliner, roster, rejoin, stream, practice, .. } = m
+                    else {
                         unreachable!()
                     };
                     let Some(picks) = picks else { anyhow::bail!("a match without ten picks") };
                     anyhow::ensure!(usize::from(seat) < el_sim::units::SEATS, "seat {seat}");
-                    self.client = Some(Client::new(map(), usize::from(seat), picks, tiers, headliner));
+                    let mut client = Client::new(map(), usize::from(seat), picks, tiers, headliner);
+                    client.set_stream(stream);
+                    if practice {
+                        client.set_practice();
+                    }
+                    self.client = Some(client);
                     self.roster = roster;
                     self.rejoin = (!rejoin.is_empty()).then_some(rejoin);
                 }

@@ -483,6 +483,9 @@ fn match_status(
     status.set("missiles", c.missiles.live().count() as u32);
     status.set("datagrams", st.datagrams as f64);
     status.set("stale", st.stale as f64);
+    // An earlier seating's snapshots, still coming when this one began: dropped.
+    status.set("foreign", st.foreign as f64);
+    status.set("stream", u32::from(c.stream()));
     status.set("errors", st.errors as f64);
     status.set("records", st.records as f64);
     status.set("depth", u32::from(st.depth));
