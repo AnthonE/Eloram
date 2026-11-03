@@ -117,7 +117,7 @@ impl Models {
                         params.tint.w = h * f32::from(to) + 0.31;
                     }
                     Kind::Ice => {
-                        params.look.x = 0.9;
+                        params.look.x = 0.45;
                         params.look.w = -100.0;
                         params.tint.w = 100.0;
                         params.tint = Vec4::new(0.35, 0.65, 1.0, 1.0);

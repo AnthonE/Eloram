@@ -11,6 +11,10 @@
 }
 #import el::fog::{fog_dark, apply_fog}
 
+// The chasm's haze, linear (`look::HAZE`), and the depths it takes over between (as the cliffs').
+const HAZE: vec3<f32> = vec3(0.0027, 0.0050, 0.0130);
+const DEEP: f32 = -14.0;
+
 struct Fogged {
     // x: the crystal's glow (0: none); y: snow on top; z: foliage (1) or not (0); w: the height
     // (m) the crystal starts at.
@@ -45,6 +49,10 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     }
     var out: FragmentOutput;
     out.color = apply_pbr_lighting(pbr);
+    // What stands down in the chasm (the spires, the ice, the ruined arches) sinks into its haze
+    // as the cliffs do, so the drop reads as deep and the eye stays on the lane.
+    let depth = smoothstep(DEEP, 0.0, in.world_position.y);
+    out.color = vec4(mix(HAZE, out.color.rgb, depth), out.color.a);
     out.color = apply_fog(out.color, fog_dark(fog, fog_s, in.world_position.xyz));
     out.color = main_pass_post_lighting_processing(pbr, out.color);
     return out;
