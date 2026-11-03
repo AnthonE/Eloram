@@ -91,11 +91,11 @@ pub fn flare(
         let (h, peak, life, range, color) = match q.what {
             What::Part(Part::Blast) => {
                 let r = (q.size * S).max(0.5);
-                (0.9, 90_000.0 * r.min(3.0) * k, 0.45, 3.5 + r * 2.5, q.look.palette.core)
+                (0.9, 60_000.0 * r.min(3.0) * k, 0.45, 3.5 + r * 2.5, q.look.palette.core)
             }
-            What::Part(Part::Ult) => (1.2, 160_000.0 * k, 0.6, 9.0, q.look.palette.core),
+            What::Part(Part::Ult) => (1.2, 110_000.0 * k, 0.6, 9.0, q.look.palette.core),
             What::Part(Part::Impact) if q.look.ult || q.rating >= 8 => {
-                (1.1, 70_000.0 * k, 0.25, 6.0, q.look.palette.core)
+                (1.1, 50_000.0 * k, 0.25, 6.0, q.look.palette.core)
             }
             What::Death(kind) if kind.is_structure() => (2.5, 450_000.0, 1.1, 15.0, q.look.palette.core),
             _ => continue,

@@ -47,7 +47,7 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   webgpu`) is headless WebGPU on SwiftShader's Vulkan. `scripts/e2e.sh` serves the `web/dist/` already
   built: rebuild it first. A test or the console drives the champion through `window.__elInbox`
   (`{t:"move",x,y}`, `cast`, `buy`, `use`, `pick`, `level`, `champ_reroll`, `champ_swap`, `ready`, `aim`, `drop_link`,
-  `ping`, `surrender`, `practice_champ`...:
+  `ping`, `surrender`, `practice_champ`, `time` (the picture's clock slowed or stopped, to catch a burst)...:
   `el-client/src/dev_hooks.rs`) and reads `window.__el`. Headless Chromium draws with
   SwiftShader at about a frame a second: its pictures are right, its frame rates mean nothing.
 - The map's art (`docs/ART.md`): `web/assets/` ships as it is (`scripts/build-web.sh` copies it);
