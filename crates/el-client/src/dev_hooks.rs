@@ -225,6 +225,13 @@ enum Cmd {
     Mute {
         on: bool,
     },
+    /// The picture's clock run at `speed` (1 as it should; 0 stops it): the effects' particles,
+    /// the shaders' time, the champions' poses. The match's own clock isn't this one, so the match
+    /// goes on; a test slows the picture to catch a burst in the middle of its life (SwiftShader
+    /// draws a frame a second, and most bursts are over in half of one).
+    Time {
+        speed: f32,
+    },
 }
 
 pub struct InboxPlugin;
@@ -247,6 +254,7 @@ fn inbox(
     mut rig: ResMut<crate::camera::Rig>,
     mut look: ResMut<crate::look::Look>,
     mut audio: ResMut<crate::audio::AudioSettings>,
+    mut clock: ResMut<Time<Virtual>>,
     drawn: Res<crate::view::Drawn>,
 ) {
     use el_client_core::lobby::ToServer;
@@ -326,6 +334,15 @@ fn inbox(
             Cmd::Mute { on } => {
                 audio.muted = on;
                 audio.save();
+                continue;
+            }
+            Cmd::Time { speed } => {
+                if speed <= 0.0 {
+                    clock.pause();
+                } else {
+                    clock.unpause();
+                    clock.set_relative_speed(speed.min(4.0));
+                }
                 continue;
             }
             Cmd::ChampReroll => {

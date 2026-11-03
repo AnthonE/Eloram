@@ -29,8 +29,8 @@ use crate::coords::{S, world};
 use crate::ground::FogTex;
 use crate::look::Look;
 
-/// Particles a burst holds at most.
-const QUADS: usize = 40;
+/// Particles a burst holds at most (what's past it is dropped, so what matters goes first).
+const QUADS: usize = 48;
 
 /// A burst's material: added (what glows) or laid over (smoke, dust, rubble).
 #[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
@@ -38,6 +38,9 @@ pub struct BurstMat {
     #[texture(0)]
     #[sampler(1)]
     pub fog: Handle<Image>,
+    /// x: 1 for the added pool (light: born white-hot), 0 for the laid-over one.
+    #[uniform(2)]
+    pub pool: Vec4,
     pub additive: bool,
 }
 
@@ -92,6 +95,9 @@ mod shape {
     pub const RING: f32 = 4.0;
     pub const COLUMN: f32 = 5.0;
     pub const FLASH: f32 = 6.0;
+    pub const STAR: f32 = 7.0;
+    pub const EMBER: f32 = 8.0;
+    pub const SCORCH: f32 = 9.0;
 }
 
 struct Slot {
@@ -138,8 +144,8 @@ pub fn setup(
     mut mats: ResMut<Assets<BurstMat>>,
 ) {
     let (glows, smokes) = if look.high { (72, 24) } else { (40, 12) };
-    let glow_mat = mats.add(BurstMat { fog: fog.0.clone(), additive: true });
-    let smoke_mat = mats.add(BurstMat { fog: fog.0.clone(), additive: false });
+    let glow_mat = mats.add(BurstMat { fog: fog.0.clone(), pool: Vec4::X, additive: true });
+    let smoke_mat = mats.add(BurstMat { fog: fog.0.clone(), pool: Vec4::ZERO, additive: false });
     let mut pool = |n: usize, mat: &Handle<BurstMat>| {
         (0..n)
             .map(|_| {
@@ -288,6 +294,8 @@ impl Make<'_> {
             Some(Family::Ember) => {
                 self.spray(at, 14.0 * k, shape::STREAK, 6.0, 0.7, 0.45, 0.05, 7.0, 2.0, core, false);
                 self.spray(at, 3.0 * k, shape::PUFF, 0.8, 0.9, 0.9, 0.35, -0.6, 2.0, dust, true);
+                // Embers that linger, drifting up off the hit as it cools.
+                self.spray(at, 5.0 * k, shape::EMBER, 0.9, 0.95, 1.3, 0.06, -0.9, 1.6, edge, false);
             }
             Some(Family::Frost) => {
                 self.spray(at, 12.0 * k, shape::SHARD, 4.0, 0.6, 0.55, 0.09, 6.0, 2.5, core, false);
@@ -394,6 +402,8 @@ fn recipe(m: &mut Make<'_>, q: &Cue) {
             let at = ground(1.1);
             m.one(at, shape::GLOW, 0.25 * k, 0.16, core, false);
             if matches!(q.look.reach, Reach::Line { .. } | Reach::Homing | Reach::Turret) {
+                // A muzzle's flash, and what it throws forward.
+                m.one(at, shape::STAR, 0.3 * k, 0.1, core, false);
                 m.spray(at, 4.0 * k, shape::GLOW, 1.5, 0.4, 0.3, 0.05, 0.0, 3.0, edge, false);
             }
         }
@@ -408,8 +418,11 @@ fn recipe(m: &mut Make<'_>, q: &Cue) {
             let hurt = (q.size / 150.0).clamp(0.6, 1.6);
             let auto = matches!(q.look.reach, Reach::Auto { .. });
             let kk = if auto { k * 0.5 * hurt } else { k * hurt };
-            m.sparks(fam, &pal, at, kk);
+            // Where it struck: a hot glow and a star of rays, there and gone, the sharpest thing in
+            // the hit (first: a burst past its particles' room drops the last).
             m.one(at, shape::GLOW, 0.32 * kk.max(0.6), 0.14, core, false);
+            m.one(at, shape::STAR, 0.42 * kk.max(0.5), 0.13, core, false);
+            m.sparks(fam, &pal, at, kk);
             if q.look.ult || q.rating >= 8 {
                 m.one(ground(0.05), shape::RING, 0.9 * k, 0.45, edge, false);
             }
@@ -461,8 +474,28 @@ fn recipe(m: &mut Make<'_>, q: &Cue) {
                     });
                 }
             }
+            // What burns or breaks the ground leaves a mark on it for a while.
+            if q.look.ult || matches!(fam, Some(Family::Ember | Family::Stone)) {
+                m.one(ground(0.03), shape::SCORCH, r * 0.8, 3.0, SCORCH, true);
+            }
+            if matches!(fam, Some(Family::Ember)) {
+                m.spray(
+                    ground(0.3),
+                    (r * 3.0).clamp(4.0, 10.0) * k,
+                    shape::EMBER,
+                    1.2,
+                    0.9,
+                    1.6,
+                    0.06,
+                    -0.8,
+                    1.4,
+                    edge,
+                    false,
+                );
+            }
             if q.look.ult {
                 m.one(ground(0.0), shape::COLUMN, r * 0.35, 0.8, core, false);
+                m.one(ground(0.6), shape::STAR, r * 0.5, 0.18, core, false);
             }
         }
         What::Part(Part::Windup) => {
@@ -634,6 +667,8 @@ fn recipe(m: &mut Make<'_>, q: &Cue) {
                 );
                 m.spray(ground(2.0), 16.0 * big, shape::SHARD, 5.0, 0.8, 1.0, 0.1, 7.0, 1.0, core, false);
                 m.one(ground(0.05), shape::RING, 3.0 * big, 1.0, edge, false);
+                m.one(ground(0.03), shape::SCORCH, 1.8 * big, 6.0, SCORCH, true);
+                m.spray(ground(1.5), 10.0 * big, shape::EMBER, 1.5, 0.9, 2.5, 0.08, -0.6, 1.2, core, false);
             }
             _ => m.spray(
                 ground(0.3),
@@ -666,6 +701,9 @@ fn recipe(m: &mut Make<'_>, q: &Cue) {
         What::Ping(_) | What::TurretWarn | What::Ui => {}
     }
 }
+
+/// A scorch's colour: soot, laid over the stone.
+const SCORCH: [f32; 4] = [0.015, 0.014, 0.016, 0.85];
 
 /// The Causeway's dust: stone and snow.
 fn world_dust() -> Rgb {

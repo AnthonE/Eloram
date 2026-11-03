@@ -1,10 +1,12 @@
 //! Effects (`docs/FX.md`, "The effects runtime"): `el_client_core::fx`'s director says what each
 //! frame should show and play; here it's drawn. Bursts (sparks, embers, shards, dust, rings, flashes)
 //! are closed forms moved in the shader ([`burst`]); what lasts (missiles' heads and trails,
-//! telegraphs, fields, statuses on units) is a pool of quads placed each frame ([`live`]). The
-//! sounds of the same cues are `audio.rs`'s.
+//! telegraphs, fields, statuses on units) is a pool of quads placed each frame ([`live`]); a blast,
+//! an ultimate or a structure falling lights what's round it for a moment ([`light`]). The sounds
+//! of the same cues are `audio.rs`'s.
 
 pub mod burst;
+pub mod light;
 pub mod live;
 
 use bevy::prelude::*;
@@ -48,10 +50,10 @@ impl Plugin for FxPlugin {
                 MaterialPlugin::<burst::BurstMat>::default(),
                 MaterialPlugin::<live::LiveMat>::default(),
             ))
-            .add_systems(Startup, (burst::setup, live::setup))
+            .add_systems(Startup, (burst::setup, light::setup, live::setup))
             .add_systems(
                 Update,
-                (direct, burst::spawn, live::draw, shake)
+                (direct, burst::spawn, light::flare, live::draw, shake)
                     .chain()
                     .in_set(FxSet)
                     .after(crate::net::NetSet::Send)
