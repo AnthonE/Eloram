@@ -200,10 +200,14 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
         a *= smoothstep(1.0, 0.55, 1.0 - o.uv.y) * (1.0 + 1.5 * exp(-o.uv.y * 9.0));
         a += exp(-x * x * 40.0) * 0.4 * (1.0 - o.uv.y);
     } else if shape < 6.5 {
-        // A flash on the ground: a core, and short rays out of it.
+        // A flash on the ground: a hot middle, short rays out of it, and the whole of it torn
+        // by turbulence boiling outward, so it reads as a burst of light, not a disc laid down.
         let ang = atan2(c.y, c.x);
         let rays = pow(abs(cos(ang * 3.0 + seed * 6.0)), 12.0) * max(1.0 - d, 0.0);
-        a = pow(max(1.0 - d, 0.0), 2.2) * 0.8 + rays * 0.5;
+        let boil = vnoise(vec2(ang * 3.0 + seed * 30.0, d * 5.0 - k * 4.0)) * 0.6
+            + vnoise(c * 11.0 + vec2(seed * 13.0, k * 3.0)) * 0.4;
+        let body = smoothstep(0.0, 0.6, 1.0 - d + (boil - 0.5) * 0.55);
+        a = body * (0.25 + 0.75 * pow(max(1.0 - d, 0.0), 1.6)) * (0.55 + 0.6 * boil) + rays * 0.45;
     } else if shape < 7.5 {
         // A star: four long rays and four short between them, a white core; gone fast.
         let q = abs(c) * 2.0;
