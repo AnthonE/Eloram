@@ -4,18 +4,26 @@
 //   position: where it starts (scene metres); normal: its velocity (m/s);
 //   uv: its corner; uv_b: (when it's born, how long it lives), in the shader's clock (s);
 //   tangent: (its size (m), gravity (m/s²), drag (1/s), its shape); colour: linear rgb, alpha.
-// Shapes: 0 a soft glow, 1 a streak along its motion, 2 a shard turning, 3 a puff that grows and
-// fades (smoke, dust), 4 a ring on the ground widening to its size, 5 a column of light, 6 a flash
-// lying on the ground.
+// Shapes: 0 a glow (a hot core in a soft halo), 1 a spark streaking along its motion, 2 a shard
+// turning and glinting, 3 a puff that billows, grows and thins (smoke, dust), 4 a shockwave on the
+// ground widening to its size, 5 a column of light, 6 a flash lying on the ground, 7 a star (a hit's
+// flash of rays), 8 an ember that flickers and wanders as it rises, 9 a scorch left on the ground.
+//
+// Light (the added pool) is born white-hot and cools to its colour, as fire and sparks do; smoke
+// and dust (laid over) keep theirs. Every particle has a seed of its own, from where and when it
+// was born, so no two puffs are the same shape and no two embers flicker together.
 
 #import bevy_pbr::{
     mesh_view_bindings::{view, globals},
     view_transformations::position_world_to_clip,
 }
 #import el::fog::fog_dark
+#import el::display::display
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(0) var fog: texture_2d<f32>;
 @group(#{MATERIAL_BIND_GROUP}) @binding(1) var fog_s: sampler;
+// x: 1 for the added pool (light), 0 for the laid-over one (smoke, dust, rubble, scorch).
+@group(#{MATERIAL_BIND_GROUP}) @binding(2) var<uniform> pool: vec4<f32>;
 
 struct Vertex {
     @location(0) position: vec3<f32>,
@@ -30,8 +38,37 @@ struct Out {
     @builtin(position) clip: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) color: vec4<f32>,
-    // x: its age as a share of its life; y: its shape; z: how dark the fog is where it is.
-    @location(2) life: vec3<f32>,
+    // x: its age as a share of its life; y: its shape; z: how dark the fog is where it is; w: its
+    // seed (0 to 1).
+    @location(2) life: vec4<f32>,
+    // x: its age (s).
+    @location(3) age: vec2<f32>,
+}
+
+// What lights smoke and dust: about what the moon and the night's ambient give the stone, linear.
+const NIGHT: vec3<f32> = vec3(0.30, 0.34, 0.44);
+
+fn hash1(x: f32) -> f32 {
+    return fract(sin(x * 127.1) * 43758.5453);
+}
+
+fn hash2(p: vec2<f32>) -> f32 {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+// Value noise, 0 to 1.
+fn vnoise(p: vec2<f32>) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), u.x),
+               mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+
+fn turn(v: vec2<f32>, a: f32) -> vec2<f32> {
+    let c = cos(a);
+    let s = sin(a);
+    return vec2(v.x * c - v.y * s, v.x * s + v.y * c);
 }
 
 @vertex
@@ -53,13 +90,29 @@ fn vertex(v: Vertex) -> Out {
     // Where it is: thrown at its velocity, slowed by drag, pulled down by gravity.
     let travel = select(age, (1.0 - exp(-drag * age)) / drag, drag > 0.0001);
     var p = v.position + v.normal * travel - vec3(0.0, 0.5 * gravity * age * age, 0.0);
-    let corner = v.uv - 0.5;
+    let seed = hash1(born * 13.7 + v.position.x * 3.1 + v.position.z * 1.7 + v.position.y * 5.3);
+    var corner = v.uv - 0.5;
     let right = view.world_from_view[0].xyz;
     let up = view.world_from_view[1].xyz;
     var s = size;
     if shape < 0.5 {
-        s = size * (1.0 - k * k);
+        // Pops to its size, then shrinks away.
+        s = size * (0.55 + 0.45 * smoothstep(0.0, 0.12, k)) * (1.0 - k * k);
         p += (right * corner.x + up * corner.y) * s;
+    } else if shape > 6.5 && shape < 7.5 {
+        // A star: opens fast, a turn of its own.
+        s = size * (0.6 + 0.9 * sqrt(k));
+        corner = turn(corner, seed * 3.14159);
+        p += (right * corner.x + up * corner.y) * s;
+    } else if shape > 7.5 && shape < 8.5 {
+        // An ember: wanders side to side as it rises, and shrinks as it cools.
+        s = size * (1.0 - 0.6 * k);
+        p += right * sin(age * (2.0 + 2.0 * seed) + seed * 20.0) * 0.18 * k;
+        p += (right * corner.x + up * corner.y) * s;
+    } else if shape > 8.5 {
+        // A scorch: flat on the ground, turned its own way, as big as it was made.
+        corner = turn(corner, seed * 6.2832);
+        p += vec3(corner.x, 0.0, corner.y) * size * 2.0;
     } else if shape < 1.5 {
         // Stretched along its motion on the screen, as long as it's fast.
         let vel = v.normal * exp(-drag * age) - vec3(0.0, gravity * age, 0.0);
@@ -78,7 +131,9 @@ fn vertex(v: Vertex) -> Out {
         s = size * (1.0 - 0.6 * k);
         p += (right * r.x + up * r.y) * s;
     } else if shape < 3.5 {
+        // A puff billows out and slowly turns.
         s = size * (0.5 + 1.5 * sqrt(k));
+        corner = turn(corner, seed * 6.2832 + age * (seed - 0.5) * 1.6);
         p += (right * corner.x + up * corner.y) * s;
     } else if shape < 4.5 || shape > 5.5 {
         // Flat on the ground: a ring widening to its size, or a flash.
@@ -92,7 +147,8 @@ fn vertex(v: Vertex) -> Out {
     o.clip = position_world_to_clip(p);
     o.uv = v.uv;
     o.color = v.color;
-    o.life = vec3(k, shape, fog_dark(fog, fog_s, p));
+    o.life = vec4(k, shape, fog_dark(fog, fog_s, p), seed);
+    o.age = vec2(age, 0.0);
     return o;
 }
 
@@ -100,36 +156,97 @@ fn vertex(v: Vertex) -> Out {
 fn fragment(o: Out) -> @location(0) vec4<f32> {
     let k = o.life.x;
     let shape = o.life.y;
-    let d = length(o.uv - 0.5) * 2.0;
+    let seed = o.life.w;
+    let age = o.age.x;
+    let c = o.uv - 0.5;
+    let d = length(c) * 2.0;
     var a = 0.0;
-    if shape < 0.5 {
-        // Hot in the middle, soft to its rim.
-        a = pow(max(1.0 - d, 0.0), 1.6);
-    } else if shape < 1.5 {
-        let x = abs(o.uv.x - 0.5) * 2.0;
-        let y = abs(o.uv.y - 0.5) * 2.0;
-        a = (1.0 - smoothstep(0.2, 1.0, x)) * (1.0 - y * y);
-    } else if shape < 2.5 {
-        let m = abs(o.uv.x - 0.5) + abs(o.uv.y - 0.5);
-        a = 1.0 - smoothstep(0.32, 0.5, m);
-    } else if shape < 3.5 {
-        a = (1.0 - smoothstep(0.1, 1.0, d)) * 0.6;
-    } else if shape < 4.5 {
-        // A bright rim, thinning as it widens.
-        let w = 0.12 * (1.0 - k) + 0.03;
-        a = 1.0 - smoothstep(0.0, w, abs(d - 0.92));
-    } else if shape < 5.5 {
-        let x = abs(o.uv.x - 0.5) * 2.0;
-        a = (1.0 - smoothstep(0.0, 1.0, x)) * smoothstep(0.0, 0.15, o.uv.y) * smoothstep(1.0, 0.6, 1.0 - o.uv.y);
-    } else {
-        a = pow(max(1.0 - d, 0.0), 2.2) * 0.8;
-    }
     // In, quickly; out, over the rest of its life.
-    let fade = smoothstep(0.0, 0.06, k) * (1.0 - smoothstep(0.55, 1.0, k));
-    a *= fade * o.color.a;
+    var fade = smoothstep(0.0, 0.06, k) * (1.0 - smoothstep(0.55, 1.0, k));
+    if shape < 0.5 {
+        // A hot core in a soft halo.
+        a = exp(-d * d * 10.0) * 0.85 + pow(max(1.0 - d, 0.0), 2.0) * 0.35;
+    } else if shape < 1.5 {
+        // A spark: its head (the end it flies toward) bright and wide, its tail thin and fading.
+        let x = abs(o.uv.x - 0.5) * 2.0;
+        let y = o.uv.y;
+        let w = mix(0.12, 0.85, y * y);
+        a = (1.0 - smoothstep(0.0, w, x)) * smoothstep(0.0, 0.6, y) * (1.0 - smoothstep(0.86, 1.0, y));
+        a *= 0.55 + 0.75 * y;
+    } else if shape < 2.5 {
+        // A shard: a diamond lit on two facets, its edge bright, glinting as it turns.
+        let m = abs(c.x) + abs(c.y);
+        let inside = 1.0 - smoothstep(0.34, 0.5, m);
+        let facet = select(0.55, 1.0, (c.x > 0.0) != (c.y > 0.0));
+        let rim = smoothstep(0.26, 0.42, m) * inside;
+        let glint = pow(max(sin(age * (9.0 + 8.0 * seed) + seed * 30.0), 0.0), 8.0);
+        a = inside * facet * 0.8 + rim * 0.5 + inside * glint * 1.2;
+    } else if shape < 3.5 {
+        // A puff: a billowing edge, torn by noise of its own, thinning as it spreads.
+        let n = vnoise(c * 4.0 + vec2(seed * 37.0, seed * 11.0 - k * 0.8)) * 0.6
+            + vnoise(c * 9.0 + vec2(seed * 7.0 + k, seed * 23.0)) * 0.4;
+        a = smoothstep(0.0, 0.55, 1.0 - d + (n - 0.5) * 0.7) * (0.75 - 0.35 * k);
+    } else if shape < 4.5 {
+        // A shockwave: a sharp leading edge, a soft wake behind it toward the middle, uneven
+        // round its length, thinning as it widens.
+        let x = d - 0.92;
+        let lead = 1.0 - smoothstep(0.0, 0.035, x);
+        let wake = exp(min(x, 0.0) * (7.0 + 18.0 * k));
+        let ang = atan2(c.y, c.x);
+        let rough = 0.7 + 0.3 * vnoise(vec2(ang * 5.0 + seed * 40.0, k * 3.0));
+        a = select(lead, wake, x < 0.0) * rough * step(d, 0.97) * (1.15 - 0.4 * k);
+    } else if shape < 5.5 {
+        // A column: bright at its foot and its middle line, streaks rising up it.
+        let x = abs(o.uv.x - 0.5) * 2.0;
+        let rise = vnoise(vec2(x * 7.0 + seed * 20.0, o.uv.y * 3.0 + age * 5.0));
+        a = (1.0 - smoothstep(0.0, 1.0, x)) * (0.45 + 0.75 * rise) * (1.0 - smoothstep(0.98, 1.0, o.uv.y));
+        a *= smoothstep(1.0, 0.55, 1.0 - o.uv.y) * (1.0 + 1.5 * exp(-o.uv.y * 9.0));
+        a += exp(-x * x * 40.0) * 0.4 * (1.0 - o.uv.y);
+    } else if shape < 6.5 {
+        // A flash on the ground: hot in the middle and falling away to its edge, torn by
+        // turbulence boiling outward, so it reads as a burst of light, not a disc laid down (the
+        // shockwave round it is what marks the edge).
+        let ang = atan2(c.y, c.x);
+        let boil = vnoise(vec2(ang * 2.5 + seed * 30.0, d * 4.0 - k * 5.0)) * 0.55
+            + vnoise(c * 9.0 + vec2(seed * 13.0, k * 3.0)) * 0.45;
+        let body = smoothstep(0.0, 0.5, 1.0 - d + (boil - 0.5) * 0.8);
+        a = body * pow(max(1.0 - d, 0.0), 1.3) * (0.3 + 0.9 * boil) * 0.85;
+    } else if shape < 7.5 {
+        // A star: four long rays and four short between them, a white core; gone fast.
+        let q = abs(c) * 2.0;
+        let long_rays = exp(-q.x * 28.0) * (1.0 - q.y) + exp(-q.y * 28.0) * (1.0 - q.x);
+        let r = abs(turn(c, 0.785398)) * 2.0;
+        let short_rays = (exp(-r.x * 34.0) * (1.0 - r.y * 1.6) + exp(-r.y * 34.0) * (1.0 - r.x * 1.6)) * 0.5;
+        a = max(long_rays, 0.0) + max(short_rays, 0.0) + exp(-d * d * 30.0);
+        fade = smoothstep(0.0, 0.03, k) * (1.0 - smoothstep(0.2, 1.0, k));
+    } else if shape < 8.5 {
+        // An ember: a hot point that flickers.
+        let flick = 0.55 + 0.45 * sin(age * (18.0 + 14.0 * seed) + seed * 50.0);
+        a = (exp(-d * d * 14.0) + pow(max(1.0 - d, 0.0), 3.0) * 0.3) * flick;
+        fade = smoothstep(0.0, 0.08, k) * (1.0 - smoothstep(0.4, 1.0, k));
+    } else {
+        // A scorch: soot in patches with a ragged edge, darkest in the middle, there a while,
+        // fading slowly; the stone shows through it.
+        let n = vnoise(c * 5.0 + vec2(seed * 31.0, seed * 17.0)) * 0.6
+            + vnoise(c * 13.0 + vec2(seed * 7.0, seed * 3.0)) * 0.4;
+        a = smoothstep(0.0, 0.45, 1.0 - d + (n - 0.5) * 0.9) * (0.25 + 0.3 * n) * (1.0 - 0.5 * d);
+        fade = smoothstep(0.0, 0.05, k) * (1.0 - smoothstep(0.35, 1.0, k));
+    }
+    a = clamp(a, 0.0, 2.0) * fade * o.color.a;
     // In the fog, dimmer (it's only drawn because the team was told of it).
     let dim = 1.0 - o.life.z * 0.6;
-    let rgb = o.color.rgb * a * dim;
-    // Premultiplied: added for glows (their alpha unused), laid over for smoke (`burst.rs`).
-    return vec4(rgb, a);
+    var col = o.color.rgb;
+    if pool.x > 0.5 {
+        // Born white-hot, cooling to its colour: its own brightness, unhued, early in its life.
+        let hot = pow(1.0 - k, 3.0) * 0.7;
+        let peak = max(col.r, max(col.g, col.b));
+        col = mix(col, vec3(peak), hot);
+    } else {
+        // Smoke and dust give no light: they're lit as the stone round them is, by the moon and
+        // the night (a pale puff drawn as its own colour was a white cloud in the dark).
+        col *= NIGHT;
+    }
+    let rgb = col * a * dim;
+    // Premultiplied: added for light (its alpha unused), laid over for smoke (`burst.rs`).
+    return vec4(display(rgb), min(a, 1.0));
 }

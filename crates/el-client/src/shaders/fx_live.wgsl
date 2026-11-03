@@ -9,6 +9,7 @@
     mesh_view_bindings::{view, globals},
 }
 #import el::fog::fog_dark
+#import el::display::display
 
 struct Live {
     // The core's colour (linear) and strength.
@@ -128,5 +129,5 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let rgb = live.core.rgb * core * live.core.a + live.edge.rgb * edge * live.edge.a;
     let dim = 1.0 - fog_dark(fog, fog_s, in.world_position.xyz) * 0.6;
     let a = clamp(max(core * live.core.a, edge * live.edge.a), 0.0, 1.0);
-    return vec4(rgb * dim, a);
+    return vec4(display(rgb * dim), a);
 }

@@ -244,3 +244,20 @@ Changed on the way:
 - The `art` suite checks that the floor is drawn in the middle of the spots that look at it (a
   ground shader that fails to compile draws nothing, and the chasm's dark shows through: it
   happened once on the way, to a word WGSL keeps for itself).
+- **A second look, from the pictures** (the `art` suite on both backends, and a practice match
+  photographed spot by spot):
+  - On WebGL2 every model stood half under the floor: `scenery.rs` stood each one on its foot by
+    changing the loaded mesh in place, in the frame it arrived, and WebGL2 kept its first upload.
+    The turrets were stubs, the nexus had no crown, and the crystals (a band of the model's height)
+    were out of their glow, so neither team's colour showed. Each model is stood up as a new mesh
+    now; WebGPU had drawn them right all along.
+  - Without HDR (WebGL2, the low tier) the braziers' fire and every effect clipped to white: their
+    shaders draw their own colour and skipped the tonemapping Bevy's materials do in-shader.
+    `shaders/display.wgsl` does it for them when the camera does (`TONEMAP_IN_SHADER`).
+  - The wind's snow streaks are in patches and fainter (everywhere, they read as scratches on the
+    picture); the braziers' lights lay a warm pool on the stone (220,000 lm, 11 m: before, a glow
+    you had to look for); a little more saturation (global grading only: the sections' grading is
+    the HDR pass's, and WebGL2 would differ); a soft vignette on the high tier.
+  - What stands in the chasm sinks into its haze with depth, as the cliffs do, and the ice's own
+    light is halved: the pale spires pulled the eye off the lane.
+

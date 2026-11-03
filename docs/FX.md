@@ -407,6 +407,28 @@ numbers on a real GPU into `ROADMAP.md`, which has none yet.
   so what was cast at its place after hit nothing (dummies walk back now). Little else can be
   judged from them: at a frame every two seconds most bursts fall between pictures.
 
+**The particles, looked at.** `{t:"time",speed}` in the inbox runs the picture's clock slower or
+stops it (`speed: 0`) while the match's own clock goes on, so a burst can be caught mid-life and
+held there for a picture however long SwiftShader takes over it: the first pictures of bursts this
+pass had. From them:
+- `shaders/fx_burst.wgsl`: every particle has a seed of its own (where and when it was born). Light
+  is born white-hot and cools to its colour; a glow is a hot core in a soft halo; a spark tapers
+  from a bright head; a shard is lit on two facets and glints as it turns; a puff billows with a
+  torn edge and turns as it grows; a shockwave has a sharp leading edge and a soft wake; a column
+  has streaks rising up it; a ground flash is hot in the middle and boils outward, no flat disc.
+  New shapes: a star of rays where a hit lands and at a missile's muzzle, embers that flicker and
+  wander as they rise after fire, and a scorch of soot left under fire and stone blasts,
+  ultimates and fallen structures.
+- Smoke and dust are lit as the stone round them is: drawn as their own colour, a pale puff was a
+  white cloud in the dark (a white ring round every fire blast). The first scorch was a solid
+  black disc as wide as the blast, a pit in the floor; it's soot in patches now, half that size.
+- `fx/light.rs`: six point lights, flared where a blast lands, an ultimate is cast, a heavy hit
+  strikes or a structure falls, and fading in a fraction of a second, so the stone and the units
+  round it take the effect's colour (the high tier).
+- A burst holds 48 particles, and its hit's core and star go first, so a full one never drops them.
+- Still not caught: missiles and small hits. They fly on the match's clock, not the picture's, and
+  are over between two of SwiftShader's frames.
+
 Not yet:
 - Nobody has listened: the sounds were judged by their spectrograms and measures, not by ear. The
   look on a real GPU hasn't been seen either (SwiftShader draws a frame every two seconds, so a

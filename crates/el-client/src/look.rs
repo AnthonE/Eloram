@@ -17,8 +17,9 @@ use bevy::camera::Hdr;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::light::{CascadeShadowConfigBuilder, DirectionalLightShadowMap};
 use bevy::post_process::bloom::Bloom;
+use bevy::post_process::effect_stack::Vignette;
 use bevy::prelude::*;
-use bevy::render::view::Msaa;
+use bevy::render::view::{ColorGrading, ColorGradingGlobal, Msaa};
 
 use crate::camera::{MainCamera, VIEW};
 use crate::net::LaunchConfigRes;
@@ -77,6 +78,10 @@ fn dress_camera(mut commands: Commands, look: Res<Look>, cam: Single<Entity, Wit
             falloff: FogFalloff::Linear { start: VIEW.distance * 1.45, end: VIEW.distance * 5.2 },
             ..default()
         },
+        // A little more colour than the tonemapper leaves: the team's lights and the braziers'
+        // fire against the cold stone. Global only: the sections' grading (contrast, lift...) is
+        // the HDR pass's, and WebGL2 tonemaps in its shaders without it, so the two would differ.
+        ColorGrading { global: ColorGradingGlobal { post_saturation: 1.08, ..default() }, ..default() },
     ));
     // HDR is for the bloom: without it, the picture tonemaps in its shaders, with no float targets
     // and no pass of its own.
@@ -90,6 +95,11 @@ fn dress_camera(mut commands: Commands, look: Res<Look>, cam: Single<Entity, Wit
         (false, _) => {
             cam.insert((Msaa::Off, Fxaa::default()));
         }
+    }
+    // The corners a little darker, so the eye rests where the fight is (the high tier: it's a pass
+    // of its own over the whole picture).
+    if look.high {
+        cam.insert(Vignette { intensity: 0.38, radius: 0.95, smoothness: 2.2, ..default() });
     }
 }
 

@@ -117,7 +117,7 @@ impl Models {
                         params.tint.w = h * f32::from(to) + 0.31;
                     }
                     Kind::Ice => {
-                        params.look.x = 0.9;
+                        params.look.x = 0.45;
                         params.look.w = -100.0;
                         params.tint.w = 100.0;
                         params.tint = Vec4::new(0.35, 0.65, 1.0, 1.0);
@@ -242,14 +242,18 @@ fn ready(
 ) {
     for m in models.by_name.values_mut() {
         if m.bounds.is_none()
-            && let Some(mut mesh) = meshes.get_mut(&m.mesh)
-            && let Some(aabb) = mesh.compute_aabb()
+            && let Some(loaded) = meshes.get(&m.mesh)
+            && let Some(aabb) = loaded.compute_aabb()
         {
             // Stood on its foot, centred: the file's own placement is on its node, which a
-            // primitive loaded alone doesn't carry.
+            // primitive loaded alone doesn't carry. A new mesh, not the loaded one changed in
+            // place: on WebGL2 a mesh changed in the frame it arrives kept its first upload, and
+            // every model stood half under the floor (the structures' crystals out of their glow).
             let (lo, hi) = (Vec3::from(aabb.min()), Vec3::from(aabb.max()));
             let size = hi - lo;
-            mesh.translate_by(-Vec3::new(lo.x + size.x * 0.5, lo.y, lo.z + size.z * 0.5));
+            let stood =
+                loaded.clone().translated_by(-Vec3::new(lo.x + size.x * 0.5, lo.y, lo.z + size.z * 0.5));
+            m.mesh = meshes.add(stood);
             m.bounds = Some((Vec3::new(-size.x * 0.5, 0.0, -size.z * 0.5), size));
         }
     }
@@ -282,11 +286,13 @@ fn ready(
                 if !look.high {
                     return;
                 }
+                // Bright enough to lay a warm pool on the stone round it: the one warm light in a
+                // cold picture, and what makes the night read as night.
                 c.spawn((
                     PointLight {
-                        color: Color::srgb(1.0, 0.62, 0.32),
-                        intensity: 60_000.0,
-                        range: 8.0,
+                        color: Color::srgb(1.0, 0.56, 0.26),
+                        intensity: 220_000.0,
+                        range: 11.0,
                         radius: 0.2,
                         shadow_maps_enabled: false,
                         ..default()

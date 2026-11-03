@@ -2,6 +2,7 @@
 // that rises with time, added to what's behind it so it glows (and blooms).
 
 #import bevy_pbr::{forward_io::VertexOutput, mesh_view_bindings::globals}
+#import el::display::display
 
 struct Flame {
     // The fire's colour (linear, bright) and a phase so no two braziers flicker together.
@@ -33,5 +34,5 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let body = 1.0 - smoothstep(width * 0.4, width, abs(p.x + (n - 0.5) * 0.18 * p.y));
     let heat = clamp(body * (1.2 - p.y * 1.4 + n * 0.6), 0.0, 1.0);
     let col = mix(flame.color.rgb * vec3(1.0, 0.45, 0.2), flame.color.rgb, heat) * heat * heat;
-    return vec4(col, heat);
+    return vec4(display(col), heat);
 }
