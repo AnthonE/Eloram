@@ -458,7 +458,7 @@ fn recipe(m: &mut Make<'_>, q: &Cue) {
                 m.glow.push(p);
             }
             if matches!(fam, Some(Family::Stone | Family::Ember | Family::Tide | Family::Wind)) {
-                for _ in 0..m.n((r * 3.0).clamp(4.0, 12.0)) {
+                for _ in 0..m.n((r * 2.5).clamp(4.0, 10.0)) {
                     let a = m.b.rand() * std::f32::consts::TAU;
                     let at = ground(0.2) + Vec3::new(a.cos() * r * 0.7, 0.0, a.sin() * r * 0.7);
                     m.smoke.push(P {
@@ -466,7 +466,7 @@ fn recipe(m: &mut Make<'_>, q: &Cue) {
                         vel: Vec3::new(a.cos() * 0.8, 0.4, a.sin() * 0.8),
                         born: m.now,
                         life: 1.2,
-                        size: 0.45 * r.min(2.0),
+                        size: 0.3 * r.min(1.6),
                         drag: 1.5,
                         shape: shape::PUFF,
                         color: dust,
@@ -476,7 +476,7 @@ fn recipe(m: &mut Make<'_>, q: &Cue) {
             }
             // What burns or breaks the ground leaves a mark on it for a while.
             if q.look.ult || matches!(fam, Some(Family::Ember | Family::Stone)) {
-                m.one(ground(0.03), shape::SCORCH, r * 0.8, 3.0, SCORCH, true);
+                m.one(ground(0.03), shape::SCORCH, r * 0.5, 3.0, SCORCH, true);
             }
             if matches!(fam, Some(Family::Ember)) {
                 m.spray(
@@ -702,8 +702,8 @@ fn recipe(m: &mut Make<'_>, q: &Cue) {
     }
 }
 
-/// A scorch's colour: soot, laid over the stone.
-const SCORCH: [f32; 4] = [0.015, 0.014, 0.016, 0.85];
+/// A scorch's colour: soot, laid over the stone (its shape sets how much of the stone shows).
+const SCORCH: [f32; 4] = [0.02, 0.018, 0.02, 1.0];
 
 /// The Causeway's dust: stone and snow.
 fn world_dust() -> Rgb {

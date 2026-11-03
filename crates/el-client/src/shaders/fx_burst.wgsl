@@ -45,6 +45,9 @@ struct Out {
     @location(3) age: vec2<f32>,
 }
 
+// What lights smoke and dust: about what the moon and the night's ambient give the stone, linear.
+const NIGHT: vec3<f32> = vec3(0.30, 0.34, 0.44);
+
 fn hash1(x: f32) -> f32 {
     return fract(sin(x * 127.1) * 43758.5453);
 }
@@ -200,14 +203,14 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
         a *= smoothstep(1.0, 0.55, 1.0 - o.uv.y) * (1.0 + 1.5 * exp(-o.uv.y * 9.0));
         a += exp(-x * x * 40.0) * 0.4 * (1.0 - o.uv.y);
     } else if shape < 6.5 {
-        // A flash on the ground: a hot middle, short rays out of it, and the whole of it torn
-        // by turbulence boiling outward, so it reads as a burst of light, not a disc laid down.
+        // A flash on the ground: hot in the middle and falling away to its edge, torn by
+        // turbulence boiling outward, so it reads as a burst of light, not a disc laid down (the
+        // shockwave round it is what marks the edge).
         let ang = atan2(c.y, c.x);
-        let rays = pow(abs(cos(ang * 3.0 + seed * 6.0)), 12.0) * max(1.0 - d, 0.0);
-        let boil = vnoise(vec2(ang * 3.0 + seed * 30.0, d * 5.0 - k * 4.0)) * 0.6
-            + vnoise(c * 11.0 + vec2(seed * 13.0, k * 3.0)) * 0.4;
-        let body = smoothstep(0.0, 0.6, 1.0 - d + (boil - 0.5) * 0.55);
-        a = body * (0.25 + 0.75 * pow(max(1.0 - d, 0.0), 1.6)) * (0.55 + 0.6 * boil) + rays * 0.45;
+        let boil = vnoise(vec2(ang * 2.5 + seed * 30.0, d * 4.0 - k * 5.0)) * 0.55
+            + vnoise(c * 9.0 + vec2(seed * 13.0, k * 3.0)) * 0.45;
+        let body = smoothstep(0.0, 0.5, 1.0 - d + (boil - 0.5) * 0.8);
+        a = body * pow(max(1.0 - d, 0.0), 1.3) * (0.3 + 0.9 * boil) * 0.85;
     } else if shape < 7.5 {
         // A star: four long rays and four short between them, a white core; gone fast.
         let q = abs(c) * 2.0;
@@ -222,9 +225,11 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
         a = (exp(-d * d * 14.0) + pow(max(1.0 - d, 0.0), 3.0) * 0.3) * flick;
         fade = smoothstep(0.0, 0.08, k) * (1.0 - smoothstep(0.4, 1.0, k));
     } else {
-        // A scorch: a dark mark with a ragged edge, there a while, fading slowly.
-        let n = vnoise(c * 5.0 + vec2(seed * 31.0, seed * 17.0));
-        a = smoothstep(0.0, 0.5, 1.0 - d + (n - 0.5) * 0.6) * 0.65;
+        // A scorch: soot in patches with a ragged edge, darkest in the middle, there a while,
+        // fading slowly; the stone shows through it.
+        let n = vnoise(c * 5.0 + vec2(seed * 31.0, seed * 17.0)) * 0.6
+            + vnoise(c * 13.0 + vec2(seed * 7.0, seed * 3.0)) * 0.4;
+        a = smoothstep(0.0, 0.45, 1.0 - d + (n - 0.5) * 0.9) * (0.25 + 0.3 * n) * (1.0 - 0.5 * d);
         fade = smoothstep(0.0, 0.05, k) * (1.0 - smoothstep(0.35, 1.0, k));
     }
     a = clamp(a, 0.0, 2.0) * fade * o.color.a;
@@ -236,6 +241,10 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
         let hot = pow(1.0 - k, 3.0) * 0.7;
         let peak = max(col.r, max(col.g, col.b));
         col = mix(col, vec3(peak), hot);
+    } else {
+        // Smoke and dust give no light: they're lit as the stone round them is, by the moon and
+        // the night (a pale puff drawn as its own colour was a white cloud in the dark).
+        col *= NIGHT;
     }
     let rgb = col * a * dim;
     // Premultiplied: added for light (its alpha unused), laid over for smoke (`burst.rs`).
