@@ -453,6 +453,20 @@ Measured over the first three champions: sixteen pictures held over their twelve
 four missiles among them and what each of the twelve does as it lands (an impact, a blast, a buff
 or a dash), about six minutes a champion where it was about five, the walk still exact.
 
+Then all twenty (the suite in four runs, 3 to 8, 9 to 14 and 15 to 19 after the first three, each
+passed: about five minutes a champion, no cast missed, no sound failed, at most 11 at once, the
+walk exact): 19 missiles held in flight, and 78 of the 80 abilities held as they land. The two
+that weren't: Sefa's Q, a missile of 0.17 s that ends short of the dummy and lands on nothing,
+and Brun's E, whose missile does nothing a catch takes (no impact, blast, buff or dash). From the
+pictures, for the hand-tuning:
+- In flight, the families read apart (fire orange, frost blue, dusk magenta, steel a white
+  streak); Vessa's and Marret's W are pale blobs.
+- Blasts and ultimates read at once; a single target's hit is the smallest thing in the picture
+  (a star the size of the unit's head), and a buff on the caster at a tenth of a second is
+  barely there (Ulla's three).
+- Liora's R lays a dusk cloud under its target, dark as a shadow: it reads, but as a hole more
+  than a strike.
+
 Not yet:
 - Nobody has listened: the sounds were judged by their spectrograms and measures, not by ear. The
   look on a real GPU hasn't been seen either (SwiftShader draws a frame every two seconds, so a
