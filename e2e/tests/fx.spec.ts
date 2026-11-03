@@ -4,8 +4,9 @@ import { collectConsole, el, luminanceStdDev } from "./util";
 // The effects, champion by champion (`docs/FX.md`, "How we know it's done"): a practice match
 // (`scripts/e2e.sh fx` starts a server with `--practice`), each ability of each champion cast at
 // what it's for (the enemy dummy in front, an ally, a point, itself), each drawn and heard as the
-// player's own; two pictures of each, as it's cast and a moment after, and a contact sheet a
-// champion in `artifacts/` with all of them on one more.
+// player's own; pictures of each as it's cast and a moment after, and two held on its missile in
+// flight and on what it does as it lands, and a contact sheet a champion in `artifacts/` with all
+// of them on one more.
 
 const until = async (page: any, what: string, pred: (s: Record<string, any>) => boolean, timeout = 60_000) => {
   const end = Date.now() + timeout;
@@ -27,6 +28,8 @@ const ALLY = { unit: 1 };
 // The champions cast, from `EL_FX_FROM` (0) up to `EL_FX_CHAMPIONS` (20, all of them).
 const FROM = Number(process.env.EL_FX_FROM || 0);
 const CHAMPIONS = Number(process.env.EL_FX_CHAMPIONS || 20);
+// The pictures held on a missile in flight and on what lands (`EL_FX_CATCH=0` leaves them out).
+const CATCH = process.env.EL_FX_CATCH !== "0";
 
 test("every ability of every champion, cast in practice", async ({ page, context }, info) => {
   // About five minutes a champion: SwiftShader takes many seconds a picture.
@@ -46,7 +49,7 @@ test("every ability of every champion, cast in practice", async ({ page, context
   }
   const missed: string[] = [];
   const sheet: { champ: string; slot: number; kit: string; shots: string[] }[] = [];
-  // The contact sheets: a champion's eight pictures as it's done, then every one on one page.
+  // The contact sheets: a champion's pictures as it's done, then every one on one page.
   const fs = await import("node:fs");
   const img = (p: string) => `data:image/png;base64,${fs.readFileSync(p).toString("base64")}`;
   const tiles = (rows: typeof sheet, w: number) =>
@@ -131,7 +134,34 @@ test("every ability of every champion, cast in practice", async ({ page, context
       const b = `${dir}-${name}-${slot}-after.png`;
       const shot = await page.screenshot({ path: b });
       expect(luminanceStdDev(shot)).toBeGreaterThan(5);
-      sheet.push({ champ: name, slot, kit: kit[slot] + (ok ? "" : " (missed)"), shots: [a, b] });
+      const shots = [a, b];
+      // Cast twice more with the picture held: on its missile halfway (if it has one), then on
+      // what it does as it lands, a tenth of a second old. Both fall between SwiftShader's frames
+      // otherwise (`fx.rs`, `Catch`).
+      if (CATCH) {
+        for (const [what, at, label] of [
+          ["missile", 0.5, "flight"],
+          ["impact,blast,buff,dash", 0.1, "lands"],
+        ] as const) {
+          const was = (await el(page)).fx_caught ?? 0;
+          await push(page, { t: "catch", what, at });
+          await push(page, { t: "cast", slot, ...aim });
+          try {
+            const c = await until(page, `${name}'s ${"QWER"[slot]} caught (${what})`, (s) => (s.fx_caught ?? 0) > was, 8_000);
+            console.log(`${name} ${"QWER"[slot]} ${label}: ${c.fx_caught_what}`);
+            // A frame drawn with it held.
+            await page.waitForTimeout(2_500);
+            const p = `${dir}-${name}-${slot}-${label}.png`;
+            await page.screenshot({ path: p });
+            shots.push(p);
+          } catch {
+            // Nothing of the kind (an ability without a missile): no picture.
+          }
+          await push(page, { t: "time", speed: 1 });
+          await page.waitForTimeout(1_500);
+        }
+      }
+      sheet.push({ champ: name, slot, kit: kit[slot] + (ok ? "" : " (missed)"), shots });
     }
     await write(sheet.filter((r) => r.champ === name), 400, `${dir}-sheet-${name}.png`);
     console.log(`${name}: ${sheet.filter((r) => r.champ === name).map((r) => r.kit).join(", ")}`);

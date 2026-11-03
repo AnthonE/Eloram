@@ -232,6 +232,15 @@ enum Cmd {
     Time {
         speed: f32,
     },
+    /// The picture held on the next of `what` an ability does (`missile`, or a cue of any of the
+    /// parts named: `impact,blast`, `cast`...) as it's told: a missile at `at` of its flight (0 to
+    /// 1, 0.5 if left out), a cue's bursts `at` seconds old (0.05). The clock stops on it
+    /// (`fx_caught` counts them, `fx_held` says so, `fx_caught_what` names it) until `{t:"time"}`
+    /// runs it again (`fx.rs`, [`crate::fx::Catch`]).
+    Catch {
+        what: String,
+        at: Option<f32>,
+    },
 }
 
 pub struct InboxPlugin;
@@ -248,6 +257,7 @@ impl Plugin for InboxPlugin {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn inbox(
     net: NonSend<crate::net::NetState>,
     mut controls: ResMut<crate::input::Controls>,
@@ -255,6 +265,7 @@ fn inbox(
     mut look: ResMut<crate::look::Look>,
     mut audio: ResMut<crate::audio::AudioSettings>,
     mut clock: ResMut<Time<Virtual>>,
+    mut catch: ResMut<crate::fx::Catch>,
     drawn: Res<crate::view::Drawn>,
 ) {
     use el_client_core::lobby::ToServer;
@@ -336,7 +347,26 @@ fn inbox(
                 audio.save();
                 continue;
             }
+            Cmd::Catch { what, at } => {
+                use crate::fx::Want;
+                let want = match what.as_str() {
+                    "missile" => Some(Want::Missile { at: at.unwrap_or(0.5) }),
+                    _ => Want::cue(&what, at.unwrap_or(0.05).max(0.0)),
+                };
+                let want = match want {
+                    Some(w) => w,
+                    None => {
+                        web_sys::console::warn_1(
+                            &format!("__elInbox: nothing to catch called {what}").into(),
+                        );
+                        continue;
+                    }
+                };
+                catch.arm(want);
+                continue;
+            }
             Cmd::Time { speed } => {
+                catch.release();
                 if speed <= 0.0 {
                     clock.pause();
                 } else {
