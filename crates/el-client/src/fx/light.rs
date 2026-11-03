@@ -9,7 +9,7 @@ use el_client_core::fx::director::What;
 use el_client_core::fx::look::Rgb;
 use el_client_core::fx::sound::Part;
 
-use super::Cues;
+use super::{Catch, Cues};
 use crate::coords::{S, world};
 use crate::look::Look;
 
@@ -74,9 +74,12 @@ fn hue(c: Rgb) -> Color {
 }
 
 /// This frame's flares, and every lit one's light as it fades.
+///
+/// A picture held on a caught cue lights nothing after it, and lights the cue its age ago.
 pub fn flare(
     time: Res<Time>,
     cues: Res<Cues>,
+    catch: Res<Catch>,
     mut flares: ResMut<Flares>,
     mut lights: Query<(&mut PointLight, &mut Transform, &mut Visibility)>,
 ) {
@@ -84,7 +87,13 @@ pub fn flare(
         return;
     }
     let now = time.elapsed_secs_wrapped();
-    for q in &cues.list {
+    let (upto, age) = match catch.cue {
+        Some((i, age)) => (i + 1, age),
+        None if catch.held => (0, 0.0),
+        None => (cues.list.len(), 0.0),
+    };
+    for (i, q) in cues.list.iter().enumerate().take(upto) {
+        let born = if i + 1 == upto && catch.cue.is_some() { now - age } else { now };
         // Brighter as it matters more to this viewer, as the bursts are.
         let k = 0.62 + 0.08 * f32::from(q.rating.clamp(1, 10));
         // How high it's lit from, how bright (lm), how long (s), how far it reaches (m), in what.
@@ -105,7 +114,7 @@ pub fn flare(
         else {
             continue;
         };
-        *slot = Flare { entity: slot.entity, born: now, life, peak, on: slot.on };
+        *slot = Flare { entity: slot.entity, born, life, peak, on: slot.on };
         if let Ok((mut light, mut tf, _)) = lights.get_mut(slot.entity) {
             light.color = hue(color);
             light.range = range;

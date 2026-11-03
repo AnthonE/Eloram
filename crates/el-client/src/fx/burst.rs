@@ -24,10 +24,11 @@ use el_client_core::fx::look::{Family, Palette, Reach, Rgb};
 use el_client_core::fx::sound::Part;
 use el_sim::units::Kind;
 
-use super::Cues;
+use super::{Catch, Cues, Want};
 use crate::coords::{S, world};
 use crate::ground::FogTex;
 use crate::look::Look;
+use crate::view::Drawn;
 
 /// Particles a burst holds at most (what's past it is dropped, so what matters goes first).
 const QUADS: usize = 48;
@@ -345,27 +346,79 @@ impl Make<'_> {
 }
 
 /// The bursts of this frame's cues; each slot drawn while its burst lasts, and only then.
+///
+/// A catch armed for a cue's part holds the picture on the first such cue, its bursts born its
+/// age ago; while the picture is held nothing new is born in it.
+#[allow(clippy::too_many_arguments)]
 pub fn spawn(
     time: Res<Time>,
     cues: Res<Cues>,
+    drawn: Res<Drawn>,
+    mut catch: ResMut<Catch>,
+    mut clock: ResMut<Time<Virtual>>,
     mut bursts: ResMut<Bursts>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut shown: Query<&mut Visibility>,
 ) {
     let now = time.elapsed_secs_wrapped();
     let keep = if bursts.low { 0.5 } else { 1.0 };
-    for q in &cues.list {
-        let mut m = Make { b: &mut bursts, now, glow: Vec::new(), smoke: Vec::new(), keep };
-        recipe(&mut m, q);
+    for (i, q) in cues.list.iter().enumerate() {
+        if catch.held {
+            break;
+        }
+        let born = match catch.want {
+            Some(w @ Want::Cue { age, .. }) if w.takes(q) => {
+                catch.hold(
+                    &mut clock,
+                    format!("{:?} {:?} on {:?} at {:.0},{:.0}", q.what, q.source, q.unit, q.at.x, q.at.y),
+                );
+                catch.cue = Some((i, age));
+                now - age
+            }
+            _ => now,
+        };
+        let mut m = Make { b: &mut bursts, now: born, glow: Vec::new(), smoke: Vec::new(), keep };
+        recipe(&mut m, q, &drawn);
         let (glow, smoke) = (std::mem::take(&mut m.glow), std::mem::take(&mut m.smoke));
-        bursts.put(&glow, false, now, &mut meshes);
-        bursts.put(&smoke, true, now, &mut meshes);
+        bursts.put(&glow, false, born, &mut meshes);
+        bursts.put(&smoke, true, born, &mut meshes);
     }
     for slot in bursts.glow.iter().chain(&bursts.smoke) {
         let live = slot.ends > now && slot.ends - now < LONGEST;
         if let Ok(mut v) = shown.get_mut(slot.entity) {
             v.set_if_neq(if live { Visibility::Inherited } else { Visibility::Hidden });
         }
+    }
+}
+
+/// Where a cue on a unit is drawn: at its chest, on its body's near side. In its middle, a hit
+/// was drawn inside the model, and its depth hid all of it but what flew out (a picture held on a
+/// skillshot's hit showed nothing of it at all).
+fn on_body(q: &Cue, drawn: &Drawn) -> Vec3 {
+    let unit = q.unit.and_then(|u| drawn.units.get(usize::from(u)).copied().flatten());
+    let r = unit.map(|d| d.radius * S);
+    let kind = match (q.unit, r) {
+        (_, Some(r)) if r > 1.2 => Kind::Turret,
+        (Some(u), _) if usize::from(u) < el_sim::units::SEATS => Kind::Champion,
+        _ => Kind::Melee,
+    };
+    let out = r.map_or(body(kind), |r| (r * 0.8).clamp(0.3, 1.8));
+    world(q.at, chest(kind)) + toward_camera() * out
+}
+
+/// From the floor toward the camera, a metre.
+fn toward_camera() -> Vec3 {
+    crate::camera::VIEW.offset(1.0).normalize()
+}
+
+/// How far a unit's body stands out from its middle toward the camera (m), by its kind, where
+/// its radius isn't drawn.
+fn body(kind: Kind) -> f32 {
+    match kind {
+        Kind::Champion => 0.55,
+        k if k.is_minion() => 0.4,
+        k if k.is_structure() => 1.6,
+        _ => 0.5,
     }
 }
 
@@ -379,7 +432,7 @@ fn chest(kind: Kind) -> f32 {
     }
 }
 
-fn recipe(m: &mut Make<'_>, q: &Cue) {
+fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
     // Bigger and brighter as it matters more to this viewer: 0.7 for a 1 to 1.4 for a 10.
     let k = 0.62 + 0.08 * f32::from(q.rating.clamp(1, 10));
     let pal = q.look.palette;
@@ -399,7 +452,8 @@ fn recipe(m: &mut Make<'_>, q: &Cue) {
             m.spray(ground(0.3), 16.0 * k, shape::GLOW, 2.0, 0.9, 0.9, 0.08, -1.5, 1.5, core, false);
         }
         What::Part(Part::Launch) => {
-            let at = ground(1.1);
+            // The muzzle on the caster's near side, as a hit is (a turret's is its own height).
+            let at = if matches!(q.look.reach, Reach::Turret) { ground(1.1) } else { on_body(q, drawn) };
             m.one(at, shape::GLOW, 0.25 * k, 0.16, core, false);
             if matches!(q.look.reach, Reach::Line { .. } | Reach::Homing | Reach::Turret) {
                 // A muzzle's flash, and what it throws forward.
@@ -408,12 +462,7 @@ fn recipe(m: &mut Make<'_>, q: &Cue) {
             }
         }
         What::Part(Part::Impact) => {
-            let kind = if q.unit.is_some_and(|u| usize::from(u) < el_sim::units::SEATS) {
-                Kind::Champion
-            } else {
-                Kind::Melee
-            };
-            let at = ground(chest(kind));
+            let at = on_body(q, drawn);
             // A hit's size by its damage, a little.
             let hurt = (q.size / 150.0).clamp(0.6, 1.6);
             let auto = matches!(q.look.reach, Reach::Auto { .. });

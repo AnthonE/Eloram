@@ -42,12 +42,14 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   signing through `el-auth`'s `sign` example, `/online.json`, the resume token; `art`: the camera over each place on the map, the fog's darkness off (`{t:"camera"}`,
   `{t:"fog"}`); `draws`: WebGL2's draw calls a frame on each tier, by shader program and mesh
   (`e2e/artifacts/draws-<tier>.json`); `fx`: practice, every ability of every champion cast at a dummy, drawn and heard
-  as the player's own, and a contact sheet a champion (`EL_FX_FROM=10 EL_FX_CHAMPIONS=20` for
-  the last ten: about four minutes each); screenshots in `e2e/artifacts/`). The `webgpu` project (`scripts/e2e.sh art
+  as the player's own, held on its missile in flight and on what lands (`EL_FX_CATCH=0` skips
+  those), and a contact sheet a champion (`EL_FX_FROM=10 EL_FX_CHAMPIONS=20` for
+  the last ten: about six minutes each); screenshots in `e2e/artifacts/`). The `webgpu` project (`scripts/e2e.sh art
   webgpu`) is headless WebGPU on SwiftShader's Vulkan. `scripts/e2e.sh` serves the `web/dist/` already
   built: rebuild it first. A test or the console drives the champion through `window.__elInbox`
   (`{t:"move",x,y}`, `cast`, `buy`, `use`, `pick`, `level`, `champ_reroll`, `champ_swap`, `ready`, `aim`, `drop_link`,
-  `ping`, `surrender`, `practice_champ`, `time` (the picture's clock slowed or stopped, to catch a burst)...:
+  `ping`, `surrender`, `practice_champ`, `time` (the picture's clock slowed or stopped, to catch a burst), `catch` (the picture held on the next
+  missile at a fraction of its flight, or the next cue of a part at an age: `fx_caught_what`)...:
   `el-client/src/dev_hooks.rs`) and reads `window.__el`. Headless Chromium draws with
   SwiftShader at about a frame a second: its pictures are right, its frame rates mean nothing.
 - The map's art (`docs/ART.md`): `web/assets/` ships as it is (`scripts/build-web.sh` copies it);

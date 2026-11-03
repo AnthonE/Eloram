@@ -12,6 +12,8 @@ pub mod live;
 use bevy::prelude::*;
 use el_client_core::fx::director::{Cue, Director, NO_SEAT, Scene, Status, What};
 use el_client_core::fx::sound::Part;
+use el_client_core::missiles::Shot;
+use el_sim::missile::Source;
 
 use crate::net::now_s;
 use crate::session::Session;
@@ -36,6 +38,92 @@ impl Cues {
     }
 }
 
+/// A picture held on what a test wants to see (`{t:"catch"}` in the inbox): SwiftShader draws a
+/// frame a second or two, and a missile's whole flight, or a hit's first tenth of a second, falls
+/// between two of them. Armed, the next one is caught as it's told (a missile at a fraction of its
+/// flight, a cue's bursts at an age) and the picture's clock stops on it; nothing new is born in
+/// the picture until `{t:"time"}` runs the clock again. The match's own clock goes on: units still
+/// walk.
+#[derive(Resource, Default)]
+pub struct Catch {
+    pub want: Option<Want>,
+    /// The picture is held on what was caught.
+    pub held: bool,
+    /// The missile held (its slot, as spawned) and the tick it's drawn at.
+    pub shot: Option<(usize, Shot, f64)>,
+    /// The missile spawns counted when it was armed (set by the first frame after).
+    pub seen: Option<u64>,
+    /// This frame's cue that was caught (its place in [`Cues::list`]) and its age: the cues after
+    /// it aren't drawn.
+    pub cue: Option<(usize, f32)>,
+    /// Caught in all, and what the last one was.
+    pub caught: u32,
+    pub last: String,
+}
+
+/// What a catch waits for.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Want {
+    /// The next ability's missile spawned, at this fraction of its flight (0 to 1).
+    Missile { at: f32 },
+    /// The next ability's cue of any of these parts (by [`Part`]'s order), its bursts this many
+    /// seconds old. Autos, items and the rest aren't taken: a test casting an ability wants what
+    /// that ability does, not the attack its champion makes after.
+    Cue { parts: [bool; Part::COUNT], age: f32 },
+}
+
+impl Want {
+    /// A cue of any of `names` (`impact,blast`...), or `None` if one isn't a part's name.
+    pub fn cue(names: &str, age: f32) -> Option<Want> {
+        let mut parts = [false; Part::COUNT];
+        for n in names.split(',') {
+            parts[part_named(n.trim())? as usize] = true;
+        }
+        Some(Want::Cue { parts, age })
+    }
+
+    fn takes(&self, q: &Cue) -> bool {
+        matches!(q.source, Source::Ability { .. })
+            && matches!((self, q.what), (Want::Cue { parts, .. }, What::Part(p)) if parts[p as usize])
+    }
+}
+
+impl Catch {
+    pub fn arm(&mut self, want: Want) {
+        let last = std::mem::take(&mut self.last);
+        *self = Catch { want: Some(want), caught: self.caught, last, ..Catch::default() };
+    }
+
+    pub fn release(&mut self) {
+        let last = std::mem::take(&mut self.last);
+        *self = Catch { caught: self.caught, last, ..Catch::default() };
+    }
+
+    /// Holds the picture on what was caught (`what`, for `fx_caught_what`).
+    fn hold(&mut self, clock: &mut Time<Virtual>, what: String) {
+        self.last = what;
+        self.want = None;
+        self.held = true;
+        self.caught += 1;
+        clock.pause();
+    }
+}
+
+/// A part by the name a test gives it (`impact`, `blast`...).
+pub fn part_named(name: &str) -> Option<Part> {
+    Some(match name {
+        "cast" => Part::Cast,
+        "launch" => Part::Launch,
+        "impact" | "hit" => Part::Impact,
+        "blast" => Part::Blast,
+        "windup" => Part::Windup,
+        "dash" => Part::Dash,
+        "buff" => Part::Buff,
+        "ult" => Part::Ult,
+        _ => return None,
+    })
+}
+
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FxSet;
 
@@ -46,6 +134,7 @@ impl Plugin for FxPlugin {
         bevy::asset::embedded_asset!(app, "shaders/fx_burst.wgsl");
         bevy::asset::embedded_asset!(app, "shaders/fx_live.wgsl");
         app.init_resource::<Cues>()
+            .init_resource::<Catch>()
             .add_plugins((
                 MaterialPlugin::<burst::BurstMat>::default(),
                 MaterialPlugin::<live::LiveMat>::default(),
@@ -64,8 +153,17 @@ impl Plugin for FxPlugin {
 
 /// The director's cues for this frame (a new director for each match's client, and one for a
 /// match watched).
-fn direct(session: Res<Session>, mut cues: ResMut<Cues>, mut status: ResMut<crate::dev_hooks::DevStatus>) {
+fn direct(
+    session: Res<Session>,
+    mut cues: ResMut<Cues>,
+    mut catch: ResMut<Catch>,
+    mut status: ResMut<crate::dev_hooks::DevStatus>,
+) {
     cues.list.clear();
+    catch.cue = None;
+    status.set("fx_caught", catch.caught);
+    status.set("fx_held", catch.held);
+    status.set("fx_caught_what", catch.last.as_str());
     let watched = session.watch.as_deref().map(|w| w.scene());
     let (scene, seat): (&dyn Scene, usize) = match (&watched, session.client.as_deref()) {
         (Some(w), _) => (w, NO_SEAT),

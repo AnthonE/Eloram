@@ -17,6 +17,7 @@ use bevy::render::render_resource::{
 };
 use bevy::shader::ShaderRef;
 use el_client_core::fx::look::{self, Palette, Rgb, world as hue};
+use el_client_core::missiles::Shot;
 use el_proto::unit::flags;
 use el_sim::missile::MAX_MISSILES;
 use el_sim::units::{Kind, MAX_UNITS, SEATS};
@@ -294,6 +295,8 @@ pub fn draw(
     mut marks: Local<Vec<(Mark, Transform)>>,
     mut last: Local<Vec<(usize, Vec2)>>,
     mut dev: ResMut<crate::dev_hooks::DevStatus>,
+    mut catch: ResMut<super::Catch>,
+    mut clock_v: ResMut<Time<Virtual>>,
 ) {
     let live = &mut *live;
     let now = now_s();
@@ -314,15 +317,41 @@ pub fn draw(
     let clock = time.elapsed_secs_wrapped();
     let face = facing_camera();
     let flat = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
+    let target_of = |s: &Shot| drawn.units.get(usize::from(s.target)).copied().flatten().map(|d| d.pos);
+    // A catch armed for a missile: the next one spawned (though it ended before this frame), held
+    // at its fraction of its flight. A picture held on anything else stays as it was.
+    if let Some(super::Want::Missile { at: frac }) = catch.want {
+        let seen = *catch.seen.get_or_insert(missiles.spawns);
+        if let Some((id, s)) = missiles.last.filter(|_| missiles.spawns != seen) {
+            let flight = match (s.homing, target_of(&s)) {
+                (true, Some(to)) => (to - s.origin).length(),
+                (true, None) => s.speed * 0.5,
+                (false, _) => s.range,
+            } / s.speed.max(1.0);
+            let tick = f64::from(s.t0) + f64::from(frac.clamp(0.0, 1.0) * flight * el_proto::TICK_HZ as f32);
+            let what = format!(
+                "missile {:?} from {:.0},{:.0} at {frac} of {flight:.2}s",
+                s.source, s.origin.x, s.origin.y
+            );
+            catch.hold(&mut clock_v, what);
+            catch.shot = Some((id, s, tick));
+        }
+    }
+    if catch.held && catch.shot.is_none() {
+        return;
+    }
+    let held = catch.shot;
+    let shots =
+        held.into_iter().chain(missiles.live().filter(|_| held.is_none()).map(|(id, s)| (id, *s, at)));
     // Missiles: a head and a trail each.
     let mut k = 0;
     let mut seen_pos = std::mem::take(&mut *last);
     let mut next_pos = Vec::with_capacity(seen_pos.len());
-    for (id, s) in missiles.live() {
+    for (id, s, at) in shots {
         if k >= live.heads.len() {
             break;
         }
-        let target = drawn.units.get(usize::from(s.target)).copied().flatten().map(|d| d.pos);
+        let target = target_of(&s);
         let pos = s.pos(at, target);
         let dir = if s.homing {
             let before = seen_pos.iter().find(|(i, _)| *i == id).map(|(_, p)| *p);
@@ -389,6 +418,9 @@ pub fn draw(
         hide(&mut q, live.trails[i]);
     }
     seen_pos.clear();
+    if held.is_some() {
+        return;
+    }
     // Zones: a telegraph filling toward its landing, or a field's churn and pulses.
     let secs = |tick: f64| clock + ((tick - at) / f64::from(el_proto::TICK_HZ)) as f32;
     let mut zones_shown = 0u32;

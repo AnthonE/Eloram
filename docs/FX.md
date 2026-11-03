@@ -426,8 +426,32 @@ pass had. From them:
   strikes or a structure falls, and fading in a fraction of a second, so the stone and the units
   round it take the effect's colour (the high tier).
 - A burst holds 48 particles, and its hit's core and star go first, so a full one never drops them.
-- Still not caught: missiles and small hits. They fly on the match's clock, not the picture's, and
-  are over between two of SwiftShader's frames.
+- Not caught by it: missiles and small hits. They fly on the match's clock, not the picture's,
+  and are over between two of SwiftShader's frames (the catch, below, is for them).
+
+**Missiles and hits, caught.** `{t:"catch",what,at}` in the inbox holds the picture on the next
+missile spawned, drawn at `at` of its flight (the client's table keeps the last spawn, so one whose
+whole flight fell between two frames is still drawn), or on the next cue of the parts named
+(`impact,blast,buff,dash`), its bursts and light born `at` seconds ago; the picture's clock stops
+there, nothing new is born in it, and `{t:"time"}` lets it go (`fx.rs`, `Catch`; `fx_caught_what`
+names what it took). The match's own clock goes on, so units still walk. `scripts/e2e.sh fx` casts
+each ability twice more for it, a picture of its missile halfway and one of what it does as it
+lands, a tenth of a second old. What the first pictures showed:
+- A skillshot's hit was invisible. Its core and star were made at the unit's chest, in the middle
+  of its body, and the model's depth hid them; only what flew out of it showed, and the frost
+  shards a tenth of a second out were a few pixels. A hit, and a launch's muzzle, are drawn on
+  the body's near side now, out toward the camera by the unit's drawn radius: the star shows on
+  the dummy at 0.02 and 0.06 s and is gone by 0.12, as it's made to be.
+- A particle fades in over its first 6% of life and is nothing at age 0, so a burst born while
+  the clock is stopped never shows; a catch's age is what puts it in the picture.
+- A missile's head is a hot core (1.6 times its colour) in a faint halo of its edge, so a pale
+  family's (Vessa's frost) reads as white in flight; an ember's (Orrin's) reads as fire. One for
+  the hand-tuning, as is a blast's ground flash on the low tier, still more a soft disc than a boil.
+- A catch takes only what an ability does: Vessa's E dashes her to the dummy, and the first run's
+  "missile in flight" after it was her auto-attack.
+Measured over the first three champions: sixteen pictures held over their twelve abilities, the
+four missiles among them and what each of the twelve does as it lands (an impact, a blast, a buff
+or a dash), about six minutes a champion where it was about five, the walk still exact.
 
 Not yet:
 - Nobody has listened: the sounds were judged by their spectrograms and measures, not by ear. The

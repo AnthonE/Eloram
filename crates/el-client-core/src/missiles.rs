@@ -58,17 +58,24 @@ impl Shot {
 /// Every missile slot the server has, as the team was told of it.
 pub struct Missiles {
     pub shots: Box<[Shot]>,
+    /// Abilities' missiles spawned in all (never reset), and the last one's slot and shot as it
+    /// was spawned, whether or not it has ended since: what a picture held on a cast's missile
+    /// draws, though its whole flight fell between two frames (an auto after it doesn't take its
+    /// place).
+    pub spawns: u64,
+    pub last: Option<(usize, Shot)>,
 }
 
 impl Default for Missiles {
     fn default() -> Self {
-        Self { shots: vec![Shot::default(); MAX_MISSILES].into_boxed_slice() }
+        Self { shots: vec![Shot::default(); MAX_MISSILES].into_boxed_slice(), spawns: 0, last: None }
     }
 }
 
 impl Missiles {
     pub fn clear(&mut self) {
         self.shots.fill(Shot::default());
+        self.last = None;
     }
 
     /// Takes a `MissileSpawn` or a `MissileEnd`; anything else is no business of this.
@@ -105,6 +112,10 @@ impl Missiles {
                     target,
                     homing,
                 };
+                if matches!(s.source, Source::Ability { .. }) {
+                    self.spawns += 1;
+                    self.last = Some((usize::from(id), *s));
+                }
             }
             WireEvent::MissileEnd { id, generation, .. } => {
                 if let Some(s) = self.shots.get_mut(usize::from(id))
@@ -152,5 +163,23 @@ mod tests {
         assert!(m.shots[7].alive, "another life's end isn't this one's");
         m.take(&WireEvent::MissileEnd { id: 7, generation: 2, at: [0, 0] });
         assert_eq!(m.live().count(), 0);
+        assert_eq!(m.spawns, 1);
+        assert_eq!(m.last.map(|(i, s)| (i, s.t0)), Some((7, 300)), "the last spawn kept past its end");
+        // An auto's missile is no ability's: the last cast's stays.
+        m.take(&WireEvent::MissileSpawn {
+            id: 8,
+            generation: 0,
+            team: 0,
+            source: Source::Auto.code() as u16,
+            owner: 3,
+            origin: pos_code(Vec2::new(2_000.0, 1_900.0)),
+            t0: 320,
+            target: 5,
+            dir: facing_code(0.0),
+            speed: 2_000,
+            range: 0,
+            width: 0,
+        });
+        assert_eq!((m.spawns, m.last.map(|(i, _)| i)), (1, Some(7)));
     }
 }

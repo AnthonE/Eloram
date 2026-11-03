@@ -281,8 +281,9 @@ Left, in no order:
   fps at 1080p on integrated graphics, and a ten-way fight at 60 on `high`), and the effects'
   share of the frame (`FX.md`, step 6).
 - **Listening.** The sounds were judged by their spectrograms and measures, not by ear.
-- **Tuning by hand**: each ability's look (`FX.md`, step 5, from the contact sheets), each
-  champion's clip windows (`CHAMPIONS.md`).
+- **Tuning by hand**: each ability's look (`FX.md`, step 5, from the contact sheets, which now
+  hold each missile in flight and each hit as it lands), each champion's clip windows
+  (`CHAMPIONS.md`).
 - **Art**: an outline drawn as a line, where the rim stands in (`CHAMPIONS.md`); the HUD's last
   draw calls.
 - **The announcer's and the music's files**: wired, optional, dropped in by name (`FX.md`).
