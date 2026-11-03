@@ -13,6 +13,7 @@
     view_transformations::position_world_to_clip,
 }
 #import el::fog::fog_dark
+#import el::display::display
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(0) var fog: texture_2d<f32>;
 @group(#{MATERIAL_BIND_GROUP}) @binding(1) var fog_s: sampler;
@@ -131,5 +132,5 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
     let dim = 1.0 - o.life.z * 0.6;
     let rgb = o.color.rgb * a * dim;
     // Premultiplied: added for glows (their alpha unused), laid over for smoke (`burst.rs`).
-    return vec4(rgb, a);
+    return vec4(display(rgb), a);
 }

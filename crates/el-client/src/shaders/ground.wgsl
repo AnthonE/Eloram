@@ -119,12 +119,14 @@ fn cracks(xz: vec2<f32>) -> f32 {
     return (1.0 - smoothstep(width * 0.4, width, d)) * spots;
 }
 
-// Snow drifted by the wind in long streaks across the seams (0 to 1).
+// Snow drifted by the wind in long streaks across the seams (0 to 1), in patches: everywhere at
+// once, they read as scratches on the picture rather than snow on the stone.
 fn drifts(xz: vec2<f32>) -> f32 {
     // Along the wind, from the far side of the lane a little across it.
     let a = vec2(xz.x * 0.96 + xz.y * 0.28, xz.y * 0.96 - xz.x * 0.28);
     let n = vnoise(a * vec2(0.3, 2.4)) * 0.7 + vnoise(a * vec2(0.9, 6.0)) * 0.3;
-    return smoothstep(0.6, 0.78, n);
+    let patches = smoothstep(0.42, 0.72, vnoise(xz * 0.06 + vec2(3.1, 5.7)));
+    return smoothstep(0.64, 0.84, n) * patches;
 }
 
 struct Surf {
@@ -259,7 +261,7 @@ fn floor_surface(wp: vec3<f32>) -> Lit {
     if !low {
         // The streaks fill the joints and the low stones first, and thicken toward the edges.
         let drift = drifts(wp.xz) * clamp(1.0 - pav.height * 1.2 + sp.r, 0.0, 1.0);
-        w_snow = max(w_snow, drift * 0.85);
+        w_snow = max(w_snow, drift * 0.6);
         crack = cracks(wp.xz) * (1.0 - w_snow) * (1.0 - w_grav * 0.5);
     }
     var s = mix_surf(pav, grav, w_grav);

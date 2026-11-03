@@ -178,6 +178,7 @@ pub struct GroundPlugin;
 impl Plugin for GroundPlugin {
     fn build(&self, app: &mut App) {
         bevy::shader::load_shader_library!(app, "shaders/fog.wgsl");
+        bevy::shader::load_shader_library!(app, "shaders/display.wgsl");
         bevy::asset::embedded_asset!(app, "shaders/ground.wgsl");
         bevy::asset::embedded_asset!(app, "shaders/fogged.wgsl");
         bevy::asset::embedded_asset!(app, "shaders/brush.wgsl");
