@@ -125,6 +125,8 @@ for (const tier of (process.env.EL_DRAWS_TIERS ?? "low,high").split(",")) {
     const logs = collectConsole(page);
     await page.addInitScript(PROBE);
     await page.setViewportSize({ width: 960, height: 540 });
+    // Not a first visit: the first match's strip of keys isn't in these (`hud_first.rs`).
+    await page.addInitScript(() => localStorage.setItem("el.taught", "1"));
     await page.goto(`/?gfx=${info.project.name}&quality=${tier}&name=Counter`);
     await until(page, "champion select", (s) => s.phase === "selecting", 300_000);
     await push(page, { t: "ready" });

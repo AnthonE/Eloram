@@ -25,6 +25,8 @@ mod hud;
 #[cfg(target_arch = "wasm32")]
 mod hud_death;
 #[cfg(target_arch = "wasm32")]
+mod hud_first;
+#[cfg(target_arch = "wasm32")]
 mod hud_lobby;
 #[cfg(target_arch = "wasm32")]
 mod hud_select;
@@ -34,6 +36,8 @@ mod hud_target;
 mod input;
 #[cfg(target_arch = "wasm32")]
 mod look;
+#[cfg(target_arch = "wasm32")]
+mod menu;
 #[cfg(target_arch = "wasm32")]
 mod minions;
 #[cfg(target_arch = "wasm32")]

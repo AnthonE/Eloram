@@ -43,6 +43,8 @@ test("the map's look", async ({ page }, info) => {
   const shots = `artifacts/art-${info.project.name}`;
   await page.setViewportSize({ width: 1280, height: 720 });
   // The high tier, which software rendering would otherwise not get.
+  // Not a first visit: the first match's strip of keys isn't in these (`hud_first.rs`).
+  await page.addInitScript(() => localStorage.setItem("el.taught", "1"));
   await page.goto(`/?gfx=${info.project.name}&quality=high&name=Painter`);
   try {
     await until(page, "champion select", (s) => s.phase === "selecting", 300_000);

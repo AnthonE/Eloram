@@ -201,10 +201,14 @@ fn follow(
     session: Res<Session>,
     drawn: Res<crate::view::Drawn>,
     shake: Res<Shake>,
+    menu: Res<crate::menu::Menu>,
     mut controls: ResMut<Controls>,
     mut cam: Single<&mut Transform, With<MainCamera>>,
 ) {
     let dt = time.delta_secs();
+    // The menu up, the camera stays where it is (or on the champion, locked): the keys are the
+    // menu's (`menu.rs` takes them), and so are the cursor at the edges and the buttons.
+    let free = !menu.open;
     let client = session.client.as_deref();
     let me = client.map(|c| c.own_pos(crate::net::now_s()));
     // Watching, there's no champion of one's own: the camera is free from the start.
@@ -255,10 +259,10 @@ fn follow(
         rig.grab = None;
     } else {
         // Free: the middle button drags the map under the cursor, else the edges and the arrows.
-        if mouse.just_pressed(MouseButton::Middle) {
+        if mouse.just_pressed(MouseButton::Middle) && free {
             rig.grab = controls.cursor;
         }
-        if !mouse.pressed(MouseButton::Middle) {
+        if !mouse.pressed(MouseButton::Middle) || !free {
             rig.grab = None;
         }
         if let (Some(grab), Some(at)) = (rig.grab, controls.cursor) {
@@ -267,7 +271,7 @@ fn follow(
             rig.focus += grab - at;
         } else {
             let mut pan = Vec2::ZERO;
-            if let Some(p) = window.cursor_position().filter(|_| window.focused) {
+            if let Some(p) = window.cursor_position().filter(|_| window.focused && free) {
                 let size = window.size();
                 if p.x <= EDGE {
                     pan.x -= 1.0;

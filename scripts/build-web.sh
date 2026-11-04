@@ -28,7 +28,7 @@ if [ "$crate_ver" != "$cli_ver" ]; then
 fi
 
 mkdir -p web/dist
-cp web/index.html web/config.js web/boot.js web/loader.js web/wallet.js web/audio.js web/style.css web/favicon.svg web/dist/
+cp web/index.html web/config.js web/boot.js web/loader.js web/wallet.js web/style.css web/favicon.svg web/dist/
 # The art (docs/ART.md, docs/CHAMPIONS.md): the ground's textures, the brush, the models, the
 # champions. JPEG and PNG are compressed already; the models' geometry isn't, so they get
 # precompressed copies like the wasm's.

@@ -1,15 +1,18 @@
-//! The mouse and keys, as a MOBA player expects them (`docs/DESIGN.md`, "Controls"). League's
-//! default: right click to move, or to attack what's under the cursor; A then a click to
-//! attack-move; Q, W, E, R and the summoner spells D and F cast at once at the cursor (quick cast),
-//! or with indicators on (`?indicators=1`) show their reach while held and cast when let go (Esc or
-//! a right click calls it off); Ctrl with an ability's key levels it; S stops, H holds; 1, 2 and 3
-//! take an augment card, Shift with one rerolls it. League's WASD (`?keys=wasd`): W, A, S and D
-//! steer; left click attacks what's under the cursor; the abilities are right click, Shift, E and
-//! R, the summoner spells Q and F; C (or Esc) calls an aimed cast off; Ctrl with a number rerolls
-//! a card. Either way P opens the shop where it may be used and Tab shows the scoreboard. Each
-//! becomes an order (or the steer) for the next command.
+//! The mouse and keys, as a MOBA player expects them (`docs/DESIGN.md`, "Controls";
+//! `el_client_core::controls` names them to the menu and the HUD). League's default: right click
+//! to move, or to attack what's under the cursor; A then a click to attack-move; Q, W, E, R and
+//! the summoner spells D and F cast at once at the cursor (quick cast), or with indicators on show
+//! their reach while held and cast when let go (Esc or a right click calls it off); Ctrl with an
+//! ability's key levels it; S stops, H holds; 1, 2 and 3 take an augment card, Shift with one
+//! rerolls it. League's WASD: W, A, S and D steer; left click attacks what's under the cursor;
+//! the abilities are right click, Shift, E and R, the summoner spells Q and F; C (or Esc) calls an
+//! aimed cast off; Ctrl with a number rerolls a card. Either way P opens the shop where it may be
+//! used and Tab shows the scoreboard. The layout and the indicators are the menu's (`menu.rs`,
+//! `config::Prefs`), and while it's up nothing here orders anything. Each becomes an order (or the
+//! steer) for the next command.
 
 use bevy::prelude::*;
+use el_client_core::controls::{Key, Layout};
 use el_proto::order::slot;
 use el_proto::{Aim, Order, UnitRef};
 use el_sim::content::Target;
@@ -50,7 +53,7 @@ pub struct Controls {
     pub steer: u8,
     pub shop_open: bool,
     pub scoreboard: bool,
-    /// The keys are League's WASD layout (`?keys=wasd`), not its default.
+    /// The keys are League's WASD layout (the menu's, or `?keys=wasd`), not its default.
     pub wasd: bool,
 }
 
@@ -88,27 +91,24 @@ pub const ITEM_KEYS: [(KeyCode, u8); 7] = [
     (KeyCode::Digit4, el_proto::order::TRINKET),
 ];
 
-/// What casts each slot (Q, W, E, R, D, F), in League's default layout and in its WASD one.
-const CAST: [(Press, u8); 6] = [
-    (Press::Key(KeyCode::KeyQ), slot::Q),
-    (Press::Key(KeyCode::KeyW), slot::W),
-    (Press::Key(KeyCode::KeyE), slot::E),
-    (Press::Key(KeyCode::KeyR), slot::R),
-    (Press::Key(KeyCode::KeyD), slot::D),
-    (Press::Key(KeyCode::KeyF), slot::F),
-];
-const CAST_WASD: [(Press, u8); 6] = [
-    (Press::Mouse(MouseButton::Right), slot::Q),
-    (Press::Key(KeyCode::ShiftLeft), slot::W),
-    (Press::Key(KeyCode::KeyE), slot::E),
-    (Press::Key(KeyCode::KeyR), slot::R),
-    (Press::Key(KeyCode::KeyQ), slot::D),
-    (Press::Key(KeyCode::KeyF), slot::F),
-];
-
-/// Each slot's key as the HUD names it, by layout.
-pub fn key_names(wasd: bool) -> [&'static str; 6] {
-    if wasd { ["RMB", "Shift", "E", "R", "Q", "F"] } else { ["Q", "W", "E", "R", "D", "F"] }
+/// What casts each slot (Q, W, E, R, D, F) in a layout (`el_client_core::controls`, which names
+/// them to the HUD and the menu).
+fn cast_keys(layout: Layout) -> [(Press, u8); 6] {
+    let mut out = [(Press::Key(KeyCode::KeyQ), 0); 6];
+    for (s, key) in layout.cast().into_iter().enumerate() {
+        let press = match key {
+            Key::Q => Press::Key(KeyCode::KeyQ),
+            Key::W => Press::Key(KeyCode::KeyW),
+            Key::E => Press::Key(KeyCode::KeyE),
+            Key::R => Press::Key(KeyCode::KeyR),
+            Key::D => Press::Key(KeyCode::KeyD),
+            Key::F => Press::Key(KeyCode::KeyF),
+            Key::Shift => Press::Key(KeyCode::ShiftLeft),
+            Key::RightMouse => Press::Mouse(MouseButton::Right),
+        };
+        out[s] = (press, s as u8);
+    }
+    out
 }
 
 /// The steer W, A, S and D held make on the screen (up the screen and to its right, counted as
@@ -184,7 +184,8 @@ fn read(
     session: Res<Session>,
     drawn: Res<Drawn>,
     ui: Query<&Interaction>,
-    cfg: Res<crate::net::LaunchConfigRes>,
+    prefs: Res<crate::config::Prefs>,
+    menu: Res<crate::menu::Menu>,
     mut c: ResMut<Controls>,
 ) {
     let (cam, cam_at) = *camera;
@@ -194,10 +195,13 @@ fn read(
         .and_then(|ray| ray.plane_intersection_point(Vec3::ZERO, InfinitePlane3d::new(Vec3::Y)))
         .map(map_point);
     c.scoreboard = keys.pressed(KeyCode::Tab);
-    c.wasd = cfg.0.wasd;
-    let Some(client) = session.client.as_ref().filter(|_| session.phase == Phase::Playing) else {
+    c.wasd = prefs.layout == Layout::Wasd;
+    // The menu up, the champion goes on with its last order and is given no other.
+    let Some(client) = session.client.as_ref().filter(|_| session.phase == Phase::Playing && !menu.open)
+    else {
         c.hovered = None;
         c.aiming = None;
+        c.armed = None;
         c.steer = 0;
         return;
     };
@@ -290,8 +294,8 @@ fn read(
         }
     }
     let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
-    let indicators = cfg.0.indicators;
-    for (press, s) in if wasd { CAST_WASD } else { CAST } {
+    let indicators = prefs.indicators;
+    for (press, s) in cast_keys(prefs.layout) {
         if matches!(press, Press::Mouse(_)) && over_ui {
             continue;
         }
