@@ -10,6 +10,8 @@ use crate::fx::FxPlugin;
 use crate::ground::GroundPlugin;
 use crate::hud::HudPlugin;
 use crate::hud_death::DeathPlugin;
+use crate::hud_lobby::LobbyPlugin;
+use crate::hud_select::SelectPlugin;
 use crate::hud_target::TargetPlugin;
 use crate::input::InputPlugin;
 use crate::look::LookPlugin;
@@ -65,5 +67,6 @@ pub fn run() {
         ))
         // Past the sixteen a tuple of plugins takes.
         .add_plugins((ChampionsPlugin, MinionsPlugin, PortraitPlugin, DeathPlugin, TargetPlugin))
+        .add_plugins((SelectPlugin, LobbyPlugin))
         .run();
 }

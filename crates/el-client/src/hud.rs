@@ -1,5 +1,5 @@
-//! What the player reads, laid out as MOBA players' eyes expect it: champion select before a match
-//! (their champion, their team's, the bench, a reroll, ready); then at the bottom their portrait
+//! What the player reads, laid out as MOBA players' eyes expect it (champion select and the screens
+//! around a match are `hud_select.rs` and `hud_lobby.rs`): at the bottom their portrait
 //! and level, the abilities (the key on each, the cooldown counted down over it, the ranks under it,
 //! a "+" over it while a point may go there, its border blue when the mana's short), health and
 //! mana, the items and the gold; the score and the clock at the top; the allies down the left (F2
@@ -7,7 +7,7 @@
 //! camera's view on it; a tooltip over anything with something to say (an ability, an item, a card);
 //! the augment cards while a screen is open and the shop may be used; the shop (P); the scoreboard
 //! (Tab), with a button to open a vote to surrender from 8:00; the vote while it's open; and the
-//! line in the middle that says what's happening (the queue, a respawn, the result). All of it read
+//! line in the middle that says what's happening (taking the field, the headliner). All of it read
 //! from the prediction, so it moves when the player does.
 
 use bevy::prelude::*;
@@ -95,12 +95,6 @@ enum Label {
     ScoreHead,
     /// A scoreboard row's words: team, row, and which.
     Score(u8, usize, ScoreField),
-    SelectTitle,
-    SelectMine,
-    SelectTeam,
-    SelectReroll,
-    SelectReady,
-    Bench(usize),
     Vote,
     VoteYes,
     VoteNo,
@@ -137,7 +131,8 @@ enum Panel {
     Cards,
     Shop,
     Score,
-    Select,
+    /// The minimap, while there's a match on it.
+    Minimap,
     /// The team's vote to surrender, while it's open.
     Vote,
     /// The button that opens one, with the scoreboard, from the time one may.
@@ -147,7 +142,7 @@ enum Panel {
 
 /// What pressing a button does.
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
-enum Act {
+pub(crate) enum Act {
     Pick(u8),
     Reroll(u8),
     Buy(u8),
@@ -160,20 +155,27 @@ enum Act {
     Ready,
     /// A vote to surrender: yes (which opens one when none is) or no.
     Vote(bool),
+    /// Into the queue (from the lobby, or again once a match is over), or out of it.
+    Queue,
+    Leave,
+    /// The page loaded again (after the link failed for good).
+    Reload,
 }
 
 /// What a tooltip over this says.
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
-enum Tip {
+pub(crate) enum Tip {
     Ability(usize),
     Item(usize),
     Shop(usize),
     Trinket,
+    /// Champion select: ability `.0` of the champion the player holds there.
+    Pick(usize),
 }
 
 /// A button's colour at rest: lighter hovered, darker pressed.
 #[derive(Component, Clone, Copy)]
-struct Tint(Color);
+pub(crate) struct Tint(pub(crate) Color);
 
 /// An ability's slot (its border says ready, cooling down, short of mana or not learned).
 #[derive(Component)]
@@ -185,7 +187,7 @@ struct AbilityIcon(usize);
 
 /// The icons painted so far, by champion and slot.
 #[derive(Resource, Default)]
-struct Icons(std::collections::HashMap<(u8, u8), Handle<Image>>);
+pub(crate) struct Icons(pub(crate) std::collections::HashMap<(u8, u8), Handle<Image>>);
 
 /// An item's icon: in an inventory slot, on the shop's tile for it, or on a scoreboard row (team,
 /// row, slot).
@@ -257,13 +259,6 @@ struct AllyUlt(usize);
 #[derive(Component)]
 struct AllyRow(usize);
 
-/// A place on the bench in champion select, shown while the bench reaches it.
-#[derive(Component)]
-struct BenchSlot(usize);
-
-/// Places on a team's bench (it holds at most what was never dealt).
-const BENCH: usize = 10;
-
 /// A dot on the minimap, for unit slot `.0`.
 #[derive(Component)]
 struct Dot(usize);
@@ -287,8 +282,7 @@ impl Plugin for HudPlugin {
                 Update,
                 (
                     (press, minimap).after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send),
-                    (texts, fills, panels, dots, bench_slots, view_box, tooltip)
-                        .after(crate::net::NetSet::Send),
+                    (texts, fills, panels, dots, view_box, tooltip).after(crate::net::NetSet::Send),
                     (scale, tints, slots, pips, level_ups, card_frames, portraits, ally_rows, colors)
                         .after(crate::net::NetSet::Send),
                     (ability_icons, item_icons, portrait_picture, rec_tiles, ally_ults, sweeps, score_badges)
@@ -349,7 +343,7 @@ pub(crate) fn docked() -> (BorderColor, BackgroundGradient, BoxShadow, Interacti
 }
 
 /// A colour a little lighter (`by` > 0) or darker.
-fn shade(c: Color, by: f32) -> Color {
+pub(crate) fn shade(c: Color, by: f32) -> Color {
     let s = c.to_srgba();
     Color::srgba(
         (s.red + by).clamp(0.0, 1.0),
@@ -360,7 +354,7 @@ fn shade(c: Color, by: f32) -> Color {
 }
 
 /// The first two letters of a champion's name, for its portrait.
-fn initials(def: u8) -> String {
+pub(crate) fn initials(def: u8) -> String {
     CHAMPIONS
         .get(usize::from(def))
         .map_or(String::new(), |d| d.name.chars().take(2).collect::<String>().to_uppercase())
@@ -445,8 +439,8 @@ fn button(commands: &mut Commands, act: Act, label: Label, width: f32, base: Col
         .id()
 }
 
-const BUTTON: Color = Color::srgb(0.11, 0.12, 0.16);
-const BUTTON_GOLD: Color = Color::srgb(0.30, 0.24, 0.10);
+pub(crate) const BUTTON: Color = Color::srgb(0.11, 0.12, 0.16);
+pub(crate) const BUTTON_GOLD: Color = Color::srgb(0.30, 0.24, 0.10);
 
 #[allow(clippy::too_many_lines)]
 fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::portrait::PortraitImage>) {
@@ -618,9 +612,11 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
                 padding: UiRect::all(px(4)),
                 border: UiRect::new(px(2), px(0), px(2), px(0)),
                 border_radius: BorderRadius::px(10.0, 0.0, 0.0, 0.0),
+                display: Display::None,
                 ..default()
             },
             docked(),
+            Panel::Minimap,
         ))
         .add_child(square);
     cards(&mut commands);
@@ -680,7 +676,6 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
             Panel::Score,
         ))
         .add_child(body);
-    select(&mut commands);
     // The vote to surrender, and the button that opens one.
     let title = commands.spawn((text("", 15.0, GOLD), Label::Vote)).id();
     let yes = button(&mut commands, Act::Vote(true), Label::VoteYes, 90.0, BUTTON);
@@ -1525,127 +1520,12 @@ fn shop(commands: &mut Commands) {
         .add_child(body);
 }
 
-/// Champion select: your champion, your team's, the bench, a reroll, ready.
-fn select(commands: &mut Commands) {
-    let bench: Vec<Entity> = (0..BENCH)
-        .map(|k| {
-            let b = button(commands, Act::Swap(k), Label::Bench(k), 120.0, BUTTON);
-            commands.entity(b).insert(BenchSlot(k));
-            b
-        })
-        .collect();
-    let bench_row = commands
-        .spawn(Node {
-            flex_wrap: FlexWrap::Wrap,
-            max_width: px(640),
-            column_gap: px(6),
-            row_gap: px(6),
-            ..default()
-        })
-        .add_children(&bench)
-        .id();
-    let reroll = button(commands, Act::RerollChampion, Label::SelectReroll, 170.0, BUTTON);
-    let ready = button(commands, Act::Ready, Label::SelectReady, 240.0, BUTTON_GOLD);
-    let actions = commands
-        .spawn(Node { column_gap: px(12), margin: UiRect::top(px(6)), ..default() })
-        .add_children(&[reroll, ready])
-        .id();
-    let title = commands.spawn((text("", 14.0, GOLD), Label::SelectTitle)).id();
-    let mine = commands.spawn((text("", 28.0, TEXT), outline(), Label::SelectMine)).id();
-    let team = commands.spawn((text("", 13.0, TEXT), Label::SelectTeam)).id();
-    let bench_title = commands
-        .spawn(text("THE BENCH: click a champion to take it, yours goes in its place", 11.0, DIM))
-        .id();
-    let body = commands
-        .spawn((
-            Node {
-                flex_direction: FlexDirection::Column,
-                row_gap: px(10),
-                padding: UiRect::all(px(22)),
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(10)),
-                ..default()
-            },
-            framed(),
-        ))
-        .add_children(&[title, mine, team, bench_title, bench_row, actions])
-        .id();
-    commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                top: percent(16),
-                width: percent(100),
-                justify_content: JustifyContent::Center,
-                display: Display::None,
-                ..default()
-            },
-            Panel::Select,
-        ))
-        .add_child(body);
-}
-
 /// Champion `c`'s name, or a dash if there's none to show.
 fn champ_name(c: u8) -> &'static str {
     CHAMPIONS.get(usize::from(c)).map_or("-", |d| d.name)
 }
 
-/// The words of champion select's panel.
-fn select_text(label: Label, session: &Session) -> String {
-    let Some(s) = session.select.as_ref() else { return String::new() };
-    let left = (s.ends_at - crate::net::now_s()).max(0.0).ceil() as u32;
-    match label {
-        Label::SelectTitle => format!("CHAMPION SELECT   {left} s"),
-        Label::SelectMine => match s.mine().map(|c| &CHAMPIONS[usize::from(c)]) {
-            Some(d) => format!("{}, {}\n{}", d.name, d.title, d.role.name()),
-            None => String::new(),
-        },
-        Label::SelectTeam => {
-            let team = team_of_seat(s.seat);
-            let seats: Vec<String> = (0..SEATS)
-                .filter(|&k| team_of_seat(k) == team)
-                .map(|k| {
-                    let you = if k == s.seat { " (you)" } else { "" };
-                    format!(
-                        "{} {}{you}",
-                        session.name(k),
-                        champ_name(s.picks.get(k).copied().unwrap_or(u8::MAX))
-                    )
-                })
-                .collect();
-            format!("{}: {}", if team == 0 { "DAWN" } else { "DUSK" }, seats.join(",  "))
-        }
-        Label::SelectReroll => {
-            if s.rerolls > 0 {
-                format!("Reroll ({} left)", s.rerolls)
-            } else {
-                "No rerolls left".into()
-            }
-        }
-        Label::SelectReady => {
-            if s.ready {
-                "Ready: waiting for the others".into()
-            } else {
-                "Ready".into()
-            }
-        }
-        Label::Bench(k) => s.bench.get(k).map_or(String::new(), |&c| champ_name(c).into()),
-        _ => String::new(),
-    }
-}
-
-/// Shows as many bench places as the bench holds.
-fn bench_slots(session: Res<Session>, mut q: Query<(&BenchSlot, &mut Node)>) {
-    let n = session.select.as_ref().map_or(0, |s| s.bench.len());
-    for (slot, mut node) in &mut q {
-        let want = if slot.0 < n { Display::Flex } else { Display::None };
-        if node.display != want {
-            node.display = want;
-        }
-    }
-}
-
-fn mmss(ticks: u32) -> String {
+pub(crate) fn mmss(ticks: u32) -> String {
     let s = ticks / TICK_HZ;
     format!("{}:{:02}", s / 60, s % 60)
 }
@@ -1820,34 +1700,17 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
             continue;
         }
         let s: String = match (*label, c) {
-            (
-                Label::SelectTitle
-                | Label::SelectMine
-                | Label::SelectTeam
-                | Label::SelectReroll
-                | Label::SelectReady
-                | Label::Bench(_),
-                _,
-            ) => select_text(*label, &session),
             (Label::Center, _) => match session.phase {
-                Phase::Connecting => "Connecting...".into(),
-                Phase::SigningIn => "Sign in with your wallet...".into(),
-                Phase::Watching | Phase::Selecting => String::new(),
-                Phase::Lobby => "In the lobby".into(),
-                Phase::Reconnecting => "Reconnecting...".into(),
-                Phase::Queued => format!(
-                    "Finding a match: {} waiting, bots take the empty seats in {} s",
-                    session.waiting.max(1),
-                    session.fill_in
-                ),
-                Phase::Failed => session.error.clone().unwrap_or_else(|| "Disconnected".into()),
-                Phase::Over => match (session.winner, c) {
-                    // Neither team: the server stopped the match (`el_server::lobby::NO_CONTEST`).
-                    (Some(w), _) if w > 1 => "No contest: the match was stopped".into(),
-                    (Some(w), Some(c)) if w == c.team => "VICTORY".into(),
-                    (Some(_), Some(_)) => "DEFEAT".into(),
-                    _ => "The match is over".into(),
-                },
+                // The screens around a match say these (`hud_lobby.rs`, `hud_select.rs`).
+                Phase::Connecting
+                | Phase::SigningIn
+                | Phase::Lobby
+                | Phase::Reconnecting
+                | Phase::Queued
+                | Phase::Failed
+                | Phase::Over
+                | Phase::Watching
+                | Phase::Selecting => String::new(),
                 Phase::Playing => match c {
                     Some(c) if !c.started() => "Taking the field...".into(),
                     // Dead: the time is over the portrait, and the recap says the rest
@@ -1871,7 +1734,7 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                     .to_string()
             }
             (Label::Ping, Some(c)) => {
-                format!("{:.0} ms   seat {}   {}", c.clock.rtt * 1_000.0, c.seat, session.name(c.seat))
+                format!("{:.0} ms", c.clock.rtt * 1_000.0)
             }
             (Label::Feed, _) => feed_text(&session, now),
             (Label::Name, Some(c)) => {
@@ -1967,7 +1830,7 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                 let active = ITEMS.get(usize::from(it)).is_some_and(|d| d.active.is_some());
                 if active { ["1", "2", "3", "5", "6", "7"][k].into() } else { String::new() }
             }
-            (Label::Treats, Some(c)) => format!("×{}", c.pred.champs[c.seat].treats),
+            (Label::Treats, Some(c)) => format!("x{}", c.pred.champs[c.seat].treats),
             (Label::Shop(k), _) => ITEMS[k].name.into(),
             (Label::ShopCost(k), _) => ITEMS[k].cost.to_string(),
             (Label::Vote, Some(c)) => {
@@ -2210,7 +2073,7 @@ fn ability_icons(
 }
 
 /// An icon's picture, `ICON` square, from its painted pixels.
-fn icon_image(pixels: Vec<u8>) -> Image {
+pub(crate) fn icon_image(pixels: Vec<u8>) -> Image {
     use bevy::asset::RenderAssetUsages;
     use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
     let side = el_client_core::icons::ICON as u32;
@@ -2485,14 +2348,22 @@ fn panels(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Panel, 
     let watching = session.watch.is_some();
     let now = crate::net::now_s();
     let feed = session.feed.iter().any(|l| now - l.at < 12.0);
+    // Once a match is over its scoreboard stays up, under the result (`hud_lobby.rs`).
+    let over = session.phase == Phase::Over && session.client.is_some();
     for (p, mut node) in &mut q {
+        if *p == Panel::Score {
+            let top = percent(if over { 27 } else { 18 });
+            if node.top != top {
+                node.top = top;
+            }
+        }
         let show = match (*p, c) {
-            (Panel::Select, _) => session.phase == Phase::Selecting && session.select.is_some(),
+            (Panel::Score, _) if over => true,
             (Panel::Feed, _) => feed,
             (Panel::Tip, _) => node.display == Display::Flex,
-            (Panel::Top, _) if watching => true,
+            (Panel::Top | Panel::Minimap, _) if watching => true,
             (Panel::Score, _) if watching => controls.scoreboard,
-            (Panel::Top | Panel::Bottom, Some(_)) => true,
+            (Panel::Top | Panel::Bottom | Panel::Minimap, Some(_)) => true,
             (Panel::Allies, Some(_)) => true,
             // The augment cards, the shop and the scoreboard share the middle: the shop or the
             // scoreboard, while it's open, has it.
@@ -2539,19 +2410,27 @@ fn tooltip(
         ((centre - n.size * 0.5) * n.inverse_scale_factor, n.size * n.inverse_scale_factor)
     });
     let tip = tip.map(|(_, t, ..)| *t);
-    let said = c.zip(tip).map(|(c, tip)| {
-        let ch = &c.pred.champs[c.seat];
-        match tip {
-            Tip::Ability(k) => tips::ability_tip(ch.def, k as u8, if k < 4 { ch.ranks[k] } else { 1 }),
-            Tip::Item(k) if ch.items[k] != items::NONE => {
-                let mut s = tips::item_tip(ch.items[k]);
-                s.push_str("\nClick in the shop to sell it.");
-                s
+    // Champion select's abilities are the champion held there, before there's a match.
+    let pick = match (tip, session.select.as_ref().filter(|_| session.phase == Phase::Selecting)) {
+        (Some(Tip::Pick(k)), Some(s)) => s.mine().map(|def| tips::ability_tip(def, k as u8, 1)),
+        _ => None,
+    };
+    let said = pick.or_else(|| {
+        c.zip(tip).map(|(c, tip)| {
+            let ch = &c.pred.champs[c.seat];
+            match tip {
+                Tip::Ability(k) => tips::ability_tip(ch.def, k as u8, if k < 4 { ch.ranks[k] } else { 1 }),
+                Tip::Item(k) if ch.items[k] != items::NONE => {
+                    let mut s = tips::item_tip(ch.items[k]);
+                    s.push_str("\nClick in the shop to sell it.");
+                    s
+                }
+                Tip::Item(_) => String::new(),
+                Tip::Shop(k) => tips::item_tip(k as u8),
+                Tip::Trinket => tips::treat_tip(ch.treats),
+                Tip::Pick(_) => String::new(),
             }
-            Tip::Item(_) => String::new(),
-            Tip::Shop(k) => tips::item_tip(k as u8),
-            Tip::Trinket => tips::treat_tip(ch.treats),
-        }
+        })
     });
     let said = said.filter(|s| !s.is_empty());
     let Some((_, mut node)) = panel.iter_mut().find(|(p, _)| **p == Panel::Tip) else { return };
@@ -2720,6 +2599,20 @@ fn press(
             }
             Act::Ready => {
                 controls.lobby.push(ToServer::Ready);
+                continue;
+            }
+            Act::Queue => {
+                controls.lobby.push(ToServer::Queue);
+                continue;
+            }
+            Act::Leave => {
+                controls.lobby.push(ToServer::Leave);
+                continue;
+            }
+            Act::Reload => {
+                if let Some(w) = web_sys::window() {
+                    let _ = w.location().reload();
+                }
                 continue;
             }
         };

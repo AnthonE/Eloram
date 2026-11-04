@@ -34,11 +34,12 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
     // Champion select: a reroll benches the dealt champion; taking it back off the bench swaps
     // the new one onto it; ready starts the match (the bots in the other seats keep theirs).
     s = await until(page, "champion select", (s) => s.phase === "selecting" && s.select_champion_id >= 0, 150_000);
-    expect(s.select_rerolls).toBe(2);
+    // A guest's one reroll a select (`el_server::rerolls::GUEST_REROLLS`).
+    expect(s.select_rerolls).toBe(1);
     const dealt = s.select_champion_id;
     await page.screenshot({ path: `${shots}-select.png` });
     await push(page, { t: "champ_reroll" });
-    s = await until(page, "a reroll", (s) => s.select_rerolls === 1 && s.select_bench_ids === String(dealt));
+    s = await until(page, "a reroll", (s) => s.select_rerolls === 0 && s.select_bench_ids === String(dealt));
     const rerolled = s.select_champion_id;
     expect(rerolled).not.toBe(dealt);
     await push(page, { t: "champ_swap", champ: dealt });

@@ -48,7 +48,7 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   webgpu`) is headless WebGPU on SwiftShader's Vulkan. `scripts/e2e.sh` serves the `web/dist/` already
   built: rebuild it first. A test or the console drives the champion through `window.__elInbox`
   (`{t:"move",x,y}`, `cast`, `buy`, `use`, `pick`, `level`, `champ_reroll`, `champ_swap`, `ready`, `aim`, `drop_link`,
-  `ping`, `surrender`, `practice_champ`, `time` (the picture's clock slowed or stopped, to catch a burst), `catch` (the picture held on the next
+  `ping`, `surrender`, `practice_champ`, `queue`, `leave`, `time` (the picture's clock slowed or stopped, to catch a burst), `catch` (the picture held on the next
   missile at a fraction of its flight, or the next cue of a part at an age: `fx_caught_what`)...:
   `el-client/src/dev_hooks.rs`) and reads `window.__el`. Headless Chromium draws with
   SwiftShader at about a frame a second: its pictures are right, its frame rates mean nothing.
@@ -79,7 +79,8 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `minion_flashes`, `wheels_turning` and `audio_*`; the inbox takes `{t:"volume",bus,v}` and
   `{t:"mute",on}`.
 - The HUD (`docs/DESIGN.md`, "The HUD"): `hud.rs`, `hud_death.rs` (the grey, the recap), `hud_target.rs`
-  (the target frame), `portrait.rs` (the live portraits); the icons are painted by
+  (the target frame), `portrait.rs` (the live portraits), `hud_select.rs` (champion select's screen),
+  `hud_lobby.rs` (the connecting, lobby and queue card, and a match's end with Play again); the icons are painted by
   `el_client_core::icons`. `window.__el` has `portrait`, `ally_portraits`, `death_screen` and
   `recap_lines`.
 - Practice (`el_sim::practice`, `docs/FX.md` step 4): `el-server --practice` holds practice

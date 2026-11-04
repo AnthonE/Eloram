@@ -25,6 +25,10 @@ mod hud;
 #[cfg(target_arch = "wasm32")]
 mod hud_death;
 #[cfg(target_arch = "wasm32")]
+mod hud_lobby;
+#[cfg(target_arch = "wasm32")]
+mod hud_select;
+#[cfg(target_arch = "wasm32")]
 mod hud_target;
 #[cfg(target_arch = "wasm32")]
 mod input;

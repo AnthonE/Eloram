@@ -91,6 +91,9 @@ pub struct Session {
     pub winner: Option<u8>,
     pub waiting: usize,
     pub fill_in: u32,
+    /// When the bots take the empty seats, as the queue last said (s, the page's clock): it says
+    /// so only as someone joins.
+    pub fill_at: f64,
     pub error: Option<String>,
     /// Each seat's kills and deaths, as the kill feed told them.
     pub kd: [(u16, u16); SEATS],

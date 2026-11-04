@@ -32,9 +32,13 @@ pub struct PortraitImage(pub [Handle<Image>; VIEWS]);
 #[derive(Resource, Default)]
 pub struct PortraitShown(pub [bool; VIEWS]);
 
-/// A figure a portrait shows, and which.
+/// A figure a portrait shows, and which; `still` while its champion is down, when the portrait
+/// keeps the last face it drew rather than the body on the ground (or nothing, once it's gone).
 #[derive(Component)]
-pub struct PortraitSubject(pub usize);
+pub struct PortraitSubject {
+    pub view: usize,
+    pub still: bool,
+}
 
 #[derive(Component)]
 struct PortraitCam(usize);
@@ -107,9 +111,13 @@ fn follow(
     mut turn: ResMut<Turn>,
 ) {
     let mut at: [Option<&GlobalTransform>; VIEWS] = [None; VIEWS];
+    // Down: still shown (its last face), not drawn again until it's up.
+    let mut still = [false; VIEWS];
     for (s, gt, vis) in &subjects {
-        if s.0 < VIEWS && vis.get() {
-            at[s.0] = Some(gt);
+        if s.view < VIEWS && s.still {
+            still[s.view] = true;
+        } else if s.view < VIEWS && vis.get() {
+            at[s.view] = Some(gt);
         }
     }
     // The next ally shown takes this frame's turn.
@@ -129,7 +137,7 @@ fn follow(
             camera.is_active = draw;
         }
     }
-    let shown = at.map(|a| a.is_some());
+    let shown: [bool; VIEWS] = std::array::from_fn(|v| at[v].is_some() || still[v]);
     if drawn.0 != shown {
         drawn.0 = shown;
     }
