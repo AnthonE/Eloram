@@ -258,7 +258,7 @@ fn ready(
         }
     });
     if let Some(v) = view {
-        commands.entity(e).insert(PortraitSubject(v));
+        commands.entity(e).insert(PortraitSubject { view: v, still: false });
     }
     for c in children.iter_descendants(e) {
         if let Some(v) = view
@@ -299,7 +299,10 @@ fn animate(
     mut seats: ResMut<Seats>,
     mut views: Query<(&UnitView, &mut Transform, &mut Visibility), Without<Figure>>,
     mut parts: Query<&mut Visibility, (Without<UnitView>, Without<Figure>)>,
-    mut figures: Query<(&mut Figure, &mut Transform, &mut Visibility), Without<UnitView>>,
+    mut figures: Query<
+        (&mut Figure, &mut Transform, &mut Visibility, Option<&mut PortraitSubject>),
+        Without<UnitView>,
+    >,
     mut players: Query<&mut AnimationPlayer>,
     mut materials: ResMut<Assets<RimMat>>,
     mut dev: ResMut<DevStatus>,
@@ -387,7 +390,7 @@ fn animate(
         }
         let seat = &mut seats.seats[i];
         let Some((d, entity)) = seat.figure else { continue };
-        let Ok((mut figure, mut ftf, mut fvis)) = figures.get_mut(entity) else { continue };
+        let Ok((mut figure, mut ftf, mut fvis, subject)) = figures.get_mut(entity) else { continue };
         let Some(art) = &models.ready[d] else { continue };
         // What it's doing, as the client knows it.
         let seen = match (watch, client) {
@@ -419,6 +422,12 @@ fn animate(
             seat.fell = Some(now);
         }
         let lying = !alive && seat.fell.is_some_and(|t| now - t < CORPSE) && seat.last.is_some();
+        // A portrait keeps the last face it drew while its champion is down (`portrait.rs`).
+        if let Some(mut p) = subject
+            && p.still != !alive
+        {
+            p.still = !alive;
+        }
         let parts_shown = if lying { Visibility::Hidden } else { Visibility::Inherited };
         for e in [view.ring, view.bar, view.fill, view.shield, view.ticks] {
             if let Ok(mut v) = parts.get_mut(e) {

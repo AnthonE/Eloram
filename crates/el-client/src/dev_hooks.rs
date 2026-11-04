@@ -184,6 +184,9 @@ enum Cmd {
         champ: u8,
     },
     Ready,
+    /// Into the queue (from the lobby, or again once a match is over), or out of it.
+    Queue,
+    Leave,
     /// A practice match again, as champion `champ` (`?practice=1`).
     PracticeChamp {
         champ: u8,
@@ -385,6 +388,14 @@ fn inbox(
             }
             Cmd::Ready => {
                 controls.lobby.push(ToServer::Ready);
+                continue;
+            }
+            Cmd::Queue => {
+                controls.lobby.push(ToServer::Queue);
+                continue;
+            }
+            Cmd::Leave => {
+                controls.lobby.push(ToServer::Leave);
                 continue;
             }
             Cmd::PracticeChamp { champ } => {

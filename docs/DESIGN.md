@@ -194,6 +194,16 @@ League's defaults, because that is what players' hands know:
   (`el_client_core::recap`, `hud_death.rs`). The scoreboard (Tab) has a row a player: the portrait,
   the player and the champion, the level, kills and deaths, and the items (the player's own;
   everyone's watching a record).
+- **Around a match**: a card in the middle while the page connects, signs in, waits in the lobby
+  (**Find a match**) or the queue (how long it's waited, who else is, the seconds before the bots
+  take the empty seats, **Leave the queue**), reconnects or has failed (**Reload**), `hud_lobby.rs`.
+  Champion select is a screen of its own (`hud_select.rs`): the seconds and a bar running down, the
+  team down the left (each seat's champion badge, name, role and who plays it, the player's own in
+  gold), the champion held in the middle with its title, role and its four abilities' icons (a
+  tooltip over each, at its first rank), the bench under it as tiles a click takes, and the reroll
+  (greyed once spent) and ready (green once said) buttons. A match over darkens the world and says
+  **Victory** or **Defeat** over the score, the clock it ended on and the player's own line, the
+  scoreboard under it, and **Play again** queues straight back in.
 - **WASD** as an option (`?keys=wasd`, remembered), League's own layout for it (2025): **W, A, S,
   D** move; left click attacks what's under the cursor; the abilities are right click, **Shift**,
   **E** and **R**; the summoner spells **Q** and **F**; **C** calls an aimed cast off; **Ctrl** with

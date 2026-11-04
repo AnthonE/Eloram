@@ -170,7 +170,7 @@ fn state_of(f: u32) -> String {
         (flags::REVEALED, "Revealed"),
     ];
     let on: Vec<&str> = names.iter().filter(|(b, _)| f & b != 0).map(|(_, n)| *n).collect();
-    on.join(" · ")
+    on.join(", ")
 }
 
 #[allow(clippy::type_complexity)]

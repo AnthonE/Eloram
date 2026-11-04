@@ -376,6 +376,7 @@ fn talk(
                 Ok(ToClient::Queued { waiting, fill_in }) => {
                     session.waiting = waiting;
                     session.fill_in = fill_in;
+                    session.fill_at = now_s() + f64::from(fill_in);
                 }
                 Ok(ToClient::Select { seat, picks, bench, rerolls, ends_in, roster }) => {
                     let ready = session.select.as_ref().is_some_and(|s| s.ready);
@@ -509,6 +510,24 @@ fn send(net: NonSend<NetState>, mut session: ResMut<Session>, mut controls: ResM
             session.practice = Some(champ);
             send_lobby(&t, &msg);
             continue;
+        }
+        // Into the queue from the lobby, or again once a match is over (the server lets the old
+        // seat go); out of it while waiting.
+        match (&msg, session.phase) {
+            (ToServer::Queue, Phase::Lobby | Phase::Over) => {
+                send_lobby(&t, &msg);
+                session.client = None;
+                session.winner = None;
+                session.waiting = 0;
+                session.phase = Phase::Queued;
+                continue;
+            }
+            (ToServer::Leave, Phase::Queued) => {
+                send_lobby(&t, &msg);
+                session.phase = Phase::Lobby;
+                continue;
+            }
+            _ => {}
         }
         if session.phase == Phase::Selecting {
             if msg == ToServer::Ready

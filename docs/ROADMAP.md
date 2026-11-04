@@ -276,7 +276,22 @@ foremost structure that can be hit, wave or not. Over 24 seeds every match ends,
 31:45, a median about 15 minutes; the golden bot match (seed 11) ends at 15:04. The golden hashes
 hold native and wasm.
 
+Then the screens around a match, which until now were a line of words in the middle: the page
+connecting, in the lobby or the queue is a card (the time waited, who else is, the seconds before
+the bots, a button in or out of the queue: `ToServer::Leave` had no caller), and a link gone for
+good has a Reload; champion select is a screen of its own with the team as badges, the champion
+held with its kit's icons and tooltips, the bench as tiles; a match over keeps its scoreboard up
+under Victory or Defeat and the player's line, with Play again (the page used to stay on the
+result until it was reloaded). On the way: the default font has no `·`, `×` or `–`, drawn as
+boxes in the target frame's statuses and beside the treats; a fallen ally's portrait went blank
+(its camera drew the body on the ground from chest height), and now keeps the last face, greyed;
+the minimap no longer shows over the menus; the ping no longer names the seat.
+
 Left, in no order:
+- **A settings screen**: keys (`?keys=wasd`), indicators (`?indicators=1`), the camera
+  (`?camera=locked`) and the quality are only URL parameters, remembered; the sound alone has a
+  panel. A first match's controls are told nowhere on the page.
+- **A name**: a guest's is `?name=` or the server's; the page doesn't ask for one.
 - **A real GPU.** Nobody has seen the game on one: the frame rate on either tier (the target is 60
   fps at 1080p on integrated graphics, and a ten-way fight at 60 on `high`), and the effects'
   share of the frame (`FX.md`, step 6).
