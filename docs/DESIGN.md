@@ -149,7 +149,7 @@ League's defaults, because that is what players' hands know:
 - **Right click** to move, or to attack what's under the cursor. **A** then click to attack-move.
   **S** stops, **H** holds.
 - **Q, W, E, R** cast; **D, F** are the summoner spells. Smart cast by default (cast where the cursor
-  is on the press). With indicators on (`?indicators=1`, remembered; League's "quick cast with
+  is on the press). With indicators on (the menu's, or `?indicators=1`; League's "quick cast with
   indicator"), a held key shows the ability's range and its shape where it would land (a
   skillshot's lane, an area's circle kept in range, a dash's path, a blink's landing) and letting go
   casts; **Esc** or a right click calls it off. **Ctrl** with an ability's key levels it.
@@ -209,6 +209,23 @@ League's defaults, because that is what players' hands know:
   **E** and **R**; the summoner spells **Q** and **F**; **C** calls an aimed cast off; **Ctrl** with
   a number rerolls an augment card. The steer rides each tick's command (`InputCmd`), predicted like
   walking.
+- **The menu** (**Esc**, or the button at the top left; `el-client/src/menu.rs`), drawn in the game
+  as the HUD is, so a desktop build has it too: a rail of pages and **Resume** at its foot, the
+  world going on dimmed under it (the champion keeps its last order; the keys, the wheel and the
+  map's clicks are the menu's while it's up). **Controls**: the keys' layout (League's default or
+  WASD), casting (quick, or with an indicator), the camera (free or locked), and under them every
+  key of the layout chosen, two columns of groups. **Graphics**: the tier (low or high, at the next
+  load: a reload keeps the seat in a match, and a button does it) and what's drawing now, the
+  frame rate with it. **Sound**: the master's volume and each bus's, and mute. Esc is one thing at
+  a time, the top one first: an aimed cast called off, then the shop closed, then the menu. Each
+  choice is kept for the next visit (the URL's `?keys=`, `?indicators=`, `?camera=` and `?quality=`
+  still choose too, and a choice in the menu takes its parameter off the address). The keys are
+  one table, `el_client_core::controls`: the menu's page, the first match's strip and the key over
+  each ability on the HUD read it, and the input code casts with its keys.
+- **A first match** shows a strip under the score: the least that plays (right click walks and
+  attacks, Q W E R cast, Ctrl with one levels it, P the shop, Tab the scores; WASD's own), and Esc
+  for every other key, until **Got it**, three minutes in, or the match's end; then never again
+  (`hud_first.rs`). Not in practice, nor watching.
 
 ## Sources
 

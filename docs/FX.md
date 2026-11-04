@@ -339,9 +339,9 @@ numbers on a real GPU into `ROADMAP.md`, which has none yet.
   - Opus where the browser plays it, else MP3, from `assets/audio/files.json` (what's there:
     `build-web.sh`). The shared sounds load with the page, a family's once a match deals one of
     its champions. The first click or key resumes the audio, as browsers ask.
-  - A panel on the page (`web/audio.js`, the corner button) with the master and each bus, kept in
-    `localStorage` and told to the client through the inbox (`{t:"volume",bus,v}`,
-    `{t:"mute",on}`).
+  - The menu's Sound page (Esc, or the button at the top left: `el-client/src/menu.rs`; a panel
+    on the page, `web/audio.js`, until the menu) with the master and each bus, kept in
+    `localStorage` (a test sets them through the inbox: `{t:"volume",bus,v}`, `{t:"mute",on}`).
 - The sounds (`art/tools/sounds.py`, `art/LICENSES.md`):
   - The physical bodies are recordings from five of Kenney's CC0 packs, pinned by hash, their
     licence checked. The elements are synthesised: fire's roar and crackle, water, wind bands,

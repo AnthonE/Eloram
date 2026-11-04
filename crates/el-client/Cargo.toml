@@ -37,7 +37,7 @@ wasm-bindgen-futures.workspace = true
 js-sys.workspace = true
 web-sys = { workspace = true, features = [
     "Window", "Location", "UrlSearchParams", "Document", "Element", "HtmlElement", "Performance", "DomTokenList",
-    "Storage", "console", "EventTarget", "Response",
+    "Storage", "History", "console", "EventTarget", "Response",
     # The WebTransport is built here, for its datagram queue's high-water mark (`transport.rs`).
     "WebTransport", "WebTransportOptions", "WebTransportHash", "WebTransportCongestionControl",
     "WebTransportDatagramDuplexStream",

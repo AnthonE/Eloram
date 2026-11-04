@@ -8,11 +8,11 @@
   <link rel="stylesheet" href="style.css">
   <!-- Where the game server is (config.js: empty here, the server that serves the page), then the
        boot watchdog (boot.js). No inline script or handler anywhere on the page: it also runs
-       under the store's `script-src 'self'`. -->
+       under the store's `script-src 'self'`. The menu (the keys, the settings, the sound) is the
+       game's own, drawn in the canvas (`el-client/src/menu.rs`), so a desktop build has it too. -->
   <script src="config.js"></script>
   <script src="boot.js"></script>
   <script src="wallet.js"></script>
-  <script src="audio.js"></script>
 </head>
 <body>
   <canvas id="el" tabindex="0"></canvas>

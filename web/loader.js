@@ -114,7 +114,8 @@ function keysSetting() {
 }
 
 // The camera free (the default: the edges pan it, Space brings it back) or locked on the champion
-// (`?camera=locked`; `?camera=free` back). Remembered, and Y in a match changes it (and the memory).
+// (`?camera=locked`; `?camera=free` back). Remembered; Y in a match, or the menu, changes it (and the
+// memory).
 function cameraSetting() {
   const asked = params.get("camera");
   try {
@@ -162,7 +163,8 @@ async function main() {
     // sign-in while it's good, so the wallet isn't asked every time.
     signIn: params.get("signin") === "1",
     // Cast with an indicator: hold an ability's key to see its reach, let go to cast
-    // (`?indicators=1`; `?indicators=0` back to quick cast). Remembered for the next visit.
+    // (`?indicators=1`; `?indicators=0` back to quick cast). Remembered for the next visit. The
+    // game's menu (Esc) changes this and the three below, writing the same memory.
     indicators: indicatorsSetting(),
     // League's WASD layout (`?keys=wasd`; `?keys=league` back to its default). Remembered.
     wasd: keysSetting() === "wasd",

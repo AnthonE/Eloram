@@ -287,10 +287,17 @@ boxes in the target frame's statuses and beside the treats; a fallen ally's port
 (its camera drew the body on the ground from chest height), and now keeps the last face, greyed;
 the minimap no longer shows over the menus; the ping no longer names the seat.
 
+Then the menu (Esc, or the button at the top left: `menu.rs`), in the game's own UI as Gates'
+is (`AnthonE/Gates`, `render/pause.rs` and `settings.rs`), not the page's, so a desktop build has it
+too: Controls (the layout, casting, the camera, and every key of the layout chosen), Graphics
+(the tier, at the next load, and what's drawing now with its frame rate) and Sound (the page's
+panel, `web/audio.js`, until now). Esc is the top thing first: a held cast, the shop, then the
+menu. The keys are one table, as Before Colony's are (`el_client_core::controls`): the menu's
+page, the HUD's key over each ability and a first match's strip of the essentials read it, and
+the input code casts with its keys. Settings were URL parameters, remembered; they still are, and
+the menu writes the same memory (`config::remember`: a desktop build keeps them in a file there).
+
 Left, in no order:
-- **A settings screen**: keys (`?keys=wasd`), indicators (`?indicators=1`), the camera
-  (`?camera=locked`) and the quality are only URL parameters, remembered; the sound alone has a
-  panel. A first match's controls are told nowhere on the page.
 - **A name**: a guest's is `?name=` or the server's; the page doesn't ask for one.
 - **A real GPU.** Nobody has seen the game on one: the frame rate on either tier (the target is 60
   fps at 1080p on integrated graphics, and a ten-way fight at 60 on `high`), and the effects'

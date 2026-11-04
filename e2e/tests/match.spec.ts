@@ -159,9 +159,13 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
 // League's WASD layout (`?keys=wasd`): a held key steers the champion, and it stops when the key
 // comes up. (Exactness is the netcode tests': at this page's frame or so a second, the oldest
 // commands of a long frame can reach the server after their tick, which then repeats the last
-// steer a few ticks, so the stop is a few ticks long here.)
-test("WASD: the keys walk the champion", async ({ page }, info) => {
+// steer a few ticks, so the stop is a few ticks long here.) And the menu (Esc, `menu.rs`): while
+// it's up the keys are its alone; a layout chosen there is the page's at once and the next
+// visit's; a first match shows its strip of keys until it's let go (`hud_first.rs`).
+test("WASD and the menu: the keys walk the champion, Esc holds them", async ({ page }, info) => {
+  test.setTimeout(300_000);
   const logs = collectConsole(page);
+  const shots = `artifacts/match-${info.project.name}`;
   await page.goto(`/?gfx=${info.project.name}&name=Walker&keys=wasd`);
   let s: Record<string, any>;
   try {
@@ -174,10 +178,33 @@ test("WASD: the keys walk the champion", async ({ page }, info) => {
     throw e;
   }
   expect(s.keys).toBe("wasd");
+  // A first visit: the strip of keys over the match.
+  expect(s.first_strip).toBe(true);
+  await page.screenshot({ path: `${shots}-first.png` });
   // The camera is free unless asked (`?camera=locked`), and starts on the champion (within the
   // edge it keeps off the map's ends).
   expect(s.camera_locked).toBe(false);
   expect(Math.abs(s.camera_x - s.x)).toBeLessThan(250);
+
+  // Esc opens the menu on its keys; a key held under it walks nothing; Esc closes it.
+  await page.click("canvas");
+  await page.keyboard.press("Escape");
+  s = await until(page, "the menu", (s) => s.menu_open === true && s.menu_tab === "controls");
+  expect(s.first_strip).toBe(false);
+  await page.screenshot({ path: `${shots}-menu-controls.png` });
+  await page.keyboard.down("w");
+  await page.waitForTimeout(2_000);
+  s = await el(page);
+  expect(s.steer).toBe(0);
+  await page.keyboard.up("w");
+  for (const tab of ["graphics", "sound"]) {
+    await push(page, { t: "menu", tab });
+    s = await until(page, `the menu's ${tab}`, (s) => s.menu_tab === tab);
+    await page.screenshot({ path: `${shots}-menu-${tab}.png` });
+  }
+  await page.keyboard.press("Escape");
+  s = await until(page, "the menu closed", (s) => s.menu_open === false);
+
   const before = s.x;
   // Down the lane, which runs up the screen to the right (the camera looks across it diagonally):
   // W and D for Dawn, S and A for Dusk. The keys are the screen's; the steer is the map's.
@@ -194,6 +221,17 @@ test("WASD: the keys walk the champion", async ({ page }, info) => {
   // Held, three seconds would have been about a thousand units.
   expect(Math.abs(s.x - stopped)).toBeLessThan(150);
   expect(s.steer).toBe(0);
+
+  // League's default chosen in the menu: the page's at once, kept, and the address no longer asks
+  // for WASD (a reload would take it back).
+  await push(page, { t: "setting", key: "keys", value: "league" });
+  s = await until(page, "League's keys", (s) => s.keys === "league");
+  expect(await page.evaluate(() => localStorage.getItem("el.keys"))).toBe("league");
+  expect(page.url()).not.toContain("keys=");
+  // The strip let go, for good.
+  await push(page, { t: "taught" });
+  s = await until(page, "the strip gone", (s) => s.first_strip === false);
+  expect(await page.evaluate(() => localStorage.getItem("el.taught"))).toBe("1");
 });
 
 // A link that goes takes its seat back: a reload mid-match (the tab's rejoin token in

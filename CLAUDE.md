@@ -36,7 +36,8 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `cargo run -p el-server --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
 - `scripts/e2e.sh spike|match|watch|login|art|recover|fx|draws [webgl2]`: Playwright against a real server
   (`match`: queue, champion select (a reroll, the bench, ready), the headliner, augment, shop,
-  Blink, a walk predicted exactly, the fog; and `?keys=wasd`'s keys walking the champion; `watch`:
+  Blink, a walk predicted exactly, the fog; and `?keys=wasd`'s keys walking the champion, the
+  first match's strip, and Esc's menu holding the keys, its pages, a layout chosen there; `watch`:
   an agent's match watched live a minute behind from a checkpoint, then replayed; `recover`: the
   server SIGKILLed mid-match and started again, the page back in its seat; `login`: a stub wallet
   signing through `el-auth`'s `sign` example, `/online.json`, the resume token; `art`: the camera over each place on the map, the fog's darkness off (`{t:"camera"}`,
@@ -83,6 +84,16 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `hud_lobby.rs` (the connecting, lobby and queue card, and a match's end with Play again); the icons are painted by
   `el_client_core::icons`. `window.__el` has `portrait`, `ally_portraits`, `death_screen` and
   `recap_lines`.
+- The menu (Esc, or the button at the top left: `menu.rs`; `docs/DESIGN.md`, "Controls"): Controls,
+  Graphics, Sound, in the game's own UI (not the page's: a desktop build is coming). Settings are
+  `config::Prefs` (the layout, the indicators, the tier now and at the next load, the first
+  match's strip seen), kept by `config::remember` in the same `localStorage` keys `web/loader.js`
+  reads for `?keys=`, `?indicators=`, `?camera=` and `?quality=`; the camera's lock is the rig's,
+  the volumes `audio.rs`'s. The keys are `el_client_core::controls` (the menu's page, the HUD's key
+  over each ability, `hud_first.rs`'s strip, and the keys `input.rs` casts with). The inbox takes
+  `{t:"menu",open,tab}`, `{t:"setting",key,value}` and `{t:"taught"}`; `window.__el` has
+  `menu_open`, `menu_tab`, `indicators`, `quality`, `quality_next` and `first_strip`. `art` and
+  `draws` set `localStorage["el.taught"]` first, so the strip isn't in their pictures and counts.
 - Practice (`el_sim::practice`, `docs/FX.md` step 4): `el-server --practice` holds practice
   matches, which the page asks for on `?practice=1` (`&champ=<number>`; `{t:"practice_champ",
   champ}` again as another): seat 0 the player's at the top level with every rank, nothing on

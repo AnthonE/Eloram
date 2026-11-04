@@ -6,6 +6,7 @@
 pub mod baselines;
 pub mod client;
 pub mod clock;
+pub mod controls;
 pub mod fog;
 pub mod fx;
 pub mod icons;

@@ -1784,7 +1784,9 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                 let u = &c.pred.units[c.seat];
                 format!("{:.0} / {:.0}", u.mana.max(0.0), u.stats.max_mana)
             }
-            (Label::Key(k), _) => crate::input::key_names(controls.wasd)[k].into(),
+            (Label::Key(k), _) => {
+                el_client_core::controls::Layout::of(controls.wasd).ability_keys()[k].into()
+            }
             (Label::AbilityName(k), Some(c)) => {
                 let a = ability(c.pred.champs[c.seat].def, k as u8);
                 // The name's last word, to fit the slot.
@@ -2556,7 +2558,11 @@ fn minimap(
     mut rig: ResMut<crate::camera::Rig>,
     mut controls: ResMut<Controls>,
     session: Res<Session>,
+    menu: Res<crate::menu::Menu>,
 ) {
+    if menu.open {
+        return;
+    }
     let Some(n) = q.iter().find(|r| r.cursor_over()).and_then(|r| r.normalized) else { return };
     // (-0.5, -0.5) is the top left: the map's far end of its first half.
     let at = Vec2::new((n.x + 0.5) * MAP_W, (0.5 - n.y) * MAP_H);

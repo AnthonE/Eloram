@@ -1,5 +1,6 @@
 //! Launch configuration injected by `web/loader.js` as `window.EL_CONFIG`.
 
+use el_client_core::controls::Layout;
 use wasm_bindgen::JsValue;
 
 #[derive(Clone, Debug, Default)]
@@ -90,11 +91,94 @@ pub fn store_resume(token: Option<&[u8]>) {
     };
 }
 
+/// The settings the menu changes while the page runs (`menu.rs`), started from the launch
+/// config: each change is kept for the next visit ([`remember`]) and takes effect at once, but the
+/// picture's tier, which the renderer is built with, takes effect on the next load. The camera's
+/// lock is the rig's (`camera.rs`); the volumes are `audio.rs`'s.
+#[derive(bevy::prelude::Resource, Clone, Debug)]
+pub struct Prefs {
+    pub layout: Layout,
+    /// Cast with an indicator: a held key shows the ability's reach, letting go casts.
+    pub indicators: bool,
+    /// The tier drawn now, and the one chosen for the next load.
+    pub low: bool,
+    pub low_next: bool,
+    /// The first match's strip of keys has been seen (`localStorage["el.taught"]`, `hud_first.rs`).
+    pub taught: bool,
+}
+
+impl Prefs {
+    pub fn of(cfg: &LaunchConfig) -> Self {
+        Self {
+            layout: Layout::of(cfg.wasd),
+            indicators: cfg.indicators,
+            low: cfg.low,
+            low_next: cfg.low,
+            taught: recall("el.taught").is_some_and(|v| v == "1"),
+        }
+    }
+
+    pub fn set_layout(&mut self, layout: Layout) {
+        self.layout = layout;
+        remember("el.keys", layout.name(), "keys");
+    }
+
+    pub fn set_indicators(&mut self, on: bool) {
+        self.indicators = on;
+        remember("el.indicators", if on { "1" } else { "0" }, "indicators");
+    }
+
+    pub fn set_low_next(&mut self, low: bool) {
+        self.low_next = low;
+        remember("el.quality", if low { "low" } else { "high" }, "quality");
+    }
+
+    pub fn set_taught(&mut self) {
+        self.taught = true;
+        remember("el.taught", "1", "taught");
+    }
+}
+
+/// Keeps a setting for the next visit (`localStorage[key]`, which `web/loader.js` reads), and takes
+/// `?param=` off the address (where it was the setting asked for, it would win again at a reload).
+/// The one place the browser's storage is written for a setting: a desktop build keeps them here
+/// in a file.
+pub fn remember(key: &str, value: &str, param: &str) {
+    let Some(window) = web_sys::window() else { return };
+    if let Some(storage) = window.local_storage().ok().flatten() {
+        let _ = storage.set_item(key, value);
+    }
+    let Ok(href) = window.location().href() else { return };
+    let Ok(mut url) = url::Url::parse(&href) else { return };
+    if !url.query_pairs().any(|(k, _)| k == param) {
+        return;
+    }
+    let kept: Vec<(String, String)> = url
+        .query_pairs()
+        .filter(|(k, _)| k != param)
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect();
+    if kept.is_empty() {
+        url.set_query(None);
+    } else {
+        url.query_pairs_mut().clear().extend_pairs(kept);
+    }
+    if let Ok(history) = window.history() {
+        let _ = history.replace_state_with_url(&wasm_bindgen::JsValue::NULL, "", Some(url.as_str()));
+    }
+}
+
+/// A setting kept by an earlier visit.
+pub fn recall(key: &str) -> Option<String> {
+    web_sys::window()
+        .and_then(|w| w.local_storage().ok().flatten())
+        .and_then(|s| s.get_item(key).ok().flatten())
+}
+
 /// Remembers the camera locked or free for the next visit (`localStorage["el.camera"]`, which
 /// `web/loader.js` reads).
 pub fn store_camera(locked: bool) {
-    let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) else { return };
-    let _ = storage.set_item("el.camera", if locked { "locked" } else { "free" });
+    remember("el.camera", if locked { "locked" } else { "free" }, "camera");
 }
 
 /// Keeps (or with `None`, forgets) this tab's rejoin token (`sessionStorage["el.rejoin"]`, never

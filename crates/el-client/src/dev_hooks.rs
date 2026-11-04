@@ -219,7 +219,7 @@ enum Cmd {
     Fog {
         on: bool,
     },
-    /// A volume on the page's audio panel: `"master"` or a bus's name (`effects`, `voice`, `ui`,
+    /// A volume, as the menu's Sound page sets it (`menu.rs`): `"master"` or a bus's name (`effects`, `voice`, `ui`,
     /// `ambience`, `music`), 0 to 1.
     Volume {
         bus: String,
@@ -228,6 +228,20 @@ enum Cmd {
     Mute {
         on: bool,
     },
+    /// The menu opened or closed (`open` left out: as it is), on a page (`controls`, `graphics`,
+    /// `sound`), as Esc and its rail would.
+    Menu {
+        open: Option<bool>,
+        tab: Option<String>,
+    },
+    /// A setting changed as the menu's buttons change it: `keys` (`league`, `wasd`), `indicators`
+    /// (`on`, `off`), `camera` (`locked`, `free`), `quality` (`low`, `high`: at the next load).
+    Setting {
+        key: String,
+        value: String,
+    },
+    /// The first match's strip of keys let go, as its button does (`hud_first.rs`).
+    Taught,
     /// The picture's clock run at `speed` (1 as it should; 0 stops it): the effects' particles,
     /// the shaders' time, the champions' poses. The match's own clock isn't this one, so the match
     /// goes on; a test slows the picture to catch a burst in the middle of its life (SwiftShader
@@ -269,6 +283,8 @@ fn inbox(
     mut audio: ResMut<crate::audio::AudioSettings>,
     mut clock: ResMut<Time<Virtual>>,
     mut catch: ResMut<crate::fx::Catch>,
+    mut menu: ResMut<crate::menu::Menu>,
+    mut prefs: ResMut<crate::config::Prefs>,
     drawn: Res<crate::view::Drawn>,
 ) {
     use el_client_core::lobby::ToServer;
@@ -348,6 +364,30 @@ fn inbox(
             Cmd::Mute { on } => {
                 audio.muted = on;
                 audio.save();
+                continue;
+            }
+            Cmd::Menu { open, tab } => {
+                if let Some(t) = tab.as_deref().and_then(crate::menu::Tab::parse) {
+                    menu.tab = t;
+                }
+                if let Some(open) = open {
+                    menu.show(open);
+                }
+                continue;
+            }
+            Cmd::Setting { key, value } => {
+                use el_client_core::controls::Layout;
+                match (key.as_str(), value.as_str(), Layout::parse(&value)) {
+                    ("keys", _, Some(layout)) => prefs.set_layout(layout),
+                    ("indicators", "on" | "off", _) => prefs.set_indicators(value == "on"),
+                    ("camera", "locked" | "free", _) => rig.set_locked(value == "locked"),
+                    ("quality", "low" | "high", _) => prefs.set_low_next(value == "low"),
+                    _ => web_sys::console::warn_1(&format!("__elInbox: no setting {key} = {value}").into()),
+                }
+                continue;
+            }
+            Cmd::Taught => {
+                prefs.set_taught();
                 continue;
             }
             Cmd::Catch { what, at } => {
