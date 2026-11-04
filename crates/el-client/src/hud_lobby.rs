@@ -208,7 +208,7 @@ fn setup(mut commands: Commands) {
                 display: Display::None,
                 ..default()
             },
-            crate::hud::down(Color::srgba(0.0, 0.0, 0.0, 0.72), Color::srgba(0.0, 0.0, 0.0, 0.5)),
+            crate::hud::down(Color::srgba(0.0, 0.0, 0.0, 0.80), Color::srgba(0.0, 0.0, 0.0, 0.62)),
             // Under the scoreboard, over the rest of the HUD.
             GlobalZIndex(-5),
             Over,
