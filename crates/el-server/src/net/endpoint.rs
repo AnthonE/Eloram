@@ -127,6 +127,7 @@ pub type CertHash = Arc<std::sync::RwLock<Option<String>>>;
 /// certificate older than its `keep` is remade and kept, and a CA-issued one is read again and
 /// taken up if its file changed. Connections already open keep going (the new configuration is
 /// for the handshakes after it); a page dials with the hash it fetches fresh each time.
+#[allow(clippy::too_many_arguments)]
 pub async fn rotate(
     endpoint: Arc<Endpoint<Server>>,
     source: TlsSource,
