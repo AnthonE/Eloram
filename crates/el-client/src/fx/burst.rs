@@ -412,7 +412,7 @@ impl Make<'_> {
         match fam {
             Some(Family::Ember) => {
                 self.spray(at, 14.0 * k, shape::STREAK, 6.0, 0.7, 0.45, 0.05, 7.0, 2.0, core, false);
-                self.spray(at, 3.0 * k, shape::PUFF, 0.8, 0.9, 0.9, 0.35, -0.6, 2.0, dust, true);
+                self.spray(at, 3.0 * k, shape::PUFF, 0.8, 0.9, 0.8, 0.24, -0.6, 2.0, dust, true);
                 // Embers that linger, drifting up off the hit as it cools.
                 self.spray(at, 5.0 * k, shape::EMBER, 0.9, 0.95, 1.3, 0.06, -0.9, 1.6, edge, false);
             }
@@ -422,7 +422,7 @@ impl Make<'_> {
             }
             Some(Family::Tide) => {
                 self.spray(at, 16.0 * k, shape::STREAK, 5.0, 0.8, 0.5, 0.05, 9.0, 1.5, core, false);
-                self.spray(at, 3.0 * k, shape::PUFF, 1.0, 0.6, 0.7, 0.3, 0.0, 2.0, dust, true);
+                self.spray(at, 3.0 * k, shape::PUFF, 1.0, 0.6, 0.7, 0.22, 0.0, 2.0, dust, true);
             }
             Some(Family::Wind) => {
                 self.spray(at, 12.0 * k, shape::STREAK, 7.0, 0.1, 0.35, 0.05, 0.0, 4.0, core, false);
@@ -449,7 +449,9 @@ impl Make<'_> {
                     rgba(pal.smoke, 1.6, 1.0),
                     true,
                 );
-                self.spray(at, 4.0 * k, shape::PUFF, 1.0, 0.5, 0.9, 0.4, -0.3, 2.0, dust, true);
+                // Dust off a hit, no more: the puffs outgrew and outlasted the hit itself (the
+                // strip of Brakka's Q peaked at 0.6 s on its dust, not at the strike).
+                self.spray(at, 3.0 * k, shape::PUFF, 1.0, 0.5, 0.7, 0.22, -0.3, 2.0, dust, true);
                 self.spray(at, 5.0 * k, shape::STREAK, 4.0, 0.6, 0.3, 0.04, 6.0, 2.0, core, false);
             }
             Some(Family::Bronze) => {
@@ -574,7 +576,8 @@ fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
         What::Part(Part::Cast) => {
             let glow = m.k("cast.glow");
             m.spray(ground(0.2), 8.0 * k * glow, shape::GLOW, 1.2, 0.95, 0.55, 0.07, -2.0, 1.5, core, false);
-            m.one(ground(0.04), shape::FLASH, 0.6 * k * m.k("cast.flash"), 0.35, edge, false);
+            // A quick flash at the feet; the motes carry the cast (a wide one read as pink smoke).
+            m.one(ground(0.04), shape::FLASH, 0.42 * k * m.k("cast.flash"), 0.25, edge, false);
         }
         What::Part(Part::Ult) => {
             m.one(ground(0.0), shape::COLUMN, 0.45 * k, 0.9, core, false);

@@ -19,6 +19,8 @@ struct Live {
     // x: the shape; y, z: two times on the shader's clock (a telegraph's start and its landing; a
     // field's next pulse and its period); w: a shape's own number.
     p: vec4<f32>,
+    // The stage's knobs (all 1 in a match): x a missile's core, y its halo, z its trail.
+    k: vec4<f32>,
 }
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> live: Live;
@@ -53,15 +55,15 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     if shape < 0.5 {
         // A missile's head: a hot point in a soft halo, flickering a little.
         let flick = 0.9 + 0.1 * sin(t * 40.0 + live.p.w * 7.0);
-        core = pow(max(1.0 - d * 1.6, 0.0), 2.0) * 1.6 * flick;
-        edge = pow(max(1.0 - d, 0.0), 1.5) * 0.7;
+        core = pow(max(1.0 - d * 1.6, 0.0), 2.0) * 1.6 * flick * live.k.x;
+        edge = pow(max(1.0 - d, 0.0), 1.5) * 0.7 * live.k.y;
     } else if shape < 1.5 {
         // Its trail, along x from the tail (0) to the head (1), torn by noise moving back.
         let across = abs(uv.y - 0.5) * 2.0;
         let n = noise(vec2(uv.x * 6.0 + t * 9.0, uv.y * 3.0 + live.p.w));
         let along = pow(uv.x, 1.6);
-        core = along * (1.0 - smoothstep(0.0, 0.45, across)) * (0.6 + 0.4 * n);
-        edge = along * (1.0 - smoothstep(0.2, 1.0, across)) * 0.5 * n;
+        core = along * (1.0 - smoothstep(0.0, 0.45, across)) * (0.6 + 0.4 * n) * live.k.z;
+        edge = along * (1.0 - smoothstep(0.2, 1.0, across)) * 0.5 * n * live.k.z;
     } else if shape < 2.5 {
         // A blast's telegraph: its rim, bright and exact; inside, a fill growing toward the moment
         // it lands; and a beat quickening as it comes.

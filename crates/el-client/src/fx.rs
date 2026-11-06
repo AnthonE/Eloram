@@ -136,6 +136,7 @@ impl Plugin for FxPlugin {
         app.init_resource::<Cues>()
             .init_resource::<Catch>()
             .init_resource::<burst::KnobsRes>()
+            .init_resource::<live::StageShots>()
             .add_plugins((
                 MaterialPlugin::<burst::BurstMat>::default(),
                 MaterialPlugin::<live::LiveMat>::default(),

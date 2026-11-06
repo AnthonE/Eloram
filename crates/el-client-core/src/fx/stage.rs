@@ -9,7 +9,8 @@
 //! ability, the world's effects), the cue the stage fires for each, the clock, and the knobs that
 //! retune a recipe without a rebuild. The browser client's `stage.rs` draws it.
 
-use el_sim::content::champions::{BLINK_SLOT, CHAMPIONS, MARK_SLOT};
+use el_sim::content::champions::{BLINK_SLOT, CHAMPIONS, MARK_SLOT, ability};
+use el_sim::content::{Effect, rules};
 use el_sim::missile::Source;
 use el_sim::units::Kind;
 use glam::Vec2;
@@ -17,6 +18,7 @@ use glam::Vec2;
 use super::director::{Cue, Status, What};
 use super::look::{self, Look, Reach, Side};
 use super::sound::Part;
+use crate::missiles::{HIDDEN, Shot};
 
 /// The flipbook sheet the bursts play (`web/assets/fx/cloud_{a,b}.png`, `docs/FX.md`,
 /// "Flipbooks"): its cut, which `art/tools/flipbooks.py` bakes and `fx_burst.wgsl` reads; a test
@@ -108,6 +110,16 @@ pub enum Spec {
     },
     /// A turret's shot leaving, or landing.
     Turret(Part),
+    /// A missile in flight: an ability's, a ranged auto attack's, a turret's (the live pool's
+    /// head and trail, not a burst).
+    Missile {
+        champ: u8,
+        slot: u8,
+    },
+    AutoMissile {
+        champ: u8,
+    },
+    TurretMissile,
     Status(Status),
     Shield,
     Heal,
@@ -209,6 +221,7 @@ impl Staged {
                 Part::Dash => (0.5, 0.0),
                 Part::Buff => (0.5, 0.0),
             },
+            Spec::Missile { .. } | Spec::AutoMissile { .. } | Spec::TurretMissile => (1.1, 0.0),
             Spec::Turret(Part::Launch) => (1.1, 0.0),
             Spec::Turret(_) => (1.6, 1.3),
             Spec::Status(Status::Stun | Status::Silence | Status::Reveal) => (2.2, 0.0),
@@ -230,7 +243,9 @@ impl Staged {
         match self.spec {
             Spec::Ability { champ, slot, .. } => look::ability_look(champ, slot),
             Spec::Auto { champ, .. } => look::look(Source::Auto, Some(champ), 0),
-            Spec::Turret(_) => look::look(Source::Turret, None, 1),
+            Spec::Turret(_) | Spec::TurretMissile => look::look(Source::Turret, None, 1),
+            Spec::Missile { champ, slot } => look::ability_look(champ, slot),
+            Spec::AutoMissile { champ } => look::look(Source::Auto, Some(champ), 0),
             Spec::Relic { .. } => look::look(Source::Relic, None, 0),
             Spec::Status(s) => {
                 let mut l = look::look(Source::Auto, None, 0);
@@ -268,6 +283,11 @@ impl Staged {
             }
             Spec::Auto { part, .. } => (What::Part(part), Source::Auto, Some(1), None, size.unwrap_or(60.0)),
             Spec::Turret(part) => (What::Part(part), Source::Turret, Some(1), None, size.unwrap_or(200.0)),
+            // A missile is drawn from its shot (`Staged::shot`); its cue is nothing (`What::Ui`
+            // draws nothing and sounds nothing here).
+            Spec::Missile { champ, slot } => (What::Ui, Source::Ability { champ, slot }, None, None, 0.0),
+            Spec::AutoMissile { .. } => (What::Ui, Source::Auto, None, None, 0.0),
+            Spec::TurretMissile => (What::Ui, Source::Turret, None, None, 0.0),
             Spec::Status(s) => (What::Status(s), Source::Auto, Some(1), None, 0.0),
             Spec::Shield => (What::Shield, Source::Item(0), Some(1), None, 0.0),
             Spec::Heal => (What::Heal, Source::Item(0), Some(1), None, 0.0),
@@ -294,8 +314,68 @@ impl Staged {
     }
 }
 
+/// How far a staged missile flies (units): across the middle of its card.
+pub const FLIGHT: f32 = 240.0;
+
+impl Staged {
+    /// The missile's speed and width (units) and whether it homes, if the effect is one.
+    fn missile(&self) -> Option<(f32, f32, bool)> {
+        match self.spec {
+            Spec::Missile { champ, slot } => match ability(champ, slot).effect {
+                Effect::Line { speed, width, .. } => Some((speed, width, false)),
+                Effect::Homing { speed, .. } => Some((speed, 60.0, true)),
+                _ => None,
+            },
+            Spec::AutoMissile { champ } => Some((CHAMPIONS[usize::from(champ)].missile_speed, 60.0, true)),
+            Spec::TurretMissile => Some((rules::TURRET_MISSILE_SPEED, 60.0, true)),
+            _ => None,
+        }
+    }
+
+    /// The shot a staged missile flies as, from left to right across `at` (map units; `right`
+    /// the screen's right), its clock starting at tick 0 as it fires, and the champion whose
+    /// look it carries (an auto's), for the live pool to draw.
+    pub fn shot(&self, at: Vec2, right: Vec2) -> Option<(Shot, Option<u8>)> {
+        let (speed, width, homing) = self.missile()?;
+        let source = match self.spec {
+            Spec::Missile { champ, slot } => Source::Ability { champ, slot },
+            Spec::TurretMissile => Source::Turret,
+            _ => Source::Auto,
+        };
+        let champ = match self.spec {
+            Spec::AutoMissile { champ } => Some(champ),
+            _ => None,
+        };
+        let shot = Shot {
+            alive: true,
+            generation: 1,
+            team: 0,
+            source,
+            owner: HIDDEN,
+            origin: at - right * (FLIGHT * 0.5),
+            t0: 0,
+            dir: right,
+            speed: speed.max(1.0),
+            range: FLIGHT,
+            width,
+            target: HIDDEN,
+            homing,
+        };
+        Some((shot, champ))
+    }
+
+    /// How long a staged missile's flight lasts (s).
+    pub fn flight_s(&self) -> f32 {
+        self.missile().map_or(0.0, |(speed, _, _)| FLIGHT / speed.max(1.0))
+    }
+}
+
+fn missile_frame(speed: f32) -> (f32, f32) {
+    (1.2, (FLIGHT / speed.max(1.0)).clamp(0.15, 1.0))
+}
+
 /// Everything the stage can fire, in a fixed order: each champion's abilities part by part (Q to
-/// R), its auto attack, then Blink and Tag, then the world's.
+/// R) and its missile, its auto attack and its missile, then Blink and Tag, then the world's.
 pub fn list() -> Vec<Staged> {
     let mut out = Vec::new();
     for (c, def) in CHAMPIONS.iter().enumerate() {
@@ -320,6 +400,21 @@ pub fn list() -> Vec<Staged> {
                     Spec::Ability { champ, slot, part },
                 ));
             }
+            if let Effect::Line { speed, .. } | Effect::Homing { speed, .. } = a.effect {
+                let (radius, span) = missile_frame(speed);
+                out.push(Staged::new(
+                    format!("{slug}-{}-missile", slot_name(slot)),
+                    format!(
+                        "{}'s {} ({}): its missile in flight",
+                        def.name,
+                        a.name,
+                        slot_name(slot).to_ascii_uppercase()
+                    ),
+                    radius,
+                    span,
+                    Spec::Missile { champ, slot },
+                ));
+            }
         }
         let auto = look::look(Source::Auto, Some(champ), 0);
         for part in parts_of(&auto) {
@@ -330,6 +425,16 @@ pub fn list() -> Vec<Staged> {
                 radius,
                 span,
                 Spec::Auto { champ, part },
+            ));
+        }
+        if def.missile_speed > 0.0 {
+            let (radius, span) = missile_frame(def.missile_speed);
+            out.push(Staged::new(
+                format!("{slug}-auto-missile"),
+                format!("{}'s auto attack: its missile in flight", def.name),
+                radius,
+                span,
+                Spec::AutoMissile { champ },
             ));
         }
     }
@@ -355,6 +460,16 @@ pub fn list() -> Vec<Staged> {
             radius,
             span,
             Spec::Turret(part),
+        ));
+    }
+    {
+        let (radius, span) = missile_frame(rules::TURRET_MISSILE_SPEED);
+        out.push(Staged::new(
+            "turret-missile".into(),
+            "a turret's shot in flight".into(),
+            radius,
+            span,
+            Spec::TurretMissile,
         ));
     }
     for (s, n) in STATUSES {
@@ -517,6 +632,9 @@ pub const KNOBS: &[(&str, &str)] = &[
     ("buff.ring", "a buff's ring"),
     ("buff.glow", "a buff's rising motes"),
     ("dash.flash", "a dash's flash where it lands"),
+    ("missile.core", "a missile's head: its hot core (the live pool's shader)"),
+    ("missile.halo", "a missile's head: the halo round its core"),
+    ("missile.trail", "a missile's trail"),
 ];
 
 impl Knobs {
@@ -591,6 +709,28 @@ mod tests {
         for n in ["blink-dash", "tag-impact", "turret-impact", "status-stun", "death-turret", "relic-beam"] {
             assert!(all.iter().any(|s| s.name == n), "{n} isn't staged");
         }
+        // Every skillshot and homing ability has its missile, and every ranged auto, and the turret.
+        for n in ["vessa-q-missile", "vessa-w-missile", "vessa-auto-missile", "turret-missile"] {
+            assert!(all.iter().any(|s| s.name == n), "{n} isn't staged");
+        }
+        assert!(!all.iter().any(|s| s.name == "brakka-auto-missile"), "a melee auto has no missile");
+    }
+
+    #[test]
+    fn a_staged_missile_flies_across_its_card() {
+        let s = find("vessa-w-missile").unwrap();
+        let (shot, champ) = s.shot(Vec2::new(1000.0, 500.0), Vec2::X).unwrap();
+        assert!(shot.alive && champ.is_none());
+        assert_eq!(shot.origin, Vec2::new(1000.0 - FLIGHT * 0.5, 500.0));
+        assert_eq!(shot.dir, Vec2::X);
+        assert_eq!(shot.range, FLIGHT);
+        assert!((shot.pos(0.0, None) - shot.origin).length() < 1e-3);
+        let end = shot.pos(f64::from(s.flight_s() * el_proto::TICK_HZ as f32), None);
+        assert!((end - Vec2::new(1000.0 + FLIGHT * 0.5, 500.0)).length() < 1.0, "{end}");
+        assert!(s.span >= s.flight_s() - 1e-3 || s.span == 1.0);
+        let auto = find("vessa-auto-missile").unwrap();
+        assert_eq!(auto.shot(Vec2::ZERO, Vec2::X).unwrap().1, Some(0));
+        assert!(find("orrin-q-impact").unwrap().shot(Vec2::ZERO, Vec2::X).is_none());
     }
 
     #[test]

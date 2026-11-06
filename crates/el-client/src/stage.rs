@@ -226,10 +226,28 @@ fn clock(
 }
 
 /// The effect fired, twice: on the dark card and on the light one, the particles rolled from the
-/// seed each time, so a strip shot again is the same strip.
-fn fire(stage: Res<Stage>, mut cues: ResMut<Cues>, mut bursts: ResMut<Bursts>) {
+/// seed each time, so a strip shot again is the same strip. A missile is flown instead: its shot
+/// is the live pool's to draw at the stage's own tick while its flight lasts.
+fn fire(
+    stage: Res<Stage>,
+    mut cues: ResMut<Cues>,
+    mut bursts: ResMut<Bursts>,
+    mut shots: ResMut<crate::fx::live::StageShots>,
+) {
     if stage.clear {
         bursts.clear();
+    }
+    let t = stage.clock.t();
+    let flying = stage.clock.step() >= 1 && t <= stage.staged.flight_s();
+    let want: Vec<_> = if flying {
+        stage.anchors().iter().filter_map(|at| stage.staged.shot(*at, stage.right)).collect()
+    } else {
+        Vec::new()
+    };
+    let at = f64::from(t) * f64::from(el_proto::TICK_HZ);
+    if shots.shots != want || shots.at != at {
+        shots.shots = want;
+        shots.at = at;
     }
     if !stage.fire {
         return;

@@ -10,6 +10,7 @@
 #   scripts/fx.sh orrin-q-impact --seed 7 --frames 15 --span 1.2      # another roll, more frames, a longer span
 #   scripts/fx.sh orrin-q-impact --side enemy --size 300 --low        # as an enemy sees it, 300 damage, the low tier
 #   scripts/fx.sh --no-build …                      # the page as it was last built
+#   EL_FX_DIST=dir scripts/fx.sh --no-build …       # a copy of web/dist, while web/dist is rebuilt
 #
 # Builds the WebGL2 page (scripts/build-web.sh: wasm-bindgen-cli at the lock's version) and serves
 # it itself: no game server. Needs Playwright's Chromium (e2e/: npm ci; the dev container keeps it
@@ -19,6 +20,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 OUT=${EL_FX_OUT:-e2e/artifacts/fx}
+# The page served (a copy of web/dist, to keep shooting while web/dist is rebuilt).
+DIST=${EL_FX_DIST:-web/dist}
 BUILD=1
 NAMES=()
 KNOBS=""
@@ -53,7 +56,7 @@ esac
 if [ "$BUILD" = 1 ]; then
   ./scripts/build-web.sh webgl2
 fi
-[ -f web/dist/webgl2/el_bg.wasm ] || { echo "fx: no page in web/dist: run without --no-build" >&2; exit 1; }
+[ -f "$DIST/webgl2/el_bg.wasm" ] || { echo "fx: no page in $DIST: run without --no-build" >&2; exit 1; }
 if [ -z "${PLAYWRIGHT_BROWSERS_PATH:-}" ] && [ -d /opt/pw-browsers ]; then
   export PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
 fi
@@ -71,5 +74,5 @@ query="gfx=webgl2&quality=$QUALITY&seed=$SEED&side=$SIDE&knobs=$(enc "$KNOBS")"
 [ -n "$CARDS" ] && query="$query&cards=$(enc "$CARDS")"
 for n in "${NAMES[@]}"; do
   echo "==> $n"
-  node e2e/fxstrip.mjs page "$OUT/$n" --serve web/dist --hook fx --query "fxstage=$n&$query" "${MORE[@]}"
+  node e2e/fxstrip.mjs page "$OUT/$n" --serve "$DIST" --hook fx --query "fxstage=$n&$query" "${MORE[@]}"
 done

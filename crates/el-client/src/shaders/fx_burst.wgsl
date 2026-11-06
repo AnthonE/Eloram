@@ -246,8 +246,8 @@ fn sheet_frames(sheet: vec4<f32>, blend: f32) -> array<vec4<f32>, 2> {
 // split into the moon's share, which falls from where it stands, and the night's, which comes
 // from everywhere. The lights' own numbers (lux through the camera's exposure) are far brighter
 // than the stone reads: the ground's shader grades its own; this keeps to the stone's level.
-const MOON_SMOKE: vec3<f32> = vec3(0.62, 0.68, 0.86);
-const NIGHT_SMOKE: vec3<f32> = vec3(0.22, 0.26, 0.36);
+const MOON_SMOKE: vec3<f32> = vec3(0.50, 0.55, 0.70);
+const NIGHT_SMOKE: vec3<f32> = vec3(0.20, 0.23, 0.32);
 
 // Smoke of albedo `tint` lit six ways by the moon and the night, where the moon stands in the
 // sprite's own frame (its right and up the screen's, its front the eye's side): the side the
@@ -356,8 +356,10 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
         let boil = vnoise(vec2(ang * 2.5 + seed * 30.0, d * 4.0 - k * 5.0)) * 0.55
             + vnoise(c * 9.0 + vec2(seed * 13.0, k * 3.0)) * 0.45;
         let body = smoothstep(0.0, 0.5, 1.0 - d + (boil - 0.5) * 0.8);
-        // Not so bright that it reads as a disc: the boil shows, and the fireball over it.
-        a = body * pow(max(1.0 - d, 0.0), 1.4) * (0.12 + 1.1 * boil) * 0.55 * knobs.w;
+        // Not so bright that it reads as a disc: the boil shows, and the fireball over it; a hot
+        // middle, so a small one (a cast's) reads as light and not as a puff of smoke.
+        a = (body * pow(max(1.0 - d, 0.0), 1.4) * (0.12 + 1.1 * boil) * 0.55 + exp(-d * d * 14.0) * 0.6)
+            * knobs.w;
     } else if shape < 7.5 {
         // A star: four long rays and four short between them, a white core; gone fast.
         let q = abs(c) * 2.0;
