@@ -67,6 +67,10 @@ pub struct Config {
     pub require_sign_in: bool,
     /// Practice matches may be asked for (`el_sim::practice`, `ToServer::Practice`).
     pub practice: bool,
+    /// How long a self-signed certificate is used before a running server remakes it, and how
+    /// often it looks (`net::endpoint::rotate`; a CA-issued one is read again as often).
+    pub cert_keep: Duration,
+    pub cert_check: Duration,
 }
 
 impl Default for Config {
@@ -90,6 +94,8 @@ impl Default for Config {
             siwe_domains: Vec::new(),
             require_sign_in: false,
             practice: false,
+            cert_keep: net::endpoint::KEEP_CERT,
+            cert_check: net::endpoint::CHECK_CERT,
         }
     }
 }
@@ -138,21 +144,37 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
     if let Some(dir) = &cfg.records_dir {
         std::fs::create_dir_all(dir)?;
     }
-    let (identity, hash, pinned) = match &cfg.tls {
+    let (identity, hash, pinned, source) = match &cfg.tls {
         Some((cert, key)) => {
             let (id, hash) = net::endpoint::pem_identity(cert, key).await?;
-            (id, hash, false)
+            (id, hash, false, net::endpoint::TlsSource::Pem { cert: cert.clone(), key: key.clone() })
         }
         None => {
-            let (id, hash) = net::endpoint::kept_self_signed_identity(cfg.records_dir.as_deref()).await?;
-            (id, hash, true)
+            let (id, hash) =
+                net::endpoint::kept_self_signed_identity(cfg.records_dir.as_deref(), cfg.cert_keep).await?;
+            let source =
+                net::endpoint::TlsSource::SelfSigned { dir: cfg.records_dir.clone(), keep: cfg.cert_keep };
+            (id, hash, true, source)
         }
     };
-    let endpoint = net::endpoint::make_endpoint(cfg.wt_port, identity)?;
+    let (endpoint, bind) = net::endpoint::make_endpoint(cfg.wt_port, identity)?;
+    let endpoint = Arc::new(endpoint);
     let wt_port = endpoint.local_addr()?.port();
+    let cert_hash: net::endpoint::CertHash =
+        Arc::new(std::sync::RwLock::new(pinned.then(|| hex::encode(hash))));
     let stats = Arc::new(NetStats::default());
     let admission = Admission::new(cfg.limits);
     let (shutdown, rx) = tokio::sync::watch::channel(false);
+    tokio::spawn(net::endpoint::rotate(
+        endpoint.clone(),
+        source,
+        bind,
+        cfg.wt_port,
+        cfg.cert_check,
+        hash,
+        cert_hash.clone(),
+        rx.clone(),
+    ));
     let lobby = match cfg.mode {
         Mode::Game => {
             let map = el_sim::map::Map::leaked();
@@ -213,7 +235,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
     let launcher_stats = stats.clone();
     let status_lobby = lobby.clone();
     let state = http::HttpState {
-        cert_hash_hex: pinned.then(|| hex::encode(hash)),
+        cert_hash_hex: cert_hash,
         wt_port,
         web_dir: cfg.web_dir.clone(),
         status: Arc::new(move || {

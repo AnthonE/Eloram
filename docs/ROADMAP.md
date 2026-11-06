@@ -327,4 +327,8 @@ Left, in no order:
 - **The announcer's and the music's files**: wired, optional, dropped in by name (`FX.md`).
 - The agents' own team-view bots in the empty seats, where the server's bots sit now.
 - **The operator's**: where the game server runs (`--server`, `--http`, `--siwe-domain`), the
-  store's route to the page, and the listing.
+  store's route to the page, and the listing. Not in their way any more: a server left running
+  stopped taking new players once its self-signed certificate was a fortnight old (browsers
+  refuse a pinned one past fourteen days), and a renewed Let's Encrypt file needed a restart; a
+  running server remakes the one and reads the other again now (`net::endpoint::rotate`, a test
+  dialling with the new hash and the old).

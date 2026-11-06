@@ -143,6 +143,11 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   (`/status` `game.referee`). A server started on the same `--records` directory takes up the matches
   the last one left (killed or stopped: `el-server/src/recover.rs`), and their players rejoin with
   their tokens. `cargo test -p el-server --release --test recover` kills a real server mid-match.
+- The certificate (`el-server/src/net/endpoint.rs`): self-signed and pinned by hash unless
+  `--cert`/`--key` name a CA-issued one; a running server remakes its self-signed one every ten
+  days (browsers refuse a pinned one past fourteen) and reads a CA-issued one again every hour, so
+  a renewal is taken up without a restart; `/cert-hash` follows, and a page fetches it fresh on
+  every dial. `cargo test -p el-server --release --test rotate` dials before and after.
 - Wallet sign-in (`el-auth`: the SIWE text both sides build, the Elo Pros launcher's `prove` text
   for `eloram`): the page signs in on `?signin=1` (`web/wallet.js`), agents with a key
   (`BotConfig::key`, `el-swarm --sign-in` with throwaway test keys). The server names

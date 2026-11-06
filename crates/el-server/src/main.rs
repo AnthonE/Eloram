@@ -25,8 +25,10 @@ struct Args {
     /// Built web client directory to serve at `/`.
     #[arg(long, default_value = "web/dist")]
     web_dir: PathBuf,
-    /// PEM certificate chain for WebTransport (e.g. Let's Encrypt's fullchain.pem). Without it the
-    /// server self-signs and browsers pin the certificate's hash.
+    /// PEM certificate chain for WebTransport (e.g. Let's Encrypt's fullchain.pem), read again
+    /// every hour while the server runs, so a renewed file is taken up without a restart. Without
+    /// it the server self-signs and browsers pin the certificate's hash; that certificate is
+    /// remade every ten days while the server runs (browsers refuse one past fourteen).
     #[arg(long, requires = "key")]
     cert: Option<PathBuf>,
     /// PEM private key for `--cert`.
