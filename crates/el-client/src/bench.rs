@@ -210,10 +210,12 @@ fn publish(cfg: &crate::config::LaunchConfig, results: &[Result], text: &str) {
     let phases: Vec<serde_json::Value> = results
         .iter()
         .map(|r| {
+            // Rounded as f64, so the JSON reads 61.3 and not a float's noise.
+            let round = |v: f32, places: f64| (f64::from(v) * places).round() / places;
             serde_json::json!({
-                "name": r.name, "frames": r.frames, "fps": (r.fps * 10.0).round() / 10.0,
-                "p50_ms": (r.p50_ms * 100.0).round() / 100.0, "p99_ms": (r.p99_ms * 100.0).round() / 100.0,
-                "worst_ms": (r.worst_ms * 10.0).round() / 10.0,
+                "name": r.name, "frames": r.frames, "fps": round(r.fps, 10.0),
+                "p50_ms": round(r.p50_ms, 100.0), "p99_ms": round(r.p99_ms, 100.0),
+                "worst_ms": round(r.worst_ms, 10.0),
             })
         })
         .collect();
