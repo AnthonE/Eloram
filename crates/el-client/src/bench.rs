@@ -89,10 +89,8 @@ impl Plugin for BenchPlugin {
         if !app.world().resource::<LaunchConfigRes>().0.bench {
             return;
         }
-        app.init_resource::<Bench>().add_systems(
-            Update,
-            run.after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send),
-        );
+        app.init_resource::<Bench>()
+            .add_systems(Update, run.after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send));
     }
 }
 
@@ -141,7 +139,8 @@ fn run(
         bench.next_cast = now + CAST_EVERY;
         let slot = bench.slot;
         bench.slot = (slot + 1) % 4;
-        let unit_ref = |i: usize| UnitRef { slot: i as u8, generation: drawn.units[i].map_or(0, |d| d.generation) };
+        let unit_ref =
+            |i: usize| UnitRef { slot: i as u8, generation: drawn.units[i].map_or(0, |d| d.generation) };
         let enemy_at = drawn.units[ENEMY].map_or(practice::PLACES[ENEMY].0, |d| d.pos);
         let aim = match ability(client.pred.champs[client.seat].def, slot).target {
             Target::Dir | Target::Point => Aim::Point(enemy_at),
@@ -152,7 +151,8 @@ fn run(
         controls.pending.push(Order::Cast { slot, aim });
     }
     if since < SETTLE_SECS + PHASE_SECS {
-        status.set("bench", format!("{} ({} of {}): {:.0} s", spot.name, bench.phase + 1, spots.len(), since));
+        status
+            .set("bench", format!("{} ({} of {}): {:.0} s", spot.name, bench.phase + 1, spots.len(), since));
         return;
     }
     // The phase is over: sum it up, and on to the next.
