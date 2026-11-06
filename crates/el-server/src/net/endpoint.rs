@@ -123,10 +123,16 @@ pub enum TlsSource {
 /// shared with the HTTP side, which reads it on every request.
 pub type CertHash = Arc<std::sync::RwLock<Option<String>>>;
 
+/// A reload asked for (SIGHUP, the certbot hook's `systemctl reload`; `Handle::reload`): the
+/// certificate is read again now, not at the next check.
+pub type Reload = Arc<tokio::sync::Notify>;
+
 /// Keeps the endpoint's certificate good while the server runs: every `check`, a self-signed
 /// certificate older than its `keep` is remade and kept, and a CA-issued one is read again and
-/// taken up if its file changed. Connections already open keep going (the new configuration is
-/// for the handshakes after it); a page dials with the hash it fetches fresh each time.
+/// taken up if its file changed; and at once when a reload is asked for (SIGHUP, as oneshot's
+/// server takes it from the certbot hook: a self-signed one is remade whatever its age). Connections
+/// already open keep going (the new configuration is for the handshakes after it); a page dials
+/// with the hash it fetches fresh each time.
 #[allow(clippy::too_many_arguments)]
 pub async fn rotate(
     endpoint: Arc<Endpoint<Server>>,
@@ -136,22 +142,26 @@ pub async fn rotate(
     check: Duration,
     mut current: [u8; 32],
     hash: CertHash,
+    reload: Reload,
     mut shutdown: tokio::sync::watch::Receiver<bool>,
 ) {
     // Without a directory a self-signed certificate has no file to date: its age is counted here.
     let mut made = std::time::Instant::now();
     loop {
-        tokio::select! {
-            _ = tokio::time::sleep(check) => {}
+        let asked = tokio::select! {
+            _ = tokio::time::sleep(check) => false,
+            _ = reload.notified() => true,
             _ = shutdown.changed() => return,
-        }
+        };
         let fresh = match &source {
             TlsSource::SelfSigned { dir, keep } => {
                 let age = dir.as_deref().and_then(kept_age).unwrap_or_else(|| made.elapsed());
-                if age < *keep {
+                if age < *keep && !asked {
                     continue;
                 }
-                match kept_self_signed_identity(dir.as_deref(), *keep).await {
+                // Asked for, a kept one is remade whatever its age.
+                let keep = if asked { Duration::ZERO } else { *keep };
+                match kept_self_signed_identity(dir.as_deref(), keep).await {
                     Ok(id) => id,
                     Err(e) => {
                         tracing::warn!("remaking the self-signed certificate: {e}");
@@ -161,7 +171,12 @@ pub async fn rotate(
             }
             TlsSource::Pem { cert, key } => match pem_identity(cert, key).await {
                 Ok((id, h)) if h != current => (id, h),
-                Ok(_) => continue,
+                Ok(_) => {
+                    if asked {
+                        tracing::info!("the certificate was read again: the same one");
+                    }
+                    continue;
+                }
                 Err(e) => {
                     tracing::warn!("reading the certificate again: {e}");
                     continue;

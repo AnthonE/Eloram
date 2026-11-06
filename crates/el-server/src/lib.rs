@@ -118,9 +118,16 @@ pub struct Handle {
     pub wt_port: u16,
     pub lobby: Option<Arc<lobby::Lobby>>,
     shutdown: tokio::sync::watch::Sender<bool>,
+    reload: net::endpoint::Reload,
 }
 
 impl Handle {
+    /// Reads the certificate again now (SIGHUP; a self-signed one is remade): new handshakes
+    /// get the new one, nobody is dropped. `net::endpoint::rotate` does it.
+    pub fn reload(&self) {
+        self.reload.notify_one();
+    }
+
     /// Stops the server: the matches where they stand, the last of their records taken off the
     /// rings (a restart with the same records directory takes them up again).
     pub fn shutdown(&self) {
@@ -162,6 +169,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
     let wt_port = endpoint.local_addr()?.port();
     let cert_hash: net::endpoint::CertHash =
         Arc::new(std::sync::RwLock::new(pinned.then(|| hex::encode(hash))));
+    let reload: net::endpoint::Reload = Arc::new(tokio::sync::Notify::new());
     let stats = Arc::new(NetStats::default());
     let admission = Admission::new(cfg.limits);
     let (shutdown, rx) = tokio::sync::watch::channel(false);
@@ -173,6 +181,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
         cfg.cert_check,
         hash,
         cert_hash.clone(),
+        reload.clone(),
         rx.clone(),
     ));
     let lobby = match cfg.mode {
@@ -259,7 +268,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
             tracing::error!("http: {e}");
         }
     });
-    Ok(Handle { http_addr, wt_port, lobby, shutdown })
+    Ok(Handle { http_addr, wt_port, lobby, shutdown, reload })
 }
 
 /// `/status`'s `game`: the lobby, and each shard's ticks, costs and traffic.
