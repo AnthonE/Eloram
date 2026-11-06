@@ -546,12 +546,29 @@ smoke (`AnthonE/oneshot`, `tools/flipbooks/bake.py`), cut for the Causeway.
   shows (Brakka's E: a cracked plate of light, peak 216 where it was 232 flat), and stone's dust
   rolls out pale under the moon round it.
 
+- A second pass, thirty-eight strips across the families and the world's effects (one of each
+  part a family, the statuses, the deaths, a respawn, the relic, the turret), and the missiles
+  once they could be staged. What read as it should: every family's hit (a flash of petals in
+  its colour and what flies off it: steel's white streaks, frost's shards, tide's foam, bronze's
+  binding ring), the energy bursts (frost white-blue, dusk violet, steel white), the ultimates'
+  rings and columns, a root's ring and vines, a shield's and a heal's rings, a turret's hit, a
+  champion's and a nexus's fall. What didn't, and was changed: a cast's ground flash was wide
+  enough to read as pink smoke (smaller, quicker, a hot middle); the dust off a stone hit and
+  the foam off a tide hit outgrew and outlasted the hit (Brakka's Q peaked at 0.6 s on its dust
+  at 13.8 of light, the strike itself at 3; now 3.0 at 0.47 s and 4.4% of the card where it was
+  17.6%); a knock-up's six wide puffs outlasted the lift; and a missile's head was a wide soft
+  core in a halo as wide as its quad, with a trail as wide as its lane (Vessa's W, the suite's
+  pale blob: a hard point half its lane wide in a tight halo now, the trail a narrow streak
+  bright only at the head; 5.5% of the dark card where it was 8.8%).
+
 Not yet:
 - Nobody has listened: the sounds were judged by their spectrograms and measures, not by ear. The
   look on a real GPU hasn't been seen either (SwiftShader draws a frame every two seconds, so a
   burst is seldom in a match's picture; the stage's are exact).
-- The per-ability hand-tuning step 5 ends with: the stage and the strips are its loop now, and a
-  dozen effects have been through it; the other 280 haven't.
+- The per-ability hand-tuning step 5 ends with: the stage and the strips are its loop now, and
+  about fifty effects have been through it (one of each kind a family, and what they showed was
+  fixed in the recipes every champion of the family shares); the rest haven't been looked at one
+  by one.
 - A champion's model under a hit on the stage, to judge it against a body.
 - Step 6's frame numbers.
 

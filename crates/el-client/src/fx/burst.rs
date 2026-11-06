@@ -422,7 +422,9 @@ impl Make<'_> {
             }
             Some(Family::Tide) => {
                 self.spray(at, 16.0 * k, shape::STREAK, 5.0, 0.8, 0.5, 0.05, 9.0, 1.5, core, false);
-                self.spray(at, 3.0 * k, shape::PUFF, 1.0, 0.6, 0.7, 0.22, 0.0, 2.0, dust, true);
+                // A splash of foam, there and gone (the strip of Talmar's Q: its foam peaked at
+                // half a second, three times the strike).
+                self.spray(at, 3.0 * k, shape::PUFF, 1.0, 0.6, 0.45, 0.17, 0.0, 2.0, dust, true);
             }
             Some(Family::Wind) => {
                 self.spray(at, 12.0 * k, shape::STREAK, 7.0, 0.1, 0.35, 0.05, 0.0, 4.0, core, false);
