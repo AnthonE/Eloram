@@ -297,18 +297,42 @@ page, the HUD's key over each ability and a first match's strip of the essential
 the input code casts with its keys. Settings were URL parameters, remembered; they still are, and
 the menu writes the same memory (`config::remember`: a desktop build keeps them in a file there).
 
+Then the fx stage and the flipbooks (`FX.md`, step 7): one effect fired alone over a dark card and
+a light card on a clock stepped 1/60 s a frame, shot into a measured strip by Gates' own shooter
+(`scripts/fx.sh`, 296 effects by name, knobs to retune a recipe without a rebuild), and smoke, a
+fireball and a hit's flash baked from a fluid simulation and lit six ways by the moon
+(`art/tools/flipbooks.py`, one 1024² sheet pair, 460 KB). About fifty effects went through the
+loop, one of each kind a family and the world's, and the missiles once the stage could fly one:
+a hit's flash as wide as its star was and gone as fast, a buff shown in its first sixtieth, no
+soot under a healer's ultimate, a fireball in a family's own colours, a shockwave that's a band
+and not a cloud, a cast's flash that isn't pink smoke, dust and foam that don't outlast the hit
+they came off, and a missile's head a hard point with a narrow streak behind it, where it was the
+pale blob the suite had named. A strip of twelve exact frames takes about a minute in headless
+Chromium.
+
 Left, in no order:
 - **A name**: a guest's is `?name=` or the server's; the page doesn't ask for one.
 - **A real GPU.** Nobody has seen the game on one: the frame rate on either tier (the target is 60
   fps at 1080p on integrated graphics, and a ten-way fight at 60 on `high`), and the effects'
-  share of the frame (`FX.md`, step 6).
+  share of the frame (`FX.md`, step 6). `?bench=1` (`el-client/src/bench.rs`) collects the
+  numbers in one visit: eight phases of eight seconds over the map's places and a fight, each
+  phase's frames a second and its median, 99th-percentile and longest frame, as JSON
+  (`window.__elBench`) to paste here.
 - **Listening.** The sounds were judged by their spectrograms and measures, not by ear.
-- **Tuning by hand**: each ability's look (`FX.md`, step 5, from the contact sheets, which now
-  hold each missile in flight and each hit as it lands), each champion's clip windows
-  (`CHAMPIONS.md`).
+- **Tuning by hand**: each ability's look (`FX.md`, step 5; the stage and its strips are the
+  loop, `scripts/fx.sh`, and a dozen of the 296 have been through it), each champion's clip
+  windows (`CHAMPIONS.md`).
 - **Art**: an outline drawn as a line, where the rim stands in (`CHAMPIONS.md`); the HUD's last
   draw calls.
 - **The announcer's and the music's files**: wired, optional, dropped in by name (`FX.md`).
 - The agents' own team-view bots in the empty seats, where the server's bots sit now.
-- **The operator's**: where the game server runs (`--server`, `--http`, `--siwe-domain`), the
-  store's route to the page, and the listing.
+- **The operator's**: where the game server runs, the store's route to the page, and the
+  listing. The kit is `ops/` now, the way oneshot is hosted (`ops/README.md`: a systemd unit, the
+  certbot hook that copies a renewed chain and reloads the server with SIGHUP, the nginx block
+  for the HTTP side behind the box's 443, `scripts/deploy-server.sh`), with one slot, since a
+  restart takes the matches up again from their records. Not in their way any more: a server left
+  running stopped taking new players once its self-signed certificate was a fortnight old
+  (browsers refuse a pinned one past fourteen days), and a renewed Let's Encrypt file needed a
+  restart; a running server remakes the one and reads the other again (`net::endpoint::rotate`,
+  on SIGHUP and every hour, a test dialling with the new hash and the old). Still theirs: the
+  port and the host in the unit and the nginx file are placeholders until the box says.

@@ -69,6 +69,10 @@ pub struct Config {
     pub require_sign_in: bool,
     /// Practice matches may be asked for (`el_sim::practice`, `ToServer::Practice`).
     pub practice: bool,
+    /// How long a self-signed certificate is used before a running server remakes it, and how
+    /// often it looks (`net::endpoint::rotate`; a CA-issued one is read again as often).
+    pub cert_keep: Duration,
+    pub cert_check: Duration,
 }
 
 impl Default for Config {
@@ -93,6 +97,8 @@ impl Default for Config {
             elo_pubkey: None,
             require_sign_in: false,
             practice: false,
+            cert_keep: net::endpoint::KEEP_CERT,
+            cert_check: net::endpoint::CHECK_CERT,
         }
     }
 }
@@ -115,9 +121,16 @@ pub struct Handle {
     pub wt_port: u16,
     pub lobby: Option<Arc<lobby::Lobby>>,
     shutdown: tokio::sync::watch::Sender<bool>,
+    reload: net::endpoint::Reload,
 }
 
 impl Handle {
+    /// Reads the certificate again now (SIGHUP; a self-signed one is remade): new handshakes
+    /// get the new one, nobody is dropped. `net::endpoint::rotate` does it.
+    pub fn reload(&self) {
+        self.reload.notify_one();
+    }
+
     /// Stops the server: the matches where they stand, the last of their records taken off the
     /// rings (a restart with the same records directory takes them up again).
     pub fn shutdown(&self) {
@@ -141,21 +154,39 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
     if let Some(dir) = &cfg.records_dir {
         std::fs::create_dir_all(dir)?;
     }
-    let (identity, hash, pinned) = match &cfg.tls {
+    let (identity, hash, pinned, source) = match &cfg.tls {
         Some((cert, key)) => {
             let (id, hash) = net::endpoint::pem_identity(cert, key).await?;
-            (id, hash, false)
+            (id, hash, false, net::endpoint::TlsSource::Pem { cert: cert.clone(), key: key.clone() })
         }
         None => {
-            let (id, hash) = net::endpoint::kept_self_signed_identity(cfg.records_dir.as_deref()).await?;
-            (id, hash, true)
+            let (id, hash) =
+                net::endpoint::kept_self_signed_identity(cfg.records_dir.as_deref(), cfg.cert_keep).await?;
+            let source =
+                net::endpoint::TlsSource::SelfSigned { dir: cfg.records_dir.clone(), keep: cfg.cert_keep };
+            (id, hash, true, source)
         }
     };
-    let endpoint = net::endpoint::make_endpoint(cfg.wt_port, identity)?;
+    let (endpoint, bind) = net::endpoint::make_endpoint(cfg.wt_port, identity)?;
+    let endpoint = Arc::new(endpoint);
     let wt_port = endpoint.local_addr()?.port();
+    let cert_hash: net::endpoint::CertHash =
+        Arc::new(std::sync::RwLock::new(pinned.then(|| hex::encode(hash))));
+    let reload: net::endpoint::Reload = Arc::new(tokio::sync::Notify::new());
     let stats = Arc::new(NetStats::default());
     let admission = Admission::new(cfg.limits);
     let (shutdown, rx) = tokio::sync::watch::channel(false);
+    tokio::spawn(net::endpoint::rotate(
+        endpoint.clone(),
+        source,
+        bind,
+        cfg.wt_port,
+        cfg.cert_check,
+        hash,
+        cert_hash.clone(),
+        reload.clone(),
+        rx.clone(),
+    ));
     let lobby = match cfg.mode {
         Mode::Game => {
             let map = el_sim::map::Map::leaked();
@@ -218,7 +249,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
     let launcher_stats = stats.clone();
     let status_lobby = lobby.clone();
     let state = http::HttpState {
-        cert_hash_hex: pinned.then(|| hex::encode(hash)),
+        cert_hash_hex: cert_hash,
         wt_port,
         web_dir: cfg.web_dir.clone(),
         status: Arc::new(move || {
@@ -237,7 +268,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
             serde_json::json!({ "nonce": nonce, "game": el_auth::GAME })
         }),
     };
-    let mut http_shutdown = rx;
+    let mut http_shutdown = rx.clone();
     tokio::spawn(async move {
         let serve = axum::serve(listener, http::router(state)).with_graceful_shutdown(async move {
             let _ = http_shutdown.changed().await;
@@ -246,7 +277,66 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
             tracing::error!("http: {e}");
         }
     });
-    Ok(Handle { http_addr, wt_port, lobby, shutdown })
+    tokio::spawn(journal(stats, lobby.clone(), rx));
+    Ok(Handle { http_addr, wt_port, lobby, shutdown, reload })
+}
+
+/// How often the journal gets a status line, and what it says: what `/status` says, in one line,
+/// every ten seconds that something in it moved (oneshot's `health.rs` line, after Gates'
+/// `status.rs`): the players and agents on, the matches live and queued, the datagrams in and
+/// out, and what should stay at zero (connections refused, bad datagrams, shard overruns, output
+/// drops, records astray, referee divergences, hot-path allocations).
+pub const JOURNAL: Duration = Duration::from_secs(10);
+
+async fn journal(
+    stats: Arc<NetStats>,
+    lobby: Option<Arc<lobby::Lobby>>,
+    mut shutdown: tokio::sync::watch::Receiver<bool>,
+) {
+    let mut last = String::new();
+    loop {
+        tokio::select! {
+            _ = tokio::time::sleep(JOURNAL) => {}
+            _ = shutdown.changed() => return,
+        }
+        let line = status_line(&stats, lobby.as_deref());
+        if line != last {
+            tracing::info!("status: {line}");
+            last = line;
+        }
+    }
+}
+
+/// The journal's line (`journal`).
+pub fn status_line(stats: &NetStats, lobby: Option<&lobby::Lobby>) -> String {
+    let r = |c: &std::sync::atomic::AtomicU64| c.load(Ordering::Relaxed);
+    let mut line = format!(
+        "humans {} agents {} | in {} out {} datagrams | refused {} bad {} timeouts {}",
+        r(&stats.humans_active),
+        r(&stats.agents_active),
+        r(&stats.datagrams_in),
+        r(&stats.datagrams_out),
+        r(&stats.sessions_rejected) + r(&stats.refused_full) + r(&stats.refused_address),
+        r(&stats.malformed),
+        r(&stats.handshake_timeouts),
+    );
+    if let Some(l) = lobby {
+        let (live, queued, started) = l.counts();
+        let (overruns, out_drops, failed) = l.game.shards.iter().fold((0, 0, 0), |(o, d, f), s| {
+            let m = &s.shared.metrics;
+            (o + r(&m.overruns), d + r(&m.out_drops), f + r(&m.failed))
+        });
+        let astray = l.game.records.lock().map_or(0, |rec| rec.astray());
+        let divergences = l.game.referee.json()["divergences"].as_u64().unwrap_or(0);
+        line.push_str(&format!(
+            " | matches {live} queued {queued} started {started} | overruns {overruns} drops {out_drops} failed {failed} astray {astray} divergences {divergences}"
+        ));
+    }
+    let allocs = el_alloc::violations();
+    if allocs > 0 {
+        line.push_str(&format!(" | HOT-PATH ALLOCATIONS {allocs}"));
+    }
+    line
 }
 
 /// `/status`'s `game`: the lobby, and each shard's ticks, costs and traffic.

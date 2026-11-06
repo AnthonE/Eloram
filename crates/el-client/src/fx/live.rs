@@ -34,6 +34,26 @@ pub struct LiveParams {
     pub core: Vec4,
     pub edge: Vec4,
     pub p: Vec4,
+    /// The stage's knobs (`stage::KNOBS`; all 1 in a match): x a missile's core, y its halo, z
+    /// its trail.
+    pub k: Vec4,
+}
+
+/// The shots the fx stage flies (`stage.rs`), with the champion whose look each carries (an
+/// auto's), and the tick they're drawn at: the live pool draws them where a match's client would
+/// give it missiles.
+#[derive(Resource, Default)]
+pub struct StageShots {
+    pub shots: Vec<(Shot, Option<u8>)>,
+    pub at: f64,
+}
+
+impl LiveParams {
+    fn knobbed(mut self, knobs: &super::burst::KnobsRes) -> Self {
+        self.k =
+            Vec4::new(knobs.0.k("missile.core"), knobs.0.k("missile.halo"), knobs.0.k("missile.trail"), 1.0);
+        self
+    }
 }
 
 #[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
@@ -159,6 +179,7 @@ impl Mark {
             core: v4(pal.core, a),
             edge: v4(pal.edge, a),
             p: Vec4::new(shape, 0.0, 0.0, w),
+            k: Vec4::ONE,
         };
         match self {
             Mark::Stars => p(hue::STUN, shape::STARS, 0.0, 1.0),
@@ -297,16 +318,22 @@ pub fn draw(
     mut dev: ResMut<crate::dev_hooks::DevStatus>,
     mut catch: ResMut<super::Catch>,
     mut clock_v: ResMut<Time<Virtual>>,
+    stage: Res<StageShots>,
+    knobs: Res<super::burst::KnobsRes>,
 ) {
     let live = &mut *live;
     let now = now_s();
     // The match played (missiles and zones on the own champion's clock) or watched (on the
-    // record's, all of it seen; Dawn the near side).
+    // record's, all of it seen; Dawn the near side); or the fx stage's shots, and nothing else.
     let watch = session.watch.as_deref();
     let client = session.client.as_deref().filter(|_| watch.is_none());
+    let staged = watch.is_none() && client.is_none() && !stage.shots.is_empty();
     let (missiles, zones, champs, at, team) = match (watch, client) {
-        (Some(w), _) => (&w.told.missiles, &w.told.zones, &w.referee.m.champs, w.at, 0),
-        (None, Some(c)) => (&c.missiles, &c.zones, &c.world.champs, c.missile_tick(now), c.team),
+        (Some(w), _) => (Some(&w.told.missiles), Some(&w.told.zones), Some(&w.referee.m.champs), w.at, 0),
+        (None, Some(c)) => {
+            (Some(&c.missiles), Some(&c.zones), Some(&c.world.champs), c.missile_tick(now), c.team)
+        }
+        (None, None) if staged => (None, None, None, stage.at, 0),
         (None, None) => {
             for e in live.heads.iter().chain(&live.trails).chain(&live.zones).chain(&live.marks) {
                 hide(&mut q, *e);
@@ -318,9 +345,13 @@ pub fn draw(
     let face = facing_camera();
     let flat = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     let target_of = |s: &Shot| drawn.units.get(usize::from(s.target)).copied().flatten().map(|d| d.pos);
+    let champ_of = |s: &Shot| {
+        let owner = usize::from(s.owner);
+        champs.and_then(|c| (owner < SEATS).then(|| c[owner].def))
+    };
     // A catch armed for a missile: the next one spawned (though it ended before this frame), held
     // at its fraction of its flight. A picture held on anything else stays as it was.
-    if let Some(super::Want::Missile { at: frac }) = catch.want {
+    if let (Some(super::Want::Missile { at: frac }), Some(missiles)) = (catch.want, missiles) {
         let seen = *catch.seen.get_or_insert(missiles.spawns);
         if let Some((id, s)) = missiles.last.filter(|_| missiles.spawns != seen) {
             let flight = match (s.homing, target_of(&s)) {
@@ -341,13 +372,20 @@ pub fn draw(
         return;
     }
     let held = catch.shot;
-    let shots =
-        held.into_iter().chain(missiles.live().filter(|_| held.is_none()).map(|(id, s)| (id, *s, at)));
+    // Each shot drawn: its slot, the shot, the tick it's at, and the champion whose look it has.
+    let mut shots: Vec<(usize, Shot, f64, Option<u8>)> = Vec::new();
+    if let Some((id, s, tick)) = held {
+        shots.push((id, s, tick, champ_of(&s)));
+    } else if let Some(missiles) = missiles {
+        shots.extend(missiles.live().map(|(id, s)| (id, *s, at, champ_of(s))));
+    } else {
+        shots.extend(stage.shots.iter().enumerate().map(|(id, (s, c))| (id, *s, at, *c)));
+    }
     // Missiles: a head and a trail each.
     let mut k = 0;
     let mut seen_pos = std::mem::take(&mut *last);
     let mut next_pos = Vec::with_capacity(seen_pos.len());
-    for (id, s, at) in shots {
+    for (id, s, at, champ) in shots {
         if k >= live.heads.len() {
             break;
         }
@@ -362,8 +400,6 @@ pub fn draw(
             s.dir
         };
         next_pos.push((id, pos));
-        let owner = usize::from(s.owner);
-        let champ = (owner < SEATS).then(|| champs[owner].def);
         let l = look::look(s.source, champ, s.team);
         let pal = l.palette;
         let ck = key(pal.core, pal.edge);
@@ -377,7 +413,9 @@ pub fn draw(
                             core: v4(pal.core, 1.0),
                             edge: v4(pal.edge, 1.0),
                             p: Vec4::new(shape, 0.0, 0.0, 0.0),
-                        },
+                            k: Vec4::ONE,
+                        }
+                        .knobbed(&knobs),
                         fog: fog.clone(),
                     })
                 })
@@ -421,6 +459,13 @@ pub fn draw(
     if held.is_some() {
         return;
     }
+    // The stage has no zones and no units.
+    let (Some(zones), Some(champs)) = (zones, champs) else {
+        for e in live.zones.iter().chain(&live.marks) {
+            hide(&mut q, *e);
+        }
+        return;
+    };
     // Zones: a telegraph filling toward its landing, or a field's churn and pulses.
     let secs = |tick: f64| clock + ((tick - at) / f64::from(el_proto::TICK_HZ)) as f32;
     let mut zones_shown = 0u32;
@@ -459,7 +504,7 @@ pub fn draw(
                 )
             };
             if let Some(mut m) = mats.get_mut(&live.zone_mats[i]) {
-                m.live = LiveParams { core, edge, p };
+                m.live = LiveParams { core, edge, p, k: Vec4::ONE };
             }
         }
         let tf = Transform::from_translation(world(centre, 0.06))

@@ -68,7 +68,7 @@ impl Plugin for LookPlugin {
     }
 }
 
-fn dress_camera(mut commands: Commands, look: Res<Look>, cam: Single<Entity, With<MainCamera>>) {
+pub(crate) fn dress_camera(mut commands: Commands, look: Res<Look>, cam: Single<Entity, With<MainCamera>>) {
     let mut cam = commands.entity(*cam);
     cam.insert((
         Tonemapping::TonyMcMapface,

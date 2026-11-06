@@ -25,8 +25,11 @@ struct Args {
     /// Built web client directory to serve at `/`.
     #[arg(long, default_value = "web/dist")]
     web_dir: PathBuf,
-    /// PEM certificate chain for WebTransport (e.g. Let's Encrypt's fullchain.pem). Without it the
-    /// server self-signs and browsers pin the certificate's hash.
+    /// PEM certificate chain for WebTransport (e.g. Let's Encrypt's fullchain.pem), read again on
+    /// SIGHUP (the certbot hook's `systemctl reload`, `ops/`) and every hour besides, so a
+    /// renewed file is taken up without a restart. Without it the server self-signs and browsers
+    /// pin the certificate's hash; that certificate is remade every ten days while the server
+    /// runs (browsers refuse one past fourteen), and on SIGHUP.
     #[arg(long, requires = "key")]
     cert: Option<PathBuf>,
     /// PEM private key for `--cert`.
@@ -129,11 +132,38 @@ fn main() -> anyhow::Result<()> {
     rt.block_on(async move {
         let handle = el_server::start(cfg).await?;
         tracing::info!("open http://{} (WebTransport on UDP {})", handle.http_addr, handle.wt_port);
-        tokio::signal::ctrl_c().await?;
+        signals(&handle).await?;
         tracing::info!("shutting down");
         handle.shutdown();
         Ok(())
     })
+}
+
+/// What the signals do (`ops/eloram.service`, as oneshot's server takes them): SIGTERM and SIGINT
+/// stop the server, each match's record, checkpoint and lobby file left for the next server on
+/// the same `--records` to take up (`recover`); SIGHUP reads the certificate again (a renewal:
+/// the certbot hook's `systemctl reload`), nobody dropped. Returns when it's time to stop.
+#[cfg(unix)]
+async fn signals(handle: &el_server::Handle) -> anyhow::Result<()> {
+    use tokio::signal::unix::{SignalKind, signal};
+    let mut term = signal(SignalKind::terminate())?;
+    let mut hup = signal(SignalKind::hangup())?;
+    loop {
+        tokio::select! {
+            _ = term.recv() => return Ok(()),
+            _ = tokio::signal::ctrl_c() => return Ok(()),
+            _ = hup.recv() => {
+                tracing::info!("SIGHUP: reading the certificate again");
+                handle.reload();
+            }
+        }
+    }
+}
+
+#[cfg(not(unix))]
+async fn signals(_: &el_server::Handle) -> anyhow::Result<()> {
+    tokio::signal::ctrl_c().await?;
+    Ok(())
 }
 
 #[cfg(test)]

@@ -40,23 +40,29 @@ pub fn self_signed_identity() -> anyhow::Result<(Identity, [u8; 32])> {
     Ok((identity, hash))
 }
 
-/// How long a kept self-signed certificate is used before a new one is made: well inside its 14
-/// days, so a page that pinned it a while ago still connects.
-const KEEP_CERT: Duration = Duration::from_secs(10 * 24 * 3_600);
+/// How long a self-signed certificate is used before a new one is made: well inside its 14 days,
+/// so a page that pinned it a while ago still connects. A running server remakes its own on the
+/// same clock ([`rotate`]): browsers refuse a pinned certificate past its 14 days, and a server
+/// up for a fortnight took no new players before.
+pub const KEEP_CERT: Duration = Duration::from_secs(10 * 24 * 3_600);
+/// How often a running server looks at its certificate ([`rotate`]).
+pub const CHECK_CERT: Duration = Duration::from_secs(3_600);
 
-/// A self-signed identity kept in `dir` (`self-signed.pem`, `self-signed.key`) while it's young,
-/// so a restarted server has the hash its players' pages pinned; a new one otherwise (and without
-/// a directory).
+/// How old the kept self-signed certificate in `dir` is, if there is one.
+fn kept_age(dir: &std::path::Path) -> Option<Duration> {
+    std::fs::metadata(dir.join("self-signed.pem")).and_then(|m| m.modified()).ok()?.elapsed().ok()
+}
+
+/// A self-signed identity kept in `dir` (`self-signed.pem`, `self-signed.key`) while it's younger
+/// than `keep`, so a restarted server has the hash its players' pages pinned; a new one otherwise
+/// (and without a directory).
 pub async fn kept_self_signed_identity(
     dir: Option<&std::path::Path>,
+    keep: Duration,
 ) -> anyhow::Result<(Identity, [u8; 32])> {
     let Some(dir) = dir else { return self_signed_identity() };
     let (cert, key) = (dir.join("self-signed.pem"), dir.join("self-signed.key"));
-    let young = std::fs::metadata(&cert)
-        .and_then(|m| m.modified())
-        .ok()
-        .and_then(|t| t.elapsed().ok())
-        .is_some_and(|age| age < KEEP_CERT);
+    let young = kept_age(dir).is_some_and(|age| age < keep);
     if young && let Ok(kept) = pem_identity(&cert, &key).await {
         return Ok(kept);
     }
@@ -78,28 +84,137 @@ pub async fn kept_self_signed_identity(
     Ok((identity, hash))
 }
 
+/// The endpoint's configuration: its bind, its identity, its keep-alive and idle timeout.
+fn server_config(bind: IpBindConfig, port: u16, identity: Identity) -> anyhow::Result<ServerConfig> {
+    Ok(ServerConfig::builder()
+        .with_bind_config(bind, port)
+        .with_identity(identity)
+        .keep_alive_interval(Some(Duration::from_secs(3)))
+        .max_idle_timeout(Some(Duration::from_secs(10)))?
+        .build())
+}
+
 /// Binds dual-stack when the host has IPv6, IPv4-only otherwise (e.g. containers without IPv6).
-pub fn make_endpoint(port: u16, identity: Identity) -> anyhow::Result<Endpoint<Server>> {
-    let build = |bind: IpBindConfig, identity: Identity| -> anyhow::Result<ServerConfig> {
-        Ok(ServerConfig::builder()
-            .with_bind_config(bind, port)
-            .with_identity(identity)
-            .keep_alive_interval(Some(Duration::from_secs(3)))
-            .max_idle_timeout(Some(Duration::from_secs(10)))?
-            .build())
-    };
-    match Endpoint::server(build(IpBindConfig::InAddrAnyDual, identity.clone_identity())?) {
-        Ok(endpoint) => Ok(endpoint),
+/// Returns the endpoint and the bind it took, for a certificate reloaded later.
+pub fn make_endpoint(port: u16, identity: Identity) -> anyhow::Result<(Endpoint<Server>, IpBindConfig)> {
+    match Endpoint::server(server_config(IpBindConfig::InAddrAnyDual, port, identity.clone_identity())?) {
+        Ok(endpoint) => Ok((endpoint, IpBindConfig::InAddrAnyDual)),
         Err(e) => {
             tracing::info!("dual-stack bind failed ({e}); using IPv4 only");
-            Ok(Endpoint::server(build(IpBindConfig::InAddrAnyV4, identity)?)?)
+            Ok((
+                Endpoint::server(server_config(IpBindConfig::InAddrAnyV4, port, identity)?)?,
+                IpBindConfig::InAddrAnyV4,
+            ))
         }
+    }
+}
+
+/// Where a server's identity comes from, for a certificate remade or renewed while it runs.
+#[derive(Clone, Debug)]
+pub enum TlsSource {
+    /// Self-signed, kept in `dir` when there is one; remade once it's `keep` old.
+    SelfSigned { dir: Option<std::path::PathBuf>, keep: Duration },
+    /// A CA-issued certificate and key (PEM), read again every check: a renewed file (Let's
+    /// Encrypt's, every two months) is taken up without a restart.
+    Pem { cert: std::path::PathBuf, key: std::path::PathBuf },
+}
+
+/// The certificate's hash as `/cert-hash` serves it (hex; none when it's CA-issued, nothing to pin),
+/// shared with the HTTP side, which reads it on every request.
+pub type CertHash = Arc<std::sync::RwLock<Option<String>>>;
+
+/// A reload asked for (SIGHUP, the certbot hook's `systemctl reload`; `Handle::reload`): the
+/// certificate is read again now, not at the next check.
+pub type Reload = Arc<tokio::sync::Notify>;
+
+/// Keeps the endpoint's certificate good while the server runs: every `check`, a self-signed
+/// certificate older than its `keep` is remade and kept, and a CA-issued one is read again and
+/// taken up if its file changed; and at once when a reload is asked for (SIGHUP, as oneshot's
+/// server takes it from the certbot hook: a self-signed one is remade whatever its age). Connections
+/// already open keep going (the new configuration is for the handshakes after it); a page dials
+/// with the hash it fetches fresh each time.
+#[allow(clippy::too_many_arguments)]
+pub async fn rotate(
+    endpoint: Arc<Endpoint<Server>>,
+    source: TlsSource,
+    bind: IpBindConfig,
+    port: u16,
+    check: Duration,
+    mut current: [u8; 32],
+    hash: CertHash,
+    reload: Reload,
+    mut shutdown: tokio::sync::watch::Receiver<bool>,
+) {
+    // Without a directory a self-signed certificate has no file to date: its age is counted here.
+    let mut made = std::time::Instant::now();
+    loop {
+        let asked = tokio::select! {
+            _ = tokio::time::sleep(check) => false,
+            _ = reload.notified() => true,
+            _ = shutdown.changed() => return,
+        };
+        let fresh = match &source {
+            TlsSource::SelfSigned { dir, keep } => {
+                let age = dir.as_deref().and_then(kept_age).unwrap_or_else(|| made.elapsed());
+                if age < *keep && !asked {
+                    continue;
+                }
+                // Asked for, a kept one is remade whatever its age.
+                let keep = if asked { Duration::ZERO } else { *keep };
+                match kept_self_signed_identity(dir.as_deref(), keep).await {
+                    Ok(id) => id,
+                    Err(e) => {
+                        tracing::warn!("remaking the self-signed certificate: {e}");
+                        continue;
+                    }
+                }
+            }
+            TlsSource::Pem { cert, key } => match pem_identity(cert, key).await {
+                Ok((id, h)) if h != current => (id, h),
+                Ok(_) => {
+                    if asked {
+                        tracing::info!("the certificate was read again: the same one");
+                    }
+                    continue;
+                }
+                Err(e) => {
+                    tracing::warn!("reading the certificate again: {e}");
+                    continue;
+                }
+            },
+        };
+        let (identity, new_hash) = fresh;
+        let config = match server_config(bind, port, identity) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!("the new certificate's configuration: {e}");
+                continue;
+            }
+        };
+        if let Err(e) = endpoint.reload_config(config, false) {
+            tracing::warn!("taking up the new certificate: {e}");
+            continue;
+        }
+        current = new_hash;
+        made = std::time::Instant::now();
+        if let Ok(mut h) = hash.write()
+            && h.is_some()
+        {
+            *h = Some(hex::encode(new_hash));
+        }
+        tracing::info!(
+            "the certificate was {}",
+            match source {
+                TlsSource::SelfSigned { .. } => "remade (self-signed)",
+                TlsSource::Pem { .. } => "read again and taken up",
+            }
+        );
     }
 }
 
 /// Takes connections as `admission` allows (`admit`), each to its session, until shutdown.
 pub async fn accept_loop(
-    endpoint: Endpoint<Server>,
+    endpoint: Arc<Endpoint<Server>>,
     mode: Mode,
     stats: Arc<NetStats>,
     admission: Arc<Admission>,

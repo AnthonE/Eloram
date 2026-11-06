@@ -23,8 +23,9 @@ type StatusFn = Arc<dyn Fn() -> serde_json::Value + Send + Sync>;
 
 #[derive(Clone)]
 pub struct HttpState {
-    /// The self-signed certificate's SHA-256 for browsers to pin; None with a CA-issued one.
-    pub cert_hash_hex: Option<String>,
+    /// The self-signed certificate's SHA-256 for browsers to pin, as it is now (a running server
+    /// remakes its own: `net::endpoint::rotate`); None with a CA-issued one.
+    pub cert_hash_hex: crate::net::endpoint::CertHash,
     pub wt_port: u16,
     pub web_dir: Option<PathBuf>,
     pub status: StatusFn,
@@ -92,7 +93,7 @@ async fn cors(allowed: &[String], req: Request, next: Next) -> Response {
 async fn cert_hash(State(s): State<HttpState>) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "algorithm": "sha-256",
-        "hash": s.cert_hash_hex,
+        "hash": s.cert_hash_hex.read().ok().and_then(|h| h.clone()),
         "port": s.wt_port,
         "path": crate::net::endpoint::WT_PATH,
     }))
