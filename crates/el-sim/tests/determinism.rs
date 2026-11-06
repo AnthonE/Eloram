@@ -11,9 +11,9 @@ use el_sim::ticks;
 
 /// Hash after two minutes of a bot match: the first waves, the first fights (update deliberately
 /// when the sim changes).
-const GOLDEN: u64 = 0x1757_0517_549a_010f;
+const GOLDEN: u64 = 0x4bc7_9f2f_a29c_33f7;
 /// Hash of a whole bot match, at the tick its nexus fell, and that tick.
-const MATCH_GOLDEN: (u64, u32) = (0xd3e7_d44b_8f04_1aed, 27_137);
+const MATCH_GOLDEN: (u64, u32) = (0x5267_31f0_f878_271c, 32_269);
 
 fn two_minutes() -> u64 {
     let (mut m, mut s) = common::bot_match(7);
@@ -24,7 +24,7 @@ fn two_minutes() -> u64 {
 
 /// The FNV-1a of a checkpoint taken a minute into `two_minutes`'s match: the same bytes native and
 /// wasm (update with the golden hash).
-const SNAPSHOT_GOLDEN: u64 = 0xf5cf_26e9_d6f1_2791;
+const SNAPSHOT_GOLDEN: u64 = 0xeb19_52aa_4862_7f43;
 
 /// `two_minutes`, read back from a checkpoint at one minute and stepped on from there: the same
 /// hash, and the checkpoint's bytes digested.

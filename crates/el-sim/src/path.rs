@@ -1,20 +1,20 @@
-//! Paths across the navigation grid: the straight line when it's clear (most of a lane), else A*
-//! over the 8-connected grid with an octile estimate, then pulled tight so the path is a few
-//! corners, not a staircase. All of it in a [`PathScratch`] built once and reused: a query
-//! allocates nothing, and leaves nothing behind that changes the next one.
+//! Paths across the navigation mesh ([`crate::nav`]): the straight line when it's clear (most of
+//! a lane), else A* over the mesh's rectangles (each reached at the point of its portal nearest
+//! where the last was entered, the straight-line distance to the goal its estimate), then the
+//! funnel through their portals, so the path is the few corners a wall makes it turn. A goal off
+//! the floor, however far, moves to the nearest place on it. All of it in a [`PathScratch`] built
+//! once and reused: a query allocates nothing, and leaves nothing behind that changes the next.
 
 use alloc::boxed::Box;
 use glam::Vec2;
 
-use crate::map::{Map, NAV_H, NAV_W};
+use crate::map::Map;
+use crate::math;
+use crate::nav::{MAX_LINKS, MAX_RECTS, NONE};
 use crate::storage::boxed;
 
 /// Corners a path keeps (the last is the goal).
 pub const MAX_WAYPOINTS: usize = 16;
-/// Cells A* may expand before it settles for the cell nearest the goal it found.
-pub const MAX_EXPANSIONS: usize = 12_000;
-/// How far from an unwalkable goal A* looks for a walkable one, in cells.
-const SNAP_CELLS: usize = 24;
 
 /// A unit's route: the corners still to reach, nearest first.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -51,36 +51,51 @@ impl Path {
         (self.len > 0).then(|| self.points[usize::from(self.len - 1)])
     }
 
+    /// Puts `points` in front of the corner being walked to (a detour), dropping corners off the
+    /// far end if there isn't room (they're found again from there).
+    pub fn insert_next(&mut self, points: &[Vec2]) {
+        let at = usize::from(self.next);
+        let k = points.len().min(MAX_WAYPOINTS - at);
+        let len = (usize::from(self.len) + k).min(MAX_WAYPOINTS);
+        self.points.copy_within(at..len - k, at + k);
+        self.points[at..at + k].copy_from_slice(&points[..k]);
+        self.len = len as u8;
+    }
+
+    /// Whether it's full (and so may stop short of where it was found to).
+    pub fn is_full(&self) -> bool {
+        usize::from(self.len) >= MAX_WAYPOINTS
+    }
+
     fn push(&mut self, p: Vec2) {
         if usize::from(self.len) < MAX_WAYPOINTS {
             self.points[usize::from(self.len)] = p;
             self.len += 1;
-        } else {
-            // Out of room: the last corner becomes the goal itself.
-            self.points[MAX_WAYPOINTS - 1] = p;
         }
+        // Out of room: the path stops at its last corner, and whoever walks it finds the rest of
+        // the way from there (a corner dropped for the goal would cut through a wall).
     }
 }
 
-const STRAIGHT: u32 = 10;
-const DIAGONAL: u32 = 14;
-const NONE: u32 = u32::MAX;
-
-/// What a search works in: per-cell costs and parents stamped with the query they belong to, and
-/// an open list. One a thread: a shard steps its matches one after another with the same one.
+/// What a search works in: per-rectangle costs, parents and entry points stamped with the query
+/// they belong to, an open list, and the corridor's portals. One a thread: a shard steps its
+/// matches one after another with the same one.
 pub struct PathScratch {
-    g: Box<[u32]>,
-    parent: Box<[u32]>,
+    g: Box<[f32]>,
+    parent: Box<[u16]>,
+    entry: Box<[Vec2]>,
     stamp: Box<[u16]>,
     closed: Box<[u16]>,
-    heap: Box<[(u32, u32, u32)]>,
+    /// (estimate's bits, distance-to-goal's bits, rectangle): non-negative floats order as their bits.
+    heap: Box<[(u32, u32, u16)]>,
     heap_len: usize,
     query: u16,
-    trail: Box<[u32]>,
-    /// Searches run, and cells expanded, since it was built (for the bench).
+    trail: Box<[u16]>,
+    portals: Box<[(Vec2, Vec2)]>,
+    /// Searches run, and rectangles expanded, since it was built (for the bench).
     pub searches: u64,
     pub expanded: u64,
-    /// The last search: from, to, cells expanded (for finding a slow one).
+    /// The last search: from, to, rectangles expanded (for finding a slow one).
     pub last: (Vec2, Vec2, u32),
 }
 
@@ -94,32 +109,25 @@ impl PathScratch {
     /// A scratch that owns nothing, to stand in while the real one is lent out: searching with it
     /// panics.
     pub fn empty() -> Self {
-        Self {
-            g: boxed(0, 0u32),
-            parent: boxed(0, NONE),
-            stamp: boxed(0, 0u16),
-            closed: boxed(0, 0u16),
-            heap: boxed(0, (0u32, 0u32, 0u32)),
-            heap_len: 0,
-            query: 0,
-            trail: boxed(0, 0u32),
-            searches: 0,
-            expanded: 0,
-            last: (Vec2::ZERO, Vec2::ZERO, 0),
-        }
+        Self::sized(0, 0)
     }
 
     pub fn new() -> Self {
-        let n = NAV_W * NAV_H;
+        Self::sized(MAX_RECTS, MAX_LINKS + 1)
+    }
+
+    fn sized(rects: usize, heap: usize) -> Self {
         Self {
-            g: boxed(n, 0u32),
-            parent: boxed(n, NONE),
-            stamp: boxed(n, 0u16),
-            closed: boxed(n, 0u16),
-            heap: boxed(MAX_EXPANSIONS * 8 + 8, (0u32, 0u32, 0u32)),
+            g: boxed(rects, 0.0f32),
+            parent: boxed(rects, NONE),
+            entry: boxed(rects, Vec2::ZERO),
+            stamp: boxed(rects, 0u16),
+            closed: boxed(rects, 0u16),
+            heap: boxed(heap, (0u32, 0u32, 0u16)),
             heap_len: 0,
             query: 0,
-            trail: boxed(n.min(4096), 0u32),
+            trail: boxed(rects, 0u16),
+            portals: boxed(rects + 2, (Vec2::ZERO, Vec2::ZERO)),
             searches: 0,
             expanded: 0,
             last: (Vec2::ZERO, Vec2::ZERO, 0),
@@ -137,14 +145,14 @@ impl PathScratch {
         self.heap_len = 0;
     }
 
-    /// Pushes a cell by its estimate `f`; among equal estimates the one nearer the goal (`h`)
-    /// comes first, so the search runs along the path instead of flooding the band of ties.
-    fn push(&mut self, f: u32, h: u32, cell: u32) {
+    /// Pushes a rectangle by its estimate `f`; among equal estimates the one nearer the goal
+    /// (`h`) comes first, then the lower index.
+    fn push(&mut self, f: f32, h: f32, r: u16) {
         if self.heap_len == self.heap.len() {
             return;
         }
         let mut i = self.heap_len;
-        self.heap[i] = (f, h, cell);
+        self.heap[i] = (f.to_bits(), h.to_bits(), r);
         self.heap_len += 1;
         while i > 0 {
             let up = (i - 1) / 2;
@@ -156,7 +164,7 @@ impl PathScratch {
         }
     }
 
-    fn pop(&mut self) -> Option<(u32, u32, u32)> {
+    fn pop(&mut self) -> Option<(u32, u32, u16)> {
         if self.heap_len == 0 {
             return None;
         }
@@ -183,149 +191,100 @@ impl PathScratch {
     }
 }
 
-fn octile(ax: usize, ay: usize, bx: usize, by: usize) -> u32 {
-    let dx = ax.abs_diff(bx) as u32;
-    let dy = ay.abs_diff(by) as u32;
-    let (lo, hi) = if dx < dy { (dx, dy) } else { (dy, dx) };
-    DIAGONAL * lo + STRAIGHT * (hi - lo)
-}
-
-/// Finds a path from `from` to `to` into `out`. The goal moves to the nearest walkable place if
-/// it's in rock; if A* runs out of expansions it goes as near as it got. Returns whether a path
+/// Finds a path from `from` to `to` into `out`. The goal moves to the nearest place on the floor
+/// if it's off it, and so does the start (the path's first corner, then). Returns whether a path
 /// (possibly to a nearer goal) was found.
 pub fn find(map: &Map, s: &mut PathScratch, from: Vec2, to: Vec2, out: &mut Path) -> bool {
     out.clear();
     s.searches += 1;
-    let goal = map.snap(to);
+    let nav = &map.nav;
+    let (goal, target) = nav.nearest(to);
     if map.walk_clear(from, goal) {
         out.push(goal);
         return true;
     }
-    let (sx, sy) = Map::cell(from);
-    let Some((sx, sy)) = map.nearest_walkable(sx, sy, SNAP_CELLS) else { return false };
-    let (gx, gy) = Map::cell(goal);
-    let Some((gx, gy)) = map.nearest_walkable(gx, gy, SNAP_CELLS) else { return false };
+    let (start_at, start) = nav.nearest(from);
+    if start_at != from {
+        // Off the floor (pushed, or the grid's edge): back onto it first.
+        out.push(start_at);
+    }
     s.begin();
     let q = s.query;
-    let start = (sy * NAV_W + sx) as u32;
-    let target = (gy * NAV_W + gx) as u32;
-    let lm = map.landmark_dists(target as usize);
-    let estimate = |x: usize, y: usize| octile(x, y, gx, gy).max(map.alt(y * NAV_W + x, &lm));
-    s.g[start as usize] = 0;
-    s.parent[start as usize] = NONE;
-    s.stamp[start as usize] = q;
-    let h0 = estimate(sx, sy);
+    let si = usize::from(start);
+    s.g[si] = 0.0;
+    s.parent[si] = NONE;
+    s.entry[si] = start_at;
+    s.stamp[si] = q;
+    let h0 = math::distance(start_at, goal);
     s.push(h0, h0, start);
     let mut best = (h0, start);
-    let mut expansions = 0;
+    let mut expansions = 0u32;
     let mut reached = false;
-    while let Some((_, _, cell)) = s.pop() {
-        let ci = cell as usize;
-        if s.closed[ci] == q {
+    while let Some((_, _, r)) = s.pop() {
+        let ri = usize::from(r);
+        if s.closed[ri] == q {
             continue;
         }
-        s.closed[ci] = q;
-        if cell == target {
+        s.closed[ri] = q;
+        if r == target {
             reached = true;
             break;
         }
         expansions += 1;
-        if expansions > MAX_EXPANSIONS {
-            break;
+        let at = s.entry[ri];
+        let h = math::distance(at, goal);
+        if h < best.0 {
+            best = (h, r);
         }
-        let (cx, cy) = (ci % NAV_W, ci / NAV_W);
-        let h = estimate(cx, cy);
-        if (h, cell) < best {
-            best = (h, cell);
-        }
-        for (dx, dy) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)] {
-            let (nx, ny) = (cx as i32 + dx, cy as i32 + dy);
-            if nx < 0 || ny < 0 || nx >= NAV_W as i32 || ny >= NAV_H as i32 {
-                continue;
-            }
-            let (nx, ny) = (nx as usize, ny as usize);
-            if !map.walkable_cell(nx, ny) {
-                continue;
-            }
-            let diagonal = dx != 0 && dy != 0;
-            // No squeezing between two blocked cells.
-            if diagonal && (!map.walkable_cell(nx, cy) || !map.walkable_cell(cx, ny)) {
-                continue;
-            }
-            let ni = ny * NAV_W + nx;
+        for l in nav.links(r) {
+            let ni = usize::from(l.to);
             if s.closed[ni] == q {
                 continue;
             }
-            let g = s.g[ci] + if diagonal { DIAGONAL } else { STRAIGHT };
+            // Entered at the point of the portal nearest the straight line on to the goal's side:
+            // the nearest to where this one was entered, which is a real walk (a rectangle is
+            // convex), so `g` never undercounts.
+            let e = l.nearest(at);
+            let g = s.g[ri] + math::distance(at, e);
             if s.stamp[ni] != q || g < s.g[ni] {
                 s.stamp[ni] = q;
                 s.g[ni] = g;
-                s.parent[ni] = cell;
-                let h = estimate(nx, ny);
-                s.push(g + h, h, ni as u32);
+                s.parent[ni] = r;
+                s.entry[ni] = e;
+                let h = math::distance(e, goal);
+                s.push(g + h, h, l.to);
             }
         }
     }
-    s.expanded += expansions as u64;
-    s.last = (from, to, expansions as u32);
-    let end = if reached { target } else { best.1 };
-    // Walk the parents back to the start, then pull the route tight from the start's end.
+    s.expanded += u64::from(expansions);
+    s.last = (from, to, expansions);
+    let (end, last) = if reached {
+        (target, goal)
+    } else {
+        // Cut off (the mesh is one piece, so never on this map): as near as it got.
+        (best.1, nav.rect(best.1).clamp(goal))
+    };
+    // The corridor, start to end, then its portals, then the funnel through them.
     let mut n = 0;
     let mut c = end;
     while c != NONE && n < s.trail.len() {
         s.trail[n] = c;
         n += 1;
-        c = s.parent[c as usize];
+        c = s.parent[usize::from(c)];
     }
-    let centre = |cell: u32| Map::cell_centre(cell as usize % NAV_W, cell as usize / NAV_W);
-    let last = if reached { goal } else { centre(end) };
-    // trail[n-1] is the start, trail[0] the end. From where the unit is, the farthest cell of the
-    // route it can walk to straight: gallop out along the route until one can't be seen, then
-    // bisect between the last seen and that. A few dozen line checks a path, not one a cell.
-    let point = |k: usize| if k == 0 { last } else { centre(s.trail[k]) };
-    let mut at = from;
-    let mut i = n - 1;
-    while i > 0 {
-        let mut seen = i;
-        let mut step = 1;
-        let mut blocked = None;
-        loop {
-            let j = i.saturating_sub(step);
-            if map.walk_clear(at, point(j)) {
-                seen = j;
-                if j == 0 {
-                    break;
-                }
-                step *= 2;
-            } else {
-                blocked = Some(j);
-                break;
-            }
-        }
-        if let Some(mut hi) = blocked {
-            // seen > hi: the farthest seen is between them.
-            while seen - hi > 1 {
-                let mid = (seen + hi) / 2;
-                if map.walk_clear(at, point(mid)) {
-                    seen = mid;
-                } else {
-                    hi = mid;
-                }
-            }
-        }
-        if seen == i {
-            // Not even the next cell in a straight line (the unit stands off the grid's route):
-            // take the next cell as it is.
-            seen = i - 1;
-        }
-        if seen == 0 {
-            break;
-        }
-        out.push(point(seen));
-        at = point(seen);
-        i = seen;
+    s.trail[..n].reverse();
+    s.portals[0] = (start_at, start_at);
+    let mut k = 1;
+    for w in 0..n.saturating_sub(1) {
+        let Some(l) = nav.link(s.trail[w], s.trail[w + 1]) else { break };
+        s.portals[k] = (l.left, l.right);
+        k += 1;
     }
-    out.push(last);
+    s.portals[k] = (last, last);
+    crate::nav::funnel(&s.portals[..=k], |c| {
+        out.push(if c == last { c } else { nav.turn_point(c) });
+        true
+    });
     out.len > 0
 }
 
@@ -337,14 +296,14 @@ mod tests {
     fn the_heap_pops_in_order_and_breaks_ties_toward_the_goal() {
         let mut s = PathScratch::new();
         s.begin();
-        for (f, h, c) in [(5, 0, 9), (3, 2, 4), (5, 0, 2), (1, 9, 7), (3, 1, 1)] {
+        for (f, h, c) in [(5.0, 0.0, 9), (3.0, 2.0, 4), (5.0, 0.0, 2), (1.0, 9.0, 7), (3.0, 1.0, 1)] {
             s.push(f, h, c);
         }
-        let mut out = [(0, 0, 0); 5];
+        let mut out = [0u16; 5];
         for o in &mut out {
-            *o = s.pop().unwrap();
+            *o = s.pop().unwrap().2;
         }
-        assert_eq!(out, [(1, 9, 7), (3, 1, 1), (3, 2, 4), (5, 0, 2), (5, 0, 9)]);
+        assert_eq!(out, [7, 1, 4, 2, 9]);
         assert_eq!(s.pop(), None);
     }
 }
