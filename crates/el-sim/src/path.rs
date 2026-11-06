@@ -51,6 +51,17 @@ impl Path {
         (self.len > 0).then(|| self.points[usize::from(self.len - 1)])
     }
 
+    /// Puts `points` in front of the corner being walked to (a detour), dropping corners off the
+    /// far end if there isn't room (they're found again from there).
+    pub fn insert_next(&mut self, points: &[Vec2]) {
+        let at = usize::from(self.next);
+        let k = points.len().min(MAX_WAYPOINTS - at);
+        let len = (usize::from(self.len) + k).min(MAX_WAYPOINTS);
+        self.points.copy_within(at..len - k, at + k);
+        self.points[at..at + k].copy_from_slice(&points[..k]);
+        self.len = len as u8;
+    }
+
     /// Whether it's full (and so may stop short of where it was found to).
     pub fn is_full(&self) -> bool {
         usize::from(self.len) >= MAX_WAYPOINTS

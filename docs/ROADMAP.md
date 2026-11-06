@@ -326,6 +326,15 @@ next six. The same probe: 400 move orders of 400 arrive (a quarter of them click
 to 3. `walk_clear` stopped walking on past a segment that ends on a grid corner. Paths still hold
 sixteen corners; one that needs more stops at its sixteenth and the rest is found from there.
 
+Then minions in a champion's way (`champ::round_minions`, `champ::detour`). A step that would take
+a champion into a minion's body (either team's; a dash still goes through) turns along its edge at
+full speed; a step that gains under half its length on the next corner, pressed against a clump it
+can't slip through, puts two corners in front of it that go round the clump on the nearer side,
+in the path it already has (nothing new on the wire or in a checkpoint). Sent onto a minion, it
+stops against it. The prediction steps the same code against the minions of the last snapshot:
+walking among a moving wave is corrected, now counted apart as bodies (p99 12 to 38 units, at most
+87, over the netcode test's bad link), and walking anywhere else is as exact as before.
+
 Left, in no order:
 - **A name**: a guest's is `?name=` or the server's; the page doesn't ask for one.
 - **A real GPU.** Nobody has seen the game on one: the frame rate on either tier (the target is 60

@@ -150,6 +150,10 @@ standby takes a room over on the old clock's timeline. Riot built the same thing
   bits of its XOR with the baseline's): what changed in the tick, to the bit, about 18 B where the
   whole is about 210. A difference is blended out over a few frames (Gates'
   0.95 a frame for small errors) and snapped only past a few hundred units.
+- Minions are in your way (you walk round them), and the prediction has them where the last
+  snapshot did, not where they are on the server a round trip on: walking through a moving wave is
+  corrected, a few units, blended. Those corrections are counted apart, as bodies (the netcode
+  test: p99 12 to 38 units, at most 87), so walking anywhere else still reads exact.
 - The client's clock runs ahead of the server by RTT/2 and one or two ticks, steered on the
   buffer depth the server reports in every snapshot (Gates, after Overwatch).
 

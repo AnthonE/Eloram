@@ -92,6 +92,9 @@ pub enum Cause {
     Dashing,
     /// Stunned, rooted, knocked up or slowed: what others did to it, seen a round trip late.
     Crowd,
+    /// Walking among minions, whose bodies are in its way where they are on the server: the
+    /// client has them where they were a snapshot ago.
+    Bodies,
     Dead,
     /// Back at the fountain.
     Respawned,
@@ -542,12 +545,22 @@ impl Client {
                 || c.cast.slot != NO_SLOT
                 || m.units[s].windup > 0
         };
+        // A minion's body within a few steps of it (it walks round them: `champ::round_minions`).
+        let bodies = |m: &Match| {
+            let me = &m.units[s];
+            m.units[el_sim::units::FIRST_MINION..].iter().any(|u| {
+                u.alive
+                    && u.pos.distance(me.pos) < me.radius + u.radius + 3.0 * me.stats.move_speed * el_sim::DT
+            })
+        };
         if dashing(w) || dashing(p) {
             Cause::Dashing
         } else if crowd(w) || crowd(p) {
             Cause::Crowd
         } else if fighting(w) || fighting(p) {
             Cause::Fighting
+        } else if bodies(w) || bodies(p) {
+            Cause::Bodies
         } else {
             Cause::Walking
         }

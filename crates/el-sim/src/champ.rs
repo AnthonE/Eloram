@@ -16,7 +16,7 @@ use crate::math;
 use crate::missile::Source;
 use crate::path::PathScratch;
 use crate::ticks;
-use crate::units::{BuffKind, Kind, SEATS, team_of_seat};
+use crate::units::{BuffKind, FIRST_MINION, Kind, MAX_UNITS, SEATS, team_of_seat};
 
 /// How far an attack-moving champion looks for a fight.
 const ATTACK_MOVE_ACQUIRE: f32 = 600.0;
@@ -376,6 +376,12 @@ impl Match {
         let dir = d / len;
         let s = step.min(len);
         let mut p = from + dir * s;
+        if i < SEATS {
+            // Minions are in a champion's way: it walks round them.
+            let Some(m) = self.round_minions(i, from, dir * s, to) else { return false };
+            p = from + m;
+        }
+        let dir = math::normalize_or(p - from, dir);
         if !self.map.walkable(p) {
             let x = from + Vec2::new(dir.x * s, 0.0);
             let y = from + Vec2::new(0.0, dir.y * s);
@@ -386,6 +392,10 @@ impl Match {
             } else {
                 return false;
             };
+            // Along the wall, still not into a body.
+            if i < SEATS && self.round_minions(i, from, p - from, to) != Some(p - from) {
+                return false;
+            }
         }
         let p = if i < SEATS { self.gate(i, p) } else { p };
         let u = &mut self.units[i];
@@ -397,6 +407,49 @@ impl Match {
         true
     }
 
+    /// A champion's step `m` from `from`, turned along the edge of any minion it would push into
+    /// (at the same speed: it walks round, it isn't slowed), or `None` when there's no way past (two
+    /// bodies closing the gap). A step that takes it no deeper into a body is let be: one a minion
+    /// walked into, it walks out of. Allied minions and the enemy's alike; a dash goes through.
+    /// Walking to `to` and a minion stands on it: it stops at the minion (never circles it).
+    fn round_minions(&self, i: usize, from: Vec2, m: Vec2, to: Vec2) -> Option<Vec2> {
+        let r = self.units[i].radius;
+        let s = math::length(m);
+        // The minion `m` takes it deepest into, if any.
+        let blocker = |m: Vec2| {
+            let mut deepest: Option<(f32, usize)> = None;
+            for j in FIRST_MINION..MAX_UNITS {
+                let u = &self.units[j];
+                if !u.alive {
+                    continue;
+                }
+                let reach = r + u.radius;
+                let after = (from + m - u.pos).length_squared();
+                if after >= reach * reach || after >= (from - u.pos).length_squared() {
+                    continue;
+                }
+                if deepest.is_none_or(|(d, _)| after < d) {
+                    deepest = Some((after, j));
+                }
+            }
+            deepest.map(|(_, j)| j)
+        };
+        let mut m = m;
+        for _ in 0..2 {
+            let Some(j) = blocker(m) else { return Some(m) };
+            let b = &self.units[j];
+            if (to - b.pos).length_squared() < (r + b.radius) * (r + b.radius) {
+                return None;
+            }
+            // Along the body's edge, on the side the step was leaning to (the left, head on).
+            let n = math::normalize_or(from - b.pos, math::dir(self.units[i].facing));
+            let side = Vec2::new(-n.y, n.x);
+            let along = if side.dot(m) >= 0.0 { side } else { -side };
+            m = along * s;
+        }
+        blocker(m).is_none().then_some(m)
+    }
+
     /// Walks `i` along its path, `step` units, turning its corners.
     pub(crate) fn follow_path(&mut self, i: usize, step: f32) {
         let mut left = step;
@@ -404,20 +457,103 @@ impl Match {
             let Some(corner) = self.units[i].path.corner() else { return };
             let d = math::distance(self.units[i].pos, corner);
             if d <= left {
-                let before = self.units[i].pos;
                 if !self.slide_toward(i, corner, d) || math::distance(self.units[i].pos, corner) > 1.0 {
-                    // Couldn't reach it (pushed off, or a wall in the way): find a new way.
-                    self.units[i].repath_at = self.tick;
-                    let _ = before;
+                    // Couldn't reach it: round the minions in the way, or (pushed off, or a wall
+                    // in the way) find a new way.
+                    if !self.detour(i) {
+                        self.units[i].repath_at = self.tick;
+                    }
                     return;
                 }
                 self.units[i].path.next += 1;
                 left -= d;
             } else {
-                self.slide_toward(i, corner, left);
+                // Turned aside so far it gained little on the corner (pressed into minions, sliding
+                // from one to the next): round their clump instead.
+                let moved = self.slide_toward(i, corner, left);
+                if !moved || d - math::distance(self.units[i].pos, corner) < 0.5 * left {
+                    self.detour(i);
+                }
                 return;
             }
         }
+    }
+
+    /// A champion `i` whose way to its next corner is shut by minions it can't slip between:
+    /// two corners in front of it that take it round their clump (the minions touching it, and
+    /// every one nearer another of them than its own width), on the side nearer its line, beside
+    /// the clump and past its far end. Whether it found them (none with no minion touching it,
+    /// none when a minion stands on the corner, none when both sides are walled).
+    pub(crate) fn detour(&mut self, i: usize) -> bool {
+        const PAD: f32 = 8.0;
+        const N: usize = MAX_UNITS - FIRST_MINION;
+        let Some(corner) = self.units[i].path.corner() else { return false };
+        if i >= SEATS {
+            return false;
+        }
+        let (pos, r) = (self.units[i].pos, self.units[i].radius);
+        let mut clump = [0u16; N];
+        let mut taken = [false; N];
+        let mut n = 0;
+        for (k, j) in (FIRST_MINION..MAX_UNITS).enumerate() {
+            let u = &self.units[j];
+            if u.alive && math::distance(pos, u.pos) < r + u.radius + PAD {
+                if math::distance(corner, u.pos) < r + u.radius {
+                    return false;
+                }
+                clump[n] = j as u16;
+                taken[k] = true;
+                n += 1;
+            }
+        }
+        if n == 0 {
+            return false;
+        }
+        let mut at = 0;
+        while at < n {
+            let a = self.units[usize::from(clump[at])];
+            at += 1;
+            for (k, j) in (FIRST_MINION..MAX_UNITS).enumerate() {
+                let u = &self.units[j];
+                if !taken[k] && u.alive && math::distance(a.pos, u.pos) < a.radius + u.radius + 2.0 * r {
+                    if math::distance(corner, u.pos) < r + u.radius {
+                        return false;
+                    }
+                    clump[n] = j as u16;
+                    taken[k] = true;
+                    n += 1;
+                }
+            }
+        }
+        // The clump in the frame of the walk: along it (`a`), and across (`b`, + to the left).
+        let along = math::normalize_or(corner - pos, math::dir(self.units[i].facing));
+        let across = Vec2::new(-along.y, along.x);
+        let (mut a0, mut a1, mut b0, mut b1) =
+            (f32::INFINITY, f32::NEG_INFINITY, f32::INFINITY, f32::NEG_INFINITY);
+        for &j in &clump[..n] {
+            let u = &self.units[usize::from(j)];
+            let (a, b, reach) = ((u.pos - pos).dot(along), (u.pos - pos).dot(across), u.radius + r + PAD);
+            (a0, a1, b0, b1) = (a0.min(a - reach), a1.max(a + reach), b0.min(b - reach), b1.max(b + reach));
+        }
+        let sides = if b1.abs() <= b0.abs() { [b1, b0] } else { [b0, b1] };
+        for side in sides {
+            let d1 = pos + along * a0.min(0.0) + across * side;
+            let d2 = pos + along * a1 + across * side;
+            let clear = |p: Vec2, q: Vec2| {
+                self.map.walkable(q)
+                    && self.map.walk_clear(p, q)
+                    && clump[..n].iter().all(|&j| {
+                        let u = &self.units[usize::from(j)];
+                        let reach = (u.radius + r).min(math::distance(p, u.pos));
+                        segment_distance(p, q, u.pos) >= reach - 0.5
+                    })
+            };
+            if clear(pos, d1) && clear(d1, d2) {
+                self.units[i].path.insert_next(&[d1, d2]);
+                return true;
+            }
+        }
+        false
     }
 
     /// A path for `i` to `to`; whether one was found. Champions always get one (at most a few a
@@ -455,9 +591,20 @@ impl Match {
     pub(crate) fn chase(&mut self, i: usize, t: usize, scratch: &mut PathScratch) {
         let goal = self.units[t].pos;
         let step = self.step_len(i);
-        if self.map.walk_clear(self.units[i].pos, goal) {
+        // (A champion rounding minions keeps to its detour until it next looks for a way.)
+        let detouring = i < SEATS && !self.units[i].path.is_empty() && self.units[i].repath_at > self.tick;
+        if !detouring && self.map.walk_clear(self.units[i].pos, goal) {
             self.units[i].path.clear();
-            self.slide_toward(i, goal, step);
+            if !self.slide_toward(i, goal, step) && i < SEATS {
+                // Minions in the way: a path to it, round them.
+                let u = &mut self.units[i];
+                u.path.insert_next(&[goal]);
+                if self.detour(i) {
+                    self.units[i].repath_at = self.tick + CHASE_REPATH;
+                } else {
+                    self.units[i].path.clear();
+                }
+            }
             return;
         }
         if self.units[i].path.is_empty() || self.units[i].repath_at <= self.tick {
@@ -652,4 +799,12 @@ impl Match {
             cc.immune = now + ticks(COMBO_IMMUNE);
         }
     }
+}
+
+/// How near the segment `p`–`q` comes to `c`.
+fn segment_distance(p: Vec2, q: Vec2, c: Vec2) -> f32 {
+    let d = q - p;
+    let len2 = d.length_squared();
+    let t = if len2 > 1e-6 { ((c - p).dot(d) / len2).clamp(0.0, 1.0) } else { 0.0 };
+    math::distance(p + d * t, c)
 }

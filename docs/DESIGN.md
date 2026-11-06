@@ -66,7 +66,9 @@ units, of either team, gets 16% of missing health and mana (Mayhem: 22%).
   a siege minion.
 - **Minions** walk the lane and fight what they meet, in League's order of who to hit: an enemy
   champion who attacks an allied champion nearby, then the nearest enemies by kind. They push
-  each other aside and give way to champions.
+  each other aside and give way to champions, and are in a champion's way in turn: it walks
+  round a minion (ally or enemy), and round a clump of them it can't slip through; a dash goes
+  through.
 - **Turrets** shoot the nearest minion, until an enemy champion damages an allied champion in the
   turret's range. Then that champion is the target. A turret's shots against a champion grow
   stronger with each consecutive hit.
