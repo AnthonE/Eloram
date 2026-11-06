@@ -530,17 +530,18 @@ smoke (`AnthonE/oneshot`, `tools/flipbooks/bake.py`), cut for the Causeway.
   life, the heat added through the family's ramp (its edge colour as it warms, its core as it
   burns, white only at the very top: a ramp that went white early made a cloud of every fireball).
 - From the strips, against the suite's findings: a single target's hit (Orrin's Q) is a flash of
-  petals now, as wide as the old star and gone as fast (peak 243 of 255 at 0.05 s, 1.8% of the
+  petals now, as wide as the old star and gone as fast (peak 244 of 255 at 0.05 s, 1.8% of the
   dark card); its smoke a lit, lumpy puff with a bright side and a dark one where it was a flat
   grey blob. A buff (Ulla's E) blooms at the chest as it lands, so it shows at a sixtieth of a
-  second (3.4 of light on the dark card at 0.017 s, where it was 2.3) before its ring and motes
-  rise. Liora's R leaves its light on the ground, fading over two seconds, where a scorch of soot
+  second and peaks at 0.083 s where it peaked at 0.25 s, its ring and motes rising after. Liora's
+  R leaves its light on the ground, fading over two seconds, where a scorch of soot
   read as a hole (a scorch is fire's and stone's now, ultimate or not). A blast's fireball burns to
   soot where fire strikes and is the heat alone, an energy burst, for frost, dusk, tide, wind,
   growth, bronze and steel; stone throws dust and rubble and no fire. A shockwave's wake is a band
   behind its edge, not a fill: at its birth it filled the whole blast with a pale cloud of the
   family's edge colour, which read as smoke and wasn't. The ground flash is dimmer, so its boil
-  shows (Brakka's E: a cracked plate of light, peak 217 where it was 232 flat).
+  shows (Brakka's E: a cracked plate of light, peak 216 where it was 232 flat), and stone's dust
+  rolls out pale under the moon round it.
 
 Not yet:
 - Nobody has listened: the sounds were judged by their spectrograms and measures, not by ear. The
