@@ -301,10 +301,14 @@ Then the fx stage and the flipbooks (`FX.md`, step 7): one effect fired alone ov
 a light card on a clock stepped 1/60 s a frame, shot into a measured strip by Gates' own shooter
 (`scripts/fx.sh`, 296 effects by name, knobs to retune a recipe without a rebuild), and smoke, a
 fireball and a hit's flash baked from a fluid simulation and lit six ways by the moon
-(`art/tools/flipbooks.py`, one 1024² sheet pair, 460 KB). A dozen effects went through the loop:
+(`art/tools/flipbooks.py`, one 1024² sheet pair, 460 KB). About fifty effects went through the
+loop, one of each kind a family and the world's, and the missiles once the stage could fly one:
 a hit's flash as wide as its star was and gone as fast, a buff shown in its first sixtieth, no
 soot under a healer's ultimate, a fireball in a family's own colours, a shockwave that's a band
-and not a cloud. A strip of twelve exact frames takes about a minute in headless Chromium.
+and not a cloud, a cast's flash that isn't pink smoke, dust and foam that don't outlast the hit
+they came off, and a missile's head a hard point with a narrow streak behind it, where it was the
+pale blob the suite had named. A strip of twelve exact frames takes about a minute in headless
+Chromium.
 
 Left, in no order:
 - **A name**: a guest's is `?name=` or the server's; the page doesn't ask for one.
