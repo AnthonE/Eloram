@@ -212,6 +212,16 @@ async function main() {
     step("loader", "finding the server…");
     Object.assign(config, await window.elDiscover());
   }
+  // How they sign in, before anything's dialled. A token from the last sign-in needs no asking; an
+  // agent's URL or a test that names no sign-in plays as it did.
+  if (config.signIn && !config.noWebTransport && !config.resume) {
+    step("loader", "signing in…");
+    Object.assign(config, await window.elSignIn.choose(window.elServer.url("")));
+  }
+  // A guest on the published page gets the way back to signing in.
+  if (!config.signIn && !config.noWebTransport && window.elServer.http && !params.has("watch") && !params.has("replay")) {
+    window.elSignIn.offerLink();
+  }
   window.EL_CONFIG = config;
   step("graphics", "choosing WebGPU or WebGL 2…");
   const built = await builtModules();

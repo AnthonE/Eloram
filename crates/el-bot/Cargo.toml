@@ -25,6 +25,8 @@ hex.workspace = true
 
 [dev-dependencies]
 el-server.workspace = true
+ring = { version = "0.17", default-features = false }
+base64 = "0.22"
 
 [lints]
 workspace = true

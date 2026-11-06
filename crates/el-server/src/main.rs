@@ -74,6 +74,10 @@ struct Args {
     /// or separate with commas. Without it, this server's own HTTP address.
     #[arg(long)]
     siwe_domain: Vec<String>,
+    /// Elo Pros' account key, standard base64 (`GET /api/account/pubkey`). With it a player can sign
+    /// in with an Elo Pros pass: any login, or a wallet on either chain. Without it, wallets only.
+    #[arg(long)]
+    elo_pubkey: Option<String>,
     /// People must sign in with a wallet to play (agents may still come as guests).
     #[arg(long)]
     require_sign_in: bool,
@@ -113,6 +117,12 @@ fn main() -> anyhow::Result<()> {
         referee: !args.no_referee,
         checkpoint_secs: args.checkpoint_secs,
         siwe_domains: el_server::split_list(&args.siwe_domain),
+        elo_pubkey: args.elo_pubkey.as_deref().map(|k| {
+            el_server::signin::parse_pubkey(k).unwrap_or_else(|| {
+                eprintln!("--elo-pubkey is standard base64 of 32 bytes");
+                std::process::exit(2);
+            })
+        }),
         require_sign_in: args.require_sign_in,
         practice: args.practice,
         ..Config::default()

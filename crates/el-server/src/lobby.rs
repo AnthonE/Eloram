@@ -23,7 +23,7 @@ use std::time::{Duration, Instant};
 
 use el_client_core::lobby::{Player, ToClient, UNSEEN};
 use el_match::{Control, MatchState, Outcome, SeatLease, ShardShared};
-use el_proto::auth::Address;
+use el_proto::auth::PlayerId;
 use el_sim::content::champions::CHAMPIONS;
 use el_sim::math::Rng;
 use el_sim::units::{SEATS, team_of_seat};
@@ -87,7 +87,7 @@ struct Waiting {
     /// The rejoin token it came with (rejoining; empty in the queue).
     token: String,
     /// Its wallet, signed in (a guest: none).
-    wallet: Option<Address>,
+    wallet: Option<PlayerId>,
 }
 
 struct Live {
@@ -106,7 +106,7 @@ struct Live {
     pending: Vec<(u8, Waiting)>,
     /// The wallet in each seat (a guest's, a bot's: none): those still seated as it ends each earn
     /// a reroll.
-    wallets: [Option<Address>; SEATS],
+    wallets: [Option<PlayerId>; SEATS],
 }
 
 /// What a match tells `seat`: `told`, with the seat, its rejoin token and its stream.
@@ -369,7 +369,7 @@ impl Lobby {
         agent: bool,
         max_datagram: u16,
         tx: UnboundedSender<LobbyEvent>,
-        wallet: Option<Address>,
+        wallet: Option<PlayerId>,
     ) {
         let mut inner = self.inner();
         Self::out_of_select(&mut inner, session);
@@ -566,7 +566,7 @@ impl Lobby {
         max_datagram: u16,
         tx: UnboundedSender<LobbyEvent>,
         token: &str,
-        wallet: Option<Address>,
+        wallet: Option<PlayerId>,
     ) -> bool {
         let Some(token) = u128::from_str_radix(token, 16).ok().filter(|&t| t != 0 && token.len() == 32)
         else {
@@ -883,7 +883,7 @@ mod tests {
         use crate::rerolls::{BANK_MAX, GUEST_REROLLS};
         let (game, _) = Game::start(1, 2, el_sim::map::Map::leaked(), None, false, 0).unwrap();
         let lobby = Lobby::new(game, Duration::ZERO, Duration::from_secs(60));
-        let wallet = Address([7; 20]);
+        let wallet = PlayerId::from(el_proto::auth::Address([7; 20]));
         let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
         let (tx2, _rx2) = tokio::sync::mpsc::unbounded_channel();
         lobby.enqueue(1, "Signed", false, 1_200, tx, Some(wallet));

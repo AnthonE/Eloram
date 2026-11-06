@@ -58,6 +58,8 @@ fn backoff(n: u32) -> f64 {
 #[derive(Default)]
 struct Link {
     hello_sent: bool,
+    /// The launch's Elo Pros pass has gone with a Hello: it's good for one join.
+    pass_used: bool,
     ctrl: Vec<u8>,
     rejected: Option<String>,
     /// The resume token this page was given (newer than the launch config's).
@@ -213,8 +215,9 @@ async fn wallet_call(method: &str, args: &[wasm_bindgen::JsValue]) -> Result<was
     wasm_bindgen_futures::JsFuture::from(promise).await.map_err(js_said)
 }
 
-/// Answers the server's challenge: the wallet's account, the SIWE text for it (`el_auth`, the same
-/// text the server rebuilds to check), the wallet's signature over it.
+/// Answers the server's challenge: the wallet's account (an `0x` one or a Solana one, whichever the
+/// page's sign-in chose), the sign-in text for it (`el_auth`, the same text the server rebuilds to
+/// check), the wallet's signature over it.
 fn sign_with_wallet(
     t: Transport,
     nonce: [u8; el_proto::auth::NONCE_BYTES],
@@ -226,17 +229,26 @@ fn sign_with_wallet(
         let signed: Result<(), String> = async {
             let account =
                 wallet_call("connect", &[]).await?.as_string().ok_or("the wallet gave no account")?;
-            let address =
-                el_auth::parse_address(&account).ok_or("the wallet's account doesn't read as an address")?;
             let mut text = [0u8; el_auth::SIWE_MAX];
-            let n = el_auth::siwe_message(domain.as_str(), &address, &nonce, issued_at, &mut text);
-            let text = std::str::from_utf8(&text[..n]).map_err(|_| "the sign-in text")?;
-            let sig = wallet_call("sign", &[text.into(), account.as_str().into()]).await?;
-            let signature = el_auth::parse_signature(&sig.as_string().unwrap_or_default())
-                .ok_or("the wallet's answer isn't a signature")?;
+            let msg = if let Some(key) = el_proto::auth::base58_key(&account) {
+                let n = el_auth::siws_message(domain.as_str(), &account, &nonce, issued_at, &mut text);
+                let text = std::str::from_utf8(&text[..n]).map_err(|_| "the sign-in text")?;
+                let sig = wallet_call("signSolana", &[text.into(), account.as_str().into()]).await?;
+                let signature = el_auth::parse_solana_signature(&sig.as_string().unwrap_or_default())
+                    .ok_or("the wallet's answer isn't a signature")?;
+                ControlMsg::AuthSolana { key, signature }
+            } else {
+                let address = el_auth::parse_address(&account)
+                    .ok_or("the wallet's account doesn't read as an address")?;
+                let n = el_auth::siwe_message(domain.as_str(), &address, &nonce, issued_at, &mut text);
+                let text = std::str::from_utf8(&text[..n]).map_err(|_| "the sign-in text")?;
+                let sig = wallet_call("sign", &[text.into(), account.as_str().into()]).await?;
+                let signature = el_auth::parse_signature(&sig.as_string().unwrap_or_default())
+                    .ok_or("the wallet's answer isn't a signature")?;
+                ControlMsg::Auth { address, signature }
+            };
             let mut buf = [0u8; el_proto::control::MAX_FRAME];
-            let n =
-                (ControlMsg::Auth { address, signature }).encode(&mut buf).ok_or("the answer didn't fit")?;
+            let n = msg.encode(&mut buf).ok_or("the answer didn't fit")?;
             t.send_control(buf[..n].to_vec());
             Ok(())
         }
@@ -285,19 +297,31 @@ fn talk(
     if !link.hello_sent {
         let name = if cfg.0.name.is_empty() { "Summoner" } else { cfg.0.name.as_str() };
         let mut hello = ControlMsg::hello(PlayerKind::Human, name);
+        let pass = cfg.0.pass.clone().filter(|_| !link.pass_used);
         if let ControlMsg::Hello { flags, resume, .. } = &mut hello {
-            match (cfg.0.sign_in, link.resume.or(cfg.0.resume)) {
-                (true, Some(token)) => {
+            match (cfg.0.sign_in, link.resume.or(cfg.0.resume), &pass) {
+                (true, Some(token), _) => {
                     *flags |= hello_flags::RESUME;
                     *resume = token;
                 }
-                (true, None) => *flags |= hello_flags::SIGN_IN,
-                (false, _) => {}
+                (true, None, Some(_)) => *flags |= hello_flags::PASS,
+                (true, None, None) => *flags |= hello_flags::SIGN_IN,
+                (false, ..) => {}
             }
         }
         let mut buf = [0u8; el_proto::control::MAX_FRAME];
         if let Some(n) = hello.encode(&mut buf) {
             t.send_control(buf[..n].to_vec());
+        }
+        // A pass is good for one join: it goes with the first Hello that asks for it, and never again.
+        if let (ControlMsg::Hello { flags, .. }, Some(pass)) = (&hello, pass)
+            && flags & hello_flags::PASS != 0
+        {
+            let mut out = vec![0u8; pass.len() + 3];
+            if let Some(n) = el_proto::control::encode_pass(pass.as_bytes(), &mut out) {
+                t.send_control(out[..n].to_vec());
+            }
+            link.pass_used = true;
         }
         link.hello_sent = true;
     }
@@ -358,7 +382,7 @@ fn talk(
                         "Your sign-in has expired. Reload to sign in again.".into()
                     }
                     RejectReason::AuthFailed => {
-                        "The signature didn't check out. Reload to sign in again.".into()
+                        "The sign-in didn't check out. Reload to sign in again.".into()
                     }
                     RejectReason::AuthRequired => {
                         "This server is for signed-in players: add ?signin=1 to sign in with a wallet.".into()
@@ -373,6 +397,7 @@ fn talk(
                     RejectReason::BadHello => "The server didn't understand this client.".into(),
                 });
             }
+            Frame::Pass(_) => {}
             Frame::Lobby(bytes) => match serde_json::from_slice::<ToClient>(bytes) {
                 Ok(ToClient::Queued { waiting, fill_in }) => {
                     session.waiting = waiting;

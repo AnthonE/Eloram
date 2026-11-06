@@ -26,6 +26,8 @@ pub struct LaunchConfig {
     /// Sign in with the browser's wallet (`?signin=1`), or come back on the resume token the last
     /// sign-in left (`localStorage["el.resume"]`, never logged).
     pub sign_in: bool,
+    /// The Elo Pros pass the page signed in with (`web/signin.js`): it goes with the first Hello.
+    pub pass: Option<String>,
     pub resume: Option<[u8; el_proto::auth::TOKEN_BYTES]>,
     /// Cast with an indicator (`?indicators=1`, remembered): a held key shows the ability's reach,
     /// and letting go casts. Without it, a key casts at once (quick cast).
@@ -83,6 +85,7 @@ impl LaunchConfig {
             watch_live: flag("watchLive"),
             no_web_transport: flag("noWebTransport"),
             sign_in: flag("signIn"),
+            pass: Some(string("pass")).filter(|p| !p.is_empty()),
             resume: get(&cfg, "resume")
                 .as_string()
                 .and_then(|h| decode_hex(&h))

@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use el_client_core::lobby::{ToClient, ToServer};
 use el_match::InputMsg;
-use el_proto::auth::{Address, Domain, TOKEN_BYTES};
+use el_proto::auth::{Domain, PlayerId, TOKEN_BYTES};
 use el_proto::control::{
     ControlMsg, Frame, MAX_FRAME, MAX_LOBBY_FRAME, PlayerKind, RejectReason, encode_lobby, hello_flags,
     welcome_flags,
@@ -34,7 +34,7 @@ use wtransport::{Connection, RecvStream, SendStream};
 use super::NetStats;
 use super::admit::{Asked, Requests};
 use crate::lobby::{Lobby, LobbyEvent, Seating};
-use crate::signin::{SignIn, pick_domain, short};
+use crate::signin::{SignIn, host_of, pick_domain, short, unix_now};
 
 /// How long a client has to say Hello.
 const HELLO_WAIT: Duration = Duration::from_secs(10);
@@ -54,6 +54,7 @@ static NEXT_SESSION: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32
 enum Incoming {
     Msg(ControlMsg),
     Lobby(Vec<u8>),
+    Pass(String),
 }
 
 pub async fn run(
@@ -212,7 +213,7 @@ pub async fn run(
                         Err(_) => NetStats::add(&stats.malformed, 1),
                     },
                 },
-                Some(Incoming::Msg(_)) => {}
+                Some(Incoming::Msg(_) | Incoming::Pass(_)) => {}
             },
             Some(ev) = events.recv() => match ev {
                 LobbyEvent::Queued { waiting, fill_in } => {
@@ -291,16 +292,37 @@ struct Ask<'a> {
     origin: Option<&'a str>,
 }
 
-/// Who a Hello says the player is: a wallet proved by a signature (or a resume token), or a guest.
+/// Who a Hello says the player is: a wallet proved by a signature, an Elo Pros player proved by a
+/// pass (or either by a resume token), or a guest.
 async fn identify(
     signin: &SignIn,
     tx: &mut SendStream,
     rx: &mut RecvStream,
     inbox: &mut Vec<u8>,
     ask: Ask<'_>,
-) -> Result<Option<Address>, RejectReason> {
+) -> Result<Option<PlayerId>, RejectReason> {
     if ask.flags & hello_flags::RESUME != 0 {
         return signin.tokens.redeem(ask.resume).map(Some).ok_or(RejectReason::ResumeExpired);
+    }
+    if ask.flags & hello_flags::PASS != 0 {
+        let frame = tokio::time::timeout(HELLO_WAIT, read_frame(rx, inbox)).await;
+        let Ok(Some(Incoming::Pass(pass))) = frame else { return Err(RejectReason::AuthFailed) };
+        let key = signin.pass_key.ok_or(RejectReason::AuthFailed)?;
+        let hosts = signin.domains.iter().map(|d| host_of(d));
+        return match el_auth::verify_pass(
+            &pass,
+            &key,
+            el_auth::GAME,
+            hosts,
+            |n| signin.nonces.take(n),
+            unix_now(),
+        ) {
+            Ok(passed) => Ok(Some(passed.player())),
+            Err(e) => {
+                tracing::info!("pass refused: {e:?}");
+                Err(RejectReason::AuthFailed)
+            }
+        };
     }
     if ask.flags & hello_flags::SIGN_IN == 0 {
         return if signin.required && ask.player == PlayerKind::Human {
@@ -319,13 +341,21 @@ async fn identify(
     let answer = tokio::time::timeout(signin.wait, read_frame(rx, inbox))
         .await
         .map_err(|_| RejectReason::AuthTimeout)?;
-    let Some(Incoming::Msg(ControlMsg::Auth { address, signature })) = answer else {
-        return Err(RejectReason::BadHello);
+    let (id, checked) = match answer {
+        Some(Incoming::Msg(ControlMsg::Auth { address, signature })) => (
+            PlayerId::from(address),
+            el_auth::verify(domain.as_str(), &nonce, issued_at, &address, &signature),
+        ),
+        Some(Incoming::Msg(ControlMsg::AuthSolana { key, signature })) => (
+            PlayerId::solana(&key),
+            el_auth::verify_solana(domain.as_str(), &nonce, issued_at, &key, &signature),
+        ),
+        _ => return Err(RejectReason::BadHello),
     };
-    match el_auth::verify(domain.as_str(), &nonce, issued_at, &address, &signature) {
-        Ok(()) => Ok(Some(address)),
+    match checked {
+        Ok(()) => Ok(Some(id)),
         Err(e) => {
-            tracing::info!(address = short(&address).as_str(), "sign-in refused: {e:?}");
+            tracing::info!(address = short(&id).as_str(), "sign-in refused: {e:?}");
             Err(RejectReason::AuthFailed)
         }
     }
@@ -367,6 +397,7 @@ async fn read_frame(rx: &mut RecvStream, inbox: &mut Vec<u8>) -> Option<Incoming
                 let f = match frame {
                     Frame::Msg(m) => Incoming::Msg(m),
                     Frame::Lobby(bytes) => Incoming::Lobby(bytes.to_vec()),
+                    Frame::Pass(bytes) => Incoming::Pass(String::from_utf8_lossy(bytes).into_owned()),
                 };
                 inbox.drain(..used);
                 return Some(f);

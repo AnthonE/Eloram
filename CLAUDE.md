@@ -145,6 +145,14 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   (`/status` `game.referee`). A server started on the same `--records` directory takes up the matches
   the last one left (killed or stopped: `el-server/src/recover.rs`), and their players rejoin with
   their tokens. `cargo test -p el-server --release --test recover` kills a real server mid-match.
+- Sign-in (`el-auth`: the SIWE text both sides build, the Elo Pros launcher's `prove` text
+  for `eloram`, its Solana form, and the check of an Elo Pros pass): the page signs in on `?signin=1`
+  (`web/signin.js` asks how, `web/wallet.js`; a guest on the published page gets a link back), agents
+  with a key (`BotConfig::key`, `el-swarm --sign-in` with throwaway test keys). A player id is
+  `el_proto::auth::PlayerId`: `0x` lowercase, base58 exactly as written, or `acct_`. The server names
+  `--siwe-domain` hosts (default: its own address), takes passes with `--elo-pubkey` (`/nonce` hands
+  the page what one must carry), `--require-sign-in` turns guests away, and `/online.json` lists the
+  signed-in players for the store's playtime. A wallet's champion-select
 - The certificate (`el-server/src/net/endpoint.rs`): self-signed and pinned by hash unless
   `--cert`/`--key` name a CA-issued one; a running server reads it again on SIGHUP (the certbot
   hook's `systemctl reload`) and every hour besides, and remakes its self-signed one every ten

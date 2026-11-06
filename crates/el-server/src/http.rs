@@ -37,6 +37,8 @@ pub struct HttpState {
     pub records: Option<Arc<std::sync::Mutex<crate::records::RecordStore>>>,
     /// `/online.json`: the signed-in wallets on now, for the store's playtime.
     pub online: StatusFn,
+    /// `/nonce`: a fresh nonce for an Elo Pros pass, or null when this server takes none.
+    pub nonce: StatusFn,
 }
 
 pub fn router(state: HttpState) -> Router {
@@ -47,6 +49,7 @@ pub fn router(state: HttpState) -> Router {
         .route("/status", get(status))
         .route("/status.json", get(launcher_status))
         .route("/online.json", get(online))
+        .route("/nonce", get(nonce))
         .route("/records.json", get(records_list))
         .route("/records/{id}", get(record))
         .route("/records/{id}/checkpoint", get(checkpoint))
@@ -106,6 +109,10 @@ async fn launcher_status(State(s): State<HttpState>) -> Json<serde_json::Value> 
 
 async fn online(State(s): State<HttpState>) -> Json<serde_json::Value> {
     Json((s.online)())
+}
+
+async fn nonce(State(s): State<HttpState>) -> Json<serde_json::Value> {
+    Json((s.nonce)())
 }
 
 /// The records kept: the live matches' and the last finished ones.

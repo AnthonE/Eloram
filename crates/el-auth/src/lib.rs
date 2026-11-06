@@ -6,12 +6,17 @@
 //! to the wallet and the server rebuilds it from its own nonce, time and domain to check the
 //! signature; the client never sends the text, so a signature over anything else can't pass.
 //!
+//! A Solana wallet signs the same text in its own form ([`siws_message`]), and a player signed in on
+//! Elo Pros brings a pass instead of a signature ([`verify_pass`]): any login, a wallet or none.
+//!
 //! `no_std`, no allocation: the message is written into a fixed buffer. `verify` (the server's)
-//! needs the `verify` feature (k256); `sign` (tests and agents) needs the `sign` feature.
+//! needs the `verify` feature (k256, ring); `sign` (tests and agents) needs the `sign` feature.
 
 #![no_std]
 
-use el_proto::auth::{Address, NONCE_BYTES, Signature};
+use el_proto::auth::{Address, NONCE_BYTES, Signature, SolanaSignature};
+#[cfg(feature = "verify")]
+use el_proto::auth::{PlayerId, SOLANA_KEY_BYTES};
 use tiny_keccak::{Hasher, Keccak};
 
 /// The longest message [`siwe_message`] writes.
@@ -90,6 +95,11 @@ pub fn parse_address(s: &str) -> Option<Address> {
 /// A `personal_sign` signature from a wallet: `0x` and 130 hex digits (r, s, v).
 pub fn parse_signature(s: &str) -> Option<Signature> {
     parse_hex::<65>(s).map(Signature)
+}
+
+/// A Solana wallet's signature, as the page hands it over: `0x` and 128 hex digits.
+pub fn parse_solana_signature(s: &str) -> Option<SolanaSignature> {
+    parse_hex::<64>(s).map(SolanaSignature)
 }
 
 /// What `personal_sign` actually signs: keccak of the EIP-191 envelope around the message.
@@ -204,18 +214,54 @@ pub fn siwe_message(
     issued_at: u64,
     out: &mut [u8; SIWE_MAX],
 ) -> usize {
-    let mut w = Text { out, at: 0 };
     let checksummed = checksum_hex(address);
+    write_message(domain, b"Ethereum", &checksummed, Chain::Id(CHAIN_ID), nonce, issued_at, out)
+}
+
+/// The text a Solana wallet signs to sign in, its address as written: [`siwe_message`]'s in its
+/// Solana form (Elo Pros' `/api/signin/check` reads the same shape, `Chain ID: mainnet`).
+pub fn siws_message(
+    domain: &str,
+    address: &str,
+    nonce: &[u8; NONCE_BYTES],
+    issued_at: u64,
+    out: &mut [u8; SIWE_MAX],
+) -> usize {
+    write_message(domain, b"Solana", address.as_bytes(), Chain::Named("mainnet"), nonce, issued_at, out)
+}
+
+/// A message's `Chain ID` line.
+enum Chain {
+    Id(u64),
+    Named(&'static str),
+}
+
+/// EIP-4361's shape.
+fn write_message(
+    domain: &str,
+    family: &[u8],
+    address: &[u8],
+    chain: Chain,
+    nonce: &[u8; NONCE_BYTES],
+    issued_at: u64,
+    out: &mut [u8; SIWE_MAX],
+) -> usize {
+    let mut w = Text { out, at: 0 };
     w.s(domain);
-    w.s(" wants you to sign in with your Ethereum account:\n");
-    w.bytes(&checksummed);
+    w.s(" wants you to sign in with your ");
+    w.bytes(family);
+    w.s(" account:\n");
+    w.bytes(address);
     w.s("\n\n");
     w.s(STATEMENT);
     w.s("\n\nURI: ");
     w.s(if loopback(domain) { "http://" } else { "https://" });
     w.s(domain);
     w.s("\nVersion: 1\nChain ID: ");
-    w.num(CHAIN_ID);
+    match chain {
+        Chain::Id(id) => w.num(id),
+        Chain::Named(name) => w.s(name),
+    }
     w.s("\nNonce: ");
     w.hex(nonce);
     w.s("\nIssued At: ");
@@ -316,6 +362,148 @@ impl LocalWallet {
         let n = siwe_message(domain, &self.address(), nonce, issued_at, &mut text);
         self.sign(&text[..n])
     }
+}
+
+/// Checks that `signature` is the Solana wallet `key` signing in to `domain` with this nonce and
+/// time. The message is rebuilt here, as [`verify`]'s is; a Solana wallet signs its bytes as they
+/// are, with no envelope.
+#[cfg(feature = "verify")]
+pub fn verify_solana(
+    domain: &str,
+    nonce: &[u8; NONCE_BYTES],
+    issued_at: u64,
+    key: &[u8; SOLANA_KEY_BYTES],
+    signature: &SolanaSignature,
+) -> Result<(), AuthError> {
+    let mut text = [0u8; SIWE_MAX];
+    let len = siws_message(domain, PlayerId::solana(key).as_str(), nonce, issued_at, &mut text);
+    ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, key)
+        .verify(&text[..len], &signature.0)
+        .map_err(|_| AuthError::WrongSigner)
+}
+
+/// Who an Elo Pros pass says signed in.
+#[cfg(feature = "verify")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Passed {
+    /// The account: `acct_` and 20 lowercase hex.
+    pub account: PlayerId,
+    /// The wallet it signs in with, if the pass names one.
+    pub wallet: Option<PlayerId>,
+}
+
+#[cfg(feature = "verify")]
+impl Passed {
+    /// The id the player plays as: the wallet if there is one, else the account (Elo Pros' `player`).
+    pub fn player(&self) -> PlayerId {
+        self.wallet.unwrap_or(self.account)
+    }
+}
+
+/// Why a pass was refused.
+#[cfg(feature = "verify")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PassError {
+    Malformed,
+    WrongSigner,
+    /// For another game, or handed to another host.
+    Elsewhere,
+    /// A nonce we didn't issue, or already used.
+    Replayed,
+    Expired,
+}
+
+/// base64url with no padding into `out`; the bytes written.
+#[cfg(feature = "verify")]
+fn base64url<'a>(s: &[u8], out: &'a mut [u8]) -> Option<&'a [u8]> {
+    let mut bits = 0u32;
+    let mut have = 0;
+    let mut n = 0;
+    for &c in s {
+        let v = match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'-' => 62,
+            b'_' => 63,
+            _ => return None,
+        };
+        bits = bits << 6 | u32::from(v);
+        have += 6;
+        if have >= 8 {
+            have -= 8;
+            *out.get_mut(n)? = (bits >> have) as u8;
+            n += 1;
+        }
+    }
+    Some(&out[..n])
+}
+
+/// The longest pass text and signature decoded, bytes.
+#[cfg(feature = "verify")]
+const PASS_TEXT_MAX: usize = 768;
+
+/// Checks an Elo Pros pass offline against the account key (`GET /api/account/pubkey`).
+///
+/// A pass is `b64url(text) "." b64url(ed25519 signature over text)`; the text is exactly seven
+/// lines: `elo account`, `id: acct_…`, `for: play:<slug>`, `shard: <the page's host>`, `nonce: <the
+/// one this server handed out>`, `wallet: 0x…|<base58>|none`, `exp: <unix>`. `hosts` are the names
+/// the page is served from, with no port; `nonce_ok` says whether the pass's nonce is one this
+/// server issued and hasn't seen used, and marks it used, last, so a refused pass spends nothing.
+#[cfg(feature = "verify")]
+pub fn verify_pass<'h>(
+    pass: &str,
+    key: &[u8; 32],
+    slug: &str,
+    hosts: impl IntoIterator<Item = &'h str>,
+    nonce_ok: impl FnOnce(&str) -> bool,
+    now: u64,
+) -> Result<Passed, PassError> {
+    let (body, sig) = pass.split_once('.').ok_or(PassError::Malformed)?;
+    let mut text = [0u8; PASS_TEXT_MAX];
+    let text = base64url(body.as_bytes(), &mut text).ok_or(PassError::Malformed)?;
+    let mut raw_sig = [0u8; 64];
+    let sig = base64url(sig.as_bytes(), &mut raw_sig).ok_or(PassError::Malformed)?;
+    ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, key)
+        .verify(text, sig)
+        .map_err(|_| PassError::WrongSigner)?;
+    let text = core::str::from_utf8(text).map_err(|_| PassError::Malformed)?;
+    let mut lines = text.split('\n');
+    if lines.next() != Some("elo account") {
+        return Err(PassError::Malformed);
+    }
+    let mut take = |name: &str| {
+        lines
+            .next()
+            .and_then(|l| l.strip_prefix(name))
+            .and_then(|l| l.strip_prefix(": "))
+            .ok_or(PassError::Malformed)
+    };
+    let id = take("id")?;
+    let game = take("for")?;
+    let shard = take("shard")?;
+    let nonce = take("nonce")?;
+    let wallet = take("wallet")?;
+    let exp = take("exp")?;
+    if lines.next().is_some() {
+        return Err(PassError::Malformed);
+    }
+    let account = PlayerId::parse(id).filter(|a| !a.is_wallet()).ok_or(PassError::Malformed)?;
+    let wallet = match wallet {
+        "none" => None,
+        w => Some(PlayerId::parse(w).filter(PlayerId::is_wallet).ok_or(PassError::Malformed)?),
+    };
+    let exp: u64 = exp.parse().map_err(|_| PassError::Malformed)?;
+    if game.strip_prefix("play:") != Some(slug) || !hosts.into_iter().any(|h| h == shard) {
+        return Err(PassError::Elsewhere);
+    }
+    if exp <= now {
+        return Err(PassError::Expired);
+    }
+    if !nonce_ok(nonce) {
+        return Err(PassError::Replayed);
+    }
+    Ok(Passed { account, wallet })
 }
 
 #[cfg(test)]
@@ -447,5 +635,201 @@ Issued At: 2026-09-21T14:13:20Z";
                 let _ = verify("127.0.0.1:8080", &[1; NONCE_BYTES], 5, &w.address(), &Signature(sig));
             }
         }
+    }
+}
+
+/// Against Elo Pros' own vectors (`sdk/testdata/` there, copied to `tests/testdata/`).
+#[cfg(all(test, feature = "verify"))]
+mod pass_tests {
+    use super::*;
+    use ring::signature::{Ed25519KeyPair, KeyPair};
+
+    const VECTOR: &str = include_str!("../tests/testdata/account_token.json");
+    const SIGNIN: &str = include_str!("../tests/testdata/signin_check.json");
+    const NONCE: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+
+    /// The string after `"key": "`, from where `after` first appears.
+    fn field<'a>(json: &'a str, after: &str, key: &str) -> &'a str {
+        let tail = &json[json.find(after).unwrap()..];
+        let mut quoted = [0u8; 64];
+        let (q, k) = quoted.split_at_mut(1);
+        q[0] = b'"';
+        k[..key.len()].copy_from_slice(key.as_bytes());
+        let name = core::str::from_utf8(&quoted[..key.len() + 1]).unwrap();
+        let at = tail.find(name).unwrap() + name.len();
+        let rest = tail[at..].trim_start_matches("\": \"");
+        &rest[..rest.find('"').unwrap()]
+    }
+
+    fn seed() -> [u8; 32] {
+        let hex = field(VECTOR, "\"seed_hex", "seed_hex");
+        let mut out = [0u8; 32];
+        for (i, o) in out.iter_mut().enumerate() {
+            *o = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).unwrap();
+        }
+        out
+    }
+
+    fn pair() -> Ed25519KeyPair {
+        Ed25519KeyPair::from_seed_unchecked(&seed()).unwrap()
+    }
+
+    fn pubkey() -> [u8; 32] {
+        pair().public_key().as_ref().try_into().unwrap()
+    }
+
+    fn check(pass: &str, slug: &str, host: &str, now: u64) -> Result<Passed, PassError> {
+        verify_pass(pass, &pubkey(), slug, [host], |n| n == NONCE, now)
+    }
+
+    fn b64(bytes: &[u8], out: &mut [u8]) -> usize {
+        const A: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+        let (mut bits, mut have, mut n) = (0u32, 0, 0);
+        for &b in bytes {
+            bits = bits << 8 | u32::from(b);
+            have += 8;
+            while have >= 6 {
+                have -= 6;
+                out[n] = A[(bits >> have & 63) as usize];
+                n += 1;
+            }
+        }
+        if have > 0 {
+            out[n] = A[(bits << (6 - have) & 63) as usize];
+            n += 1;
+        }
+        n
+    }
+
+    /// A pass over `text`, signed with the vector's key, as Elo Pros would mint it.
+    fn with_pass<R>(text: &str, then: impl FnOnce(&str) -> R) -> R {
+        let mut out = [0u8; 1024];
+        let mut n = b64(text.as_bytes(), &mut out);
+        out[n] = b'.';
+        n += 1;
+        n += b64(pair().sign(text.as_bytes()).as_ref(), &mut out[n..]);
+        then(core::str::from_utf8(&out[..n]).unwrap())
+    }
+
+    #[test]
+    fn elo_pros_vector_checks_out() {
+        let with = field(VECTOR, "with_wallet", "pass");
+        let p = check(with, "gates", "elopros.com", 1_700_000_000).unwrap();
+        assert_eq!(p.account.as_str(), "acct_0123456789abcdef0123");
+        assert_eq!(p.player().as_str(), "0x24445efddb08d4938e3e3627042b2cf4063d9092");
+        let without = field(VECTOR, "no_wallet", "pass");
+        let p = check(without, "gates", "elopros.com", 1_700_000_000).unwrap();
+        assert_eq!(p.wallet, None);
+        assert_eq!(p.player().as_str(), "acct_0123456789abcdef0123");
+    }
+
+    #[test]
+    fn a_base58_wallet_on_a_pass_keeps_its_case() {
+        let sol = "GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB";
+        let text = "elo account\nid: acct_0123456789abcdef0123\nfor: play:eloram\nshard: elopros.com\nnonce: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\nwallet: GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB\nexp: 1800000000";
+        with_pass(text, |pass| {
+            let p = check(pass, GAME, "elopros.com", 1_700_000_000).unwrap();
+            assert_eq!(p.player().as_str(), sol);
+        });
+        // A wallet line that spells nothing (here, the same address lowercased).
+        let bad = "elo account\nid: acct_0123456789abcdef0123\nfor: play:eloram\nshard: elopros.com\nnonce: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\nwallet: gmadrppbc7p5arkv8g3djiwp89vz1jlk23v2gbjuaegb\nexp: 1800000000";
+        with_pass(bad, |pass| {
+            assert_eq!(check(pass, GAME, "elopros.com", 1_700_000_000), Err(PassError::Malformed));
+        });
+    }
+
+    #[test]
+    fn what_is_refused() {
+        let pass = field(VECTOR, "with_wallet", "pass");
+        assert_eq!(check(pass, "eloram", "elopros.com", 0), Err(PassError::Elsewhere));
+        assert_eq!(check(pass, "gates", "evil.example", 0), Err(PassError::Elsewhere));
+        assert_eq!(check(pass, "gates", "elopros.com", 1_800_000_000), Err(PassError::Expired));
+        assert_eq!(
+            verify_pass(pass, &pubkey(), "gates", ["elopros.com"], |_| false, 0),
+            Err(PassError::Replayed)
+        );
+        assert_eq!(
+            verify_pass(pass, &[9; 32], "gates", ["elopros.com"], |_| true, 0),
+            Err(PassError::WrongSigner)
+        );
+        assert_eq!(check("not a pass", "gates", "elopros.com", 0), Err(PassError::Malformed));
+        // Good bytes in the wrong shape: a site token, an extra line.
+        with_pass("elo account\nid: acct_0123456789abcdef0123\nfor: site\nexp: 1800000000", |p| {
+            assert_eq!(check(p, "gates", "elopros.com", 0), Err(PassError::Malformed));
+        });
+    }
+
+    /// Elo Pros' Solana case: Ed25519 over the text as it stands, with the address's own key.
+    #[test]
+    fn elo_pros_solana_vector_checks_out() {
+        let at = SIGNIN.find("the web SDK's Solana sign-in").unwrap();
+        let tail = &SIGNIN[at..];
+        let msg = tail.find("\"message\": \"").unwrap() + 12;
+        let end = tail[msg..].find('"').unwrap();
+        let mut text = [0u8; 512];
+        let mut n = 0;
+        let raw = &tail.as_bytes()[msg..msg + end];
+        let mut i = 0;
+        while i < raw.len() {
+            if raw[i] == b'\\' && raw[i + 1] == b'n' {
+                text[n] = b'\n';
+                i += 2;
+            } else {
+                text[n] = raw[i];
+                i += 1;
+            }
+            n += 1;
+        }
+        let key =
+            PlayerId::parse("GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB").unwrap().solana_key().unwrap();
+        // The signature's bytes, from its base58: a big number, like a key but 64 bytes long.
+        let sig_at = tail.find("\"signature\": \"").unwrap() + 14;
+        let sig_end = tail[sig_at..].find('"').unwrap();
+        let mut sig = [0u8; 64];
+        for c in tail[sig_at..sig_at + sig_end].bytes() {
+            let alphabet = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+            let mut carry = alphabet.iter().position(|d| *d == c).unwrap() as u32;
+            for b in sig.iter_mut().rev() {
+                carry += u32::from(*b) * 58;
+                *b = carry as u8;
+                carry >>= 8;
+            }
+        }
+        ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, &key)
+            .verify(&text[..n], &sig)
+            .expect("Elo Pros' Solana vector");
+    }
+
+    #[test]
+    fn a_solana_wallet_signs_in_and_nothing_else_passes() {
+        let seed = [7u8; 32];
+        let pair = Ed25519KeyPair::from_seed_unchecked(&seed).unwrap();
+        let key: [u8; 32] = pair.public_key().as_ref().try_into().unwrap();
+        assert_eq!(PlayerId::solana(&key).as_str(), "GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB");
+        let nonce = [5u8; NONCE_BYTES];
+        let mut text = [0u8; SIWE_MAX];
+        let n =
+            siws_message("elopros.com", PlayerId::solana(&key).as_str(), &nonce, 1_793_016_000, &mut text);
+        let message = core::str::from_utf8(&text[..n]).unwrap();
+        assert!(message.starts_with(
+            "elopros.com wants you to sign in with your Solana account:\nGmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB\n\n"
+        ));
+        assert!(message.contains("\nChain ID: mainnet\n"));
+        let mut sig = [0u8; 64];
+        sig.copy_from_slice(pair.sign(&text[..n]).as_ref());
+        let sig = SolanaSignature(sig);
+        assert_eq!(verify_solana("elopros.com", &nonce, 1_793_016_000, &key, &sig), Ok(()));
+        assert_eq!(
+            verify_solana("evil.example", &nonce, 1_793_016_000, &key, &sig),
+            Err(AuthError::WrongSigner)
+        );
+        assert_eq!(
+            verify_solana("elopros.com", &[6; 32], 1_793_016_000, &key, &sig),
+            Err(AuthError::WrongSigner)
+        );
+        assert_eq!(
+            verify_solana("elopros.com", &nonce, 1_793_016_000, &[1; 32], &sig),
+            Err(AuthError::WrongSigner)
+        );
     }
 }

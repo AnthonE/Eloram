@@ -1,0 +1,246 @@
+{
+  "note": "Sign-in messages a game's server receives — from the web SDK's Elo.signIn (Ethereum and Solana) and the launcher's prove — and what POST /api/signin/check answers for each, with `now` (unix seconds) pinned. `expect.code` names the refusal; `signature_ok: false` marks a case whose fields check out but whose signature does not cover the text sent. meter/test_signin_check.py runs every case through the route; the SDKs test their checkSignIn calls against these shapes. The keys are throwaway test keys (0x11…11 and Ed25519 seed 07…07): never fund them.",
+  "now": 1793016000,
+  "cases": [
+    {
+      "name": "the web SDK's Ethereum sign-in (fractional seconds)",
+      "message": "game.example wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\nURI: https://game.example\nVersion: 1\nChain ID: 4663\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:58:20.512Z",
+      "signature": "b1b300ce67fe37d5873e1b755fb071478f0478368fd7185979d9e731e4b92dca18d923950abba655b0757af52c5e5b3041660b0f7229e7864185db8b6a36116d1c",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016000,
+      "expect": {
+        "ok": true,
+        "address": "0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A",
+        "chain": "evm",
+        "chain_id": "4663",
+        "statement": "Sign in to play.",
+        "uri": "https://game.example",
+        "issued_at": "2026-10-26T11:58:20.512Z"
+      }
+    },
+    {
+      "name": "the web SDK's Solana sign-in",
+      "message": "game.example wants you to sign in with your Solana account:\nGmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB\n\nSign in to play.\n\nURI: https://game.example\nVersion: 1\nChain ID: mainnet\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:59:00.000Z",
+      "signature": "sk676UKfrpwLsaTujsdyMMFTHZN4iiQ6tsouDvGWATQvBqSZ37xF2hQUbu5mafhG1XXtTZFMDRBuvJQ8rvYDhfc",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016000,
+      "expect": {
+        "ok": true,
+        "address": "GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB",
+        "chain": "solana",
+        "chain_id": "mainnet"
+      }
+    },
+    {
+      "name": "no statement",
+      "message": "game.example wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\n\nURI: https://game.example\nVersion: 1\nChain ID: 4663\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:58:20Z",
+      "signature": "37130c100529d2c7ec0e4553d872ea7a0499934440bf548ee81c8245da9d261b41261fa3069c7f7718219c9337293b075f7f693207ca8d056904360f6c3c4d061c",
+      "domain": "GAME.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016000,
+      "expect": {
+        "ok": true,
+        "address": "0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A",
+        "statement": null
+      }
+    },
+    {
+      "name": "every optional field, a port in the domain",
+      "message": "game.example:8443 wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\nURI: https://game.example:8443/play\nVersion: 1\nChain ID: 4663\nNonce: Zz99Yy88\nIssued At: 2026-10-26T11:58:20Z\nExpiration Time: 2026-10-26T12:30:00Z\nNot Before: 2026-10-26T11:58:00Z\nRequest ID: r-7\nResources:\n- https://game.example/terms",
+      "signature": "9946d764a215f23cf2614b999b69bed92e5d25ac6ec6c6e99b0adb3f78151da41086f16a738f4a6339afdf371de16ba2ea8a30482c4a980ec247a7b1412cd4e51c",
+      "domain": "game.example:8443",
+      "nonce": "Zz99Yy88",
+      "now": 1793016000,
+      "uri": "https://game.example:8443/play",
+      "chain_id": "4663",
+      "expect": {
+        "ok": true,
+        "expiration_time": "2026-10-26T12:30:00Z"
+      }
+    },
+    {
+      "name": "the launcher's prove message",
+      "message": "shard-3.gates.example wants you to sign in with your Ethereum account:\n0x24445EFddB08d4938E3E3627042B2Cf4063d9092\n\nProve your identity to play gates. This signature authorises nothing and moves no funds.\n\nURI: https://shard-3.gates.example\nVersion: 1\nChain ID: 4663\nNonce: 8f14e45fceea167a\nIssued At: 2026-08-07T12:00:00Z",
+      "domain": "shard-3.gates.example",
+      "nonce": "8f14e45fceea167a",
+      "now": 1786104000,
+      "expect": {
+        "ok": true,
+        "address": "0x24445EFddB08d4938E3E3627042B2Cf4063d9092",
+        "chain": "evm"
+      }
+    },
+    {
+      "name": "another site's sign-in",
+      "message": "game.example wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\nURI: https://game.example\nVersion: 1\nChain ID: 4663\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:58:20.512Z",
+      "signature": "b1b300ce67fe37d5873e1b755fb071478f0478368fd7185979d9e731e4b92dca18d923950abba655b0757af52c5e5b3041660b0f7229e7864185db8b6a36116d1c",
+      "domain": "other.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016000,
+      "expect": {
+        "ok": false,
+        "code": "domain"
+      }
+    },
+    {
+      "name": "another nonce",
+      "message": "game.example wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\nURI: https://game.example\nVersion: 1\nChain ID: 4663\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:58:20.512Z",
+      "signature": "b1b300ce67fe37d5873e1b755fb071478f0478368fd7185979d9e731e4b92dca18d923950abba655b0757af52c5e5b3041660b0f7229e7864185db8b6a36116d1c",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abd",
+      "now": 1793016000,
+      "expect": {
+        "ok": false,
+        "code": "nonce"
+      }
+    },
+    {
+      "name": "older than max_age_s",
+      "message": "game.example wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\nURI: https://game.example\nVersion: 1\nChain ID: 4663\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:58:20.512Z",
+      "signature": "b1b300ce67fe37d5873e1b755fb071478f0478368fd7185979d9e731e4b92dca18d923950abba655b0757af52c5e5b3041660b0f7229e7864185db8b6a36116d1c",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016600,
+      "expect": {
+        "ok": false,
+        "code": "stale"
+      }
+    },
+    {
+      "name": "a longer max_age_s takes it",
+      "message": "game.example wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\nURI: https://game.example\nVersion: 1\nChain ID: 4663\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:58:20.512Z",
+      "signature": "b1b300ce67fe37d5873e1b755fb071478f0478368fd7185979d9e731e4b92dca18d923950abba655b0757af52c5e5b3041660b0f7229e7864185db8b6a36116d1c",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016600,
+      "max_age_s": 3600,
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "issued in the future",
+      "message": "game.example wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\nURI: https://game.example\nVersion: 1\nChain ID: 4663\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:58:20.512Z",
+      "signature": "b1b300ce67fe37d5873e1b755fb071478f0478368fd7185979d9e731e4b92dca18d923950abba655b0757af52c5e5b3041660b0f7229e7864185db8b6a36116d1c",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793012400,
+      "expect": {
+        "ok": false,
+        "code": "not_yet"
+      }
+    },
+    {
+      "name": "past its Expiration Time",
+      "message": "game.example:8443 wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\nURI: https://game.example:8443/play\nVersion: 1\nChain ID: 4663\nNonce: Zz99Yy88\nIssued At: 2026-10-26T11:58:20Z\nExpiration Time: 2026-10-26T12:30:00Z\nNot Before: 2026-10-26T11:58:00Z\nRequest ID: r-7\nResources:\n- https://game.example/terms",
+      "signature": "9946d764a215f23cf2614b999b69bed92e5d25ac6ec6c6e99b0adb3f78151da41086f16a738f4a6339afdf371de16ba2ea8a30482c4a980ec247a7b1412cd4e51c",
+      "domain": "game.example:8443",
+      "nonce": "Zz99Yy88",
+      "now": 1793017800,
+      "max_age_s": 86400,
+      "expect": {
+        "ok": false,
+        "code": "expired"
+      }
+    },
+    {
+      "name": "the URI is not the one asked for",
+      "message": "game.example wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\nURI: https://game.example\nVersion: 1\nChain ID: 4663\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:58:20.512Z",
+      "signature": "b1b300ce67fe37d5873e1b755fb071478f0478368fd7185979d9e731e4b92dca18d923950abba655b0757af52c5e5b3041660b0f7229e7864185db8b6a36116d1c",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016000,
+      "uri": "https://game.example/other",
+      "expect": {
+        "ok": false,
+        "code": "uri"
+      }
+    },
+    {
+      "name": "the Chain ID is not the one asked for",
+      "message": "game.example wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\nURI: https://game.example\nVersion: 1\nChain ID: 4663\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:58:20.512Z",
+      "signature": "b1b300ce67fe37d5873e1b755fb071478f0478368fd7185979d9e731e4b92dca18d923950abba655b0757af52c5e5b3041660b0f7229e7864185db8b6a36116d1c",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016000,
+      "chain_id": "1",
+      "expect": {
+        "ok": false,
+        "code": "chain_id"
+      }
+    },
+    {
+      "name": "a line added after signing",
+      "message": "game.example wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\nURI: https://game.example\nVersion: 1\nChain ID: 4663\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:58:20.512Z\nRequest ID: x",
+      "signature": "b1b300ce67fe37d5873e1b755fb071478f0478368fd7185979d9e731e4b92dca18d923950abba655b0757af52c5e5b3041660b0f7229e7864185db8b6a36116d1c",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016000,
+      "expect": {
+        "ok": true,
+        "signature_ok": false
+      }
+    },
+    {
+      "name": "not a sign-in message",
+      "message": "elo play\naction: duel\nwallet: 0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\nday: 2026-10-26\ndetail: x",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016000,
+      "expect": {
+        "ok": false,
+        "code": "format"
+      }
+    },
+    {
+      "name": "a carriage return",
+      "message": "game.example wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\r\nURI: https://game.example\nVersion: 1\nChain ID: 4663\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:58:20.512Z",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016000,
+      "expect": {
+        "ok": false,
+        "code": "format"
+      }
+    },
+    {
+      "name": "a tag out of order",
+      "message": "game.example wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\nURI: https://game.example\nChain ID: 4663\nVersion: 1\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:58:20.512Z",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016000,
+      "expect": {
+        "ok": false,
+        "code": "format"
+      }
+    },
+    {
+      "name": "a tag twice",
+      "message": "game.example wants you to sign in with your Ethereum account:\n0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A\n\nSign in to play.\n\nURI: https://game.example\nVersion: 1\nChain ID: 4663\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:58:20.512Z\nNonce: Q8n2Vx41abc",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016000,
+      "expect": {
+        "ok": false,
+        "code": "format"
+      }
+    },
+    {
+      "name": "an Ethereum header over a Solana address",
+      "message": "game.example wants you to sign in with your Ethereum account:\nGmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB\n\nSign in to play.\n\nURI: https://game.example\nVersion: 1\nChain ID: mainnet\nNonce: Q8n2Vx41abc\nIssued At: 2026-10-26T11:59:00.000Z",
+      "domain": "game.example",
+      "nonce": "Q8n2Vx41abc",
+      "now": 1793016000,
+      "expect": {
+        "ok": false,
+        "code": "format"
+      }
+    }
+  ],
+  "web_sdk": {
+    "note": "cases[0] and cases[1] are byte for byte what elo-3.js's Elo.signIn({ nonce }) composes on a page at https://game.example, at the case's issued_at, for an Ethereum and a Solana wallet holding these keys (sdk/js/test/web.test.js pins it). The server's parser reads the same bytes, so neither side moves without this file.",
+    "location": "https://game.example"
+  }
+}

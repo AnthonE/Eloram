@@ -25,7 +25,9 @@ cargo build --release -p el-server
 bin="${CARGO_TARGET_DIR:-target}/release"
 wt="${EL_WT_PORT:-4433}"
 # `exec`, so the pid kept is the server's own and killing it stops the server.
-server() { exec "$bin/el-server" --web-dir web/dist "$@"; }
+# Elo Pros' test key (crates/el-auth/tests/testdata/account_token.json): the login suite mints passes
+# with it. It signs nothing real.
+server() { exec "$bin/el-server" --web-dir web/dist --elo-pubkey "H0SHD2PwtN2Lb2tZhyrcrQCHGFIs+qy9VvR4aISFwlE=" "$@"; }
 pids=()
 # Each server is waited for, so the next suite's can have its ports.
 cleanup() {
