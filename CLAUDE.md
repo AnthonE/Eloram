@@ -80,11 +80,13 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `minion_flashes`, `wheels_turning` and `audio_*`; the inbox takes `{t:"volume",bus,v}` and
   `{t:"mute",on}`.
 - The fx stage (`docs/FX.md`, step 7): `scripts/fx.sh <name>…` (`list [filter]` names everything it
-  can fire: `orrin-q-impact`, `liora-r-blast`, `death-turret`...) builds the page and shoots one
+  can fire: `orrin-q-impact`, `liora-r-blast`, `vessa-w-missile`, `death-turret`...) builds the page and shoots one
   effect alone in front of a dark and a light card on a clock stepped 1/60 s a frame, into
   `e2e/artifacts/fx/<name>/{strip.png,numbers.json,diff.png}` (`e2e/fxstrip.mjs`, vendored from
   Gates; `--no-build` keeps the page, `--knobs 'impact.star=1.5;size=0.8'` retunes a recipe without a
-  rebuild (`knobs` lists them), `--seed`, `--frames`, `--span`, `--side enemy`, `--size`, `--low`).
+  rebuild (`knobs` lists them), `--seed`, `--frames`, `--span`, `--side enemy`, `--size`, `--low`;
+  `EL_FX_DIST=dir` serves a copy of the page, so a long batch keeps shooting while `web/dist` is
+  rebuilt).
   The page is `?fxstage=<name>` (`el-client/src/stage.rs`; `el_client_core::fx::stage` is the
   catalogue, the clock and the knobs). The flipbook sheet the puffs, fireballs and flashes play is
   `web/assets/fx/cloud_{a,b}.png`, remade by `python3 -I art/tools/flipbooks.py` (`--preview DIR`

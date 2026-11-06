@@ -243,6 +243,9 @@ shooter as they are, and keeps its own particles, which are closed forms moved i
   numbers per card against the plate (light added, light taken, cover, peak, clip, where), a diff
   against the last run, all in `e2e/artifacts/fx/<name>/`. Headless Chromium draws in software,
   but a clock that holds for every frame doesn't care: a strip is right at any frame rate.
+- **Missiles** (`vessa-w-missile`, `orrin-auto-missile`, `turret-missile`): a shot flown from
+  left to right across each card at the ability's own speed and width, drawn by the live pool
+  (its head and trail) at the stage's own tick, where a match's client would give it missiles.
 - **Knobs** (`scripts/fx.sh <name> --knobs 'impact.star=1.5;size=0.8'`; `scripts/fx.sh knobs`):
   named multipliers on the recipes' numbers, read where a burst is made and in the shader, so a
   look is retuned without the four-minute wasm rebuild, and the numbers that work are then
@@ -549,9 +552,7 @@ Not yet:
   burst is seldom in a match's picture; the stage's are exact).
 - The per-ability hand-tuning step 5 ends with: the stage and the strips are its loop now, and a
   dozen effects have been through it; the other 280 haven't.
-- Missiles in flight on the stage (their heads and trails are the live pool's, which reads a
-  match's client: Vessa's and Marret's W are still pale blobs), and a champion's model under a
-  hit, to judge it against a body.
+- A champion's model under a hit on the stage, to judge it against a body.
 - Step 6's frame numbers.
 
 ## Sources
