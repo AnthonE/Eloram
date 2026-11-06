@@ -503,12 +503,54 @@ pictures, for the hand-tuning:
 - Liora's R lays a dusk cloud under its target, dark as a shadow: it reads, but as a hole more
   than a strike.
 
+**Step 7, the stage and the flipbooks.** The loop the hand-tuning was missing, taken from Gates
+as it is (`AnthonE/Gates`, `crates/fx/src/stage.rs` and `ci/fxstrip.mjs`), and oneshot's baked
+smoke (`AnthonE/oneshot`, `tools/flipbooks/bake.py`), cut for the Causeway.
+- `?fxstage=orrin-q-impact` (`scripts/fx.sh list` names 296: every part of every ability, each
+  champion's auto, Blink, Tag, the turret's shot, the statuses, the deaths, a respawn, a level,
+  the relic) fires the one effect twice at once over a dark card and a light card laid on the
+  Causeway's middle, on a clock stepped exactly 1/60 s a frame and held where `window.__fxStep`
+  asks; `scripts/fx.sh <name>` shoots it with Gates' `fxstrip.mjs` into a strip with its numbers
+  (`e2e/artifacts/fx/<name>/`). The stage needs no server (it makes the cue the director would and
+  hands it to the same bursts), hides everything of the Causeway each frame (the chasm's spires,
+  9 m tall, stood over the cards' far edge before), looks at the effect's own height (a hit is
+  drawn on a body's near side, a metre and a half up and toward the camera: framed from the floor
+  it sat in the frame's corner), and its cards read 26 and 183 of 255 through the tonemapping (the
+  stage's 25 and 185). A strip of twelve frames over a second and a half takes about a minute in
+  headless Chromium, the frames exact at any frame rate; the suite's five minutes a champion were
+  for the match's own clock. `--knobs 'impact.star=1.5;size=0.8'` retunes a recipe's numbers
+  without the four-minute wasm rebuild (`scripts/fx.sh knobs` lists the twenty-two).
+- `art/tools/flipbooks.py` bakes one 1024² sheet pair (8 × 8 cells of 128: a smoke puff's sixteen
+  frames twice, a fireball's eight twice, a flash of petals' four, four times) in fifteen seconds
+  from a 256² fluid simulation, lit six ways; 460 KB as PNG, where the models are 3.3 MiB a match.
+  The burst shader plays them for a puff, a blast's fireball and a hit's flash: the frame for its
+  age and the next crossfaded, the smoke lit from where the moon stands in the sprite's own frame
+  at about the level the stone reads (the lights' own numbers, lux through the camera's exposure,
+  are far brighter: the ground's shader grades its own), eroded from its thin parts past half its
+  life, the heat added through the family's ramp (its edge colour as it warms, its core as it
+  burns, white only at the very top: a ramp that went white early made a cloud of every fireball).
+- From the strips, against the suite's findings: a single target's hit (Orrin's Q) is a flash of
+  petals now, as wide as the old star and gone as fast (peak 243 of 255 at 0.05 s, 1.8% of the
+  dark card); its smoke a lit, lumpy puff with a bright side and a dark one where it was a flat
+  grey blob. A buff (Ulla's E) blooms at the chest as it lands, so it shows at a sixtieth of a
+  second (3.4 of light on the dark card at 0.017 s, where it was 2.3) before its ring and motes
+  rise. Liora's R leaves its light on the ground, fading over two seconds, where a scorch of soot
+  read as a hole (a scorch is fire's and stone's now, ultimate or not). A blast's fireball burns to
+  soot where fire strikes and is the heat alone, an energy burst, for frost, dusk, tide, wind,
+  growth, bronze and steel; stone throws dust and rubble and no fire. A shockwave's wake is a band
+  behind its edge, not a fill: at its birth it filled the whole blast with a pale cloud of the
+  family's edge colour, which read as smoke and wasn't. The ground flash is dimmer, so its boil
+  shows (Brakka's E: a cracked plate of light, peak 217 where it was 232 flat).
+
 Not yet:
 - Nobody has listened: the sounds were judged by their spectrograms and measures, not by ear. The
   look on a real GPU hasn't been seen either (SwiftShader draws a frame every two seconds, so a
-  burst is seldom in a picture).
-- The per-ability hand-tuning step 5 ends with (the derived looks are the base it tunes from; the
-  contact sheets are where it starts).
+  burst is seldom in a match's picture; the stage's are exact).
+- The per-ability hand-tuning step 5 ends with: the stage and the strips are its loop now, and a
+  dozen effects have been through it; the other 280 haven't.
+- Missiles in flight on the stage (their heads and trails are the live pool's, which reads a
+  match's client: Vessa's and Marret's W are still pale blobs), and a champion's model under a
+  hit, to judge it against a body.
 - Step 6's frame numbers.
 
 ## Sources

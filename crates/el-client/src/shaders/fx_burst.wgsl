@@ -246,8 +246,8 @@ fn sheet_frames(sheet: vec4<f32>, blend: f32) -> array<vec4<f32>, 2> {
 // split into the moon's share, which falls from where it stands, and the night's, which comes
 // from everywhere. The lights' own numbers (lux through the camera's exposure) are far brighter
 // than the stone reads: the ground's shader grades its own; this keeps to the stone's level.
-const MOON_SMOKE: vec3<f32> = vec3(0.34, 0.38, 0.50);
-const NIGHT_SMOKE: vec3<f32> = vec3(0.12, 0.14, 0.20);
+const MOON_SMOKE: vec3<f32> = vec3(0.62, 0.68, 0.86);
+const NIGHT_SMOKE: vec3<f32> = vec3(0.22, 0.26, 0.36);
 
 // Smoke of albedo `tint` lit six ways by the moon and the night, where the moon stands in the
 // sprite's own frame (its right and up the screen's, its front the eye's side): the side the
@@ -333,10 +333,11 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
         a = smoothstep(0.0, 0.55, 1.0 - d + (n - 0.5) * 0.7) * (0.75 - 0.35 * k) * knobs.z;
     } else if shape < 4.5 {
         // A shockwave: a sharp leading edge, a soft wake behind it toward the middle, uneven
-        // round its length, thinning as it widens.
+        // round its length, thinning as it widens. The wake stays a band behind the edge: a
+        // slower fall filled the ring early in its life, a pale cloud over the whole blast.
         let x = d - 0.92;
         let lead = 1.0 - smoothstep(0.0, 0.035, x);
-        let wake = exp(min(x, 0.0) * (7.0 + 18.0 * k));
+        let wake = exp(min(x, 0.0) * (14.0 + 20.0 * k)) * 0.8;
         let ang = atan2(c.y, c.x);
         let rough = 0.7 + 0.3 * vnoise(vec2(ang * 5.0 + seed * 40.0, k * 3.0));
         a = select(lead, wake, x < 0.0) * rough * step(d, 0.97) * (1.15 - 0.4 * k);

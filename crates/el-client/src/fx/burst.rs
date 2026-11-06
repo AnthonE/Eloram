@@ -653,7 +653,7 @@ fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
                         vel: Vec3::new(a.cos() * 0.8, 0.4, a.sin() * 0.8),
                         born: m.now,
                         life: 1.2,
-                        size: 0.3 * r.min(1.6) * puff,
+                        size: 0.42 * r.min(1.6) * puff,
                         drag: 1.5,
                         shape: shape::PUFF,
                         color: dust,

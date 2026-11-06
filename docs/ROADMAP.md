@@ -297,15 +297,24 @@ page, the HUD's key over each ability and a first match's strip of the essential
 the input code casts with its keys. Settings were URL parameters, remembered; they still are, and
 the menu writes the same memory (`config::remember`: a desktop build keeps them in a file there).
 
+Then the fx stage and the flipbooks (`FX.md`, step 7): one effect fired alone over a dark card and
+a light card on a clock stepped 1/60 s a frame, shot into a measured strip by Gates' own shooter
+(`scripts/fx.sh`, 296 effects by name, knobs to retune a recipe without a rebuild), and smoke, a
+fireball and a hit's flash baked from a fluid simulation and lit six ways by the moon
+(`art/tools/flipbooks.py`, one 1024² sheet pair, 460 KB). A dozen effects went through the loop:
+a hit's flash as wide as its star was and gone as fast, a buff shown in its first sixtieth, no
+soot under a healer's ultimate, a fireball in a family's own colours, a shockwave that's a band
+and not a cloud. A strip of twelve exact frames takes about a minute in headless Chromium.
+
 Left, in no order:
 - **A name**: a guest's is `?name=` or the server's; the page doesn't ask for one.
 - **A real GPU.** Nobody has seen the game on one: the frame rate on either tier (the target is 60
   fps at 1080p on integrated graphics, and a ten-way fight at 60 on `high`), and the effects'
   share of the frame (`FX.md`, step 6).
 - **Listening.** The sounds were judged by their spectrograms and measures, not by ear.
-- **Tuning by hand**: each ability's look (`FX.md`, step 5, from the contact sheets, which now
-  hold each missile in flight and each hit as it lands), each champion's clip windows
-  (`CHAMPIONS.md`).
+- **Tuning by hand**: each ability's look (`FX.md`, step 5; the stage and its strips are the
+  loop, `scripts/fx.sh`, and a dozen of the 296 have been through it), each champion's clip
+  windows (`CHAMPIONS.md`).
 - **Art**: an outline drawn as a line, where the rim stands in (`CHAMPIONS.md`); the HUD's last
   draw calls.
 - **The announcer's and the music's files**: wired, optional, dropped in by name (`FX.md`).
