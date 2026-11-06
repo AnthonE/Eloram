@@ -82,7 +82,7 @@ for v in "${variants[@]}"; do
     [ -f "$OUT/$v/$f.gz" ] || gzip -9 -k "$OUT/$v/$f"
   done
 done
-for f in index.html config.js boot.js loader.js wallet.js style.css favicon.svg; do
+for f in index.html config.js boot.js loader.js wallet.js signin.js style.css favicon.svg; do
   [ -f "$OUT/$f" ] || { echo "$OUT/$f is missing: run scripts/build-web.sh" >&2; exit 1; }
 done
 # A variant left over from an older build would be picked (build.json names it) and would speak

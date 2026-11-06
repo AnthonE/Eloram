@@ -13,6 +13,8 @@
   <script src="config.js"></script>
   <script src="boot.js"></script>
   <script src="wallet.js"></script>
+  <!-- Sign in with Elo Pros (signin.js). -->
+  <script async src="https://elopros.com/sdk/elo-signin-1.js"></script>
 </head>
 <body>
   <canvas id="el" tabindex="0"></canvas>
@@ -29,6 +31,16 @@
       </div>
     </div>
   </div>
+  <!-- `?signin=1` with no token to come back on: how to sign in, before the game starts (signin.js).
+       A guest gets the link. -->
+  <div id="signin" class="signin-card hidden">
+    <div class="title">SIGN IN</div>
+    <div id="signin-choices" class="signin-choices"></div>
+    <div id="signin-note" class="sub"></div>
+    <button id="signin-guest" type="button">PLAY AS GUEST</button>
+  </div>
+  <a id="signin-link" class="signin-link hidden" href="?signin=1">SIGN IN</a>
+  <script src="signin.js"></script>
   <script type="module" src="loader.js"></script>
 </body>
 </html>

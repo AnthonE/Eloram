@@ -124,11 +124,14 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   (`/status` `game.referee`). A server started on the same `--records` directory takes up the matches
   the last one left (killed or stopped: `el-server/src/recover.rs`), and their players rejoin with
   their tokens. `cargo test -p el-server --release --test recover` kills a real server mid-match.
-- Wallet sign-in (`el-auth`: the SIWE text both sides build, the Elo Pros launcher's `prove` text
-  for `eloram`): the page signs in on `?signin=1` (`web/wallet.js`), agents with a key
-  (`BotConfig::key`, `el-swarm --sign-in` with throwaway test keys). The server names
-  `--siwe-domain` hosts (default: its own address), `--require-sign-in` turns guests away, and
-  `/online.json` lists the signed-in wallets for the store's playtime. A wallet's champion-select
+- Sign-in (`el-auth`: the SIWE text both sides build, the Elo Pros launcher's `prove` text
+  for `eloram`, its Solana form, and the check of an Elo Pros pass): the page signs in on `?signin=1`
+  (`web/signin.js` asks how, `web/wallet.js`; a guest on the published page gets a link back), agents
+  with a key (`BotConfig::key`, `el-swarm --sign-in` with throwaway test keys). A player id is
+  `el_proto::auth::PlayerId`: `0x` lowercase, base58 exactly as written, or `acct_`. The server names
+  `--siwe-domain` hosts (default: its own address), takes passes with `--elo-pubkey` (`/nonce` hands
+  the page what one must carry), `--require-sign-in` turns guests away, and `/online.json` lists the
+  signed-in players for the store's playtime. A wallet's champion-select
   rerolls are banked across matches (`el-server/src/rerolls.rs`, `rerolls.json` in `--records`).
 - `scripts/publish-web.sh --server host:port --http url`: the page onto the Elo Pros origin
   (`elopros.com/games/eloram/play/`), refused if the live server's `/status.json` speaks another

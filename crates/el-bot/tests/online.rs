@@ -187,3 +187,136 @@ async fn practice_switches_take_nothing_of_the_last_match() {
     bot.close().await;
     h.shutdown();
 }
+
+/// A Solana wallet signs in by its own signature, and an Elo Pros pass by Elo Pros': each on the
+/// store's roster as Elo Pros writes it, base58 exactly as it is.
+mod solana_and_pass {
+    use base64::Engine;
+    use el_bot::Way;
+    use el_proto::auth::{PlayerId, SolanaSignature};
+    use ring::signature::{Ed25519KeyPair, KeyPair};
+
+    use super::*;
+
+    /// Elo Pros' test key (`sdk/testdata/account_token.json`, its `seed_hex`), and `signin_check.json`'s
+    /// throwaway wallet (Ed25519 seed 07…07).
+    const SEED: &str = "2f3e65db2d7c08d3d45cb88040eca8badb2b6287066b2d30a1861756938b6536";
+    const ACCT: &str = "acct_0123456789abcdef0123";
+    const SOL: &str = "GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB";
+
+    fn account_key() -> Ed25519KeyPair {
+        Ed25519KeyPair::from_seed_unchecked(&hex::decode(SEED).unwrap()).unwrap()
+    }
+
+    fn mint(wallet: &str, game: &str, shard: &str, nonce: &str) -> String {
+        let exp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() + 600;
+        let text = format!(
+            "elo account\nid: {ACCT}\nfor: play:{game}\nshard: {shard}\nnonce: {nonce}\nwallet: {wallet}\nexp: {exp}"
+        );
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        format!("{}.{}", b64.encode(&text), b64.encode(account_key().sign(text.as_bytes())))
+    }
+
+    fn config(server: &str, name: &str) -> BotConfig {
+        BotConfig { server: server.to_string(), name: name.to_string(), key: None }
+    }
+
+    async fn nonce(server: &str) -> String {
+        let doc = el_bot::get_json(server, "/nonce").await.unwrap();
+        assert_eq!(doc["game"], "eloram");
+        doc["nonce"].as_str().expect("this server takes passes").to_string()
+    }
+
+    async fn online(server: &str) -> Vec<String> {
+        let doc = el_bot::get_json(server, "/online.json").await.unwrap();
+        doc["online"].as_array().unwrap().iter().map(|e| e["wallet"].as_str().unwrap().to_string()).collect()
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn a_solana_wallet_and_a_pass_sign_in() {
+        let cfg = el_server::Config {
+            wt_port: 0,
+            http_addr: "127.0.0.1:0".parse().unwrap(),
+            web_dir: None,
+            matches_per_shard: 2,
+            siwe_domains: vec!["elopros.com".into()],
+            elo_pubkey: Some(account_key().public_key().as_ref().try_into().unwrap()),
+            ..el_server::Config::default()
+        };
+        let h = el_server::start(cfg).await.expect("the server starts");
+        let server = format!("http://{}", h.http_addr);
+
+        // A Solana wallet, its address exact.
+        let pair = Ed25519KeyPair::from_seed_unchecked(&[7; 32]).unwrap();
+        let key: [u8; 32] = pair.public_key().as_ref().try_into().unwrap();
+        let sign = |text: &[u8]| {
+            let mut s = [0u8; 64];
+            s.copy_from_slice(pair.sign(text).as_ref());
+            SolanaSignature(s)
+        };
+        let sol =
+            BotClient::connect_with(&config(&server, "Sol"), Way::Solana { key, sign: &sign }).await.unwrap();
+        assert_eq!(sol.address.map(|a| a.to_string()).as_deref(), Some(SOL));
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert_eq!(online(&server).await, [SOL]);
+
+        // Someone else's signature for it.
+        let other = Ed25519KeyPair::from_seed_unchecked(&[8; 32]).unwrap();
+        let forged = |text: &[u8]| {
+            let mut s = [0u8; 64];
+            s.copy_from_slice(other.sign(text).as_ref());
+            SolanaSignature(s)
+        };
+        assert!(
+            BotClient::connect_with(&config(&server, "Forger"), Way::Solana { key, sign: &forged })
+                .await
+                .is_err()
+        );
+
+        // A pass with no wallet plays as its account; used, its nonce is gone.
+        let n = nonce(&server).await;
+        let pass = mint("none", "eloram", "elopros.com", &n);
+        let acct = BotClient::connect_with(&config(&server, "Acct"), Way::Pass(&pass)).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(online(&server).await.contains(&ACCT.to_string()));
+        assert!(BotClient::connect_with(&config(&server, "Again"), Way::Pass(&pass)).await.is_err());
+
+        // A pass that names a Solana wallet plays as that wallet, as written.
+        let n = nonce(&server).await;
+        assert_eq!(PlayerId::parse(SOL).map(|a| a.to_string()).as_deref(), Some(SOL));
+        let pass = mint(SOL, "eloram", "elopros.com", &n);
+        let named = BotClient::connect_with(&config(&server, "Named"), Way::Pass(&pass)).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(online(&server).await.contains(&SOL.to_string()));
+
+        // Passes never for here, and no pass at all.
+        for (game, shard) in [("gates", "elopros.com"), ("eloram", "evil.example")] {
+            let n = nonce(&server).await;
+            let pass = mint("none", game, shard, &n);
+            assert!(BotClient::connect_with(&config(&server, "Elsewhere"), Way::Pass(&pass)).await.is_err());
+        }
+        let made_up = mint("none", "eloram", "elopros.com", &"0123456789abcdef".repeat(4));
+        assert!(BotClient::connect_with(&config(&server, "Made"), Way::Pass(&made_up)).await.is_err());
+        assert!(BotClient::connect_with(&config(&server, "Junk"), Way::Pass("not a pass")).await.is_err());
+
+        drop((sol, acct, named));
+        h.shutdown();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn with_no_account_key_no_pass_is_taken() {
+        let cfg = el_server::Config {
+            wt_port: 0,
+            http_addr: "127.0.0.1:0".parse().unwrap(),
+            web_dir: None,
+            matches_per_shard: 2,
+            ..el_server::Config::default()
+        };
+        let h = el_server::start(cfg).await.expect("the server starts");
+        let server = format!("http://{}", h.http_addr);
+        assert!(el_bot::get_json(&server, "/nonce").await.unwrap()["nonce"].is_null());
+        let pass = mint("none", "eloram", "127.0.0.1", &"0".repeat(64));
+        assert!(BotClient::connect_with(&config(&server, "Acct"), Way::Pass(&pass)).await.is_err());
+        h.shutdown();
+    }
+}

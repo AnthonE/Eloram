@@ -5,7 +5,9 @@
 //! lobby message instead (JSON: the queue, the draw, the shop's catalogue, the scoreboard; up to
 //! [`MAX_LOBBY_FRAME`]): read the stream with [`Frame::decode`].
 
-use crate::auth::{Address, Domain, MAX_DOMAIN, NONCE_BYTES, Signature, TOKEN_BYTES};
+use crate::auth::{
+    Address, Domain, MAX_DOMAIN, NONCE_BYTES, SOLANA_KEY_BYTES, Signature, SolanaSignature, TOKEN_BYTES,
+};
 use crate::{DecodeError, PROTOCOL_VERSION};
 
 /// Longest player name, in UTF-8 bytes.
@@ -16,6 +18,10 @@ pub const MAX_FRAME: usize = 256;
 pub const LOBBY: u8 = 11;
 /// Largest lobby frame (prefix and tag included).
 pub const MAX_LOBBY_FRAME: usize = 2 + u16::MAX as usize;
+/// The tag of a pass frame: an Elo Pros pass as the page was handed it (`el_auth::verify_pass`).
+pub const PASS: u8 = 13;
+/// The longest pass (Elo Pros refuses a longer one too).
+pub const MAX_PASS: usize = 1024;
 
 /// Who is at the controls. Agents say so: the store is for people and agents equally, and both
 /// are shown for what they are.
@@ -38,6 +44,8 @@ pub mod hello_flags {
     pub const SIGN_IN: u8 = 1 << 0;
     /// The player signed in earlier and carries a resume token (a reconnect: no signature asked).
     pub const RESUME: u8 = 1 << 1;
+    /// The player signs in with an Elo Pros pass: a [`super::PASS`] frame follows the Hello.
+    pub const PASS: u8 = 1 << 2;
 }
 
 /// [`ControlMsg::Welcome`] flags.
@@ -151,6 +159,8 @@ pub enum ControlMsg {
     Challenge { nonce: [u8; NONCE_BYTES], issued_at: u64, domain: Domain },
     /// Client → server: the wallet's address and its signature over the challenge's message.
     Auth { address: Address, signature: Signature },
+    /// Client → server: the same from a Solana wallet, over `el_auth::siws_message`'s text.
+    AuthSolana { key: [u8; SOLANA_KEY_BYTES], signature: SolanaSignature },
     /// Server → client, after the Welcome of a signed-in player: reconnect with this instead of
     /// signing again.
     Token { token: [u8; TOKEN_BYTES] },
@@ -209,6 +219,11 @@ impl ControlMsg {
             ControlMsg::Auth { address, signature } => {
                 p.u8(8);
                 p.bytes(&address.0);
+                p.bytes(&signature.0);
+            }
+            ControlMsg::AuthSolana { key, signature } => {
+                p.u8(12);
+                p.bytes(&key);
                 p.bytes(&signature.0);
             }
             ControlMsg::Token { token } => {
@@ -290,6 +305,7 @@ impl ControlMsg {
                 ControlMsg::Challenge { nonce, issued_at, domain: Domain::new(text) }
             }
             8 => ControlMsg::Auth { address: Address(r.array()?), signature: Signature(r.array()?) },
+            12 => ControlMsg::AuthSolana { key: r.array()?, signature: SolanaSignature(r.array()?) },
             9 => ControlMsg::Token { token: r.array()? },
             10 => ControlMsg::Notice { code: r.u8()?, name: r.name()? },
             _ => return Err(DecodeError::WrongKind),
@@ -304,6 +320,8 @@ pub enum Frame<'a> {
     Msg(ControlMsg),
     /// A lobby message's payload (JSON).
     Lobby(&'a [u8]),
+    /// An Elo Pros pass.
+    Pass(&'a [u8]),
 }
 
 impl<'a> Frame<'a> {
@@ -313,17 +331,18 @@ impl<'a> Frame<'a> {
         if buf.len() < 3 {
             return Ok(None);
         }
-        if buf[2] != LOBBY {
+        if buf[2] != LOBBY && buf[2] != PASS {
             return ControlMsg::decode(buf).map(|m| m.map(|(msg, used)| (Frame::Msg(msg), used)));
         }
         let payload = u16::from_le_bytes([buf[0], buf[1]]) as usize;
-        if payload == 0 {
+        if payload == 0 || (buf[2] == PASS && payload > MAX_PASS + 1) {
             return Err(DecodeError::Invalid);
         }
         if buf.len() < payload + 2 {
             return Ok(None);
         }
-        Ok(Some((Frame::Lobby(&buf[3..payload + 2]), payload + 2)))
+        let body = &buf[3..payload + 2];
+        Ok(Some((if buf[2] == PASS { Frame::Pass(body) } else { Frame::Lobby(body) }, payload + 2)))
     }
 }
 
@@ -338,6 +357,16 @@ pub fn encode_lobby(payload: &[u8], out: &mut [u8]) -> Option<usize> {
     out[2] = LOBBY;
     out[3..len + 2].copy_from_slice(payload);
     Some(len + 2)
+}
+
+/// Writes a pass frame carrying `pass` into `out`. Its length, or `None` if it's too long.
+pub fn encode_pass(pass: &[u8], out: &mut [u8]) -> Option<usize> {
+    if pass.len() > MAX_PASS {
+        return None;
+    }
+    let n = encode_lobby(pass, out)?;
+    out[2] = PASS;
+    Some(n)
 }
 
 struct Cursor<'a> {
@@ -466,8 +495,18 @@ mod tests {
             domain: Domain::new("elopros.com"),
         });
         round_trip(ControlMsg::Auth { address: Address([9; 20]), signature: Signature([4; 65]) });
+        round_trip(ControlMsg::AuthSolana { key: [9; 32], signature: SolanaSignature([4; 64]) });
         round_trip(ControlMsg::Token { token: [1; TOKEN_BYTES] });
         round_trip(ControlMsg::Notice { code: 2, name: Name::new("Dusk") });
+    }
+
+    #[test]
+    fn a_pass_frame_comes_whole_and_one_too_long_is_refused() {
+        let mut out = [0u8; MAX_PASS + 8];
+        let n = encode_pass(b"abc.def", &mut out).unwrap();
+        assert_eq!(Frame::decode(&out[..n]).unwrap(), Some((Frame::Pass(b"abc.def"), n)));
+        assert_eq!(Frame::decode(&out[..n - 1]).unwrap(), None);
+        assert_eq!(encode_pass(&[b'a'; MAX_PASS + 1], &mut out), None);
     }
 
     #[test]

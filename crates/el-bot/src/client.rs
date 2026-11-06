@@ -53,6 +53,17 @@ impl std::fmt::Debug for BotConfig {
 /// What plays the seat: given the prediction, the seat and the tick, its steer and orders.
 pub type Brain<'a> = dyn FnMut(&Match, usize, u32, &mut SeatInput) + Send + 'a;
 
+/// How an agent signs in.
+#[derive(Clone, Copy)]
+pub enum Way<'a> {
+    /// With [`BotConfig::key`], or as a guest without one.
+    Config,
+    /// With a Solana wallet: its public key, and what signs a challenge's text.
+    Solana { key: [u8; 32], sign: &'a (dyn Fn(&[u8]) -> el_proto::auth::SolanaSignature + Send + Sync) },
+    /// With an Elo Pros pass.
+    Pass(&'a str),
+}
+
 enum Incoming {
     Msg(ControlMsg),
     Lobby(Vec<u8>),
@@ -69,7 +80,7 @@ pub struct BotClient {
     /// The winner, once the match is over.
     pub over: Option<u8>,
     /// The wallet it signed in as, if it did.
-    pub address: Option<el_proto::auth::Address>,
+    pub address: Option<el_proto::auth::PlayerId>,
     /// The token its match gave it, to take the seat back on another connection.
     pub rejoin: Option<String>,
     /// A rejoin found no seat.
@@ -83,23 +94,50 @@ impl BotClient {
     /// Connects and says hello as an agent named `cfg.name`, signing in with its key if it has
     /// one.
     pub async fn connect(cfg: &BotConfig) -> anyhow::Result<BotClient> {
+        Self::connect_with(cfg, Way::Config).await
+    }
+
+    /// Connects and signs in `way`.
+    pub async fn connect_with(cfg: &BotConfig, way: Way<'_>) -> anyhow::Result<BotClient> {
         let info = transport::discover(&cfg.server).await?;
         let conn = transport::connect(&info.url, info.cert_hash).await?;
         let (mut tx, rx) = conn.open_bi().await?.await?;
         let wallet = cfg.key.as_ref().and_then(el_auth::LocalWallet::from_secret);
         anyhow::ensure!(cfg.key.is_none() || wallet.is_some(), "the key isn't a valid secp256k1 secret");
         let mut hello = ControlMsg::hello(PlayerKind::Agent, &cfg.name);
-        if let (ControlMsg::Hello { flags, .. }, Some(_)) = (&mut hello, &wallet) {
-            *flags |= hello_flags::SIGN_IN;
+        if let ControlMsg::Hello { flags, .. } = &mut hello {
+            match way {
+                Way::Config if wallet.is_some() => *flags |= hello_flags::SIGN_IN,
+                Way::Config => {}
+                Way::Solana { .. } => *flags |= hello_flags::SIGN_IN,
+                Way::Pass(_) => *flags |= hello_flags::PASS,
+            }
         }
         let mut buf = [0u8; MAX_FRAME];
         let n = hello.encode(&mut buf).expect("a hello fits");
         tx.write_all(&buf[..n]).await?;
+        if let Way::Pass(pass) = way {
+            let mut out = vec![0u8; pass.len() + 3];
+            let n = el_proto::control::encode_pass(pass.as_bytes(), &mut out).expect("a pass fits");
+            tx.write_all(&out[..n]).await?;
+        }
         let (frames_tx, mut frames) = mpsc::channel(16);
         tokio::spawn(read_frames(rx, frames_tx));
         let mut address = None;
         let session = loop {
             match tokio::time::timeout(Duration::from_secs(10), frames.recv()).await {
+                Ok(Some(Incoming::Msg(ControlMsg::Challenge { nonce, issued_at, domain })))
+                    if matches!(way, Way::Solana { .. }) =>
+                {
+                    let Way::Solana { key, sign } = way else { unreachable!() };
+                    let id = el_proto::auth::PlayerId::solana(&key);
+                    let mut text = [0u8; el_auth::SIWE_MAX];
+                    let n = el_auth::siws_message(domain.as_str(), id.as_str(), &nonce, issued_at, &mut text);
+                    let msg = ControlMsg::AuthSolana { key, signature: sign(&text[..n]) };
+                    let n = msg.encode(&mut buf).expect("an auth fits");
+                    tx.write_all(&buf[..n]).await?;
+                    address = Some(id);
+                }
                 Ok(Some(Incoming::Msg(ControlMsg::Challenge { nonce, issued_at, domain }))) => {
                     let Some(w) = &wallet else { anyhow::bail!("challenged, with no key to sign with") };
                     let signature = w.sign_in(domain.as_str(), &nonce, issued_at);
@@ -107,7 +145,7 @@ impl BotClient {
                         .encode(&mut buf)
                         .expect("an auth fits");
                     tx.write_all(&buf[..n]).await?;
-                    address = Some(w.address());
+                    address = Some(w.address().into());
                 }
                 Ok(Some(Incoming::Msg(ControlMsg::Welcome { session, .. }))) => break session,
                 Ok(Some(Incoming::Msg(ControlMsg::Reject { reason }))) => {
@@ -287,6 +325,11 @@ async fn read_frames(mut rx: RecvStream, out: mpsc::Sender<Incoming>) {
                 let f = match frame {
                     Frame::Msg(m) => Incoming::Msg(m),
                     Frame::Lobby(bytes) => Incoming::Lobby(bytes.to_vec()),
+                    // Only ever sent by a client.
+                    Frame::Pass(_) => {
+                        inbox.drain(..used);
+                        continue;
+                    }
                 };
                 inbox.drain(..used);
                 if out.send(f).await.is_err() {

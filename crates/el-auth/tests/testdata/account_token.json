@@ -1,0 +1,27 @@
+{
+  "note": "A game's pass from Elo Pros (meter/accounts.py, docs/client/ACCOUNTS.md \u00a72): what a shard is handed instead of a wallet signature when a player is signed in to Elo Pros. Verify it offline: split on '.', base64url-decode both halves, check the ed25519 signature over the text's bytes against the account pubkey (GET /api/account/pubkey: standard base64 of 32 bytes), then that the text is exactly these seven lines, `for` is play:<your slug>, `shard` is a domain your shard signs in as, `nonce` is the one your shard handed this join (as SIWE's is), and `exp` is ahead. With a wallet the player is that wallet (lowercase); with `none` it is the account id. meter/test_accounts.py pins the minter to this file. The seed is a test key, sha256(\"elo account token fixture\"), and signs nothing real.",
+  "seed_hex": "2f3e65db2d7c08d3d45cb88040eca8badb2b6287066b2d30a1861756938b6536",
+  "pubkey": "H0SHD2PwtN2Lb2tZhyrcrQCHGFIs+qy9VvR4aISFwlE=",
+  "account": "acct_0123456789abcdef0123",
+  "game": "gates",
+  "shard": "elopros.com",
+  "nonce": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "exp": 1800000000,
+  "with_wallet": {
+    "wallet": "0x24445efddb08d4938e3e3627042b2cf4063d9092",
+    "text": "elo account\nid: acct_0123456789abcdef0123\nfor: play:gates\nshard: elopros.com\nnonce: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\nwallet: 0x24445efddb08d4938e3e3627042b2cf4063d9092\nexp: 1800000000",
+    "pass": "ZWxvIGFjY291bnQKaWQ6IGFjY3RfMDEyMzQ1Njc4OWFiY2RlZjAxMjMKZm9yOiBwbGF5OmdhdGVzCnNoYXJkOiBlbG9wcm9zLmNvbQpub25jZTogMDAwMTAyMDMwNDA1MDYwNzA4MDkwYTBiMGMwZDBlMGYxMDExMTIxMzE0MTUxNjE3MTgxOTFhMWIxYzFkMWUxZgp3YWxsZXQ6IDB4MjQ0NDVlZmRkYjA4ZDQ5MzhlM2UzNjI3MDQyYjJjZjQwNjNkOTA5MgpleHA6IDE4MDAwMDAwMDA.YbX6fWS4o2cHhFNXK6sExcLsm1M53Y0vlpH5clP4BDcFMZGEXP-sPCa39s70wgikSQvIi9viXHJ3KrRoSb0TBw"
+  },
+  "no_wallet": {
+    "wallet": null,
+    "text": "elo account\nid: acct_0123456789abcdef0123\nfor: play:gates\nshard: elopros.com\nnonce: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\nwallet: none\nexp: 1800000000",
+    "pass": "ZWxvIGFjY291bnQKaWQ6IGFjY3RfMDEyMzQ1Njc4OWFiY2RlZjAxMjMKZm9yOiBwbGF5OmdhdGVzCnNoYXJkOiBlbG9wcm9zLmNvbQpub25jZTogMDAwMTAyMDMwNDA1MDYwNzA4MDkwYTBiMGMwZDBlMGYxMDExMTIxMzE0MTUxNjE3MTgxOTFhMWIxYzFkMWUxZgp3YWxsZXQ6IG5vbmUKZXhwOiAxODAwMDAwMDAw.eOk7HA9cxLiFGRkyVXgITBLcWitPOavP-i3h_beyuuLhRMSRaRXWP8vGGs5hPojdht0KFvZN9ZVb5MPYSuVEAw"
+  },
+  "header": "Authorization: Elo-Account <pass>",
+  "refused": {
+    "another_game": "for: play:other",
+    "another_shard": "shard: evil.example \u2014 a pass a player handed some other server",
+    "site": "for: site \u2014 the site's own token, never a pass",
+    "another_join": "nonce: another \u2014 a pass replayed at a later join, even at the same shard"
+  }
+}

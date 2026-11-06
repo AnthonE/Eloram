@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use el_proto::auth::Address;
+use el_proto::auth::PlayerId;
 
 /// The most rerolls a wallet banks (and what one never seen before starts with).
 pub const BANK_MAX: u8 = 2;
@@ -18,7 +18,7 @@ pub const GUEST_REROLLS: u8 = 1;
 #[derive(Default)]
 pub struct Bank {
     /// Each wallet's rerolls, those not at [`BANK_MAX`] (a wallet not here has the most).
-    held: Mutex<HashMap<Address, u8>>,
+    held: Mutex<HashMap<PlayerId, u8>>,
     file: Option<PathBuf>,
 }
 
@@ -30,7 +30,7 @@ impl Bank {
             && let Ok(rows) = serde_json::from_slice::<Vec<(String, u8)>>(&b)
         {
             for (wallet, n) in rows {
-                if let Some(a) = el_auth::parse_address(&wallet)
+                if let Some(a) = PlayerId::parse(&wallet)
                     && n < BANK_MAX
                 {
                     held.insert(a, n);
@@ -41,22 +41,22 @@ impl Bank {
     }
 
     /// The rerolls `wallet` has (a guest's, without one).
-    pub fn balance(&self, wallet: Option<Address>) -> u8 {
+    pub fn balance(&self, wallet: Option<PlayerId>) -> u8 {
         let Some(a) = wallet else { return GUEST_REROLLS };
         self.held.lock().map_or(BANK_MAX, |h| h.get(&a).copied().unwrap_or(BANK_MAX))
     }
 
     /// `wallet` spent one.
-    pub fn spend(&self, wallet: Address) {
+    pub fn spend(&self, wallet: PlayerId) {
         self.change(wallet, |n| n.saturating_sub(1));
     }
 
     /// `wallet` earned one (up to the most).
-    pub fn earn(&self, wallet: Address) {
+    pub fn earn(&self, wallet: PlayerId) {
         self.change(wallet, |n| (n + 1).min(BANK_MAX));
     }
 
-    fn change(&self, wallet: Address, f: impl FnOnce(u8) -> u8) {
+    fn change(&self, wallet: PlayerId, f: impl FnOnce(u8) -> u8) {
         let Ok(mut h) = self.held.lock() else { return };
         let was = h.get(&wallet).copied().unwrap_or(BANK_MAX);
         let now = f(was);
@@ -69,10 +69,7 @@ impl Bank {
             h.insert(wallet, now);
         }
         if let Some(file) = &self.file {
-            let mut rows: Vec<(String, u8)> = h
-                .iter()
-                .map(|(a, n)| (String::from_utf8_lossy(&el_auth::lower_hex(a)).into_owned(), *n))
-                .collect();
+            let mut rows: Vec<(String, u8)> = h.iter().map(|(a, n)| (a.as_str().to_string(), *n)).collect();
             rows.sort();
             if let Ok(b) = serde_json::to_vec(&rows) {
                 crate::records::write_atomically(file, &b);
@@ -91,7 +88,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("rerolls.json");
         let _ = std::fs::remove_file(&file);
-        let a = Address([0xab; 20]);
+        let a = PlayerId::from(el_proto::auth::Address([0xab; 20]));
         let bank = Bank::kept(file.clone());
         assert_eq!(bank.balance(Some(a)), BANK_MAX, "a new wallet starts full");
         assert_eq!(bank.balance(None), GUEST_REROLLS);

@@ -2812,6 +2812,7 @@ version = "0.1.0"
 dependencies = [
  "el-proto",
  "k256",
+ "ring",
  "tiny-keccak",
 ]
 
@@ -2820,6 +2821,7 @@ name = "el-bot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64",
  "clap",
  "el-auth",
  "el-client-core",
@@ -2827,6 +2829,7 @@ dependencies = [
  "el-server",
  "el-sim",
  "hex",
+ "ring",
  "rustls",
  "serde_json",
  "tokio",
@@ -2912,6 +2915,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "base64",
  "clap",
  "crossbeam-queue",
  "el-alloc",
@@ -2924,6 +2928,7 @@ dependencies = [
  "futures",
  "getrandom 0.3.4",
  "hex",
+ "ring",
  "rustls",
  "serde",
  "serde_json",

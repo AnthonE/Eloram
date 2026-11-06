@@ -17,6 +17,8 @@ el-client-core.workspace = true
 el-auth = { path = "../el-auth", default-features = false, features = ["verify"] }
 crossbeam-queue.workspace = true
 getrandom = "0.3"
+ring = { version = "0.17", default-features = false }
+base64 = "0.22"
 tokio.workspace = true
 wtransport.workspace = true
 axum.workspace = true

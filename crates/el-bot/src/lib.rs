@@ -18,7 +18,7 @@
 pub mod client;
 pub mod transport;
 
-pub use client::{BotClient, BotConfig, Brain};
+pub use client::{BotClient, BotConfig, Brain, Way};
 pub use transport::{EndpointInfo, connect, discover, get_json, install_crypto_provider};
 
 /// The scripted bot (`el_sim::bot`), playing from what its client is sent.

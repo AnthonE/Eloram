@@ -1,6 +1,7 @@
-//! Wallet sign-in on the server: the domains a challenge may name, the resume tokens that bring a
-//! signed-in player back without asking their wallet again, and who is on (`/online.json`, for the
-//! Elo Pros store). The check itself is `el_auth::verify`. Nothing here is near a shard thread.
+//! Sign-in on the server: the domains a challenge may name, the nonces an Elo Pros pass must carry,
+//! the resume tokens that bring a signed-in player back without asking again, and who is on
+//! (`/online.json`, for the Elo Pros store). The checks themselves are `el_auth`'s. Nothing here is
+//! near a shard thread.
 //!
 //! Never logged: signatures and resume tokens. An address is logged only shortened ([`short`]).
 
@@ -9,18 +10,28 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use el_proto::auth::{Address, NONCE_BYTES, TOKEN_BYTES};
+use base64::Engine;
+use el_proto::auth::{NONCE_BYTES, PlayerId, TOKEN_BYTES};
 
 /// Seconds since the epoch.
 pub fn unix_now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs())
 }
 
-/// `0x1234…cdef`: an address as a log may name it.
-pub fn short(a: &Address) -> String {
-    let hex = el_auth::lower_hex(a);
-    let s = std::str::from_utf8(&hex).unwrap_or("0x?");
-    format!("{}…{}", &s[..6], &s[38..])
+/// `0x1234…cdef`: an id as a log may name it.
+pub fn short(a: &PlayerId) -> String {
+    let s = a.as_str();
+    format!("{}…{}", &s[..6], &s[s.len() - 4..])
+}
+
+/// A domain as a pass names it: the host, with no port.
+pub fn host_of(domain: &str) -> &str {
+    domain.rsplit_once(':').map_or(domain, |(h, _)| h)
+}
+
+/// Elo Pros' account key from its standard base64 (`GET /api/account/pubkey`).
+pub fn parse_pubkey(text: &str) -> Option<[u8; 32]> {
+    base64::engine::general_purpose::STANDARD.decode(text.trim()).ok()?.try_into().ok()
 }
 
 /// The host (and port, unless it's the scheme's default) of an `Origin`, as SIWE names a domain:
@@ -53,7 +64,7 @@ pub fn random<const N: usize>() -> [u8; N] {
 #[derive(Default)]
 pub struct Tokens {
     /// Each token's hash: its wallet, and until when (seconds since the epoch).
-    held: Mutex<HashMap<[u8; 32], (Address, u64)>>,
+    held: Mutex<HashMap<[u8; 32], (PlayerId, u64)>>,
     file: Option<PathBuf>,
 }
 
@@ -66,7 +77,7 @@ impl Tokens {
         {
             let now = unix_now();
             for (hash, wallet, until) in rows {
-                let (Ok(h), Some(a)) = (hex::decode(&hash), el_auth::parse_address(&wallet)) else {
+                let (Ok(h), Some(a)) = (hex::decode(&hash), PlayerId::parse(&wallet)) else {
                     continue;
                 };
                 if let Ok(h) = <[u8; 32]>::try_from(h.as_slice())
@@ -80,7 +91,7 @@ impl Tokens {
     }
 
     /// A new token for `address`, good for `ttl`.
-    pub fn issue(&self, address: Address, ttl: Duration) -> [u8; TOKEN_BYTES] {
+    pub fn issue(&self, address: PlayerId, ttl: Duration) -> [u8; TOKEN_BYTES] {
         let token = random::<TOKEN_BYTES>();
         if let Ok(mut t) = self.held.lock() {
             let now = unix_now();
@@ -89,9 +100,7 @@ impl Tokens {
             if let Some(file) = &self.file {
                 let rows: Vec<(String, String, u64)> = t
                     .iter()
-                    .map(|(h, (a, until))| {
-                        (hex::encode(h), String::from_utf8_lossy(&el_auth::lower_hex(a)).into_owned(), *until)
-                    })
+                    .map(|(h, (a, until))| (hex::encode(h), a.as_str().to_string(), *until))
                     .collect();
                 if let Ok(b) = serde_json::to_vec(&rows) {
                     crate::records::write_atomically(file, &b);
@@ -102,7 +111,7 @@ impl Tokens {
     }
 
     /// The wallet a token names, if it's one of ours and still good.
-    pub fn redeem(&self, token: &[u8; TOKEN_BYTES]) -> Option<Address> {
+    pub fn redeem(&self, token: &[u8; TOKEN_BYTES]) -> Option<PlayerId> {
         let t = self.held.lock().ok()?;
         t.get(&el_auth::keccak256(token)).filter(|(_, until)| *until > unix_now()).map(|(a, _)| *a)
     }
@@ -115,33 +124,33 @@ struct Entry {
     session: u32,
 }
 
-/// The wallets on now, by address (so the document reads in a stable order). The store's
-/// playtime polls it once a minute and counts hours per wallet (`meter/playtime.py` in
-/// AnthonE/scry-forge), in the shape Gates' shard and Before Colony serve. Guests have no wallet
-/// and aren't in it.
+/// The wallets on now, by id (so the document reads in a stable order). The store's playtime polls
+/// it once a minute and counts hours per wallet (`meter/playtime.py` in AnthonE/scry-forge), in the
+/// shape Gates' shard and Before Colony serve. `wallet` is the player's id as Elo Pros writes it:
+/// `0x…` lowercase, base58 exactly as written, or an account's `acct_…`. Guests have none and
+/// aren't in it.
 #[derive(Default)]
-pub struct Online(Mutex<BTreeMap<[u8; 20], Entry>>);
+pub struct Online(Mutex<BTreeMap<PlayerId, Entry>>);
 
 impl Online {
     /// `address` is on in `session` until the guard drops. A newer session for the same wallet
     /// takes the entry over, and the older one's guard then leaves it be.
-    pub fn enter(self: &Arc<Self>, address: Address, session: u32, name: &str, agent: bool) -> Here {
+    pub fn enter(self: &Arc<Self>, address: PlayerId, session: u32, name: &str, agent: bool) -> Here {
         if let Ok(mut on) = self.0.lock() {
-            on.insert(address.0, Entry { name: name.to_string(), agent, since: unix_now(), session });
+            on.insert(address, Entry { name: name.to_string(), agent, since: unix_now(), session });
         }
         Here { online: self.clone(), address, session }
     }
 
-    /// `{"at": unix, "online": [{"wallet", "name", "agent", "since"}]}`, wallets lowercase.
+    /// `{"at": unix, "online": [{"wallet", "name", "agent", "since"}]}`.
     pub fn json(&self) -> serde_json::Value {
         let online: Vec<serde_json::Value> = self.0.lock().map_or_else(
             |_| Vec::new(),
             |on| {
                 on.iter()
                     .map(|(a, e)| {
-                        let wallet = el_auth::lower_hex(&Address(*a));
                         serde_json::json!({
-                            "wallet": std::str::from_utf8(&wallet).unwrap_or_default(),
+                            "wallet": a.as_str(),
                             "name": e.name,
                             "agent": e.agent,
                             "since": e.since,
@@ -157,17 +166,86 @@ impl Online {
 /// A session's place in [`Online`], given back when it ends.
 pub struct Here {
     online: Arc<Online>,
-    address: Address,
+    address: PlayerId,
     session: u32,
 }
 
 impl Drop for Here {
     fn drop(&mut self) {
         if let Ok(mut on) = self.online.0.lock()
-            && on.get(&self.address.0).is_some_and(|e| e.session == self.session)
+            && on.get(&self.address).is_some_and(|e| e.session == self.session)
         {
-            on.remove(&self.address.0);
+            on.remove(&self.address);
         }
+    }
+}
+
+/// How long a nonce is good for: long enough to sit on the page until a pass (ten minutes of its
+/// own) is used.
+pub const NONCE_TTL: Duration = Duration::from_secs(15 * 60);
+const NONCE_CAP: usize = 100_000;
+
+/// The nonces this server hands the page, each good once.
+///
+/// A nonce carries its own proof: `hex(issued unix seconds, 8 bytes)`, `hex(8 random bytes)`, then
+/// the first 16 bytes of their HMAC-SHA256 under this process's key, in hex: 64 characters, inside
+/// Elo Pros' `[0-9A-Za-z]{8,64}`. So it needs no list of what was issued (oneshot's, whose page signs
+/// in the same way).
+pub struct Nonces {
+    key: ring::hmac::Key,
+    used: Mutex<BTreeMap<String, u64>>,
+}
+
+impl Default for Nonces {
+    fn default() -> Self {
+        Self {
+            key: ring::hmac::Key::new(ring::hmac::HMAC_SHA256, &random::<32>()),
+            used: Mutex::new(BTreeMap::new()),
+        }
+    }
+}
+
+impl Nonces {
+    fn mac(&self, head: &str) -> String {
+        hex::encode(&ring::hmac::sign(&self.key, head.as_bytes()).as_ref()[..16])
+    }
+
+    pub fn issue(&self) -> String {
+        self.issue_at(unix_now())
+    }
+
+    pub fn issue_at(&self, now: u64) -> String {
+        let head = format!("{}{}", hex::encode(now.to_be_bytes()), hex::encode(random::<8>()));
+        let mac = self.mac(&head);
+        head + &mac
+    }
+
+    /// Whether `n` was issued here in the last [`NONCE_TTL`] and hasn't been taken. Takes it.
+    pub fn take(&self, n: &str) -> bool {
+        self.take_at(n, unix_now())
+    }
+
+    pub fn take_at(&self, n: &str, now: u64) -> bool {
+        if n.len() != 64 || !n.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+            return false;
+        }
+        let (head, mac) = n.split_at(32);
+        // Compared whole, in constant time.
+        let want = self.mac(head);
+        if want.bytes().zip(mac.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) != 0 {
+            return false;
+        }
+        let Ok(at) = u64::from_str_radix(&head[..16], 16) else { return false };
+        if at > now + 5 || now.saturating_sub(at) >= NONCE_TTL.as_secs() {
+            return false;
+        }
+        let Ok(mut used) = self.used.lock() else { return false };
+        used.retain(|_, t| now.saturating_sub(*t) < NONCE_TTL.as_secs());
+        if used.contains_key(n) || used.len() >= NONCE_CAP {
+            return false;
+        }
+        used.insert(n.to_string(), at);
+        true
     }
 }
 
@@ -186,6 +264,10 @@ pub struct SignIn {
     pub online: Arc<Online>,
     /// Sign-ins waiting on a wallet at once.
     pub waiting: Arc<tokio::sync::Semaphore>,
+    /// Elo Pros' account key (`--elo-pubkey`). Without it no pass is taken.
+    pub pass_key: Option<[u8; 32]>,
+    /// The nonces a pass must carry (`/nonce`).
+    pub nonces: Nonces,
 }
 
 impl SignIn {
@@ -198,6 +280,8 @@ impl SignIn {
             tokens: Tokens::default(),
             online: Arc::new(Online::default()),
             waiting: Arc::new(tokio::sync::Semaphore::new(256)),
+            pass_key: None,
+            nonces: Nonces::default(),
         }
     }
 
@@ -210,6 +294,51 @@ impl SignIn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use el_proto::auth::Address;
+
+    #[test]
+    fn nonces_are_good_once_and_for_a_while() {
+        let n = Nonces::default();
+        let a = n.issue_at(1000);
+        assert_eq!(a.len(), 64);
+        assert!(a.bytes().all(|b| b.is_ascii_alphanumeric()), "Elo Pros' nonce shape");
+        assert!(n.take_at(&a, 1001));
+        assert!(!n.take_at(&a, 1002), "once");
+        assert!(!n.take_at(&"0".repeat(64), 1001));
+        assert!(!Nonces::default().take_at(&n.issue_at(1000), 1001), "another key");
+        let ttl = NONCE_TTL.as_secs();
+        assert!(!n.take_at(&n.issue_at(1000), 1000 + ttl));
+        assert!(n.take_at(&n.issue_at(1000), 1000 + ttl - 1));
+        assert!(!n.take_at(&n.issue_at(2000), 1000), "not from the future");
+    }
+
+    #[test]
+    fn the_account_key_is_base64_of_32_bytes() {
+        assert_eq!(parse_pubkey("H0SHD2PwtN2Lb2tZhyrcrQCHGFIs+qy9VvR4aISFwlE=").map(|k| k[0]), Some(0x1f));
+        assert_eq!(parse_pubkey("AAAA"), None);
+    }
+
+    #[test]
+    fn a_solana_wallet_and_an_account_are_on_the_roster_and_in_the_tokens_file_as_written() {
+        let sol = "GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB";
+        let acct = "acct_0123456789abcdef0123";
+        let online = Arc::new(Online::default());
+        let _a = online.enter(PlayerId::parse(sol).unwrap(), 1, "Sol", false);
+        let _b = online.enter(PlayerId::parse(acct).unwrap(), 2, "Acct", false);
+        let doc = online.json();
+        let wallets: Vec<&str> =
+            doc["online"].as_array().unwrap().iter().map(|e| e["wallet"].as_str().unwrap()).collect();
+        assert!(wallets.contains(&sol) && wallets.contains(&acct), "{wallets:?}");
+
+        let file = std::env::temp_dir().join(format!("el-tokens-{}.json", std::process::id()));
+        let _ = std::fs::remove_file(&file);
+        let t = Tokens::kept(file.clone()).issue(PlayerId::parse(sol).unwrap(), Duration::from_secs(60));
+        assert_eq!(
+            Tokens::kept(file.clone()).redeem(&t).map(|a| a.as_str().to_string()).as_deref(),
+            Some(sol)
+        );
+        let _ = std::fs::remove_file(&file);
+    }
 
     #[test]
     fn a_challenge_names_the_pages_own_domain() {
@@ -224,7 +353,7 @@ mod tests {
     #[test]
     fn a_token_names_its_wallet_until_it_runs_out() {
         let t = Tokens::default();
-        let a = Address([7; 20]);
+        let a = PlayerId::from(Address([7; 20]));
         let token = t.issue(a, Duration::from_secs(60));
         assert_eq!(t.redeem(&token), Some(a));
         assert_eq!(t.redeem(&[0; TOKEN_BYTES]), None);
@@ -235,7 +364,7 @@ mod tests {
     #[test]
     fn a_takeover_keeps_the_newer_session() {
         let online = Arc::new(Online::default());
-        let a = Address([0xAB; 20]);
+        let a = PlayerId::from(Address([0xAB; 20]));
         let first = online.enter(a, 1, "Ace", false);
         let second = online.enter(a, 2, "Ace", false);
         drop(first);
@@ -248,7 +377,7 @@ mod tests {
 
     #[test]
     fn a_short_address_keeps_its_ends() {
-        let a = el_auth::parse_address("0x7e5f4552091a69125d5dfcb7b8c2659029395bdf").unwrap();
+        let a = PlayerId::parse("0x7e5f4552091a69125d5dfcb7b8c2659029395bdf").unwrap();
         assert_eq!(short(&a), "0x7e5f…5bdf");
     }
 }

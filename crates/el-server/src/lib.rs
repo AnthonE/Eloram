@@ -63,6 +63,8 @@ pub struct Config {
     /// The domains a wallet sign-in may name (`--siwe-domain`): the pages' hosts. Empty: this
     /// server's own HTTP address.
     pub siwe_domains: Vec<String>,
+    /// Elo Pros' account key (`GET /api/account/pubkey`). None: no pass is taken, and `/nonce` says so.
+    pub elo_pubkey: Option<[u8; 32]>,
     /// People must sign in with a wallet (agents may still play as guests).
     pub require_sign_in: bool,
     /// Practice matches may be asked for (`el_sim::practice`, `ToServer::Practice`).
@@ -88,6 +90,7 @@ impl Default for Config {
             referee: true,
             checkpoint_secs: 60.0,
             siwe_domains: Vec::new(),
+            elo_pubkey: None,
             require_sign_in: false,
             practice: false,
         }
@@ -195,6 +198,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
     if let Some(dir) = &cfg.records_dir {
         signin.tokens = signin::Tokens::kept(dir.join("tokens.json"));
     }
+    signin.pass_key = cfg.elo_pubkey;
     let signin = Arc::new(signin);
     tokio::spawn(net::endpoint::accept_loop(
         endpoint,
@@ -208,6 +212,7 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
 
     let mode = cfg.mode;
     let online = signin.online.clone();
+    let nonces = signin.clone();
     let max_players = cfg.max_players;
     let status_stats = stats.clone();
     let launcher_stats = stats.clone();
@@ -227,6 +232,10 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
         cors_origins: cfg.cors_origins.clone().into(),
         records: lobby.as_ref().map(|l| l.game.records.clone()),
         online: Arc::new(move || online.json()),
+        nonce: Arc::new(move || {
+            let nonce = nonces.pass_key.map(|_| nonces.nonces.issue());
+            serde_json::json!({ "nonce": nonce, "game": el_auth::GAME })
+        }),
     };
     let mut http_shutdown = rx;
     tokio::spawn(async move {
