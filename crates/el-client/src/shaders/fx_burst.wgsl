@@ -7,14 +7,22 @@
 // Shapes: 0 a glow (a hot core in a soft halo), 1 a spark streaking along its motion, 2 a shard
 // turning and glinting, 3 a puff that billows, grows and thins (smoke, dust), 4 a shockwave on the
 // ground widening to its size, 5 a column of light, 6 a flash lying on the ground, 7 a star (a hit's
-// flash of rays), 8 an ember that flickers and wanders as it rises, 9 a scorch left on the ground.
+// flash of rays), 8 an ember that flickers and wanders as it rises, 9 a scorch left on the ground,
+// 10 a fireball (in the laid-over pool: fire burning to soot; in the added pool: the heat alone, an
+// energy burst), 11 a flash of petals (a hit's).
+//
+// A puff, a fireball and a petal flash play a flipbook (`web/assets/fx/cloud_{a,b}.png`, baked
+// by `art/tools/flipbooks.py` from a fluid simulation: `docs/FX.md`, "Flipbooks"): the frame for
+// its age and the next crossfaded, the smoke lit six ways by the moon and the night where the
+// moon stands in the sprite's own frame, eroded from its thin parts as it ages, its heat added
+// through its family's ramp. Each sprite picks a variant of its strip and a mirror by its seed.
 //
 // Light (the added pool) is born white-hot and cools to its colour, as fire and sparks do; smoke
 // and dust (laid over) keep theirs. Every particle has a seed of its own, from where and when it
 // was born, so no two puffs are the same shape and no two embers flicker together.
 
 #import bevy_pbr::{
-    mesh_view_bindings::{view, globals},
+    mesh_view_bindings::{view, globals, lights},
     view_transformations::position_world_to_clip,
 }
 #import el::fog::fog_dark
@@ -24,6 +32,15 @@
 @group(#{MATERIAL_BIND_GROUP}) @binding(1) var fog_s: sampler;
 // x: 1 for the added pool (light), 0 for the laid-over one (smoke, dust, rubble, scorch).
 @group(#{MATERIAL_BIND_GROUP}) @binding(2) var<uniform> pool: vec4<f32>;
+// The stage's knobs (`burst.rs`, `BurstMat::knobs`; all 1 in a match): x how white-hot light is
+// born, y how brightly the night lights smoke, z a puff's alpha, w a flash's and a star's brightness.
+@group(#{MATERIAL_BIND_GROUP}) @binding(3) var<uniform> knobs: vec4<f32>;
+// The flipbook sheet (`art/tools/flipbooks.py`): a, light from the sprite's right, left and top
+// and its coverage; b, light from below, the front and behind, and its heat.
+@group(#{MATERIAL_BIND_GROUP}) @binding(4) var sheet_a: texture_2d<f32>;
+@group(#{MATERIAL_BIND_GROUP}) @binding(5) var sheet_a_s: sampler;
+@group(#{MATERIAL_BIND_GROUP}) @binding(6) var sheet_b: texture_2d<f32>;
+@group(#{MATERIAL_BIND_GROUP}) @binding(7) var sheet_b_s: sampler;
 
 struct Vertex {
     @location(0) position: vec3<f32>,
@@ -41,8 +58,49 @@ struct Out {
     // x: its age as a share of its life; y: its shape; z: how dark the fog is where it is; w: its
     // seed (0 to 1).
     @location(2) life: vec4<f32>,
-    // x: its age (s).
+    // x: its age (s); y: how far into the crossfade to the flipbook's next frame.
     @location(3) age: vec2<f32>,
+    // The flipbook's uvs on the sheet for this corner: the frame drawn (xy) and the next (zw).
+    @location(4) sheet: vec4<f32>,
+}
+
+// The sheet's cut (`art/tools/flipbooks.py`; `burst.rs` holds the same): 8 × 8 cells; a strip's
+// first cell, its variants and the frames in each: smoke from 0, the fireball from 32, the flash
+// from 48.
+const SHEET_CELLS: f32 = 8.0;
+
+fn strip(shape: f32) -> vec3<f32> {
+    if shape > 2.5 && shape < 3.5 {
+        return vec3(0.0, 2.0, 16.0);
+    }
+    if shape > 9.5 && shape < 10.5 {
+        return vec3(32.0, 2.0, 8.0);
+    }
+    return vec3(48.0, 4.0, 4.0);
+}
+
+fn plays_sheet(shape: f32) -> bool {
+    return (shape > 2.5 && shape < 3.5) || shape > 9.5;
+}
+
+// Where a cell's corner (0 to 1 across the cell) is on the sheet.
+fn cell_uv(cell: f32, corner: vec2<f32>) -> vec2<f32> {
+    let row = floor(cell / SHEET_CELLS);
+    let col = cell - row * SHEET_CELLS;
+    return (vec2(col, row) + corner) / SHEET_CELLS;
+}
+
+// What heat `h` (0 to 1) glows in a family's colours: its edge colour as it warms, its core as it
+// burns, white-hot only at the very top; brighter than linear in the heat, so a core burns
+// bright, an edge smoulders, and what's barely warm gives nothing to the soot. The family's hue
+// holds most of the way up: a fireball all white read as a cloud, not fire.
+fn ramp(h: f32, core: vec3<f32>) -> vec3<f32> {
+    let peak = max(core.r, max(core.g, core.b));
+    let hue = core / max(peak, 0.001);
+    let edge = hue * hue * peak * 0.35;
+    var c = mix(edge, core, smoothstep(0.08, 0.6, h));
+    c = mix(c, vec3(peak), smoothstep(0.88, 1.0, h) * 0.6);
+    return c * (0.08 + 0.75 * h * h);
 }
 
 // What lights smoke and dust: about what the moon and the night's ambient give the stone, linear.
@@ -95,6 +153,22 @@ fn vertex(v: Vertex) -> Out {
     let right = view.world_from_view[0].xyz;
     let up = view.world_from_view[1].xyz;
     var s = size;
+    o.sheet = vec4(0.0);
+    o.age = vec2(age, 0.0);
+    if plays_sheet(shape) {
+        // Its strip's variant and a mirror by its seed; the frame for its age, and the next.
+        let st = strip(shape);
+        let variant = min(floor(seed * st.y), st.y - 1.0);
+        let f = k * (st.z - 1.0);
+        let fa = floor(f);
+        let fb = min(fa + 1.0, st.z - 1.0);
+        let flip = step(0.5, fract(seed * 7.31));
+        // The sheet's rows run down the image; the sprite's up is its uv's top.
+        let c = vec2(mix(v.uv.x, 1.0 - v.uv.x, flip), 1.0 - v.uv.y);
+        let base = st.x + variant * st.z;
+        o.sheet = vec4(cell_uv(base + fa, c), cell_uv(base + fb, c));
+        o.age.y = f - fa;
+    }
     if shape < 0.5 {
         // Pops to its size, then shrinks away.
         s = size * (0.55 + 0.45 * smoothstep(0.0, 0.12, k)) * (1.0 - k * k);
@@ -108,6 +182,14 @@ fn vertex(v: Vertex) -> Out {
         // An ember: wanders side to side as it rises, and shrinks as it cools.
         s = size * (1.0 - 0.6 * k);
         p += right * sin(age * (2.0 + 2.0 * seed) + seed * 20.0) * 0.18 * k;
+        p += (right * corner.x + up * corner.y) * s;
+    } else if shape > 9.5 && shape < 10.5 {
+        // A fireball: small as it's lit, swelling as it burns (the frames swell too).
+        s = size * (0.7 + 1.5 * sqrt(k));
+        p += (right * corner.x + up * corner.y) * s;
+    } else if shape > 10.5 {
+        // A flash of petals: opens fast, a turn of its own (the mirror is the sheet's).
+        s = size * (0.7 + 0.8 * sqrt(k));
         p += (right * corner.x + up * corner.y) * s;
     } else if shape > 8.5 {
         // A scorch: flat on the ground, turned its own way, as big as it was made.
@@ -131,9 +213,10 @@ fn vertex(v: Vertex) -> Out {
         s = size * (1.0 - 0.6 * k);
         p += (right * r.x + up * r.y) * s;
     } else if shape < 3.5 {
-        // A puff billows out and slowly turns.
-        s = size * (0.5 + 1.5 * sqrt(k));
-        corner = turn(corner, seed * 6.2832 + age * (seed - 0.5) * 1.6);
+        // A puff: its frames billow; the sprite grows a little with them, turned a little its
+        // own way (its frames are upright, the smoke rising).
+        s = size * (1.7 + 0.9 * sqrt(k));
+        corner = turn(corner, (seed - 0.5) * 0.8);
         p += (right * corner.x + up * corner.y) * s;
     } else if shape < 4.5 || shape > 5.5 {
         // Flat on the ground: a ring widening to its size, or a flash.
@@ -148,8 +231,48 @@ fn vertex(v: Vertex) -> Out {
     o.uv = v.uv;
     o.color = v.color;
     o.life = vec4(k, shape, fog_dark(fog, fog_s, p), seed);
-    o.age = vec2(age, 0.0);
     return o;
+}
+
+// A sheet sprite's two frames, crossfaded: a (light from right, left, top; coverage) and b (from
+// below, the front, behind; heat).
+fn sheet_frames(sheet: vec4<f32>, blend: f32) -> array<vec4<f32>, 2> {
+    let a = mix(textureSample(sheet_a, sheet_a_s, sheet.xy), textureSample(sheet_a, sheet_a_s, sheet.zw), blend);
+    let b = mix(textureSample(sheet_b, sheet_b_s, sheet.xy), textureSample(sheet_b, sheet_b_s, sheet.zw), blend);
+    return array(a, b);
+}
+
+// What the moon and the night give smoke, linear: about what they give the stone (`NIGHT`),
+// split into the moon's share, which falls from where it stands, and the night's, which comes
+// from everywhere. The lights' own numbers (lux through the camera's exposure) are far brighter
+// than the stone reads: the ground's shader grades its own; this keeps to the stone's level.
+const MOON_SMOKE: vec3<f32> = vec3(0.34, 0.38, 0.50);
+const NIGHT_SMOKE: vec3<f32> = vec3(0.12, 0.14, 0.20);
+
+// Smoke of albedo `tint` lit six ways by the moon and the night, where the moon stands in the
+// sprite's own frame (its right and up the screen's, its front the eye's side): the side the
+// moon is on is lit, the thick inside is dark, the thin edge glows through from behind.
+fn lit_smoke(a: vec4<f32>, b: vec4<f32>, tint: vec3<f32>) -> vec3<f32> {
+    let right = view.world_from_view[0].xyz;
+    let up = view.world_from_view[1].xyz;
+    let to_eye = view.world_from_view[2].xyz;
+    var to_moon = vec3(0.0, 1.0, 0.0);
+    if lights.n_directional_lights > 0u {
+        to_moon = lights.directional_lights[0].direction_to_light;
+    }
+    let l = vec3(dot(to_moon, right), dot(to_moon, up), dot(to_moon, to_eye));
+    let lit = a.r * max(l.x, 0.0) + a.g * max(-l.x, 0.0)
+        + a.b * max(l.y, 0.0) + b.r * max(-l.y, 0.0)
+        + b.g * max(l.z, 0.0) + b.b * max(-l.z, 0.0);
+    let open = (a.r + a.g + a.b + b.r + b.g + b.b) / 6.0;
+    return tint * (MOON_SMOKE * lit * 1.4 + NIGHT_SMOKE * (0.35 + 0.65 * open)) * knobs.y;
+}
+
+// Coverage eroded from its thin parts as the sprite ages past half its life (the smoke thins and
+// tears rather than fading evenly), and gone by its end.
+fn eroded(cover: f32, k: f32) -> f32 {
+    let erode = clamp((k - 0.5) / 0.5, 0.0, 1.0) * 1.3;
+    return cover * smoothstep(erode - 0.35, erode + 0.02, cover) * (1.0 - smoothstep(0.85, 1.0, k));
 }
 
 @fragment
@@ -160,6 +283,28 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
     let age = o.age.x;
     let c = o.uv - 0.5;
     let d = length(c) * 2.0;
+    // In the fog, dimmer (it's only drawn because the team was told of it).
+    let dim = 1.0 - o.life.z * 0.6;
+    if plays_sheet(shape) {
+        let frames = sheet_frames(o.sheet, o.age.y);
+        let fa = frames[0];
+        let fb = frames[1];
+        let born = smoothstep(0.0, 0.05, k);
+        let col = o.color.rgb;
+        if pool.x > 0.5 {
+            // Light alone: a flash's petals, or an energy burst's heat, through the ramp.
+            let heat = fb.a * born * (1.0 - smoothstep(0.6, 1.0, k)) * o.color.a;
+            let glow = ramp(fb.a, col) * heat * knobs.w;
+            return vec4(display(glow * dim), min(heat, 1.0));
+        }
+        // Laid over: smoke lit by the night, with the fire (a fireball's) added through it.
+        let cover = eroded(fa.a, k) * born * o.color.a * knobs.z;
+        let soot = select(col, vec3(0.12, 0.10, 0.09), shape > 9.5);
+        let smoke = lit_smoke(fa, fb, soot) * cover;
+        let heat = fb.a * born * (1.0 - smoothstep(0.5, 0.9, k)) * o.color.a;
+        let glow = ramp(fb.a, col) * heat * knobs.w;
+        return vec4(display((smoke + glow) * dim), min(cover, 1.0));
+    }
     var a = 0.0;
     // In, quickly; out, over the rest of its life.
     var fade = smoothstep(0.0, 0.06, k) * (1.0 - smoothstep(0.55, 1.0, k));
@@ -185,7 +330,7 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
         // A puff: a billowing edge, torn by noise of its own, thinning as it spreads.
         let n = vnoise(c * 4.0 + vec2(seed * 37.0, seed * 11.0 - k * 0.8)) * 0.6
             + vnoise(c * 9.0 + vec2(seed * 7.0 + k, seed * 23.0)) * 0.4;
-        a = smoothstep(0.0, 0.55, 1.0 - d + (n - 0.5) * 0.7) * (0.75 - 0.35 * k);
+        a = smoothstep(0.0, 0.55, 1.0 - d + (n - 0.5) * 0.7) * (0.75 - 0.35 * k) * knobs.z;
     } else if shape < 4.5 {
         // A shockwave: a sharp leading edge, a soft wake behind it toward the middle, uneven
         // round its length, thinning as it widens.
@@ -210,14 +355,15 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
         let boil = vnoise(vec2(ang * 2.5 + seed * 30.0, d * 4.0 - k * 5.0)) * 0.55
             + vnoise(c * 9.0 + vec2(seed * 13.0, k * 3.0)) * 0.45;
         let body = smoothstep(0.0, 0.5, 1.0 - d + (boil - 0.5) * 0.8);
-        a = body * pow(max(1.0 - d, 0.0), 1.3) * (0.3 + 0.9 * boil) * 0.85;
+        // Not so bright that it reads as a disc: the boil shows, and the fireball over it.
+        a = body * pow(max(1.0 - d, 0.0), 1.4) * (0.12 + 1.1 * boil) * 0.55 * knobs.w;
     } else if shape < 7.5 {
         // A star: four long rays and four short between them, a white core; gone fast.
         let q = abs(c) * 2.0;
         let long_rays = exp(-q.x * 28.0) * (1.0 - q.y) + exp(-q.y * 28.0) * (1.0 - q.x);
         let r = abs(turn(c, 0.785398)) * 2.0;
         let short_rays = (exp(-r.x * 34.0) * (1.0 - r.y * 1.6) + exp(-r.y * 34.0) * (1.0 - r.x * 1.6)) * 0.5;
-        a = max(long_rays, 0.0) + max(short_rays, 0.0) + exp(-d * d * 30.0);
+        a = (max(long_rays, 0.0) + max(short_rays, 0.0) + exp(-d * d * 30.0)) * knobs.w;
         fade = smoothstep(0.0, 0.03, k) * (1.0 - smoothstep(0.2, 1.0, k));
     } else if shape < 8.5 {
         // An ember: a hot point that flickers.
@@ -233,18 +379,16 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
         fade = smoothstep(0.0, 0.05, k) * (1.0 - smoothstep(0.35, 1.0, k));
     }
     a = clamp(a, 0.0, 2.0) * fade * o.color.a;
-    // In the fog, dimmer (it's only drawn because the team was told of it).
-    let dim = 1.0 - o.life.z * 0.6;
     var col = o.color.rgb;
     if pool.x > 0.5 {
         // Born white-hot, cooling to its colour: its own brightness, unhued, early in its life.
-        let hot = pow(1.0 - k, 3.0) * 0.7;
+        let hot = pow(1.0 - k, 3.0) * 0.7 * knobs.x;
         let peak = max(col.r, max(col.g, col.b));
         col = mix(col, vec3(peak), hot);
     } else {
         // Smoke and dust give no light: they're lit as the stone round them is, by the moon and
         // the night (a pale puff drawn as its own colour was a white cloud in the dark).
-        col *= NIGHT;
+        col *= NIGHT * knobs.y;
     }
     let rgb = col * a * dim;
     // Premultiplied: added for light (its alpha unused), laid over for smoke (`burst.rs`).

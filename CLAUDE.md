@@ -79,6 +79,16 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `window.__el` has `fx_cues`, `fx_own_casts`, `fx_missiles`, `fx_zones`, `champion_casts`,
   `minion_flashes`, `wheels_turning` and `audio_*`; the inbox takes `{t:"volume",bus,v}` and
   `{t:"mute",on}`.
+- The fx stage (`docs/FX.md`, step 7): `scripts/fx.sh <name>…` (`list [filter]` names everything it
+  can fire: `orrin-q-impact`, `liora-r-blast`, `death-turret`...) builds the page and shoots one
+  effect alone in front of a dark and a light card on a clock stepped 1/60 s a frame, into
+  `e2e/artifacts/fx/<name>/{strip.png,numbers.json,diff.png}` (`e2e/fxstrip.mjs`, vendored from
+  Gates; `--no-build` keeps the page, `--knobs 'impact.star=1.5;size=0.8'` retunes a recipe without a
+  rebuild (`knobs` lists them), `--seed`, `--frames`, `--span`, `--side enemy`, `--size`, `--low`).
+  The page is `?fxstage=<name>` (`el-client/src/stage.rs`; `el_client_core::fx::stage` is the
+  catalogue, the clock and the knobs). The flipbook sheet the puffs, fireballs and flashes play is
+  `web/assets/fx/cloud_{a,b}.png`, remade by `python3 -I art/tools/flipbooks.py` (`--preview DIR`
+  writes it lit, to look at); a test holds its cut to the baker's and the shader's.
 - The HUD (`docs/DESIGN.md`, "The HUD"): `hud.rs`, `hud_death.rs` (the grey, the recap), `hud_target.rs`
   (the target frame), `portrait.rs` (the live portraits), `hud_select.rs` (champion select's screen),
   `hud_lobby.rs` (the connecting, lobby and queue card, and a match's end with Play again); the icons are painted by

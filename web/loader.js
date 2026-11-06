@@ -172,6 +172,14 @@ async function main() {
     // The picture's tier (`?quality=low`: no HDR, bloom, shadows or multisampling, a few textures
     // read for the ground; `high` back). Remembered; without a GPU, low unless asked.
     quality: qualitySetting(),
+    // The fx stage (`?fxstage=<name>`, `el-client/src/stage.rs`): one effect alone on a stepped
+    // clock, no server; `&knobs=`, `&seed=`, `&side=`, `&size=` and `&cards=` go with it.
+    fxstage: params.get("fxstage") || "",
+    fxknobs: params.get("knobs") || "",
+    fxseed: Number(params.get("seed") || 0) | 0,
+    fxside: params.get("side") || "own",
+    fxsize: Number(params.get("size") || 0),
+    fxcards: params.get("cards") || "",
   };
   if (config.signIn) {
     try {
@@ -189,7 +197,7 @@ async function main() {
   } else if (params.get("replay")) {
     config.recordUrl = params.get("replay");
   }
-  if (config.recordUrl) {
+  if (config.recordUrl || config.fxstage) {
     // Nothing to dial.
   } else if (!("WebTransport" in window)) {
     config.noWebTransport = true;

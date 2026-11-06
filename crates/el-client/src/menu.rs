@@ -77,6 +77,10 @@ impl Tab {
     }
 }
 
+/// The button at the top left (the fx stage hides it: `stage.rs`).
+#[derive(Component)]
+pub struct TopButton;
+
 /// What a button of the menu does.
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
 enum Do {
@@ -245,6 +249,7 @@ fn setup(mut commands: Commands) {
         BackgroundColor(OFF),
         Tint(OFF),
         Do::Toggle,
+        TopButton,
         // Over the menu's dimming, so it closes it too.
         GlobalZIndex(45),
         children![bar(), bar(), bar()],

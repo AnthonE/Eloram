@@ -135,6 +135,7 @@ impl Plugin for FxPlugin {
         bevy::asset::embedded_asset!(app, "shaders/fx_live.wgsl");
         app.init_resource::<Cues>()
             .init_resource::<Catch>()
+            .init_resource::<burst::KnobsRes>()
             .add_plugins((
                 MaterialPlugin::<burst::BurstMat>::default(),
                 MaterialPlugin::<live::LiveMat>::default(),
@@ -152,8 +153,8 @@ impl Plugin for FxPlugin {
 }
 
 /// The director's cues for this frame (a new director for each match's client, and one for a
-/// match watched).
-fn direct(
+/// match watched). The stage's come after (`stage.rs`): it has no client.
+pub(crate) fn direct(
     session: Res<Session>,
     mut cues: ResMut<Cues>,
     mut catch: ResMut<Catch>,

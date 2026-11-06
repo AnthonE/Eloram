@@ -39,6 +39,15 @@ pub struct LaunchConfig {
     /// bloom, shadows, multisampling or the braziers' lights, and the ground read from a few
     /// textures, for older machines.
     pub low: bool,
+    /// The fx stage (`?fxstage=<name>`, `stage.rs`): one effect alone, no server. With it, the
+    /// knobs (`&knobs=`), the seed (`&seed=`), whose view (`&side=`), the cue's size (`&size=`) and
+    /// the cards' greys (`&cards=dark,light`).
+    pub fxstage: Option<String>,
+    pub fxknobs: String,
+    pub fxseed: u32,
+    pub fxside: String,
+    pub fxsize: Option<f32>,
+    pub fxcards: Option<[f32; 2]>,
 }
 
 fn get(obj: &JsValue, key: &str) -> JsValue {
@@ -78,6 +87,19 @@ impl LaunchConfig {
             wasd: flag("wasd"),
             camera_locked: flag("cameraLocked"),
             low: string("quality") == "low",
+            fxstage: get(&cfg, "fxstage").as_string().filter(|s| !s.is_empty()),
+            fxknobs: string("fxknobs"),
+            fxseed: get(&cfg, "fxseed").as_f64().unwrap_or(0.0).clamp(0.0, f64::from(u32::MAX)) as u32,
+            fxside: string("fxside"),
+            fxsize: get(&cfg, "fxsize").as_f64().map(|v| v as f32).filter(|v| *v > 0.0),
+            fxcards: {
+                let c = string("fxcards");
+                let mut it = c.split(',').map(|v| v.trim().parse::<f32>().ok());
+                match (it.next().flatten(), it.next().flatten()) {
+                    (Some(d), Some(l)) => Some([d.clamp(0.0, 1.0), l.clamp(0.0, 1.0)]),
+                    _ => None,
+                }
+            },
         }
     }
 }

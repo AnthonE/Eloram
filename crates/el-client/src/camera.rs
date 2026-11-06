@@ -23,6 +23,9 @@ pub struct MainCamera;
 pub struct Rig {
     /// The map point the camera looks at.
     pub focus: Vec2,
+    /// How far above the floor it looks (m): 0 in a match; the fx stage looks at an effect's
+    /// middle (`stage.rs`).
+    pub height: f32,
     /// The zoom drawn, and the one the wheel asks for (the first eases to the second).
     pub zoom: f32,
     pub zoom_to: f32,
@@ -41,6 +44,7 @@ impl Default for Rig {
     fn default() -> Self {
         Self {
             focus: Vec2::new(1_200.0, el_sim::map::MID_Y),
+            height: 0.0,
             zoom: 1.0,
             zoom_to: 1.0,
             locked: false,
@@ -308,7 +312,7 @@ fn follow(
     rig.zoom += (rig.zoom_to - rig.zoom) * (1.0 - (-EASE_ZOOM * dt).exp());
     rig.focus = rig.focus.clamp(Vec2::new(600.0, 900.0), Vec2::new(MAP_W - 600.0, MAP_H - 900.0));
     controls.view = rig.focus;
-    let target = world(rig.focus, 0.0);
+    let target = world(rig.focus, rig.height);
     let jolt = shake.offset(crate::net::now_s());
     **cam =
         Transform::from_translation(target + VIEW.offset(rig.zoom) + jolt).looking_at(target + jolt, Vec3::Y);

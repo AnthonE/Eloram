@@ -25,6 +25,8 @@ pub enum Phase {
     Failed,
     /// Watching a record.
     Watching,
+    /// The fx stage (`?fxstage=`): no server, one effect on a stepped clock (`stage.rs`).
+    Stage,
 }
 
 impl Phase {
@@ -40,6 +42,7 @@ impl Phase {
             Phase::Over => "over",
             Phase::Failed => "failed",
             Phase::Watching => "watching",
+            Phase::Stage => "stage",
         }
     }
 }

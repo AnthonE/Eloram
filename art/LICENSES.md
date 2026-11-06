@@ -125,6 +125,12 @@ pitched, filtered and enveloped under the synthesis.
 The announcer's lines (`voice.*`) and the music (`music.*`) are optional lines the tool doesn't
 make; they come with their own licences when they come.
 
+## The effects' flipbooks (`web/assets/fx/`)
+
+| File | What it is |
+|---|---|
+| `cloud_a.png`, `cloud_b.png` | smoke, a fireball and a flash of petals, a strip of frames each, baked by `art/tools/flipbooks.py` from its own fluid simulation and lit six ways (`docs/FX.md`, step 7); ours. The baker is after oneshot's (`AnthonE/oneshot`, `tools/flipbooks/bake.py`, MIT). |
+
 ## Made in code
 
 The fog's texture, the floor's splat, the mist, the snow and the braziers' fire are made by the

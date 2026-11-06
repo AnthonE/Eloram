@@ -114,8 +114,9 @@ pub fn now_s() -> f64 {
 }
 
 fn connect(net: NonSend<NetState>, cfg: Res<LaunchConfigRes>) {
-    if cfg.0.record_url.is_some() {
-        // Watching: the record comes over HTTP (`watch`), nothing is dialled.
+    if cfg.0.record_url.is_some() || cfg.0.fxstage.is_some() {
+        // Watching: the record comes over HTTP (`watch`), nothing is dialled. The fx stage has no
+        // match at all.
         return;
     }
     if cfg.0.no_web_transport {

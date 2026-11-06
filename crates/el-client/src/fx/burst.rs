@@ -22,6 +22,7 @@ use bevy::shader::ShaderRef;
 use el_client_core::fx::director::{Cue, Status, What};
 use el_client_core::fx::look::{Family, Palette, Reach, Rgb};
 use el_client_core::fx::sound::Part;
+use el_client_core::fx::stage::Knobs;
 use el_sim::units::Kind;
 
 use super::{Catch, Cues, Want};
@@ -42,7 +43,37 @@ pub struct BurstMat {
     /// x: 1 for the added pool (light: born white-hot), 0 for the laid-over one.
     #[uniform(2)]
     pub pool: Vec4,
+    /// The stage's knobs on the shader's numbers (`el_client_core::fx::stage::KNOBS`; all 1 in a
+    /// match): x how white-hot light is born, y how brightly the night lights smoke, z a puff's
+    /// alpha, w a flash's and a star's brightness.
+    #[uniform(3)]
+    pub knobs: Vec4,
+    /// The flipbook sheet ([`sheet`], `web/assets/fx/`): light through the smoke from six sides,
+    /// its coverage and its heat, a strip of frames a cell.
+    #[texture(4)]
+    #[sampler(5)]
+    pub sheet_a: Handle<Image>,
+    #[texture(6)]
+    #[sampler(7)]
+    pub sheet_b: Handle<Image>,
     pub additive: bool,
+}
+
+/// The flipbook sheet the shader plays (`el_client_core::fx::stage::sheet` is its cut, checked
+/// against the baker's and the shader's).
+pub mod sheet {
+    pub const FILES: [&str; 2] = ["fx/cloud_a.png", "fx/cloud_b.png"];
+}
+
+/// The knobs the recipes are made with (`el_client_core::fx::stage::Knobs`): the stage's, or none.
+#[derive(Resource, Default)]
+pub struct KnobsRes(pub Knobs);
+
+impl KnobsRes {
+    /// The shader's four, as `BurstMat::knobs` takes them.
+    fn shader(&self) -> Vec4 {
+        Vec4::new(self.0.k("hot"), self.0.k("night"), self.0.k("puff"), self.0.k("flash"))
+    }
 }
 
 impl Material for BurstMat {
@@ -99,6 +130,11 @@ mod shape {
     pub const STAR: f32 = 7.0;
     pub const EMBER: f32 = 8.0;
     pub const SCORCH: f32 = 9.0;
+    /// A fireball (the sheet): fire burning to soot in the laid-over pool, its heat alone (an
+    /// energy burst) in the added one.
+    pub const BOOM: f32 = 10.0;
+    /// A flash of petals (the sheet), a hit's.
+    pub const FLASH_PETALS: f32 = 11.0;
 }
 
 struct Slot {
@@ -116,8 +152,14 @@ const LONGEST: f32 = 600.0;
 pub struct Bursts {
     glow: Vec<Slot>,
     smoke: Vec<Slot>,
+    /// The two pools' materials, for the knobs.
+    mats: [Handle<BurstMat>; 2],
+    /// The flipbook sheet's two images.
+    sheets: [Handle<Image>; 2],
     rng: u32,
     low: bool,
+    /// The shader's clock as `spawn` last saw it.
+    now_seen: f32,
 }
 
 fn empty_mesh() -> Mesh {
@@ -141,12 +183,28 @@ pub fn setup(
     mut commands: Commands,
     look: Res<Look>,
     fog: Res<FogTex>,
+    server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut mats: ResMut<Assets<BurstMat>>,
 ) {
     let (glows, smokes) = if look.high { (72, 24) } else { (40, 12) };
-    let glow_mat = mats.add(BurstMat { fog: fog.0.clone(), pool: Vec4::X, additive: true });
-    let smoke_mat = mats.add(BurstMat { fog: fog.0.clone(), pool: Vec4::ZERO, additive: false });
+    // The sheet holds light and coverage, not colour: linear (`mips.rs` gives it its chain).
+    let linear = |s: &mut bevy::image::ImageLoaderSettings| {
+        s.is_srgb = false;
+        s.sampler = crate::mips::sampler(false);
+    };
+    let sheet_a: Handle<Image> = server.load_builder().with_settings(linear).load(sheet::FILES[0]);
+    let sheet_b: Handle<Image> = server.load_builder().with_settings(linear).load(sheet::FILES[1]);
+    let mat = |pool: Vec4, additive: bool| BurstMat {
+        fog: fog.0.clone(),
+        pool,
+        knobs: Vec4::ONE,
+        sheet_a: sheet_a.clone(),
+        sheet_b: sheet_b.clone(),
+        additive,
+    };
+    let glow_mat = mats.add(mat(Vec4::X, true));
+    let smoke_mat = mats.add(mat(Vec4::ZERO, false));
     let mut pool = |n: usize, mat: &Handle<BurstMat>| {
         (0..n)
             .map(|_| {
@@ -168,10 +226,41 @@ pub fn setup(
     };
     let glow = pool(glows, &glow_mat);
     let smoke = pool(smokes, &smoke_mat);
-    commands.insert_resource(Bursts { glow, smoke, rng: 0x2545_F491, low: !look.high });
+    commands.insert_resource(Bursts {
+        glow,
+        smoke,
+        mats: [glow_mat, smoke_mat],
+        sheets: [sheet_a, sheet_b],
+        rng: 0x2545_F491,
+        low: !look.high,
+        now_seen: 0.0,
+    });
 }
 
 impl Bursts {
+    /// The generator started again from `seed` (the stage: a strip shot again is the same strip).
+    pub fn reseed(&mut self, seed: u32) {
+        self.rng = seed.wrapping_mul(0x9E37_79B9) ^ 0x2545_F491 | 1;
+    }
+
+    /// Every slot's burst over (the stage going round to its plate).
+    pub fn clear(&mut self) {
+        for s in self.glow.iter_mut().chain(&mut self.smoke) {
+            s.ends = 0.0;
+        }
+    }
+
+    /// The flipbook sheet is in (nothing of a burst that plays it is drawn before).
+    pub fn sheets_loaded(&self, server: &AssetServer) -> bool {
+        self.sheets.iter().all(|h| server.is_loaded_with_dependencies(h))
+    }
+
+    /// How many slots hold a live burst: of light, and of smoke.
+    pub fn live(&self) -> (u32, u32) {
+        let n = |v: &[Slot]| v.iter().filter(|s| s.ends > self.now_seen).count() as u32;
+        (n(&self.glow), n(&self.smoke))
+    }
+
     fn rand(&mut self) -> f32 {
         let mut x = self.rng;
         x ^= x << 13;
@@ -241,11 +330,35 @@ struct Make<'a> {
     smoke: Vec<P>,
     /// The share of particles kept (the low tier keeps half).
     keep: f32,
+    /// The stage's knobs (none in a match: every one 1).
+    knobs: &'a Knobs,
 }
 
 impl Make<'_> {
+    /// A knob's multiplier (`stage::KNOBS`).
+    fn k(&self, name: &str) -> f32 {
+        self.knobs.k(name)
+    }
+
     fn n(&self, n: f32) -> usize {
-        (n * self.keep).round().max(1.0) as usize
+        (n * self.keep * self.k("count")).round().max(1.0) as usize
+    }
+
+    /// A particle as the knobs have it: its size, life and speed scaled, its light brightened or
+    /// its smoke thinned.
+    fn knobbed(&self, mut p: P, smoke: bool) -> P {
+        p.size *= self.k("size");
+        p.life *= self.k("life");
+        p.vel *= self.k("speed");
+        if smoke {
+            p.color[3] *= self.k("smoke");
+        } else {
+            let b = self.k("bright");
+            p.color[0] *= b;
+            p.color[1] *= b;
+            p.color[2] *= b;
+        }
+        p
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -277,12 +390,17 @@ impl Make<'_> {
                 shape,
                 color,
             };
-            if smoke { self.smoke.push(p) } else { self.glow.push(p) }
+            self.push(p, smoke);
         }
     }
 
     fn one(&mut self, at: Vec3, shape: f32, size: f32, life: f32, color: [f32; 4], smoke: bool) {
         let p = P { at, born: self.now, life, size, shape, color, ..P::default() };
+        self.push(p, smoke);
+    }
+
+    fn push(&mut self, p: P, smoke: bool) {
+        let p = self.knobbed(p, smoke);
         if smoke { self.smoke.push(p) } else { self.glow.push(p) }
     }
 
@@ -354,13 +472,23 @@ pub fn spawn(
     time: Res<Time>,
     cues: Res<Cues>,
     drawn: Res<Drawn>,
+    knobs: Res<KnobsRes>,
     mut catch: ResMut<Catch>,
     mut clock: ResMut<Time<Virtual>>,
     mut bursts: ResMut<Bursts>,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut mats: ResMut<Assets<BurstMat>>,
     mut shown: Query<&mut Visibility>,
 ) {
     let now = time.elapsed_secs_wrapped();
+    bursts.now_seen = now;
+    if knobs.is_changed() {
+        for h in bursts.mats.clone() {
+            if let Some(mut m) = mats.get_mut(&h) {
+                m.knobs = knobs.shader();
+            }
+        }
+    }
     let keep = if bursts.low { 0.5 } else { 1.0 };
     for (i, q) in cues.list.iter().enumerate() {
         if catch.held {
@@ -377,7 +505,8 @@ pub fn spawn(
             }
             _ => now,
         };
-        let mut m = Make { b: &mut bursts, now: born, glow: Vec::new(), smoke: Vec::new(), keep };
+        let mut m =
+            Make { b: &mut bursts, now: born, glow: Vec::new(), smoke: Vec::new(), keep, knobs: &knobs.0 };
         recipe(&mut m, q, &drawn);
         let (glow, smoke) = (std::mem::take(&mut m.glow), std::mem::take(&mut m.smoke));
         bursts.put(&glow, false, born, &mut meshes);
@@ -443,8 +572,9 @@ fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
     let ground = |h: f32| world(q.at, h);
     match q.what {
         What::Part(Part::Cast) => {
-            m.spray(ground(0.2), 8.0 * k, shape::GLOW, 1.2, 0.95, 0.55, 0.07, -2.0, 1.5, core, false);
-            m.one(ground(0.04), shape::FLASH, 0.6 * k, 0.35, edge, false);
+            let glow = m.k("cast.glow");
+            m.spray(ground(0.2), 8.0 * k * glow, shape::GLOW, 1.2, 0.95, 0.55, 0.07, -2.0, 1.5, core, false);
+            m.one(ground(0.04), shape::FLASH, 0.6 * k * m.k("cast.flash"), 0.35, edge, false);
         }
         What::Part(Part::Ult) => {
             m.one(ground(0.0), shape::COLUMN, 0.45 * k, 0.9, core, false);
@@ -467,19 +597,26 @@ fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
             let hurt = (q.size / 150.0).clamp(0.6, 1.6);
             let auto = matches!(q.look.reach, Reach::Auto { .. });
             let kk = if auto { k * 0.5 * hurt } else { k * hurt };
-            // Where it struck: a hot glow and a star of rays, there and gone, the sharpest thing in
-            // the hit (first: a burst past its particles' room drops the last).
-            m.one(at, shape::GLOW, 0.32 * kk.max(0.6), 0.14, core, false);
-            m.one(at, shape::STAR, 0.42 * kk.max(0.5), 0.13, core, false);
-            m.sparks(fam, &pal, at, kk);
+            // Where it struck: a hot glow and a flash of petals, there and gone, the sharpest thing
+            // in the hit (first: a burst past its particles' room drops the last).
+            m.one(at, shape::GLOW, 0.32 * kk.max(0.6) * m.k("impact.glow"), 0.14, core, false);
+            m.one(at, shape::FLASH_PETALS, 0.65 * kk.max(0.5) * m.k("impact.star"), 0.16, core, false);
+            m.sparks(fam, &pal, at, kk * m.k("impact.sparks"));
             if q.look.ult || q.rating >= 8 {
                 m.one(ground(0.05), shape::RING, 0.9 * k, 0.45, edge, false);
             }
         }
         What::Part(Part::Blast) => {
             let r = (q.size * S).max(0.3);
-            m.one(ground(0.05), shape::RING, r, 0.55, edge, false);
-            m.one(ground(0.04), shape::FLASH, r * 0.9, 0.35, core, false);
+            m.one(ground(0.05), shape::RING, r * m.k("blast.ring"), 0.55, edge, false);
+            m.one(ground(0.04), shape::FLASH, r * 0.9 * m.k("blast.flash"), 0.35, core, false);
+            // What boils up from its middle: a fireball burning to soot where fire strikes, the
+            // heat alone (an energy burst) for the rest; stone throws dust and rubble, not fire.
+            if !matches!(fam, Some(Family::Stone)) {
+                let fire = matches!(fam, Some(Family::Ember));
+                let size = (r * 0.45).clamp(0.3, 1.4) * m.k("blast.flash");
+                m.one(ground(0.3), shape::BOOM, size, 0.55, core, fire);
+            }
             let n = (r * 6.0).clamp(8.0, 30.0) * k;
             for _ in 0..m.n(n) {
                 let a = m.b.rand() * std::f32::consts::TAU;
@@ -504,28 +641,41 @@ fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
                     },
                     color: core,
                 };
-                m.glow.push(p);
+                m.push(p, false);
             }
             if matches!(fam, Some(Family::Stone | Family::Ember | Family::Tide | Family::Wind)) {
-                for _ in 0..m.n((r * 2.5).clamp(4.0, 10.0)) {
+                let puff = m.k("blast.puff");
+                for _ in 0..m.n((r * 2.5).clamp(4.0, 10.0) * puff) {
                     let a = m.b.rand() * std::f32::consts::TAU;
                     let at = ground(0.2) + Vec3::new(a.cos() * r * 0.7, 0.0, a.sin() * r * 0.7);
-                    m.smoke.push(P {
+                    let p = P {
                         at,
                         vel: Vec3::new(a.cos() * 0.8, 0.4, a.sin() * 0.8),
                         born: m.now,
                         life: 1.2,
-                        size: 0.3 * r.min(1.6),
+                        size: 0.3 * r.min(1.6) * puff,
                         drag: 1.5,
                         shape: shape::PUFF,
                         color: dust,
                         ..P::default()
-                    });
+                    };
+                    m.push(p, true);
                 }
             }
-            // What burns or breaks the ground leaves a mark on it for a while.
-            if q.look.ult || matches!(fam, Some(Family::Ember | Family::Stone)) {
-                m.one(ground(0.03), shape::SCORCH, r * 0.5, 3.0, SCORCH, true);
+            // What burns or breaks the ground leaves a mark on it for a while: soot where fire
+            // or stone struck; an ultimate of any other family leaves its light on the ground
+            // instead, fading slowly (a soot scorch under a healer's sanctuary read as a hole).
+            if matches!(fam, Some(Family::Ember | Family::Stone)) {
+                m.one(ground(0.03), shape::SCORCH, r * 0.5 * m.k("blast.scorch"), 3.0, SCORCH, true);
+            } else if q.look.ult {
+                m.one(
+                    ground(0.03),
+                    shape::FLASH,
+                    r * 0.6 * m.k("blast.scorch"),
+                    2.0,
+                    rgba(pal.edge, 0.5, 0.6),
+                    false,
+                );
             }
             if matches!(fam, Some(Family::Ember)) {
                 m.spray(
@@ -553,7 +703,7 @@ fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
             for _ in 0..m.n(14.0 * k) {
                 let a = m.b.rand() * std::f32::consts::TAU;
                 let from = Vec3::new(a.cos() * r, 0.15 + 0.4 * m.b.rand(), a.sin() * r);
-                m.glow.push(P {
+                let p = P {
                     at: ground(0.0) + from,
                     vel: -from * 2.2,
                     born: m.now + m.b.rand() * 0.3,
@@ -563,7 +713,8 @@ fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
                     shape: shape::GLOW,
                     color: edge,
                     ..P::default()
-                });
+                };
+                m.push(p, false);
             }
         }
         What::Part(Part::Dash) => {
@@ -584,9 +735,9 @@ fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
                     color: if smoke { dust } else { core },
                     ..P::default()
                 };
-                if smoke { m.smoke.push(p) } else { m.glow.push(p) }
+                m.push(p, smoke);
             }
-            m.one(ground(0.05), shape::FLASH, 0.7 * k, 0.3, edge, false);
+            m.one(ground(0.05), shape::FLASH, 0.7 * k * m.k("dash.flash"), 0.3, edge, false);
             if q.look.family.is_none() {
                 // Blink: there and here at once.
                 m.one(world(from, 0.05), shape::FLASH, 0.7, 0.3, edge, false);
@@ -595,22 +746,27 @@ fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
             }
         }
         What::Part(Part::Buff) | What::Shield | What::Heal => {
-            for i in 0..m.n(12.0 * k) {
+            let glow = m.k("buff.glow");
+            for i in 0..m.n(12.0 * k * glow) {
                 let a = i as f32 * 0.9 + m.b.rand();
                 let at = ground(0.1) + Vec3::new(a.cos() * 0.45, 0.0, a.sin() * 0.45);
-                m.glow.push(P {
+                let p = P {
                     at,
                     vel: Vec3::new(-a.sin() * 0.6, 1.6 + m.b.rand(), a.cos() * 0.6),
                     born: m.now + m.b.rand() * 0.15,
                     life: 0.8,
-                    size: 0.07,
+                    size: 0.07 * glow,
                     drag: 1.0,
                     shape: shape::GLOW,
                     color: core,
                     ..P::default()
-                });
+                };
+                m.push(p, false);
             }
-            m.one(ground(0.05), shape::RING, 0.85, 0.5, edge, false);
+            m.one(ground(0.05), shape::RING, 0.85 * m.k("buff.ring"), 0.5, edge, false);
+            // A soft bloom at the chest as it lands, so the buff shows in its first tenth of a
+            // second (the ring and the motes take a moment to rise).
+            m.one(ground(1.0), shape::GLOW, 0.5 * k * m.k("buff.glow"), 0.3, rgba(pal.core, 0.6, 1.0), false);
         }
         What::Fizzle => {
             m.spray(ground(1.1), 6.0, shape::GLOW, 1.0, 0.5, 0.35, 0.06, 0.0, 3.0, edge, false);

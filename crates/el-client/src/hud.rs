@@ -1710,6 +1710,7 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                 | Phase::Failed
                 | Phase::Over
                 | Phase::Watching
+                | Phase::Stage
                 | Phase::Selecting => String::new(),
                 Phase::Playing => match c {
                     Some(c) if !c.started() => "Taking the field...".into(),

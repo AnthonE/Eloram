@@ -221,6 +221,42 @@ A ten-champion fight in practice (dummies with abilities cast on a loop) and in 
 the readability rules held, the frame budget held, the mix's ladder heard. Writes the frame-time
 numbers on a real GPU into `ROADMAP.md`, which has none yet.
 
+### 7. The stage, and the flipbooks
+
+Step 5's hand-tuning needs a place where one effect can be looked at alone, as it moves, and
+measured, so a change can be seen to do what it meant and nothing else. Gates built that loop
+for its effects (`AnthonE/Gates`, `crates/fx/src/stage.rs`, `ci/fxstrip.mjs`, the `fx` skill)
+and oneshot runs the same loop against its browser page; Eloram takes the contract and the
+shooter as they are, and keeps its own particles, which are closed forms moved in the shader
+(step 2), not Gates' pool.
+
+- **The stage** (`?fxstage=<name>`, `el-client/src/stage.rs`; the catalogue, the clock and the
+  knobs are `el_client_core::fx::stage`, tested natively): one effect, fired twice at once, in
+  front of a dark card (the frame's left half: light reads here) and a light card (the right:
+  smoke, dust and a scorch read here), laid on the Causeway's middle with everything else hidden,
+  the camera close over them at the effect's own height. The picture's clock steps exactly 1/60 s
+  a frame and holds where the shooter asks (`window.__fxStep`; `window.__fx` says where the page
+  stands): step 0 is the plate, the effect fires on step 1. No server: the stage makes the cue
+  the director would (`Staged::cue`) and hands it to the same bursts.
+- **The strip** (`e2e/fxstrip.mjs`, Gates' own, vendored; `scripts/fx.sh <name>`): every frame
+  captioned, the brightest large, an envelope of how much each card changed over time, and the
+  numbers per card against the plate (light added, light taken, cover, peak, clip, where), a diff
+  against the last run, all in `e2e/artifacts/fx/<name>/`. Headless Chromium draws in software,
+  but a clock that holds for every frame doesn't care: a strip is right at any frame rate.
+- **Knobs** (`scripts/fx.sh <name> --knobs 'impact.star=1.5;size=0.8'`; `scripts/fx.sh knobs`):
+  named multipliers on the recipes' numbers, read where a burst is made and in the shader, so a
+  look is retuned without the four-minute wasm rebuild, and the numbers that work are then
+  written into the recipe. In a match every knob is 1.
+- **Flipbooks** (`art/tools/flipbooks.py`, `web/assets/fx/cloud_{a,b}.png`): smoke, a fireball
+  and a flash of petals baked from a small fluid simulation (Stam's stable fluids with a
+  multigrid pressure solve, after oneshot's baker) into one 1024² sheet pair, each frame lit from
+  six sides, so the shader lights a puff from wherever the moon stands in the sprite's own frame,
+  erodes it from its thin parts as it ages, and adds its heat through the family's ramp. A puff,
+  a blast's fireball (fire burning to soot where fire or stone strikes; the heat alone, an energy
+  burst, for the rest) and a hit's flash play them; the bursts' other shapes are drawn as before.
+  The sheet's cut is one set of numbers in the baker, the shader and `stage::sheet`, held together
+  by a test.
+
 ## Sound: what it's made of
 
 - **Sources**: CC0 recordings (Kenney's audio sets, Freesound's CC0 pool, our own Foley), never a
