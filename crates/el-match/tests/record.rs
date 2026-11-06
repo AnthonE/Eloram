@@ -136,7 +136,9 @@ fn one_order_changed_is_caught_at_the_next_hash() {
     let mut rig = Rig::new(3, vec![(2, BAD, walker(5))]);
     rig.run(60.0);
     let bytes = rig.record.clone();
-    // The walker's first move order, taken somewhere else.
+    // The walker's first move order, sent back to its own platform (a nudge of the goal can
+    // leave the walk the same until its next order: the way out of the base turns at the same
+    // corner).
     let mut changed_at = None;
     let out = rewrite(&bytes, |f| match f {
         Frame::Tick { tick, mut inputs }
@@ -144,8 +146,8 @@ fn one_order_changed_is_caught_at_the_next_hash() {
                 && inputs[2].orders().iter().any(|o| matches!(o, el_proto::Order::Move { .. })) =>
         {
             for o in &mut inputs[2].orders[..usize::from(inputs[2].n)] {
-                if let el_proto::Order::Move { to } = o {
-                    to.x += 300.0;
+                if let el_proto::Order::Move { .. } = o {
+                    *o = el_proto::Order::Move { to: el_sim::map::PLATFORM.0 }.quantized();
                 }
             }
             changed_at = Some(tick);
