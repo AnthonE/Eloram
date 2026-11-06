@@ -1,0 +1,70 @@
+# The public Eloram server as a systemd service on the game box, beside Gates and oneshot
+# (ops/README.md). One slot: a restart takes its matches up again from their records and
+# checkpoints, and the players come back to their seats with their tokens (`docs/NETCODE.md`,
+# "The record"; `el-server/src/recover.rs`), so nobody needs a second slot to drain into.
+#
+#   sudo cp ops/eloram.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now eloram
+#   systemctl status eloram ; journalctl -u eloram -f
+#
+# It runs the staged binary in /home/master/eloram-deploy (scripts/deploy-server.sh), never the
+# checkout; what it writes (the records, the checkpoints, the lobby's file, the resume tokens'
+# hashes, the rerolls) goes to /home/master/eloram-data.
+#
+# Signals (el-server/src/main.rs):
+#   - stop sends SIGTERM: the server stops; each live match's record, checkpoint and lobby file are
+#     left for the next server on the same --records to take up, and its players rejoin.
+#   - reload sends SIGHUP: the certificate is read again and handed to new handshakes; nobody is
+#     disconnected (the certbot hook uses this: ops/certbot-deploy-hook.sh).
+
+[Unit]
+Description=Eloram server — game.elopros.com
+Documentation=https://github.com/AnthonE/Eloram
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=master
+Group=master
+WorkingDirectory=/home/master/eloram-deploy
+# UDP 61260 open in ufw AND the Hetzner cloud firewall (the cloud firewall passes 49152–65535;
+# taken already: Gates 61234, Before Colony 61240, oneshot 61250–61251, Fireplace 61290–61297, kit
+# rooms 61300–61315). HTTP 8460 loopback only, behind the box's nginx on 443
+# (ops/game-elopros-eloram.nginx.conf). The page is on elopros.com (scripts/publish-web.sh), so a
+# sign-in names elopros.com and the page's origin may read the server's HTTP side.
+ExecStart=/home/master/eloram-deploy/el-server \
+  --wt-port 61260 \
+  --http 127.0.0.1:8460 \
+  --web-dir /home/master/eloram-deploy/no-web-here \
+  --cert /home/master/eloram-certs/fullchain.pem \
+  --key /home/master/eloram-certs/privkey.pem \
+  --records /home/master/eloram-data \
+  --siwe-domain elopros.com \
+  --cors-origin https://elopros.com \
+  --fill-after 30
+ExecReload=/bin/kill -HUP $MAINPID
+
+Restart=always
+RestartSec=2
+
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=60
+
+LimitNOFILE=65536
+
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/master/eloram-data
+PrivateTmp=true
+NoNewPrivileges=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=eloram
+
+[Install]
+WantedBy=multi-user.target

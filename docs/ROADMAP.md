@@ -326,9 +326,13 @@ Left, in no order:
   draw calls.
 - **The announcer's and the music's files**: wired, optional, dropped in by name (`FX.md`).
 - The agents' own team-view bots in the empty seats, where the server's bots sit now.
-- **The operator's**: where the game server runs (`--server`, `--http`, `--siwe-domain`), the
-  store's route to the page, and the listing. Not in their way any more: a server left running
-  stopped taking new players once its self-signed certificate was a fortnight old (browsers
-  refuse a pinned one past fourteen days), and a renewed Let's Encrypt file needed a restart; a
-  running server remakes the one and reads the other again now (`net::endpoint::rotate`, a test
-  dialling with the new hash and the old).
+- **The operator's**: where the game server runs, the store's route to the page, and the
+  listing. The kit is `ops/` now, the way oneshot is hosted (`ops/README.md`: a systemd unit, the
+  certbot hook that copies a renewed chain and reloads the server with SIGHUP, the nginx block
+  for the HTTP side behind the box's 443, `scripts/deploy-server.sh`), with one slot, since a
+  restart takes the matches up again from their records. Not in their way any more: a server left
+  running stopped taking new players once its self-signed certificate was a fortnight old
+  (browsers refuse a pinned one past fourteen days), and a renewed Let's Encrypt file needed a
+  restart; a running server remakes the one and reads the other again (`net::endpoint::rotate`,
+  on SIGHUP and every hour, a test dialling with the new hash and the old). Still theirs: the
+  port and the host in the unit and the nginx file are placeholders until the box says.

@@ -9,8 +9,9 @@ use std::time::Duration;
 
 use el_server::{Config, Mode};
 
-fn dir() -> PathBuf {
-    let d = std::env::temp_dir().join(format!("el-rotate-{}", std::process::id()));
+/// A directory of the test's own (the tests run at once in one process).
+fn dir(name: &str) -> PathBuf {
+    let d = std::env::temp_dir().join(format!("el-rotate-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
     std::fs::create_dir_all(&d).unwrap();
     d
@@ -22,7 +23,7 @@ async fn hash(base: &str) -> String {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn the_self_signed_certificate_is_remade_while_the_server_runs() {
-    let dir = dir();
+    let dir = dir("remade");
     let cfg = Config {
         mode: Mode::Echo,
         wt_port: 0,
@@ -63,6 +64,39 @@ async fn the_self_signed_certificate_is_remade_while_the_server_runs() {
     drop(conn);
     let old = el_bot::connect(&info.url, first_info.cert_hash).await;
     assert!(old.is_err(), "the old hash still connects");
+    server.shutdown();
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_reload_remakes_a_self_signed_certificate_whatever_its_age() {
+    let dir = dir("reload");
+    let cfg = Config {
+        mode: Mode::Echo,
+        wt_port: 0,
+        http_addr: "127.0.0.1:0".parse().unwrap(),
+        records_dir: Some(dir.clone()),
+        cert_keep: Duration::from_secs(3_600),
+        cert_check: Duration::from_secs(3_600),
+        ..Config::default()
+    };
+    let server = el_server::start(cfg).await.unwrap();
+    let base = format!("http://{}", server.http_addr);
+    let first = hash(&base).await;
+    // SIGHUP's work: a new one at once, kept and served.
+    server.reload();
+    let mut second = first.clone();
+    for _ in 0..40 {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        second = hash(&base).await;
+        if second != first {
+            break;
+        }
+    }
+    assert_ne!(second, first, "the reload remade nothing");
+    let info = el_bot::discover(&base).await.unwrap();
+    assert_eq!(info.cert_hash.map(hex::encode), Some(second));
+    el_bot::connect(&info.url, info.cert_hash).await.expect("the new hash connects");
     server.shutdown();
     let _ = std::fs::remove_dir_all(&dir);
 }
