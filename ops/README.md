@@ -36,11 +36,20 @@ No Docker; no `cargo` at run time. The unit runs the staged binary, never the ch
    `scripts/deploy-server.sh --go` installs the hook and runs it once to make the copies.
 3. **nginx**: `include /home/master/eloram-deploy/game-elopros-eloram.nginx.conf;` inside the
    `game.elopros.com` 443 server block, then `sudo nginx -t && sudo systemctl reload nginx`.
-4. `scripts/deploy-server.sh --go`, then from a workstation `scripts/publish-web.sh --server
+4. **UDP buffers.** The server asks for 8 MiB each way and logs what it got if the kernel
+   clamped it: `sudo sysctl -w net.core.rmem_max=16777216 net.core.wmem_max=16777216` (and the
+   same in `/etc/sysctl.d/90-eloram.conf`; oneshot asks for the same, so the box may have it).
+5. `scripts/deploy-server.sh --go`, then from a workstation `scripts/publish-web.sh --server
    game.elopros.com:61260 --http https://game.elopros.com/eloram/` (it refuses a page the live
    server can't talk to).
-5. On Elo Pros: the listing's `play_url`, the nginx block for the page, and the playtime poller
+6. On Elo Pros: the listing's `play_url`, the nginx block for the page, and the playtime poller
    on `online.json` (`docs/ROADMAP.md`, phase 5).
+
+Not taken from Gates: its `ops/gates-udp443.nft`, which forwards UDP 443 to the shard's port so
+a network that passes only web ports can still reach it. Only one thing can own UDP 443 on an
+address, and on this box it is Gates. Eloram could have it on an address of its own; until then
+a player behind such a network can't play, and the page says only that the server didn't
+answer.
 
 ## Day to day
 
@@ -52,7 +61,10 @@ No Docker; no `cargo` at run time. The unit runs the staged binary, never the ch
   `morr`.
 - **Renewal:** certbot runs the hook; it copies and `systemctl reload`s the server (SIGHUP). Nobody
   is dropped. `journalctl -u eloram | grep certificate`.
-- **Logs:** `journalctl -u eloram -f`.
+- **Logs:** `journalctl -u eloram -f`: a `status:` line every ten seconds that something moved
+  (players, matches, datagrams, and what should stay at zero: refusals, bad datagrams, shard
+  overruns, output drops, records astray, referee divergences, hot-path allocations), the
+  certificate's reloads, each match taken up after a restart.
 - **The unit changed** (a new flag)? `scripts/deploy-server.sh --go` installs it and reloads
   systemd before the restart.
 - **Health:** `curl -s https://game.elopros.com/eloram/status.json` (the wire's protocol, the

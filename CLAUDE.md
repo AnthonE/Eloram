@@ -86,7 +86,9 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   Gates; `--no-build` keeps the page, `--knobs 'impact.star=1.5;size=0.8'` retunes a recipe without a
   rebuild (`knobs` lists them), `--seed`, `--frames`, `--span`, `--side enemy`, `--size`, `--low`;
   `EL_FX_DIST=dir` serves a copy of the page, so a long batch keeps shooting while `web/dist` is
-  rebuilt).
+  rebuilt). The loop as a skill: `.claude/skills/fx/SKILL.md` (the brief, the stage, the numbers,
+  the judging list) and `.claude/agents/fx-judge.md` (a read of a strip not anchored on whoever
+  tuned it), after Gates' and oneshot's.
   The page is `?fxstage=<name>` (`el-client/src/stage.rs`; `el_client_core::fx::stage` is the
   catalogue, the clock and the knobs). The flipbook sheet the puffs, fireballs and flashes play is
   `web/assets/fx/cloud_{a,b}.png`, remade by `python3 -I art/tools/flipbooks.py` (`--preview DIR`
@@ -153,7 +155,10 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
 - Hosting (`ops/README.md`, after oneshot's): `ops/eloram.service` (one slot: a restart takes the
   matches up again), `ops/certbot-deploy-hook.sh` (copies a renewed chain and reloads),
   `ops/game-elopros-eloram.nginx.conf` (the HTTP side behind the box's 443, under `/eloram/`),
-  `scripts/deploy-server.sh` (build, stage, install, restart, on the box).
+  `scripts/deploy-server.sh` (build, stage, install, restart, on the box). The server binds its
+  own UDP socket with 8 MiB buffers asked for each way (`net::endpoint::bind_udp`, logging what
+  the kernel gave) and writes a `status:` line to the journal every ten seconds that something
+  moved (`el_server::status_line`).
 - Wallet sign-in (`el-auth`: the SIWE text both sides build, the Elo Pros launcher's `prove` text
   for `eloram`): the page signs in on `?signin=1` (`web/wallet.js`), agents with a key
   (`BotConfig::key`, `el-swarm --sign-in` with throwaway test keys). The server names
