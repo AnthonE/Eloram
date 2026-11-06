@@ -786,14 +786,16 @@ fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
                     m.spray(ground(0.2), 8.0, shape::SHARD, 1.2, 0.9, 0.6, 0.07, 2.0, 2.0, c, false);
                 }
                 Status::Airborne => {
+                    // A little dust kicked up, no more (the strip: six wide puffs outlasting and
+                    // outweighing the lift).
                     m.spray(
                         ground(0.1),
-                        6.0,
+                        4.0,
                         shape::PUFF,
                         1.5,
                         0.2,
-                        0.8,
-                        0.35,
+                        0.6,
+                        0.2,
                         0.0,
                         2.0,
                         rgba(world_dust(), 1.0, 0.6),
@@ -804,12 +806,12 @@ fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
                 Status::Shove => {
                     m.spray(
                         ground(0.15),
-                        6.0,
+                        4.0,
                         shape::PUFF,
                         1.2,
                         0.2,
-                        0.7,
-                        0.3,
+                        0.55,
+                        0.18,
                         0.0,
                         2.0,
                         rgba(world_dust(), 1.0, 0.6),
