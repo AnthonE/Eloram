@@ -620,6 +620,11 @@ fn show(
         Field::Num(n) => Some(*n),
         _ => None,
     });
+    // The bench's results (`bench.rs`), while a bench runs or once it's done.
+    let bench = status.fields.iter().find(|(k, _)| *k == "bench").and_then(|(_, v)| match v {
+        Field::Text(t) => Some(t.clone()),
+        _ => None,
+    });
     for (w, mut t) in &mut words {
         let want = match *w {
             Words::Percent(k) => format!("{:.0}%", volume(&audio, k) * 100.0),
@@ -627,10 +632,14 @@ fn show(
             Words::Now => {
                 let api = if crate::look::WEBGPU { "WebGPU" } else { "WebGL 2" };
                 let tier = if prefs.low { "low" } else { "high" };
-                match fps.map(f64::round) {
+                let now = match fps.map(f64::round) {
                     Some(1.0) => format!("Drawing now: {api}, {tier}, a frame a second"),
                     Some(f) => format!("Drawing now: {api}, {tier}, {f:.0} frames a second"),
                     None => format!("Drawing now: {api}, {tier}"),
+                };
+                match &bench {
+                    Some(b) => format!("{now}\nBench: {b}"),
+                    None => now,
                 }
             }
         };

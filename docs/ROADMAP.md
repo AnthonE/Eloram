@@ -314,7 +314,10 @@ Left, in no order:
 - **A name**: a guest's is `?name=` or the server's; the page doesn't ask for one.
 - **A real GPU.** Nobody has seen the game on one: the frame rate on either tier (the target is 60
   fps at 1080p on integrated graphics, and a ten-way fight at 60 on `high`), and the effects'
-  share of the frame (`FX.md`, step 6).
+  share of the frame (`FX.md`, step 6). `?bench=1` (`el-client/src/bench.rs`) collects the
+  numbers in one visit: eight phases of eight seconds over the map's places and a fight, each
+  phase's frames a second and its median, 99th-percentile and longest frame, as JSON
+  (`window.__elBench`) to paste here.
 - **Listening.** The sounds were judged by their spectrograms and measures, not by ear.
 - **Tuning by hand**: each ability's look (`FX.md`, step 5; the stage and its strips are the
   loop, `scripts/fx.sh`, and a dozen of the 296 have been through it), each champion's clip

@@ -126,16 +126,20 @@ function cameraSetting() {
   }
 }
 
-// A browser drawing without a GPU (SwiftShader, llvmpipe): the low tier, unless asked otherwise.
-function softwareRenderer() {
+// What WebGL names the GPU (empty where the browser won't say).
+function rendererName() {
   try {
     const gl = document.createElement("canvas").getContext("webgl2");
     const info = gl && gl.getExtension("WEBGL_debug_renderer_info");
-    const name = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : "";
-    return /swiftshader|llvmpipe|software/i.test(name);
+    return info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : "";
   } catch (_) {
-    return false;
+    return "";
   }
+}
+
+// A browser drawing without a GPU (SwiftShader, llvmpipe): the low tier, unless asked otherwise.
+function softwareRenderer() {
+  return /swiftshader|llvmpipe|software/i.test(rendererName());
 }
 
 function qualitySetting() {
@@ -156,9 +160,12 @@ async function main() {
     // Into the queue as soon as the server says hello (`?queue=0`: stay in the lobby).
     queue: params.get("queue") !== "0",
     // A practice match instead (`?practice=1`, on a server started with `--practice`): one seat,
-    // any champion (`&champ=<number>`), every rank, no cooldowns, target dummies.
-    practice: params.get("practice") === "1",
+    // any champion (`&champ=<number>`), every rank, no cooldowns, target dummies. The frame-rate
+    // bench (`?bench=1`, `el-client/src/bench.rs`) runs over one.
+    practice: params.get("practice") === "1" || params.get("bench") === "1",
     practiceChamp: Number(params.get("champ") || 0) | 0,
+    bench: params.get("bench") === "1",
+    renderer: rendererName(),
     // Sign in with the browser's wallet (`?signin=1`): back on the resume token from the last
     // sign-in while it's good, so the wallet isn't asked every time.
     signIn: params.get("signin") === "1",

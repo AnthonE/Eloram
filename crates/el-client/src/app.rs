@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::audio::AudioPlugin;
+use crate::bench::BenchPlugin;
 use crate::camera::CameraPlugin;
 use crate::champions::ChampionsPlugin;
 use crate::config::{LaunchConfig, Prefs};
@@ -71,6 +72,6 @@ pub fn run() {
         ))
         // Past the sixteen a tuple of plugins takes.
         .add_plugins((ChampionsPlugin, MinionsPlugin, PortraitPlugin, DeathPlugin, TargetPlugin))
-        .add_plugins((SelectPlugin, LobbyPlugin, MenuPlugin, FirstPlugin, StagePlugin))
+        .add_plugins((SelectPlugin, LobbyPlugin, MenuPlugin, FirstPlugin, StagePlugin, BenchPlugin))
         .run();
 }

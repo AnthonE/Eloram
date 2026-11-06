@@ -48,6 +48,10 @@ pub struct LaunchConfig {
     pub fxside: String,
     pub fxsize: Option<f32>,
     pub fxcards: Option<[f32; 2]>,
+    /// The frame-rate bench (`?bench=1`, `bench.rs`): a practice match scripted over the map's
+    /// places and a fight, its frame times summed up. `renderer` is what WebGL names the GPU.
+    pub bench: bool,
+    pub renderer: String,
 }
 
 fn get(obj: &JsValue, key: &str) -> JsValue {
@@ -92,6 +96,8 @@ impl LaunchConfig {
             fxseed: get(&cfg, "fxseed").as_f64().unwrap_or(0.0).clamp(0.0, f64::from(u32::MAX)) as u32,
             fxside: string("fxside"),
             fxsize: get(&cfg, "fxsize").as_f64().map(|v| v as f32).filter(|v| *v > 0.0),
+            bench: flag("bench"),
+            renderer: string("renderer"),
             fxcards: {
                 let c = string("fxcards");
                 let mut it = c.split(',').map(|v| v.trim().parse::<f32>().ok());

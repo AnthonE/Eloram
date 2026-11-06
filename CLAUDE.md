@@ -106,6 +106,13 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `{t:"menu",open,tab}`, `{t:"setting",key,value}` and `{t:"taught"}`; `window.__el` has
   `menu_open`, `menu_tab`, `indicators`, `quality`, `quality_next` and `first_strip`. `art` and
   `draws` set `localStorage["el.taught"]` first, so the strip isn't in their pictures and counts.
+- The frame-rate bench (`el-client/src/bench.rs`): `?bench=1` on a server started with
+  `--practice` (`scripts/dev.sh --practice`) runs a practice match through eight phases of eight
+  seconds (the camera over the map's places, a fight at the dummies with every ability cast on a
+  loop, close and wide) and sums up each one's frame times: `window.__el.bench` as it runs, the
+  menu's Graphics page (Esc), and `window.__elBench` (JSON, also in the console) at the end;
+  `&quality=low` and `&gfx=webgl2` for the other tier and API. Headless Chromium's numbers mean
+  nothing: this is for a real GPU.
 - Practice (`el_sim::practice`, `docs/FX.md` step 4): `el-server --practice` holds practice
   matches, which the page asks for on `?practice=1` (`&champ=<number>`; `{t:"practice_champ",
   champ}` again as another): seat 0 the player's at the top level with every rank, nothing on
