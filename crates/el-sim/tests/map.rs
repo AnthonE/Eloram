@@ -102,29 +102,85 @@ fn paths_go_round_rock_with_few_corners_and_every_leg_is_walkable() {
     let mut s = PathScratch::new();
     let mut p = Path::default();
     let mut rng = el_sim::math::Rng::new(9);
-    let mut found = 0;
-    for _ in 0..300 {
-        let pick = |rng: &mut el_sim::math::Rng| loop {
-            let q = Vec2::new(rng.next_f32() * map::MAP_W_FULL, rng.next_f32() * map::MAP_H_FULL);
-            if m.walkable(q) {
-                return q;
-            }
-        };
-        let (a, b) = (pick(&mut rng), pick(&mut rng));
-        if !path::find(m, &mut s, a, b, &mut p) {
-            continue;
+    let anywhere = |rng: &mut el_sim::math::Rng| {
+        Vec2::new(rng.next_f32() * map::MAP_W_FULL, rng.next_f32() * map::MAP_H_FULL)
+    };
+    let pick = |rng: &mut el_sim::math::Rng| loop {
+        let q = anywhere(rng);
+        if m.walkable(q) {
+            return q;
         }
-        found += 1;
+    };
+    for k in 0..5_000 {
+        // A quarter of the goals off the floor: in the chasm, or rock, however far from its edge.
+        let a = pick(&mut rng);
+        let b = if k % 4 == 0 { anywhere(&mut rng) } else { pick(&mut rng) };
+        assert!(path::find(m, &mut s, a, b, &mut p), "{a} -> {b}");
         let mut at = a;
         for k in 0..usize::from(p.len) {
             let c = p.points[k];
-            assert!(m.walk_clear(at, c) || k == 0 && !m.walkable(a), "leg {k} of {a} -> {b}: {at} -> {c}");
+            assert!(m.walkable(c), "corner {k} of {a} -> {b}: {c}");
+            assert!(m.walk_clear(at, c), "leg {k} of {a} -> {b}: {at} -> {c}");
             at = c;
         }
-        assert!((p.goal().unwrap() - b).length() < 1.0, "{a} -> {b} ends at {:?}", p.goal());
+        let goal = p.goal().unwrap();
+        if p.is_full() {
+            // Stopped short: the rest of the way is found from there.
+            continue;
+        }
+        if m.walkable(b) {
+            assert!((goal - b).length() < 1.0, "{a} -> {b} ends at {goal}");
+        } else {
+            // The nearest place on the floor: nothing walkable is nearer by more than a cell.
+            let d = (goal - b).length();
+            for _ in 0..50 {
+                let q = b + Vec2::new(rng.next_f32() - 0.5, rng.next_f32() - 0.5) * (2.0 * d);
+                assert!(!m.walkable(q) || (q - b).length() > d - CELL, "{b}: {goal} is {d} off, {q} nearer");
+            }
+        }
     }
-    assert!(found > 290, "{found} of 300 found");
-    assert!(s.expanded / s.searches < 4_000, "{} cells a search", s.expanded / s.searches);
+    assert!(s.expanded / s.searches < 200, "{} rectangles a search", s.expanded / s.searches);
+}
+
+#[test]
+fn the_mesh_covers_exactly_the_walkable_cells() {
+    let m = shared();
+    for y in 0..NAV_H {
+        for x in 0..NAV_W {
+            let p = Map::cell_centre(x, y);
+            assert_eq!(m.nav.locate(p).is_some(), m.walkable_cell(x, y), "({x}, {y})");
+        }
+    }
+    println!("{} rectangles", m.nav.len());
+}
+
+#[test]
+fn marching_minions_reach_the_enemy_nexus_from_anywhere_without_sticking() {
+    let m = shared();
+    let mut rng = el_sim::math::Rng::new(4);
+    for team in [DAWN, DUSK] {
+        for _ in 0..300 {
+            let mut p = loop {
+                let q = Vec2::new(rng.next_f32() * map::MAP_W_FULL, rng.next_f32() * map::MAP_H_FULL);
+                if m.walkable(q) {
+                    break q;
+                }
+            };
+            let start = p;
+            let mut steps = 0;
+            // 325 a second at 30 ticks: about 11 a tick.
+            while let Some(to) = m.march_toward(team, p) {
+                assert!(m.walk_clear(p, to), "{start}: from {p} to {to}");
+                let d = to - p;
+                let len = d.length();
+                assert!(len > 0.5, "{start}: stuck at {p}");
+                p += d / len * len.min(11.0);
+                steps += 1;
+                assert!(steps < 3_000, "{start}: still marching at {p}");
+            }
+            assert!((p - map::march_goal(team)).length() <= CELL + 1.0, "{start}: stopped at {p}");
+        }
+    }
 }
 
 #[test]

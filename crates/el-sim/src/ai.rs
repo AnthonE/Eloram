@@ -164,14 +164,20 @@ impl Match {
         best.map(|(_, j)| j)
     }
 
-    /// No fight in sight: on down the lane to the enemy nexus, by the map's march field (no
-    /// search: the field was laid once for the whole process).
+    /// No fight in sight: on down the lane to the enemy nexus, corner to corner by the mesh's
+    /// march (no search: its flow was laid once for the whole process), a corner reached partway
+    /// through the tick's step turned and walked on from.
     fn march(&mut self, i: usize) {
         let team = self.units[i].team;
         self.units[i].path.clear();
-        if let Some(to) = self.map.march_toward(team, self.units[i].pos) {
-            let step = self.step_len(i);
-            self.slide_toward(i, to, step);
+        let mut left = self.step_len(i);
+        for _ in 0..2 {
+            let Some(to) = self.map.march_toward(team, self.units[i].pos) else { return };
+            let d = math::distance(self.units[i].pos, to);
+            if !self.slide_toward(i, to, left) || d >= left {
+                return;
+            }
+            left -= d;
         }
     }
 

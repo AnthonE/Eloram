@@ -310,6 +310,22 @@ they came off, and a missile's head a hard point with a narrow streak behind it,
 pale blob the suite had named. A strip of twelve exact frames takes about a minute in headless
 Chromium.
 
+Then the navigation mesh (`el-sim/src/nav.rs`), after a match played by hand. A probe of the grid's
+A* found what it felt like: a click more than 770 units off the floor (the chasm, most of the
+screen above and below the lane) did nothing; a walk that met a wall's stair-step corner stood there
+until the next click, since a move never looked for a new way; and minions marching by the field's
+gradient stuck on their own turrets' edges for minutes (59,264 of 385,710 minion ticks with nothing
+to fight spent standing still, in an eight-minute bot match). Now the walkable cells are merged
+into 382 rectangles joined by the edges they share; A* runs over those (each entered at the point
+of its portal nearest where the last was) and the funnel pulls the corridor tight, turning a few
+units off each wall's corner; a goal off the floor, however far, moves to the nearest place on it;
+a move that stops short or is pushed off its way finds it again; and minions march by a flow laid
+over the rectangles once a process, each step aimed at the first corner of the funnel through the
+next six. The same probe: 400 move orders of 400 arrive (a quarter of them clicks off the floor),
+90 marching minion ticks of 303,530 stand still, and deep overlaps between minions went from 124
+to 3. `walk_clear` stopped walking on past a segment that ends on a grid corner. Paths still hold
+sixteen corners; one that needs more stops at its sixteenth and the rest is found from there.
+
 Left, in no order:
 - **A name**: a guest's is `?name=` or the server's; the page doesn't ask for one.
 - **A real GPU.** Nobody has seen the game on one: the frame rate on either tier (the target is 60

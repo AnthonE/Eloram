@@ -122,6 +122,9 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   or fight, no minions. Its record says so in a frame after the header, so it replays; nothing
   in it runs in a match that isn't practice (the golden hashes hold).
 - `cargo test -p el-sim --test map -- --ignored --nocapture` prints the Causeway as text.
+- Paths are on the navigation mesh (`el_sim::nav`: the walkable cells merged into rectangles, A*
+  over them, the funnel through their portals; minions march by a flow over it). `--test walk`
+  holds a click anywhere walked to and marching minions never standing still.
 - `cargo run -p el-sim --release --example headless -- [seed]`: ten bots play a whole match, minute
   by minute; `cargo bench -p el-sim --bench match_tick`: a match's ticks, p50/p99 and by phase.
 - `cargo test -p el-match --release --test netcode -- --nocapture`: a shard and clients over a

@@ -420,16 +420,19 @@ impl Match {
         }
     }
 
-    /// A path for `i` to `to`. Champions always get one (at most a few a tick: their orders);
-    /// minions only while the tick's budget lasts, and walk straight otherwise.
-    pub(crate) fn route(&mut self, i: usize, to: Vec2, scratch: &mut PathScratch) {
+    /// A path for `i` to `to`; whether one was found. Champions always get one (at most a few a
+    /// tick: their orders); minions only while the tick's budget lasts, and keep the one they
+    /// have otherwise (or, with none, walk straight at `to` until the next tick).
+    pub(crate) fn route(&mut self, i: usize, to: Vec2, scratch: &mut PathScratch) -> bool {
         if i >= SEATS {
             if self.path_budget == 0 {
                 let u = &mut self.units[i];
-                u.path.clear();
-                u.path.points[0] = to;
-                u.path.len = 1;
-                return;
+                if u.path.is_empty() {
+                    u.path.clear();
+                    u.path.points[0] = to;
+                    u.path.len = 1;
+                }
+                return false;
             }
             self.path_budget -= 1;
         }
@@ -437,6 +440,14 @@ impl Match {
         let mut path = self.units[i].path;
         crate::path::find(self.map, scratch, from, to, &mut path);
         self.units[i].path = path;
+        true
+    }
+
+    /// Whether `seat`, walking to `to`, has to find its way again: its path stopped short (it
+    /// was longer than a path holds) or it was pushed off it.
+    fn lost_the_way(&self, seat: usize, to: Vec2) -> bool {
+        let u = &self.units[seat];
+        (u.path.is_empty() || u.repath_at == self.tick) && math::distance(u.pos, self.map.snap(to)) > 8.0
     }
 
     /// `i` goes after unit `t`: straight when nothing's between them, else by a path renewed now
@@ -450,8 +461,9 @@ impl Match {
             return;
         }
         if self.units[i].path.is_empty() || self.units[i].repath_at <= self.tick {
-            self.route(i, goal, scratch);
-            self.units[i].repath_at = self.tick + CHASE_REPATH;
+            // Out of the tick's budget: try again on the next.
+            let wait = if self.route(i, goal, scratch) { CHASE_REPATH } else { 1 };
+            self.units[i].repath_at = self.tick + wait;
         }
         self.follow_path(i, step);
     }
@@ -531,9 +543,12 @@ impl Match {
                     self.try_attack(seat, t);
                 }
             }
-            Intent::Move(_) => {
+            Intent::Move(to) => {
                 if !rooted {
                     self.follow_path(seat, step);
+                    if self.lost_the_way(seat, to) {
+                        self.route(seat, to, scratch);
+                    }
                 }
                 if self.units[seat].path.is_empty() {
                     self.champs[seat].intent = Intent::Idle;
@@ -564,6 +579,9 @@ impl Match {
                         }
                         if !rooted {
                             self.follow_path(seat, step);
+                            if self.lost_the_way(seat, to) {
+                                self.route(seat, to, scratch);
+                            }
                         }
                         if self.units[seat].path.is_empty() {
                             self.champs[seat].intent = Intent::Idle;
