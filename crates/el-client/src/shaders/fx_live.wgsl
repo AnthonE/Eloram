@@ -19,6 +19,8 @@ struct Live {
     // x: the shape; y, z: two times on the shader's clock (a telegraph's start and its landing; a
     // field's next pulse and its period); w: a shape's own number.
     p: vec4<f32>,
+    // The stage's knobs (all 1 in a match): x a missile's core, y its halo, z its trail.
+    k: vec4<f32>,
 }
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> live: Live;
@@ -51,17 +53,23 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     var core = 0.0;
     var edge = 0.0;
     if shape < 0.5 {
-        // A missile's head: a hot point in a soft halo, flickering a little.
+        // A missile's head: a hot, hard point (the bolt itself, half its lane wide) in a tight
+        // halo of its edge colour, flickering a little. The head is the part that does the
+        // gameplay, so it's the sharpest thing on the screen: a wide soft core and a halo as
+        // wide as the quad read as a pale blob (the stage's strips of Vessa's and Marret's W).
         let flick = 0.9 + 0.1 * sin(t * 40.0 + live.p.w * 7.0);
-        core = pow(max(1.0 - d * 1.6, 0.0), 2.0) * 1.6 * flick;
-        edge = pow(max(1.0 - d, 0.0), 1.5) * 0.7;
+        core = pow(max(1.0 - d * 2.4, 0.0), 1.4) * 2.4 * flick * live.k.x;
+        edge = pow(max(1.0 - d * 1.2, 0.0), 2.6) * 0.5 * live.k.y;
     } else if shape < 1.5 {
-        // Its trail, along x from the tail (0) to the head (1), torn by noise moving back.
+        // Its trail, along x from the tail (0) to the head (1), torn by noise moving back: a
+        // narrow streak, bright only at the head and thinning to its tail, so it shows the way
+        // the missile flies and never outweighs the head.
         let across = abs(uv.y - 0.5) * 2.0;
         let n = noise(vec2(uv.x * 6.0 + t * 9.0, uv.y * 3.0 + live.p.w));
-        let along = pow(uv.x, 1.6);
-        core = along * (1.0 - smoothstep(0.0, 0.45, across)) * (0.6 + 0.4 * n);
-        edge = along * (1.0 - smoothstep(0.2, 1.0, across)) * 0.5 * n;
+        let along = pow(uv.x, 2.2);
+        let thin = 1.0 - smoothstep(0.0, 0.22 + 0.3 * uv.x, across);
+        core = along * thin * (0.5 + 0.5 * n) * 0.9 * live.k.z;
+        edge = along * (1.0 - smoothstep(0.1, 0.8, across)) * 0.35 * n * live.k.z;
     } else if shape < 2.5 {
         // A blast's telegraph: its rim, bright and exact; inside, a fill growing toward the moment
         // it lands; and a beat quickening as it comes.

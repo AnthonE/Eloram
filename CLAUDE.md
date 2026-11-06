@@ -79,6 +79,18 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `window.__el` has `fx_cues`, `fx_own_casts`, `fx_missiles`, `fx_zones`, `champion_casts`,
   `minion_flashes`, `wheels_turning` and `audio_*`; the inbox takes `{t:"volume",bus,v}` and
   `{t:"mute",on}`.
+- The fx stage (`docs/FX.md`, step 7): `scripts/fx.sh <name>…` (`list [filter]` names everything it
+  can fire: `orrin-q-impact`, `liora-r-blast`, `vessa-w-missile`, `death-turret`...) builds the page and shoots one
+  effect alone in front of a dark and a light card on a clock stepped 1/60 s a frame, into
+  `e2e/artifacts/fx/<name>/{strip.png,numbers.json,diff.png}` (`e2e/fxstrip.mjs`, vendored from
+  Gates; `--no-build` keeps the page, `--knobs 'impact.star=1.5;size=0.8'` retunes a recipe without a
+  rebuild (`knobs` lists them), `--seed`, `--frames`, `--span`, `--side enemy`, `--size`, `--low`;
+  `EL_FX_DIST=dir` serves a copy of the page, so a long batch keeps shooting while `web/dist` is
+  rebuilt).
+  The page is `?fxstage=<name>` (`el-client/src/stage.rs`; `el_client_core::fx::stage` is the
+  catalogue, the clock and the knobs). The flipbook sheet the puffs, fireballs and flashes play is
+  `web/assets/fx/cloud_{a,b}.png`, remade by `python3 -I art/tools/flipbooks.py` (`--preview DIR`
+  writes it lit, to look at); a test holds its cut to the baker's and the shader's.
 - The HUD (`docs/DESIGN.md`, "The HUD"): `hud.rs`, `hud_death.rs` (the grey, the recap), `hud_target.rs`
   (the target frame), `portrait.rs` (the live portraits), `hud_select.rs` (champion select's screen),
   `hud_lobby.rs` (the connecting, lobby and queue card, and a match's end with Play again); the icons are painted by
@@ -94,6 +106,13 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `{t:"menu",open,tab}`, `{t:"setting",key,value}` and `{t:"taught"}`; `window.__el` has
   `menu_open`, `menu_tab`, `indicators`, `quality`, `quality_next` and `first_strip`. `art` and
   `draws` set `localStorage["el.taught"]` first, so the strip isn't in their pictures and counts.
+- The frame-rate bench (`el-client/src/bench.rs`): `?bench=1` on a server started with
+  `--practice` (`scripts/dev.sh --practice`) runs a practice match through eight phases of eight
+  seconds (the camera over the map's places, a fight at the dummies with every ability cast on a
+  loop, close and wide) and sums up each one's frame times: `window.__el.bench` as it runs, the
+  menu's Graphics page (Esc), and `window.__elBench` (JSON, also in the console) at the end;
+  `&quality=low` and `&gfx=webgl2` for the other tier and API. Headless Chromium's numbers mean
+  nothing: this is for a real GPU.
 - Practice (`el_sim::practice`, `docs/FX.md` step 4): `el-server --practice` holds practice
   matches, which the page asks for on `?practice=1` (`&champ=<number>`; `{t:"practice_champ",
   champ}` again as another): seat 0 the player's at the top level with every rank, nothing on
@@ -124,6 +143,11 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   (`/status` `game.referee`). A server started on the same `--records` directory takes up the matches
   the last one left (killed or stopped: `el-server/src/recover.rs`), and their players rejoin with
   their tokens. `cargo test -p el-server --release --test recover` kills a real server mid-match.
+- The certificate (`el-server/src/net/endpoint.rs`): self-signed and pinned by hash unless
+  `--cert`/`--key` name a CA-issued one; a running server remakes its self-signed one every ten
+  days (browsers refuse a pinned one past fourteen) and reads a CA-issued one again every hour, so
+  a renewal is taken up without a restart; `/cert-hash` follows, and a page fetches it fresh on
+  every dial. `cargo test -p el-server --release --test rotate` dials before and after.
 - Wallet sign-in (`el-auth`: the SIWE text both sides build, the Elo Pros launcher's `prove` text
   for `eloram`): the page signs in on `?signin=1` (`web/wallet.js`), agents with a key
   (`BotConfig::key`, `el-swarm --sign-in` with throwaway test keys). The server names

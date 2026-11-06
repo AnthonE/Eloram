@@ -5,6 +5,8 @@ mod app;
 #[cfg(target_arch = "wasm32")]
 mod audio;
 #[cfg(target_arch = "wasm32")]
+mod bench;
+#[cfg(target_arch = "wasm32")]
 mod camera;
 #[cfg(target_arch = "wasm32")]
 mod champions;
@@ -52,6 +54,8 @@ mod portrait;
 mod scenery;
 #[cfg(target_arch = "wasm32")]
 mod session;
+#[cfg(target_arch = "wasm32")]
+mod stage;
 #[cfg(target_arch = "wasm32")]
 mod transport;
 #[cfg(target_arch = "wasm32")]

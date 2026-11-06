@@ -126,16 +126,20 @@ function cameraSetting() {
   }
 }
 
-// A browser drawing without a GPU (SwiftShader, llvmpipe): the low tier, unless asked otherwise.
-function softwareRenderer() {
+// What WebGL names the GPU (empty where the browser won't say).
+function rendererName() {
   try {
     const gl = document.createElement("canvas").getContext("webgl2");
     const info = gl && gl.getExtension("WEBGL_debug_renderer_info");
-    const name = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : "";
-    return /swiftshader|llvmpipe|software/i.test(name);
+    return info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : "";
   } catch (_) {
-    return false;
+    return "";
   }
+}
+
+// A browser drawing without a GPU (SwiftShader, llvmpipe): the low tier, unless asked otherwise.
+function softwareRenderer() {
+  return /swiftshader|llvmpipe|software/i.test(rendererName());
 }
 
 function qualitySetting() {
@@ -156,9 +160,12 @@ async function main() {
     // Into the queue as soon as the server says hello (`?queue=0`: stay in the lobby).
     queue: params.get("queue") !== "0",
     // A practice match instead (`?practice=1`, on a server started with `--practice`): one seat,
-    // any champion (`&champ=<number>`), every rank, no cooldowns, target dummies.
-    practice: params.get("practice") === "1",
+    // any champion (`&champ=<number>`), every rank, no cooldowns, target dummies. The frame-rate
+    // bench (`?bench=1`, `el-client/src/bench.rs`) runs over one.
+    practice: params.get("practice") === "1" || params.get("bench") === "1",
     practiceChamp: Number(params.get("champ") || 0) | 0,
+    bench: params.get("bench") === "1",
+    renderer: rendererName(),
     // Sign in with the browser's wallet (`?signin=1`): back on the resume token from the last
     // sign-in while it's good, so the wallet isn't asked every time.
     signIn: params.get("signin") === "1",
@@ -172,6 +179,14 @@ async function main() {
     // The picture's tier (`?quality=low`: no HDR, bloom, shadows or multisampling, a few textures
     // read for the ground; `high` back). Remembered; without a GPU, low unless asked.
     quality: qualitySetting(),
+    // The fx stage (`?fxstage=<name>`, `el-client/src/stage.rs`): one effect alone on a stepped
+    // clock, no server; `&knobs=`, `&seed=`, `&side=`, `&size=` and `&cards=` go with it.
+    fxstage: params.get("fxstage") || "",
+    fxknobs: params.get("knobs") || "",
+    fxseed: Number(params.get("seed") || 0) | 0,
+    fxside: params.get("side") || "own",
+    fxsize: Number(params.get("size") || 0),
+    fxcards: params.get("cards") || "",
   };
   if (config.signIn) {
     try {
@@ -189,7 +204,7 @@ async function main() {
   } else if (params.get("replay")) {
     config.recordUrl = params.get("replay");
   }
-  if (config.recordUrl) {
+  if (config.recordUrl || config.fxstage) {
     // Nothing to dial.
   } else if (!("WebTransport" in window)) {
     config.noWebTransport = true;
