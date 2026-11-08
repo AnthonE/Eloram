@@ -9,6 +9,10 @@ use wasm_bindgen::{JsCast, JsValue};
 #[derive(Resource, Default)]
 pub struct DevStatus {
     pub fields: Vec<(&'static str, Field)>,
+    /// Where the last field set was: the systems set theirs in the same order every frame, so
+    /// the next is nearly always the one after it (a hundred-odd fields a frame, each found at
+    /// once rather than by a search).
+    next: usize,
 }
 
 /// A field's value.
@@ -61,9 +65,19 @@ impl From<&Field> for JsValue {
 impl DevStatus {
     pub fn set(&mut self, key: &'static str, value: impl Into<Field>) {
         let value = value.into();
-        match self.fields.iter_mut().find(|(k, _)| *k == key) {
-            Some(slot) => slot.1 = value,
-            None => self.fields.push((key, value)),
+        let at = match self.fields.get(self.next) {
+            Some((k, _)) if *k == key => Some(self.next),
+            _ => self.fields.iter().position(|(k, _)| *k == key),
+        };
+        match at {
+            Some(i) => {
+                self.fields[i].1 = value;
+                self.next = i + 1;
+            }
+            None => {
+                self.fields.push((key, value));
+                self.next = self.fields.len();
+            }
         }
     }
 }

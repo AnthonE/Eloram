@@ -118,7 +118,7 @@ impl Match {
                 follows: z.follows,
             });
             let ops = z.source.ops();
-            for j in 0..self.units.len() {
+            for j in 0..self.live_end() {
                 let u = &self.units[j];
                 if !u.alive || u.kind == Kind::Fountain {
                     continue;

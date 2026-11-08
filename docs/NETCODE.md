@@ -305,6 +305,11 @@ Before Colony's, sized for a match:
   nothing is built or dropped on the hot thread.
 - Each pool has an egress thread and a recorder, woken by `unpark()`. Threads meet only through
   preallocated lock-free queues (`rtrb`, `ArrayQueue`). The match tick never allocates or locks.
+- The egress thread is woken every few matches as the shard replicates them, and sends the
+  matches counted done since it last looked (`ShardShared::replicated`): a match's datagrams leave
+  a few matches' time after they're made, not after the pool's last match.
+- The server's UDP socket asks for 8 MiB of buffer each way (`net::endpoint::bind_udp`): a pool's
+  tick goes out at once, and the kernel's default drops it under load.
 - The budget a match tick is about 300 µs at p99, half simulation and half replication, which
   makes at least 64 matches a core.
 - The lobby, matchmaking, sign-in and HTTP run on tokio, off the hot path.

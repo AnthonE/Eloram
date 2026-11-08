@@ -21,7 +21,8 @@ const RETHINK: u32 = 8;
 
 impl Match {
     pub(crate) fn minions_and_structures(&mut self, scratch: &mut PathScratch) {
-        for i in FIRST_STRUCTURE..MAX_UNITS {
+        // (Nothing spawns while they act: the step's bound holds throughout.)
+        for i in FIRST_STRUCTURE..self.live_end() {
             if !self.units[i].alive {
                 continue;
             }
@@ -183,28 +184,55 @@ impl Match {
 
     /// Minions push each other apart, and give way to champions.
     pub(crate) fn separate(&mut self) {
-        for i in FIRST_MINION..MAX_UNITS {
-            if !self.units[i].alive {
-                continue;
+        const N: usize = SEATS + MAX_UNITS - FIRST_MINION;
+        // Nothing is born or dies here, and only the minion being pushed moves while it is: the
+        // bodies are gathered once (the live champions, then the live minions, in slot order, as
+        // a scan of every slot meets them; the structures between are never pushed against) into
+        // arrays a pass reads straight through, each place kept as its unit's as it moves.
+        let mut slot = [0u16; N];
+        let mut pos = [glam::Vec2::ZERO; N];
+        let mut radius = [0f32; N];
+        // How far a body pushes the minion it overlaps: all the way for a champion, half for
+        // another minion (which is pushed the other half in its turn); none for a structure.
+        let mut share = [0f32; N];
+        let (mut n, mut first_minion) = (0, 0);
+        for j in (0..SEATS).chain(FIRST_MINION..self.live_end()) {
+            let u = &self.units[j];
+            if u.alive {
+                slot[n] = j as u16;
+                pos[n] = u.pos;
+                radius[n] = u.radius;
+                share[n] = if u.kind.is_structure() {
+                    -1.0
+                } else if u.kind.is_minion() {
+                    0.5
+                } else {
+                    1.0
+                };
+                n += 1;
             }
-            for j in 0..MAX_UNITS {
-                if i == j || !self.units[j].alive {
+            if j < FIRST_MINION {
+                // The champions' bodies end here: the minions', the ones pushed, follow.
+                first_minion = n;
+            }
+        }
+        for a in first_minion..n {
+            let i = usize::from(slot[a]);
+            let ra = radius[a];
+            for b in 0..n {
+                if a == b || share[b] < 0.0 {
                     continue;
                 }
-                let (a, b) = (&self.units[i], &self.units[j]);
-                if b.kind.is_structure() {
-                    continue;
-                }
-                let d = a.pos - b.pos;
-                let min = a.radius + b.radius;
+                let d = pos[a] - pos[b];
+                let min = ra + radius[b];
                 let d2 = d.length_squared();
                 if d2 >= min * min || d2 < 1e-6 {
                     continue;
                 }
                 let len = math::sqrt(d2);
-                let share = if b.kind.is_minion() { 0.5 } else { 1.0 };
-                let p = a.pos + d / len * ((min - len) * share);
+                let p = pos[a] + d / len * ((min - len) * share[b]);
                 if self.map.walkable(p) {
+                    pos[a] = p;
                     self.units[i].pos = p;
                 }
             }

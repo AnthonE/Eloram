@@ -3,7 +3,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use wtransport::config::IpBindConfig;
+use wtransport::config::states::WantsIdentity;
+use wtransport::config::{IpBindConfig, ServerConfigBuilder};
 use wtransport::endpoint::endpoint_side::Server;
 use wtransport::{Endpoint, Identity, ServerConfig};
 
@@ -85,24 +86,75 @@ pub async fn kept_self_signed_identity(
 }
 
 /// The endpoint's configuration: its bind, its identity, its keep-alive and idle timeout.
-fn server_config(bind: IpBindConfig, port: u16, identity: Identity) -> anyhow::Result<ServerConfig> {
-    Ok(ServerConfig::builder()
-        .with_bind_config(bind, port)
+fn server_config(
+    bind: ServerConfigBuilder<WantsIdentity>,
+    identity: Identity,
+) -> anyhow::Result<ServerConfig> {
+    Ok(bind
         .with_identity(identity)
         .keep_alive_interval(Some(Duration::from_secs(3)))
         .max_idle_timeout(Some(Duration::from_secs(10)))?
         .build())
 }
 
-/// Binds dual-stack when the host has IPv6, IPv4-only otherwise (e.g. containers without IPv6).
-/// Returns the endpoint and the bind it took, for a certificate reloaded later.
+/// What the server asks the kernel for, each way, on its UDP socket: a full shard's tick goes out
+/// at once (up to 640 datagrams of a kilobyte), and inputs pile up while the runtime is busy. The
+/// kernel's default (about 200 KiB) drops them under load.
+pub const UDP_BUFFER: usize = 8 << 20;
+
+/// The server's UDP socket on `port`: dual-stack (`[::]`, IPv4 mapped in) or IPv4 only, with
+/// [`UDP_BUFFER`] asked for each way before it binds, and what the kernel gave logged. Linux
+/// clamps what it gives to `net.core.rmem_max` and `wmem_max` (`ops/README.md`), and reports
+/// twice what it keeps for data (its own bookkeeping's share).
+pub fn bind_udp(dual: bool, port: u16) -> std::io::Result<std::net::UdpSocket> {
+    use socket2::{Domain, Protocol, Socket, Type};
+    use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+    let (domain, at) = if dual {
+        (Domain::IPV6, SocketAddr::from((Ipv6Addr::UNSPECIFIED, port)))
+    } else {
+        (Domain::IPV4, SocketAddr::from((Ipv4Addr::UNSPECIFIED, port)))
+    };
+    let socket = Socket::new(domain, Type::DGRAM, Some(Protocol::UDP))?;
+    if dual {
+        socket.set_only_v6(false)?;
+    }
+    // Asked for; a kernel that gives less still binds, and says so below.
+    let _ = socket.set_recv_buffer_size(UDP_BUFFER);
+    let _ = socket.set_send_buffer_size(UDP_BUFFER);
+    socket.bind(&at.into())?;
+    // (The runtime's socket is non-blocking: tokio takes it as it is.)
+    socket.set_nonblocking(true)?;
+    let (recv, send) = (socket.recv_buffer_size().unwrap_or(0), socket.send_buffer_size().unwrap_or(0));
+    if recv < UDP_BUFFER || send < UDP_BUFFER {
+        tracing::warn!(
+            recv,
+            send,
+            asked = UDP_BUFFER,
+            "the kernel clamped the UDP buffers: raise net.core.rmem_max and wmem_max (ops/README.md)"
+        );
+    } else {
+        tracing::info!(recv, send, "UDP buffers");
+    }
+    Ok(socket.into())
+}
+
+/// Binds dual-stack when the host has IPv6, IPv4-only otherwise (e.g. containers without IPv6),
+/// on a socket of our own ([`bind_udp`]). Returns the endpoint and the bind it took, for a
+/// certificate reloaded later (a reload keeps the socket: its bind is only named).
 pub fn make_endpoint(port: u16, identity: Identity) -> anyhow::Result<(Endpoint<Server>, IpBindConfig)> {
-    match Endpoint::server(server_config(IpBindConfig::InAddrAnyDual, port, identity.clone_identity())?) {
+    let dual = bind_udp(true, port).and_then(|socket| {
+        let config =
+            server_config(ServerConfig::builder().with_bind_socket(socket), identity.clone_identity())
+                .map_err(std::io::Error::other)?;
+        Endpoint::server(config)
+    });
+    match dual {
         Ok(endpoint) => Ok((endpoint, IpBindConfig::InAddrAnyDual)),
         Err(e) => {
             tracing::info!("dual-stack bind failed ({e}); using IPv4 only");
+            let socket = bind_udp(false, port)?;
             Ok((
-                Endpoint::server(server_config(IpBindConfig::InAddrAnyV4, port, identity)?)?,
+                Endpoint::server(server_config(ServerConfig::builder().with_bind_socket(socket), identity)?)?,
                 IpBindConfig::InAddrAnyV4,
             ))
         }
@@ -184,7 +236,7 @@ pub async fn rotate(
             },
         };
         let (identity, new_hash) = fresh;
-        let config = match server_config(bind, port, identity) {
+        let config = match server_config(ServerConfig::builder().with_bind_config(bind, port), identity) {
             Ok(c) => c,
             Err(e) => {
                 tracing::warn!("the new certificate's configuration: {e}");

@@ -182,6 +182,7 @@ impl Match {
 
     fn add_missile(&mut self, mut m: Missile) -> Option<usize> {
         let i = self.missiles.iter().position(|k| !k.alive)?;
+        self.missile_end = self.missile_end.max(i as u16 + 1);
         m.generation = self.missiles[i].generation.wrapping_add(1);
         self.missiles[i] = m;
         self.event(crate::events::Event::MissileSpawn { missile: i as u16 });
@@ -196,7 +197,12 @@ impl Match {
 
     /// Moves every missile and lands the ones that hit.
     pub(crate) fn step_missiles(&mut self) {
-        for i in 0..self.missiles.len() {
+        for i in 0..MAX_MISSILES {
+            // Read again each time round: a missile fired as one lands, in a slot past this one,
+            // is met later in the pass, as a scan of every slot would meet it.
+            if i >= self.missile_end() {
+                break;
+            }
             if !self.missiles[i].alive {
                 continue;
             }
@@ -230,7 +236,7 @@ impl Match {
             loop {
                 let mut best: Option<(f32, usize)> = None;
                 let seg = (to - from).dot(m.dir);
-                for (j, u) in self.units.iter().enumerate() {
+                for (j, u) in self.units[..self.live_end()].iter().enumerate() {
                     let hit = self.missiles[i].hits[j / 64] & (1 << (j % 64)) != 0;
                     if !u.alive || u.team == m.team || hit || u.kind.is_structure() {
                         continue;

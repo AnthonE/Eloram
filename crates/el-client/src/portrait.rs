@@ -121,8 +121,12 @@ fn follow(
         }
     }
     // The next ally shown takes this frame's turn.
-    let allies: Vec<usize> = (1..VIEWS).filter(|&v| at[v].is_some()).collect();
-    let ally_now = (!allies.is_empty()).then(|| allies[turn.0 % allies.len()]);
+    let (mut allies, mut n) = ([0usize; VIEWS], 0);
+    for v in (1..VIEWS).filter(|&v| at[v].is_some()) {
+        allies[n] = v;
+        n += 1;
+    }
+    let ally_now = (n > 0).then(|| allies[turn.0 % n]);
     turn.0 = turn.0.wrapping_add(1);
     for (cam, mut camera, mut tf) in &mut cams {
         let view = cam.0;

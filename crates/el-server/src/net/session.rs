@@ -161,6 +161,10 @@ pub async fn run(
     let mut seated: Option<Box<Seating>> = None;
     let mut last_heard = tokio::time::Instant::now();
     let mut asks = Requests::new(std::time::Instant::now());
+    // One timer for the session, put forward when it goes off early, rather than a new one each
+    // time round the loop (once an input datagram: a timer registered and dropped each time).
+    let quiet = tokio::time::sleep_until(last_heard + QUIET);
+    tokio::pin!(quiet);
     loop {
         tokio::select! {
             _ = &mut writer => break,
@@ -267,7 +271,12 @@ pub async fn run(
                     Err(_) => NetStats::add(&stats.malformed, 1),
                 }
             },
-            _ = tokio::time::sleep_until(last_heard + QUIET), if seated.is_some() => {
+            () = &mut quiet, if seated.is_some() => {
+                // Heard from since it was set: set again, for QUIET after that.
+                if last_heard + QUIET > tokio::time::Instant::now() {
+                    quiet.as_mut().reset(last_heard + QUIET);
+                    continue;
+                }
                 tracing::info!(session, "quiet for {}s: gone", QUIET.as_secs());
                 break;
             }

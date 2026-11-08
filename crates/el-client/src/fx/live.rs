@@ -299,6 +299,11 @@ fn show(
     }
 }
 
+/// A shot drawn this frame: its slot, the shot, the tick it's at, and the champion whose look it has.
+type ShotNow = (usize, Shot, f64, Option<u8>);
+/// Missiles' places on the ground, by slot.
+type Places = Vec<(usize, Vec2)>;
+
 fn hide(q: &mut Query<Parts<'_>, With<LiveView>>, e: Entity) {
     if let Ok((_, mut v, _, _)) = q.get_mut(e) {
         v.set_if_neq(Visibility::Hidden);
@@ -314,7 +319,10 @@ pub fn draw(
     mut mats: ResMut<Assets<LiveMat>>,
     mut q: Query<Parts<'_>, With<LiveView>>,
     mut marks: Local<Vec<(Mark, Transform)>>,
-    mut last: Local<Vec<(usize, Vec2)>>,
+    mut list: Local<Vec<Mark>>,
+    mut shots: Local<Vec<ShotNow>>,
+    // Each missile's place: last frame's, and this frame's (kept, and swapped each frame).
+    mut last: Local<(Places, Places)>,
     mut dev: ResMut<crate::dev_hooks::DevStatus>,
     mut catch: ResMut<super::Catch>,
     mut clock_v: ResMut<Time<Virtual>>,
@@ -373,7 +381,7 @@ pub fn draw(
     }
     let held = catch.shot;
     // Each shot drawn: its slot, the shot, the tick it's at, and the champion whose look it has.
-    let mut shots: Vec<(usize, Shot, f64, Option<u8>)> = Vec::new();
+    shots.clear();
     if let Some((id, s, tick)) = held {
         shots.push((id, s, tick, champ_of(&s)));
     } else if let Some(missiles) = missiles {
@@ -383,9 +391,10 @@ pub fn draw(
     }
     // Missiles: a head and a trail each.
     let mut k = 0;
-    let mut seen_pos = std::mem::take(&mut *last);
-    let mut next_pos = Vec::with_capacity(seen_pos.len());
-    for (id, s, at, champ) in shots {
+    let (seen_pos, next_pos) = &mut *last;
+    std::mem::swap(seen_pos, next_pos);
+    next_pos.clear();
+    for (id, s, at, champ) in shots.drain(..) {
         if k >= live.heads.len() {
             break;
         }
@@ -449,13 +458,11 @@ pub fn draw(
         show(&mut q, live.trails[k], tf, &live.flat.clone(), &trail_m);
         k += 1;
     }
-    *last = next_pos;
     dev.set("fx_missiles", k as u32);
     for i in k..live.heads.len() {
         hide(&mut q, live.heads[i]);
         hide(&mut q, live.trails[i]);
     }
-    seen_pos.clear();
     if held.is_some() {
         return;
     }
@@ -516,7 +523,6 @@ pub fn draw(
     dev.set("fx_zones", zones_shown);
     // Statuses: the marks each drawn unit's flags show.
     marks.clear();
-    let mut list = Vec::with_capacity(4);
     for (i, d) in drawn.units.iter().enumerate().take(MAX_UNITS) {
         let Some(d) = d else { continue };
         let (f, kind) = match (watch, client) {
@@ -547,7 +553,7 @@ pub fn draw(
         list.clear();
         Mark::of(f, &mut list);
         let mut over = 0.0;
-        for &m in &list {
+        for &m in list.iter() {
             let tf =
                 match m {
                     Mark::Stars | Mark::Silence | Mark::Reveal => {
@@ -575,7 +581,7 @@ pub fn draw(
             marks.push((m, tf));
         }
     }
-    for (k, e) in live.marks.clone().into_iter().enumerate() {
+    for (k, &e) in live.marks.iter().enumerate() {
         let Some(&(m, tf)) = marks.get(k) else {
             hide(&mut q, e);
             continue;

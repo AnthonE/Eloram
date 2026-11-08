@@ -76,6 +76,11 @@ pub struct ShardShared {
     pub states: Box<[AtomicU32]>,
     /// The shard's own tick count.
     pub tick: AtomicU64,
+    /// Matches the shard has been through, counted over its life (every slot, every tick, in
+    /// order: count `k` is match `k % matches`). Once a match is counted its seats' datagrams for
+    /// the tick are all on their rings, so the egress thread can send them while the shard goes
+    /// on to the next match, rather than after the last.
+    pub replicated: AtomicU64,
     pub stop: AtomicBool,
     pub matches: usize,
     started: std::time::Instant,
@@ -186,6 +191,7 @@ pub fn build(
         ticks: (0..cfg.matches).map(|_| AtomicU32::new(0)).collect(),
         states: (0..cfg.matches).map(|_| AtomicU32::new(MatchState::Free as u32)).collect(),
         tick: AtomicU64::new(0),
+        replicated: AtomicU64::new(0),
         stop: AtomicBool::new(false),
         matches: cfg.matches,
         started: std::time::Instant::now(),
@@ -201,11 +207,25 @@ pub fn write_packet(ring: &mut rtrb::Producer<u8>, payload: &[u8]) -> bool {
     let Ok(len) = u16::try_from(payload.len()) else { return false };
     let Ok(mut chunk) = ring.write_chunk(payload.len() + 2) else { return false };
     let (one, two) = chunk.as_mut_slices();
-    for (dst, src) in one.iter_mut().chain(two.iter_mut()).zip(len.to_le_bytes().iter().chain(payload)) {
-        *dst = *src;
-    }
+    // The chunk may run round the ring's end in two parts: the frame goes in as whole slices
+    // (a copy each), not a byte at a time.
+    put(one, two, 0, &len.to_le_bytes());
+    put(one, two, 2, payload);
     chunk.commit_all();
     true
+}
+
+/// Copies `src` to byte `at` of the two parts `one` then `two` laid end to end.
+#[inline]
+fn put(one: &mut [u8], two: &mut [u8], at: usize, src: &[u8]) {
+    if at < one.len() {
+        let k = (one.len() - at).min(src.len());
+        one[at..at + k].copy_from_slice(&src[..k]);
+        two[..src.len() - k].copy_from_slice(&src[k..]);
+    } else {
+        let at = at - one.len();
+        two[at..at + src.len()].copy_from_slice(src);
+    }
 }
 
 /// Reads one `[u16 len][payload]` frame from an egress ring into `buf`. Returns the payload length,
@@ -309,6 +329,21 @@ mod tests {
         // One that doesn't fit isn't written at all.
         assert!(!write_packet(&mut p, &[0; 63]));
         assert_eq!(read_packet(&mut c, &mut buf), None);
+    }
+
+    #[test]
+    fn a_frame_split_at_any_byte_by_the_rings_end_reads_back_whole() {
+        let (mut p, mut c) = rtrb::RingBuffer::<u8>::new(61);
+        let mut buf = [0u8; 32];
+        // Lengths prime to the ring's size: the end falls in the length, at each byte of the
+        // payload, and just before it, over and over.
+        for k in 0..2_000usize {
+            let len = 1 + k % 23;
+            let frame: [u8; 23] = core::array::from_fn(|b| (k * 31 + b * 7) as u8);
+            assert!(write_packet(&mut p, &frame[..len]));
+            assert_eq!(read_packet(&mut c, &mut buf), Some(len));
+            assert_eq!(&buf[..len], &frame[..len], "frame {k}");
+        }
     }
 
     #[test]

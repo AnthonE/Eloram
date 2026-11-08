@@ -290,6 +290,13 @@ pub struct Match {
     pub surrender: [crate::voice::Vote; 2],
     /// A* searches left this tick.
     pub(crate) path_budget: u8,
+    /// One past the last slot that may hold a live unit ([`Match::live_end`]): worked out as each
+    /// step begins and raised as minions spawn, so a step's scans of the units stop there rather
+    /// than at [`MAX_UNITS`] (a few dozen minions live at once, low in their slots). A bound on
+    /// what the units say, not state of its own: never saved or hashed.
+    pub(crate) live_end: u16,
+    /// The same for missiles ([`Match::missile_end`]): each takes the lowest free slot.
+    pub(crate) missile_end: u16,
     /// A practice match (`practice`): set after its reset, by its record.
     pub practice: bool,
 }
@@ -368,6 +375,8 @@ impl Match {
             seated: 0,
             surrender: [crate::voice::Vote::default(); 2],
             path_budget: PATH_BUDGET,
+            live_end: MAX_UNITS as u16,
+            missile_end: MAX_MISSILES as u16,
             practice: false,
         };
         m.reset(seed, picks);
@@ -436,7 +445,39 @@ impl Match {
             u.hp = u.stats.max_hp;
             u.mana = u.stats.max_mana;
         }
+        self.find_ends();
         self.update_vision();
+    }
+
+    /// Every slot at or past this is empty: a scan of the units need look no further. Exact
+    /// within a step (worked out as it begins, raised as minions spawn); between steps, the
+    /// units may have been written since (a client's records, a test), so code that runs outside
+    /// one scans them all.
+    #[inline]
+    pub(crate) fn live_end(&self) -> usize {
+        usize::from(self.live_end)
+    }
+
+    /// Every missile slot at or past this is empty, as [`live_end`](Self::live_end) is for units.
+    #[inline]
+    pub(crate) fn missile_end(&self) -> usize {
+        usize::from(self.missile_end)
+    }
+
+    /// Works out [`live_end`](Self::live_end) from the units as they stand (past the last live
+    /// minion's slot: champions and structures are always below it), and
+    /// [`missile_end`](Self::missile_end) from the missiles.
+    pub(crate) fn find_ends(&mut self) {
+        let mut end = MAX_UNITS;
+        while end > FIRST_MINION && !self.units[end - 1].alive {
+            end -= 1;
+        }
+        self.live_end = end as u16;
+        let mut end = self.missiles.len();
+        while end > 0 && !self.missiles[end - 1].alive {
+            end -= 1;
+        }
+        self.missile_end = end as u16;
     }
 
     /// Makes `k` the match's headliner, every champion's stats with it (tests, and tools that
@@ -550,6 +591,7 @@ impl Match {
     /// A minion of `team` at `pos`; `None` if the table is full.
     pub(crate) fn spawn_minion(&mut self, team: u8, kind: Kind, pos: Vec2) -> Option<usize> {
         let i = usize::from(self.minion_slots.pop()?) + FIRST_MINION;
+        self.live_end = self.live_end.max(i as u16 + 1);
         let def = rules::minion_def(kind);
         let growth = 1.0
             + rules::MINION_GROWTH
@@ -604,6 +646,7 @@ impl Match {
         self.events.clear();
         self.keys_drawn_n = 0;
         self.path_budget = PATH_BUDGET;
+        self.find_ends();
         if self.outcome.is_some() {
             self.tick += 1;
             return;
@@ -643,6 +686,7 @@ impl Match {
     pub fn step_seat(&mut self, seat: usize, input: &SeatInput, scratch: &mut PathScratch) {
         self.events.clear();
         self.path_budget = PATH_BUDGET;
+        self.find_ends();
         self.apply_input(seat, input, scratch);
         self.refresh_stats(seat);
         self.champion_tick(seat, scratch);

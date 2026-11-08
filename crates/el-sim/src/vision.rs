@@ -10,11 +10,15 @@ use crate::units::{Kind, SEATS};
 impl Match {
     pub(crate) fn update_vision(&mut self) {
         let now = self.tick;
+        let (end, missile_end) = (self.live_end(), self.missile_end());
         for team in 0..2u8 {
             let t = usize::from(team);
             let mut grid = [0u64; map::VIS_WORDS * map::VIS_H];
+            // The cells each sight radius has been stamped from: a wave's minions stand a few to a
+            // cell, and a window ORed in twice lights nothing more.
+            let mut stamped = [[0u64; map::VIS_WORDS * map::VIS_H]; map::SIGHT.len()];
             let mut brushes = 0u32;
-            for (i, u) in self.units.iter().enumerate() {
+            for (i, u) in self.units[..end].iter().enumerate() {
                 if !u.alive || u.team != team {
                     continue;
                 }
@@ -23,7 +27,12 @@ impl Match {
                     k if k.is_minion() => map::SIGHT_MINION,
                     _ => map::SIGHT_STRUCTURE,
                 };
-                self.map.stamp_sight(u.pos, class, &mut grid);
+                let (x, y) = Map::vis_cell(u.pos);
+                let (word, bit) = (y * map::VIS_WORDS + x / 64, 1u64 << (x % 64));
+                if stamped[class][word] & bit == 0 {
+                    stamped[class][word] |= bit;
+                    self.map.stamp_sight(u.pos, class, &mut grid);
+                }
                 let b = self.map.brush_at(u.pos);
                 if b > 0 && (i < SEATS || u.kind.is_minion()) {
                     brushes |= 1 << (b - 1);
@@ -37,7 +46,7 @@ impl Match {
             self.vision.grid[t] = grid;
             let seen = &mut self.vision.units[t];
             seen.clear();
-            for (i, u) in self.units.iter().enumerate() {
+            for (i, u) in self.units[..end].iter().enumerate() {
                 if !u.alive {
                     continue;
                 }
@@ -55,7 +64,7 @@ impl Match {
             }
             let seen_m = &mut self.vision.missiles[t];
             seen_m.clear();
-            for (i, m) in self.missiles.iter().enumerate() {
+            for (i, m) in self.missiles[..missile_end].iter().enumerate() {
                 if m.alive && (m.team == team || Map::lit(&grid, m.pos)) {
                     seen_m.set(i, true);
                 }
