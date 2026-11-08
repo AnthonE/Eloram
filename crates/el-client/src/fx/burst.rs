@@ -11,10 +11,17 @@
 //! A slot is drawn only while its burst lasts: each is its own mesh, so a pool drawn whole was a
 //! draw call a slot every frame (52 of a frame's 200 on the low tier, 96 of 300 on the high,
 //! `scripts/e2e.sh draws`), nearly all of them of particles long dead.
+//!
+//! A slot is written in place, its quads past the burst's own laid where the burst starts: Bevy
+//! sorts what's laid over by its mesh's bounds, and quads left at the scene's zero stretched every
+//! burst's bounds to the middle of the map, so smoke was laid over smoke in no order. Light is
+//! drawn after smoke where they're together ([`BurstMat::depth_bias`]), as Gates' two pools are.
+//! A slot taken from a burst still burning is counted (`fx_bursts_stolen`, as Gates' pools count
+//! what they steal): the pools' size is right while it stays at zero in a fight.
 
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::NoFrustumCulling;
-use bevy::mesh::{Indices, PrimitiveTopology};
+use bevy::mesh::{Indices, PrimitiveTopology, VertexAttributeValues};
 use bevy::pbr::{Material, MaterialPipeline, MaterialPipelineKey};
 use bevy::prelude::*;
 use bevy::render::render_resource::{AsBindGroup, RenderPipelineDescriptor, SpecializedMeshPipelineError};
@@ -33,6 +40,12 @@ use crate::view::Drawn;
 
 /// Particles a burst holds at most (what's past it is dropped, so what matters goes first).
 const QUADS: usize = 48;
+
+/// How much nearer the eye (m) the light's bursts are sorted than the smoke's.
+const LIGHT_AFTER_SMOKE: f32 = 0.5;
+
+/// A quad's corners, as `fx_burst.wgsl` reads them (written once, with the mesh).
+const CORNERS: [[f32; 2]; 4] = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
 
 /// A burst's material: added (what glows) or laid over (smoke, dust, rubble).
 #[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
@@ -84,7 +97,13 @@ impl Material for BurstMat {
         "embedded://el_client/shaders/fx_burst.wgsl".into()
     }
     fn alpha_mode(&self) -> AlphaMode {
+        // Both blend premultiplied in Bevy: the added pool's shader writes no alpha.
         if self.additive { AlphaMode::Add } else { AlphaMode::Premultiplied }
+    }
+    /// Light after smoke where they're about as far off (m, the view's depth): a blast's flash and
+    /// sparks over its own fireball's soot, not under it.
+    fn depth_bias(&self) -> f32 {
+        if self.additive { LIGHT_AFTER_SMOKE } else { 0.0 }
     }
     fn enable_prepass() -> bool {
         false
@@ -160,6 +179,11 @@ pub struct Bursts {
     low: bool,
     /// The shader's clock as `spawn` last saw it.
     now_seen: f32,
+    /// Bursts written, and those written into a slot whose burst was still burning.
+    pub written: u64,
+    pub stolen: u64,
+    /// A cue's particles as its recipe makes them, kept from one to the next.
+    scratch: (Vec<P>, Vec<P>),
 }
 
 fn empty_mesh() -> Mesh {
@@ -172,7 +196,7 @@ fn empty_mesh() -> Mesh {
     Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vec![[0.0f32; 3]; n])
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0f32; 3]; n])
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0f32; 2]; n])
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, CORNERS.repeat(QUADS))
         .with_inserted_attribute(Mesh::ATTRIBUTE_UV_1, vec![[0.0f32; 2]; n])
         .with_inserted_attribute(Mesh::ATTRIBUTE_TANGENT, vec![[0.0f32; 4]; n])
         .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, vec![[0.0f32; 4]; n])
@@ -234,6 +258,9 @@ pub fn setup(
         rng: 0x2545_F491,
         low: !look.high,
         now_seen: 0.0,
+        written: 0,
+        stolen: 0,
+        scratch: (Vec::with_capacity(QUADS), Vec::with_capacity(QUADS)),
     });
 }
 
@@ -278,43 +305,49 @@ impl Bursts {
         Vec3::new(a.cos() * r, y, a.sin() * r)
     }
 
-    /// Writes `ps` into the least busy slot of its pool.
+    /// Writes `ps` into the least busy slot of its pool, in place.
     fn put(&mut self, ps: &[P], smoke: bool, now: f32, meshes: &mut Assets<Mesh>) {
-        if ps.is_empty() {
-            return;
-        }
+        let Some(first) = ps.first() else { return };
         let pool = if smoke { &mut self.smoke } else { &mut self.glow };
         let Some(slot) = pool.iter_mut().min_by(|a, b| a.ends.total_cmp(&b.ends)) else { return };
         let Some(mut mesh) = meshes.get_mut(&slot.mesh) else { return };
-        let n = QUADS * 4;
-        let (mut pos, mut vel, mut uv, mut life, mut tan, mut col) = (
-            Vec::with_capacity(n),
-            Vec::with_capacity(n),
-            Vec::with_capacity(n),
-            Vec::with_capacity(n),
-            Vec::with_capacity(n),
-            Vec::with_capacity(n),
-        );
-        let mut ends = now;
-        for k in 0..QUADS {
-            let p = ps.get(k).copied().unwrap_or_default();
-            ends = ends.max(p.born + p.life);
-            for c in [[0.0f32, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]] {
-                pos.push(p.at.to_array());
-                vel.push(p.vel.to_array());
-                uv.push(c);
-                life.push([p.born, p.life]);
-                tan.push([p.size, p.gravity, p.drag, p.shape]);
-                col.push(p.color);
+        self.written += 1;
+        if slot.ends > now && slot.ends - now < LONGEST {
+            self.stolen += 1;
+        }
+        // The quads past the burst's own: unborn (no life), where it starts, so the mesh's bounds
+        // are the burst's.
+        let rest = P { at: first.at, ..P::default() };
+        let part = |q: usize| ps.get(q).copied().unwrap_or(rest);
+        slot.ends = ps.iter().take(QUADS).fold(now, |e, p| e.max(p.born + p.life));
+        for (attr, values) in mesh.attributes_mut() {
+            let id = attr.id;
+            match values {
+                VertexAttributeValues::Float32x3(v) if id == Mesh::ATTRIBUTE_POSITION.id => {
+                    v.iter_mut().enumerate().for_each(|(i, x)| *x = part(i / 4).at.to_array());
+                }
+                VertexAttributeValues::Float32x3(v) if id == Mesh::ATTRIBUTE_NORMAL.id => {
+                    v.iter_mut().enumerate().for_each(|(i, x)| *x = part(i / 4).vel.to_array());
+                }
+                VertexAttributeValues::Float32x2(v) if id == Mesh::ATTRIBUTE_UV_1.id => {
+                    v.iter_mut().enumerate().for_each(|(i, x)| {
+                        let p = part(i / 4);
+                        *x = [p.born, p.life];
+                    });
+                }
+                VertexAttributeValues::Float32x4(v) if id == Mesh::ATTRIBUTE_TANGENT.id => {
+                    v.iter_mut().enumerate().for_each(|(i, x)| {
+                        let p = part(i / 4);
+                        *x = [p.size, p.gravity, p.drag, p.shape];
+                    });
+                }
+                VertexAttributeValues::Float32x4(v) if id == Mesh::ATTRIBUTE_COLOR.id => {
+                    v.iter_mut().enumerate().for_each(|(i, x)| *x = part(i / 4).color);
+                }
+                // The corners (`UV_0`) were written with the mesh, and never change.
+                _ => {}
             }
         }
-        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, pos);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vel);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uv);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_1, life);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, tan);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, col);
-        slot.ends = ends;
     }
 }
 
@@ -483,6 +516,7 @@ pub fn spawn(
     mut meshes: ResMut<Assets<Mesh>>,
     mut mats: ResMut<Assets<BurstMat>>,
     mut shown: Query<&mut Visibility>,
+    mut status: ResMut<crate::dev_hooks::DevStatus>,
 ) {
     let now = time.elapsed_secs_wrapped();
     bursts.now_seen = now;
@@ -509,13 +543,18 @@ pub fn spawn(
             }
             _ => now,
         };
-        let mut m =
-            Make { b: &mut bursts, now: born, glow: Vec::new(), smoke: Vec::new(), keep, knobs: &knobs.0 };
+        let (mut glow, mut smoke) = std::mem::take(&mut bursts.scratch);
+        glow.clear();
+        smoke.clear();
+        let mut m = Make { b: &mut bursts, now: born, glow, smoke, keep, knobs: &knobs.0 };
         recipe(&mut m, q, &drawn);
         let (glow, smoke) = (std::mem::take(&mut m.glow), std::mem::take(&mut m.smoke));
         bursts.put(&glow, false, born, &mut meshes);
         bursts.put(&smoke, true, born, &mut meshes);
+        bursts.scratch = (glow, smoke);
     }
+    status.set("fx_bursts", bursts.written as f64);
+    status.set("fx_bursts_stolen", bursts.stolen as f64);
     for slot in bursts.glow.iter().chain(&bursts.smoke) {
         let live = slot.ends > now && slot.ends - now < LONGEST;
         if let Ok(mut v) = shown.get_mut(slot.entity) {

@@ -76,7 +76,8 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `python3 -I art/tools/sounds.py` remakes `web/assets/audio/` from `manifest.json` (written by
   `cargo test -p el-client-core fx::sound -- --ignored write_manifest` when the table changes)
   and Kenney's CC0 packs; the announcer's and the music's files are optional, dropped in by name.
-  `window.__el` has `fx_cues`, `fx_own_casts`, `fx_missiles`, `fx_zones`, `champion_casts`,
+  `window.__el` has `fx_cues`, `fx_own_casts`, `fx_bursts`, `fx_bursts_stolen` (a burst's slot taken
+  from one still burning: the pools are big enough while it's 0), `fx_missiles`, `fx_zones`, `champion_casts`,
   `minion_flashes`, `wheels_turning` and `audio_*`; the inbox takes `{t:"volume",bus,v}` and
   `{t:"mute",on}`.
 - The fx stage (`docs/FX.md`, step 7): `scripts/fx.sh <name>…` (`list [filter]` names everything it

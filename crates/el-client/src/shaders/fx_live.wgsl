@@ -112,7 +112,9 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         // fuller middle hid the dummy it was on).
         let n = normalize(in.world_normal);
         let eye = normalize(view.world_position - in.world_position.xyz);
-        let rim = pow(1.0 - abs(dot(n, eye)), 3.2);
+        // Clamped: a hair over 1 made pow's base negative, a NaN, and a NaN blends to black
+        // (oneshot's shock shell had the same rim).
+        let rim = pow(clamp(1.0 - abs(dot(n, eye)), 0.0, 1.0), 3.2);
         let lines = smoothstep(0.7, 1.0, sin(in.world_position.y * 22.0 + t * 5.0));
         edge = rim * 1.2;
         core = rim * lines * 0.7 + 0.008;
@@ -136,6 +138,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     }
     let rgb = live.core.rgb * core * live.core.a + live.edge.rgb * edge * live.edge.a;
     let dim = 1.0 - fog_dark(fog, fog_s, in.world_position.xyz) * 0.6;
-    let a = clamp(max(core * live.core.a, edge * live.edge.a), 0.0, 1.0);
-    return vec4(display(rgb * dim), a);
+    // Added, with no alpha: Bevy blends an added material premultiplied (src + dst × (1 − a)), so
+    // an alpha covered what was behind (a telegraph's fill darkened the floor it lay on).
+    return vec4(display(rgb * dim), 0.0);
 }

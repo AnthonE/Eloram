@@ -20,6 +20,15 @@
 // Light (the added pool) is born white-hot and cools to its colour, as fire and sparks do; smoke
 // and dust (laid over) keep theirs. Every particle has a seed of its own, from where and when it
 // was born, so no two puffs are the same shape and no two embers flicker together.
+//
+// After Gates' engine (`AnthonE/Gates`, `crates/fx`) and oneshot's sheets and tracers: what's
+// thrown down bounces once off the floor and comes to rest on it, as Gates' sparks skitter off
+// the surface they struck; a spark is a true line from its head back along its flight; a spark,
+// a glow, a shard and an ember are never drawn under a pixel or two across, dimmed instead, so
+// at the camera's 27 m they don't shimmer with no bloom to widen them; a sheet's sprite is faded
+// in the last of its height over the floor (oneshot's against the depth behind: the Causeway's
+// floor is flat, so its height is the depth); and light writes no alpha, since Bevy draws an
+// added material premultiplied (src + dst × (1 − a)): an alpha covered what was behind it.
 
 #import bevy_pbr::{
     mesh_view_bindings::{view, globals, lights},
@@ -62,6 +71,58 @@ struct Out {
     @location(3) age: vec2<f32>,
     // The flipbook's uvs on the sheet for this corner: the frame drawn (xy) and the next (zw).
     @location(4) sheet: vec4<f32>,
+    // x: how much of its light a sprite held at its pixel floor keeps (its drawn size over the
+    // size it is: the same light, spread wider); y: this corner's height over the floor (m).
+    @location(5) held: vec2<f32>,
+}
+
+// The floor: the Causeway's is flat, at the scene's zero (`ground.rs`), and what's thrown down
+// comes to rest this far over it, so the floor's depth doesn't eat it (nor the stage's cards',
+// 2 cm up: `stage.rs`).
+const FLOOR: f32 = 0.0;
+const REST: f32 = 0.03;
+// Off the floor once (Gates' law, `crates/fx/src/pool.rs`): the speed into it turned back at
+// this share, and all of it kept at this share after.
+const BOUNCE_BACK: f32 = 0.35;
+const BOUNCE_KEEP: f32 = 0.45;
+
+// A spark's line: where it was this long ago is its tail, never shorter than its own width,
+// never longer than STREAK_MAX (m).
+const STREAK_S: f32 = 0.025;
+const STREAK_MAX: f32 = 0.4;
+// The narrowest a spark's line is drawn, half its width in the frame's pixels, and the smallest a
+// glow, a shard or an ember is drawn across (oneshot's tracers hold a line at 0.9 at 1080p).
+const MIN_HALF_PX: f32 = 0.8;
+const MIN_SPRITE_PX: f32 = 2.5;
+
+// A sheet's sprite fades in the last of this much height over the floor (m).
+const SOFT_FLOOR: f32 = 0.4;
+
+// Where a thing thrown from `p0` at `v0`, slowed by `drag` and pulled down by `g`, is `t` on.
+fn flown(p0: vec3<f32>, v0: vec3<f32>, drag: f32, g: f32, t: f32) -> vec3<f32> {
+    let travel = select(t, (1.0 - exp(-drag * t)) / drag, drag > 0.0001);
+    return p0 + v0 * travel - vec3(0.0, 0.5 * g * t * t, 0.0);
+}
+
+// Its velocity then.
+fn flying(v0: vec3<f32>, drag: f32, g: f32, t: f32) -> vec3<f32> {
+    return v0 * exp(-drag * t) - vec3(0.0, g * t, 0.0);
+}
+
+// How many metres one of the frame's pixels covers at `p`: what shimmers is under a pixel of the
+// frame itself, whatever its size.
+fn pixel_m(p: vec3<f32>) -> f32 {
+    let depth = max(position_world_to_clip(p).w, 0.01);
+    let per_m = view.clip_from_view[1][1] * view.viewport.w * 0.5;
+    return depth / max(per_m, 1.0);
+}
+
+// A sprite `s` across at `p`, drawn no smaller than the pixel floor: the size it's drawn (x) and
+// the share of its light it keeps (y), so its light is the same, spread wider.
+fn held(s: f32, p: vec3<f32>) -> vec2<f32> {
+    let drawn = max(s, pixel_m(p) * MIN_SPRITE_PX);
+    let keep = s / max(drawn, 0.000001);
+    return vec2(drawn, keep * keep);
 }
 
 // The sheet's cut (`art/tools/flipbooks.py`; `burst.rs` holds the same): 8 × 8 cells; a strip's
@@ -146,8 +207,33 @@ fn vertex(v: Vertex) -> Out {
     let drag = v.tangent.z;
     let shape = v.tangent.w;
     // Where it is: thrown at its velocity, slowed by drag, pulled down by gravity.
-    let travel = select(age, (1.0 - exp(-drag * age)) / drag, drag > 0.0001);
-    var p = v.position + v.normal * travel - vec3(0.0, 0.5 * gravity * age * age, 0.0);
+    var p = flown(v.position, v.normal, drag, gravity, age);
+    var vel = flying(v.normal, drag, gravity, age);
+    // What's thrown down (a spark, a glow, a shard of rubble) strikes the floor once, skitters off
+    // it and lies on it: it fell through the floor and out of the picture before.
+    if shape < 2.5 && gravity > 0.0 && v.position.y > FLOOR + REST && p.y < FLOOR + REST {
+        // When it struck, by halving: its height rises, then only falls, so it crosses once.
+        var lo = 0.0;
+        var hi = age;
+        for (var i = 0; i < 10; i++) {
+            let mid = 0.5 * (lo + hi);
+            if flown(v.position, v.normal, drag, gravity, mid).y > FLOOR + REST {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        var struck = flown(v.position, v.normal, drag, gravity, hi);
+        struck.y = FLOOR + REST;
+        let into = flying(v.normal, drag, gravity, hi);
+        let off = vec3(into.x, -into.y * BOUNCE_BACK, into.z) * BOUNCE_KEEP;
+        p = flown(struck, off, drag, gravity, age - hi);
+        vel = flying(off, drag, gravity, age - hi);
+        if p.y < FLOOR + REST {
+            p.y = FLOOR + REST;
+            vel.y = 0.0;
+        }
+    }
     let seed = hash1(born * 13.7 + v.position.x * 3.1 + v.position.z * 1.7 + v.position.y * 5.3);
     var corner = v.uv - 0.5;
     let right = view.world_from_view[0].xyz;
@@ -155,6 +241,7 @@ fn vertex(v: Vertex) -> Out {
     var s = size;
     o.sheet = vec4(0.0);
     o.age = vec2(age, 0.0);
+    o.held = vec2(1.0, 1.0);
     if plays_sheet(shape) {
         // Its strip's variant and a mirror by its seed; the frame for its age, and the next.
         let st = strip(shape);
@@ -170,9 +257,10 @@ fn vertex(v: Vertex) -> Out {
         o.age.y = f - fa;
     }
     if shape < 0.5 {
-        // Pops to its size, then shrinks away.
-        s = size * (0.55 + 0.45 * smoothstep(0.0, 0.12, k)) * (1.0 - k * k);
-        p += (right * corner.x + up * corner.y) * s;
+        // Pops to its size, then shrinks away (to its pixel floor, dimming from there).
+        let h = held(size * (0.55 + 0.45 * smoothstep(0.0, 0.12, k)) * (1.0 - k * k), p);
+        o.held.x = h.y;
+        p += (right * corner.x + up * corner.y) * h.x;
     } else if shape > 6.5 && shape < 7.5 {
         // A star: opens fast, a turn of its own.
         s = size * (0.6 + 0.9 * sqrt(k));
@@ -180,9 +268,10 @@ fn vertex(v: Vertex) -> Out {
         p += (right * corner.x + up * corner.y) * s;
     } else if shape > 7.5 && shape < 8.5 {
         // An ember: wanders side to side as it rises, and shrinks as it cools.
-        s = size * (1.0 - 0.6 * k);
         p += right * sin(age * (2.0 + 2.0 * seed) + seed * 20.0) * 0.18 * k;
-        p += (right * corner.x + up * corner.y) * s;
+        let h = held(size * (1.0 - 0.6 * k), p);
+        o.held.x = h.y;
+        p += (right * corner.x + up * corner.y) * h.x;
     } else if shape > 9.5 && shape < 10.5 {
         // A fireball: small as it's lit, swelling as it burns (the frames swell too).
         s = size * (0.7 + 1.5 * sqrt(k));
@@ -196,22 +285,37 @@ fn vertex(v: Vertex) -> Out {
         corner = turn(corner, seed * 6.2832);
         p += vec3(corner.x, 0.0, corner.y) * size * 2.0;
     } else if shape < 1.5 {
-        // Stretched along its motion on the screen, as long as it's fast.
-        let vel = v.normal * exp(-drag * age) - vec3(0.0, gravity * age, 0.0);
-        var along = vel - dot(vel, view.world_from_view[2].xyz) * view.world_from_view[2].xyz;
-        let len = length(along);
-        along = select(right, along / max(len, 0.0001), len > 0.0001);
-        let side = cross(along, view.world_from_view[2].xyz);
-        let stretch = size * (1.0 + clamp(len * 0.05, 0.0, 6.0)) * (1.0 - k);
-        p += along * corner.y * stretch + side * corner.x * size * 0.35 * (1.0 - k);
+        // A true line (Gates' streak): its head where it is, its tail back along its flight where
+        // it was STREAK_S ago, foreshortened as it flies toward or away from the eye (one flying
+        // from the eye is short, not its whole length laid square to the view; head on, a dot).
+        // It was centred on where it is, its length a few times its width at any speed: a dot at
+        // the camera's distance more than a streak. Never under a pixel and a half across, dimmed
+        // under that instead (oneshot's tracers), so far off it's a faint hair, not a shimmer.
+        let speed = length(vel);
+        let dir = select(up, vel / max(speed, 0.0001), speed > 0.0001);
+        let half_w = size * 0.175 * (1.0 - k);
+        let w = max(half_w, pixel_m(p) * MIN_HALF_PX);
+        o.held.x = half_w / max(w, 0.000001);
+        let half = 0.5 * clamp(speed * STREAK_S, size * 0.7, STREAK_MAX);
+        let to_p = p - view.world_position;
+        let eye = to_p / max(length(to_p), 0.0001);
+        let toward = dot(dir, eye);
+        let across = dir - eye * toward;
+        let across_len = length(across);
+        let axis = select(up, across / max(across_len, 0.0001), across_len > 0.0001);
+        let sd = cross(eye, axis);
+        let side = select(right, sd / max(length(sd), 0.0001), length(sd) > 0.0001);
+        let long = eye * (toward * half) + axis * max(across_len * half, w);
+        p = p - dir * half + long * (corner.y * 2.0) + side * w * (corner.x * 2.0);
     } else if shape < 2.5 {
         // A shard: a diamond turning.
         let a = age * (4.0 + 6.0 * fract(born * 13.7)) + born * 31.0;
         let c = cos(a);
         let sn = sin(a);
         let r = vec2(corner.x * c - corner.y * sn, corner.x * sn + corner.y * c);
-        s = size * (1.0 - 0.6 * k);
-        p += (right * r.x + up * r.y) * s;
+        let h = held(size * (1.0 - 0.6 * k), p);
+        o.held.x = h.y;
+        p += (right * r.x + up * r.y) * h.x;
     } else if shape < 3.5 {
         // A puff: its frames billow; the sprite grows a little with them, turned a little its
         // own way (its frames are upright, the smoke rising).
@@ -228,6 +332,7 @@ fn vertex(v: Vertex) -> Out {
         p += right * corner.x * size * (1.0 - 0.5 * k) + vec3(0.0, (corner.y + 0.5) * h, 0.0);
     }
     o.clip = position_world_to_clip(p);
+    o.held.y = p.y - FLOOR;
     o.uv = v.uv;
     o.color = v.color;
     o.life = vec4(k, shape, fog_dark(fog, fog_s, p), seed);
@@ -291,17 +396,21 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
         let fb = frames[1];
         let born = smoothstep(0.0, 0.05, k);
         let col = o.color.rgb;
+        // Faded in the last of its height over the floor, so the floor doesn't cut it off in a
+        // hard line where it sinks into it (a puff stood on the floor, a fireball's foot).
+        let soft = clamp(o.held.y / SOFT_FLOOR, 0.0, 1.0);
         if pool.x > 0.5 {
-            // Light alone: a flash's petals, or an energy burst's heat, through the ramp.
-            let heat = fb.a * born * (1.0 - smoothstep(0.6, 1.0, k)) * o.color.a;
+            // Light alone: a flash's petals, or an energy burst's heat, through the ramp; added,
+            // covering nothing (no alpha).
+            let heat = fb.a * born * (1.0 - smoothstep(0.6, 1.0, k)) * o.color.a * soft;
             let glow = ramp(fb.a, col) * heat * knobs.w;
-            return vec4(display(glow * dim), min(heat, 1.0));
+            return vec4(display(glow * dim), 0.0);
         }
         // Laid over: smoke lit by the night, with the fire (a fireball's) added through it.
-        let cover = eroded(fa.a, k) * born * o.color.a * knobs.z;
+        let cover = eroded(fa.a, k) * born * o.color.a * knobs.z * soft;
         let soot = select(col, vec3(0.12, 0.10, 0.09), shape > 9.5);
         let smoke = lit_smoke(fa, fb, soot) * cover;
-        let heat = fb.a * born * (1.0 - smoothstep(0.5, 0.9, k)) * o.color.a;
+        let heat = fb.a * born * (1.0 - smoothstep(0.5, 0.9, k)) * o.color.a * soft;
         let glow = ramp(fb.a, col) * heat * knobs.w;
         return vec4(display((smoke + glow) * dim), min(cover, 1.0));
     }
@@ -313,9 +422,11 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
         a = exp(-d * d * 10.0) * 0.85 + pow(max(1.0 - d, 0.0), 2.0) * 0.35;
     } else if shape < 1.5 {
         // A spark: its head (the end it flies toward) bright and wide, its tail thin and fading.
+        // Held at its pixel floor, as wide as its quad all along (dimmed instead, `held`): a tail
+        // narrowed inside a quad a pixel and a half across broke into dots.
         let x = abs(o.uv.x - 0.5) * 2.0;
         let y = o.uv.y;
-        let w = mix(0.12, 0.85, y * y);
+        let w = mix(mix(0.12, 0.85, y * y), 0.9, 1.0 - o.held.x);
         a = (1.0 - smoothstep(0.0, w, x)) * smoothstep(0.0, 0.6, y) * (1.0 - smoothstep(0.86, 1.0, y));
         a *= 0.55 + 0.75 * y;
     } else if shape < 2.5 {
@@ -381,7 +492,8 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
         a = smoothstep(0.0, 0.45, 1.0 - d + (n - 0.5) * 0.9) * (0.25 + 0.3 * n) * (1.0 - 0.5 * d);
         fade = smoothstep(0.0, 0.05, k) * (1.0 - smoothstep(0.35, 1.0, k));
     }
-    a = clamp(a, 0.0, 2.0) * fade * o.color.a;
+    // Held at its pixel floor, its light spread wider (`held`).
+    a = clamp(a, 0.0, 2.0) * fade * o.color.a * o.held.x;
     var col = o.color.rgb;
     if pool.x > 0.5 {
         // Born white-hot, cooling to its colour: its own brightness, unhued, early in its life.
@@ -394,6 +506,8 @@ fn fragment(o: Out) -> @location(0) vec4<f32> {
         col *= NIGHT * knobs.y;
     }
     let rgb = col * a * dim;
-    // Premultiplied: added for light (its alpha unused), laid over for smoke (`burst.rs`).
-    return vec4(display(rgb), min(a, 1.0));
+    // Premultiplied (`burst.rs`): smoke laid over; light added with no alpha, since Bevy blends
+    // an added material premultiplied too, and its alpha covered what was behind it (a spark's
+    // core blotted out the stone and the spark under it, so light over light didn't add up).
+    return vec4(display(rgb), select(min(a, 1.0), 0.0, pool.x > 0.5));
 }
