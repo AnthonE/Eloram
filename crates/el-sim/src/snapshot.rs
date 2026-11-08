@@ -7,8 +7,8 @@
 //! - Little-endian, floats as their bits, enums padded to their widest: the same bytes native and
 //!   wasm, and the same length for every match on a map (`len`).
 //! - Never the offer secret (offers stay out of a checkpoint's reach as they stay out of the
-//!   record's), never the tick's events or its scratch (`keys_drawn`, `path_budget`), which a step
-//!   starts by clearing.
+//!   record's), never the tick's events or its scratch (`keys_drawn`, `path_budget`, the scans'
+//!   bounds), which a step starts by clearing or working out again.
 //! - Each type's fields are destructured, so a field added to the match is a compile error here
 //!   until the snapshot has it.
 
@@ -657,6 +657,8 @@ fn body(m: &Match, o: &mut Out<'_>) {
         seated,
         surrender,
         path_budget: _,
+        live_end: _,
+        missile_end: _,
         practice,
     } = m;
     seed.put(o);
@@ -795,6 +797,8 @@ pub fn read(b: &[u8], m: &mut Match) -> Result<(), SnapError> {
         seated,
         surrender,
         path_budget,
+        live_end: _,
+        missile_end: _,
         practice,
     } = m;
     seed.get(&mut i)?;
@@ -823,6 +827,7 @@ pub fn read(b: &[u8], m: &mut Match) -> Result<(), SnapError> {
     *keys_drawn_n = 0;
     events.clear();
     *path_budget = PATH_BUDGET;
+    m.find_ends();
     Ok(())
 }
 
@@ -899,6 +904,8 @@ pub fn diff(a: &Match, b: &Match) -> Option<Where> {
         seated,
         surrender,
         path_budget: _,
+        live_end: _,
+        missile_end: _,
         practice,
     } = a;
     let m = "match";

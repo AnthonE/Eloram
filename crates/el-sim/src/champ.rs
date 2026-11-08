@@ -284,7 +284,7 @@ impl Match {
         source: Source,
     ) {
         let team = self.units[caster].team;
-        for j in 0..self.units.len() {
+        for j in 0..self.live_end() {
             let u = &self.units[j];
             let reach = radius + u.radius;
             if u.kind.is_structure()
@@ -418,7 +418,7 @@ impl Match {
         // The minion `m` takes it deepest into, if any.
         let blocker = |m: Vec2| {
             let mut deepest: Option<(f32, usize)> = None;
-            for j in FIRST_MINION..MAX_UNITS {
+            for j in FIRST_MINION..self.live_end() {
                 let u = &self.units[j];
                 if !u.alive {
                     continue;
@@ -495,7 +495,7 @@ impl Match {
         let mut clump = [0u16; N];
         let mut taken = [false; N];
         let mut n = 0;
-        for (k, j) in (FIRST_MINION..MAX_UNITS).enumerate() {
+        for (k, j) in (FIRST_MINION..self.live_end()).enumerate() {
             let u = &self.units[j];
             if u.alive && math::distance(pos, u.pos) < r + u.radius + PAD {
                 if math::distance(corner, u.pos) < r + u.radius {
@@ -513,7 +513,7 @@ impl Match {
         while at < n {
             let a = self.units[usize::from(clump[at])];
             at += 1;
-            for (k, j) in (FIRST_MINION..MAX_UNITS).enumerate() {
+            for (k, j) in (FIRST_MINION..self.live_end()).enumerate() {
                 let u = &self.units[j];
                 if !taken[k] && u.alive && math::distance(a.pos, u.pos) < a.radius + u.radius + 2.0 * r {
                     if math::distance(corner, u.pos) < r + u.radius {

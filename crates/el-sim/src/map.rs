@@ -450,23 +450,20 @@ impl Map {
 
     /// ORs what a unit at `p` with sight `class` sees into `grid` ([`VIS_WORDS`] words a row).
     pub fn stamp_sight(&self, p: Vec2, class: usize, grid: &mut [u64; VIS_WORDS * VIS_H]) {
+        const { assert!(VIS_WORDS == 2, "a row is two words") };
         let (cx, cy) = Map::vis_cell(p);
         let base = ((cy * VIS_W + cx) * SIGHT.len() + class) * WINDOW;
-        for wy in 0..WINDOW {
-            let y = cy as i32 + wy as i32 - SIGHT_CELLS as i32;
-            if y < 0 || y >= VIS_H as i32 {
-                continue;
-            }
-            let row = u128::from(self.windows[base + wy]);
-            if row == 0 {
-                continue;
-            }
-            // The window's bit `wx` is cell `cx + wx - SIGHT_CELLS` of the row.
-            let shift = cx as i32 - SIGHT_CELLS as i32;
+        // The window's rows that are on the map (row `wy` is the map's row `cy + wy - SIGHT_CELLS`),
+        // and its bit `wx` as cell `cx + wx - SIGHT_CELLS` of each: the same shift every row.
+        let (y0, y1) = (cy.saturating_sub(SIGHT_CELLS), (cy + SIGHT_CELLS + 1).min(VIS_H));
+        let rows = &self.windows[base + y0 + SIGHT_CELLS - cy..base + y1 + SIGHT_CELLS - cy];
+        let shift = cx as i32 - SIGHT_CELLS as i32;
+        let (lines, _) = grid[y0 * VIS_WORDS..y1 * VIS_WORDS].as_chunks_mut::<2>();
+        for (&row, words) in rows.iter().zip(lines) {
+            let row = u128::from(row);
             let bits = if shift >= 0 { row << shift } else { row >> -shift };
-            let at = y as usize * VIS_WORDS;
-            grid[at] |= bits as u64;
-            grid[at + 1] |= (bits >> 64) as u64;
+            words[0] |= bits as u64;
+            words[1] |= (bits >> 64) as u64;
         }
     }
 

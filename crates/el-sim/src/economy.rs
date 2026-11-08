@@ -163,7 +163,7 @@ impl Match {
         }
         let team = team_of_seat(seat);
         let at = self.units[seat].pos;
-        for j in 0..self.units.len() {
+        for j in 0..self.live_end() {
             let u = &self.units[j];
             let reach = active.radius + u.radius;
             if !u.kind.is_structure()
@@ -345,7 +345,7 @@ impl Match {
                         self.champs[seat].aug_ready[k] = now + ticks(period);
                         let team = team_of_seat(seat);
                         let at = self.units[seat].pos;
-                        for j in 0..self.units.len() {
+                        for j in 0..self.live_end() {
                             let u = &self.units[j];
                             let reach = radius + u.radius;
                             if !u.kind.is_structure()

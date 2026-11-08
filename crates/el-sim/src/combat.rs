@@ -9,7 +9,7 @@ use crate::game::{Casting, Dash, Match};
 use crate::math;
 use crate::missile::Source;
 use crate::ticks;
-use crate::units::{BuffKind, Kind, SEATS, structure, structure_slot, team_of_seat};
+use crate::units::{BuffKind, FIRST_MINION, Kind, SEATS, structure, structure_slot, team_of_seat};
 
 impl Match {
     /// Whether a structure may be hurt: the one in front of it is down (`docs/DESIGN.md`).
@@ -407,18 +407,33 @@ impl Match {
         champions: bool,
         minions: bool,
     ) -> Option<usize> {
-        let team = self.units[i].team;
-        let at = self.units[i].pos;
+        let (team, at, reach) = (self.units[i].team, self.units[i].pos, reach + self.units[i].radius);
+        let seen = &self.vision.units[usize::from(team)];
         let mut best: Option<(f32, usize)> = None;
-        for (j, u) in self.units.iter().enumerate() {
-            let kind_ok = (champions && u.kind == Kind::Champion) || (minions && u.kind.is_minion());
-            if !kind_ok || !self.attackable(team, j) {
-                continue;
+        // Champions hold slots 0–9 and minions the slots after the structures, so each kind is
+        // looked for only where it can be (an unused slot's default kind is a champion's). The
+        // cheap tests come first, the vision bit last; neither kind is a structure, so there's no
+        // protection to ask about. In slot order, nearest first: what `attackable` and a scan of
+        // every slot would choose.
+        let mut look = |j: usize, minion_only: bool| {
+            let u = &self.units[j];
+            if !u.alive || u.team == team || (minion_only && !u.kind.is_minion()) {
+                return;
             }
-            let r = reach + self.units[i].radius + u.radius;
+            let r = reach + u.radius;
             let d2 = (u.pos - at).length_squared();
-            if d2 <= r * r && best.is_none_or(|(b, _)| d2 < b) {
+            if d2 <= r * r && best.is_none_or(|(b, _)| d2 < b) && seen.get(j) {
                 best = Some((d2, j));
+            }
+        };
+        if champions {
+            for j in 0..SEATS {
+                look(j, false);
+            }
+        }
+        if minions {
+            for j in FIRST_MINION..self.live_end() {
+                look(j, true);
             }
         }
         best.map(|(_, j)| j)
