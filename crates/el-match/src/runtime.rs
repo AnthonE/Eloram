@@ -29,12 +29,15 @@ impl ShardThread {
     }
 }
 
-/// Runs `shard` on a thread called `name`, paced at the tick rate, waking `egress` after every
-/// tick.
+/// Runs `shard` on a thread called `name`, paced at the tick rate, waking `egress` as its matches
+/// are replicated and after every tick.
 #[allow(clippy::disallowed_methods, clippy::disallowed_macros)]
 pub fn spawn(mut shard: Shard, egress: Option<Thread>, name: &str) -> std::io::Result<ShardThread> {
     let shared = shard.shared().clone();
     let hot = shard.config().hot_guard;
+    if let Some(t) = &egress {
+        shard.set_egress(t.clone());
+    }
     let handle = thread::Builder::new().name(name.into()).spawn(move || {
         let period = Duration::from_secs_f64(1.0 / f64::from(el_sim::TICK_HZ));
         let spin_window = Duration::from_micros(1_500);

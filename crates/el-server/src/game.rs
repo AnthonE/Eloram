@@ -136,9 +136,10 @@ impl Game {
                 stop: AtomicBool::new(false),
                 stats: EgressStats::default(),
             });
-            let e = egress.clone();
-            let egress_thread =
-                thread::Builder::new().name(format!("egress-{k}")).spawn(move || egress_loop(ends, &e))?;
+            let (e, sh) = (egress.clone(), shared.clone());
+            let egress_thread = thread::Builder::new()
+                .name(format!("egress-{k}"))
+                .spawn(move || egress_loop(ends, &e, &sh))?;
             let thread = el_match::spawn(shard, Some(egress_thread.thread().clone()), &format!("shard-{k}"))?;
             out.push(Shard {
                 shared,
@@ -231,11 +232,15 @@ impl Drop for Game {
     }
 }
 
-/// The egress thread: woken after each tick, it sends every queued datagram to its seat's
-/// connection (or drops it, for a seat no one is attached to).
-fn egress_loop(mut ends: EgressEnds, e: &Egress) {
+/// The egress thread: woken as the shard replicates its matches, it sends each match's queued
+/// datagrams to their seats' connections (or drops them, for a seat no one is attached to), a
+/// match at a time as the shard counts them done ([`el_match::ShardShared::replicated`]).
+fn egress_loop(mut ends: EgressEnds, e: &Egress, shard: &el_match::ShardShared) {
     let mut sinks: Vec<Option<Connection>> = (0..ends.rings.len()).map(|_| None).collect();
     let mut buf = [0u8; el_proto::MAX_DATAGRAM + 64];
+    let matches = shard.matches as u64;
+    // Matches sent, counted as the shard counts them replicated.
+    let mut sent = shard.replicated.load(Ordering::Acquire);
     while !e.stop.load(Ordering::Acquire) {
         thread::park_timeout(Duration::from_millis(50));
         while let Some(c) = e.cmds.pop() {
@@ -244,16 +249,28 @@ fn egress_loop(mut ends: EgressEnds, e: &Egress) {
                 EgressCmd::Detach { g } => sinks[g as usize] = None,
             }
         }
-        for (g, ring) in ends.rings.iter_mut().enumerate() {
-            while let Some(n) = read_packet(ring, &mut buf) {
-                let Some(conn) = &sinks[g] else { continue };
-                if conn.send_datagram(&buf[..n]).is_ok() {
-                    e.stats.datagrams.fetch_add(1, Ordering::Relaxed);
-                    e.stats.bytes.fetch_add(n as u64, Ordering::Relaxed);
-                } else {
-                    e.stats.refused.fetch_add(1, Ordering::Relaxed);
+        let done = shard.replicated.load(Ordering::Acquire);
+        // A whole tick or more behind: every match's rings, once each.
+        let (from, to) = if done - sent >= matches { (0, matches) } else { (sent, done) };
+        sent = done;
+        let (mut datagrams, mut bytes, mut refused) = (0, 0, 0);
+        for k in from..to {
+            let m = (k % matches) as usize;
+            let seats = m * SEATS..(m + 1) * SEATS;
+            for (ring, sink) in ends.rings[seats.clone()].iter_mut().zip(&sinks[seats]) {
+                while let Some(n) = read_packet(ring, &mut buf) {
+                    let Some(conn) = sink else { continue };
+                    if conn.send_datagram(&buf[..n]).is_ok() {
+                        datagrams += 1;
+                        bytes += n as u64;
+                    } else {
+                        refused += 1;
+                    }
                 }
             }
         }
+        e.stats.datagrams.fetch_add(datagrams, Ordering::Relaxed);
+        e.stats.bytes.fetch_add(bytes, Ordering::Relaxed);
+        e.stats.refused.fetch_add(refused, Ordering::Relaxed);
     }
 }

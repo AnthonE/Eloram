@@ -741,13 +741,13 @@ impl Lobby {
     fn over(&self, inner: &mut Inner, k: usize, m: u16, winner: u8) {
         if let Some(l) = inner.live.iter_mut().find(|l| l.shard == k && l.m == m && l.over_at.is_none()) {
             l.over_at = Some(Instant::now());
-            for (_, seat, tx) in &l.sessions {
+            for (_, _, tx) in &l.sessions {
                 let _ = tx.send(LobbyEvent::Over { winner });
-                if winner != NO_CONTEST
-                    && let Some(a) = l.wallets[usize::from(*seat)]
-                {
-                    self.rerolls.earn(a);
-                }
+            }
+            if winner != NO_CONTEST {
+                let wallets = &l.wallets;
+                self.rerolls
+                    .earn_all(l.sessions.iter().filter_map(|(_, seat, _)| wallets[usize::from(*seat)]));
             }
         }
     }

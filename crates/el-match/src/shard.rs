@@ -4,6 +4,7 @@
 
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::thread::Thread;
 use std::time::Instant;
 
 use el_proto::MAX_DATAGRAM;
@@ -49,7 +50,14 @@ pub struct Shard {
     frame: Box<[u8]>,
     /// A checkpoint being written (empty without `checkpoints`).
     snap: Box<[u8]>,
+    /// The thread that sends the seats' datagrams, woken as matches are replicated.
+    egress: Option<Thread>,
 }
+
+/// Matches replicated between wakes of the egress thread: the first match's datagrams leave a few
+/// matches' time after they're made, not a whole shard tick's (an unpark is an atomic swap, and a
+/// futex wake only when the thread is parked).
+const WAKE_EVERY: usize = 4;
 
 impl Shard {
     pub(crate) fn new(cfg: ShardConfig, shared: Arc<ShardShared>, ends: ShardEnds) -> Self {
@@ -71,7 +79,13 @@ impl Shard {
                 if cfg.checkpoint_every > 0 { snapshot::len(&Match::new(cfg.map, 0, [0; SEATS])) } else { 0 },
                 0u8,
             ),
+            egress: None,
         }
+    }
+
+    /// Wakes `t` as matches are replicated ([`ShardShared::replicated`]), not only after the tick.
+    pub fn set_egress(&mut self, t: Thread) {
+        self.egress = Some(t);
     }
 
     pub fn shared(&self) -> &Arc<ShardShared> {
@@ -95,6 +109,7 @@ impl Shard {
             self.control(c);
         }
         let mut live = 0;
+        let mut since_wake = 0;
         for m in 0..self.cfg.matches {
             if self.running[m] {
                 // A match that panics is stopped; the others in the shard go on. (Unwinding costs
@@ -106,6 +121,14 @@ impl Shard {
                 } else {
                     live += 1;
                 }
+                since_wake += 1;
+            }
+            self.shared.replicated.fetch_add(1, Ordering::Release);
+            if since_wake == WAKE_EVERY
+                && let Some(t) = &self.egress
+            {
+                t.unpark();
+                since_wake = 0;
             }
         }
         Metrics::set(&self.shared.metrics.matches, live);

@@ -48,25 +48,38 @@ impl Bank {
 
     /// `wallet` spent one.
     pub fn spend(&self, wallet: PlayerId) {
-        self.change(wallet, |n| n.saturating_sub(1));
+        self.change([wallet], |n| n.saturating_sub(1));
     }
 
     /// `wallet` earned one (up to the most).
     pub fn earn(&self, wallet: PlayerId) {
-        self.change(wallet, |n| (n + 1).min(BANK_MAX));
+        self.earn_all([wallet]);
     }
 
-    fn change(&self, wallet: PlayerId, f: impl FnOnce(u8) -> u8) {
+    /// Each of `wallets` earned one, kept in one write (a match's end: one for its seats, not one
+    /// each, each synced to disk).
+    pub fn earn_all(&self, wallets: impl IntoIterator<Item = PlayerId>) {
+        self.change(wallets, |n| (n + 1).min(BANK_MAX));
+    }
+
+    fn change(&self, wallets: impl IntoIterator<Item = PlayerId>, f: impl Fn(u8) -> u8) {
         let Ok(mut h) = self.held.lock() else { return };
-        let was = h.get(&wallet).copied().unwrap_or(BANK_MAX);
-        let now = f(was);
-        if now == was {
-            return;
+        let mut changed = false;
+        for wallet in wallets {
+            let was = h.get(&wallet).copied().unwrap_or(BANK_MAX);
+            let now = f(was);
+            if now == was {
+                continue;
+            }
+            changed = true;
+            if now >= BANK_MAX {
+                h.remove(&wallet);
+            } else {
+                h.insert(wallet, now);
+            }
         }
-        if now >= BANK_MAX {
-            h.remove(&wallet);
-        } else {
-            h.insert(wallet, now);
+        if !changed {
+            return;
         }
         if let Some(file) = &self.file {
             let mut rows: Vec<(String, u8)> = h.iter().map(|(a, n)| (a.as_str().to_string(), *n)).collect();
