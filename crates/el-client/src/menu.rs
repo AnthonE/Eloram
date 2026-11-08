@@ -616,6 +616,25 @@ fn show(
             *border = BorderColor::all(edge);
         }
     }
+    // Its words are inside it: worked out only while it's open (the frame it opens included), not
+    // formatted every frame for a menu nobody sees.
+    if menu.open {
+        words_now(&prefs, &audio, &status, &mut words);
+    }
+    status.set("menu_open", menu.open);
+    status.set("menu_tab", menu.tab.title().to_lowercase());
+    status.set("indicators", prefs.indicators);
+    status.set("quality", if prefs.low { "low" } else { "high" });
+    status.set("quality_next", if prefs.low_next { "low" } else { "high" });
+}
+
+/// The menu's words that change: the volumes, the mute button's, and what's drawing now.
+fn words_now(
+    prefs: &Prefs,
+    audio: &AudioSettings,
+    status: &DevStatus,
+    words: &mut Query<(&Words, &mut Text)>,
+) {
     let fps = status.fields.iter().find(|(k, _)| *k == "fps").and_then(|(_, v)| match v {
         Field::Num(n) => Some(*n),
         _ => None,
@@ -625,9 +644,9 @@ fn show(
         Field::Text(t) => Some(t.clone()),
         _ => None,
     });
-    for (w, mut t) in &mut words {
+    for (w, mut t) in words.iter_mut() {
         let want = match *w {
-            Words::Percent(k) => format!("{:.0}%", volume(&audio, k) * 100.0),
+            Words::Percent(k) => format!("{:.0}%", volume(audio, k) * 100.0),
             Words::Mute => if audio.muted { "UNMUTE" } else { "MUTE" }.to_string(),
             Words::Now => {
                 let api = if crate::look::WEBGPU { "WebGPU" } else { "WebGL 2" };
@@ -647,11 +666,6 @@ fn show(
             **t = want;
         }
     }
-    status.set("menu_open", menu.open);
-    status.set("menu_tab", menu.tab.title().to_lowercase());
-    status.set("indicators", prefs.indicators);
-    status.set("quality", if prefs.low { "low" } else { "high" });
-    status.set("quality_next", if prefs.low_next { "low" } else { "high" });
 }
 
 /// The Controls page's keys, two columns of groups, written again when the layout or the casting

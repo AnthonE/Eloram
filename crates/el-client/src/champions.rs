@@ -150,13 +150,18 @@ fn load(
     if !look.art {
         return;
     }
-    let dealt: Vec<usize> =
-        match (session.watch.as_deref(), session.client.as_deref(), session.select.as_ref()) {
-            (Some(w), _, _) => w.referee.m.champs[..SEATS].iter().map(|c| usize::from(c.def)).collect(),
-            (None, Some(c), _) => c.world.champs[..SEATS].iter().map(|c| usize::from(c.def)).collect(),
-            (None, None, Some(s)) => s.picks.iter().map(|&p| usize::from(p)).collect(),
-            (None, None, None) => Vec::new(),
-        };
+    // (Every frame: in an array, the seats' champions or none, not a new vector.)
+    let mut dealt = [usize::MAX; SEATS];
+    match (session.watch.as_deref(), session.client.as_deref(), session.select.as_ref()) {
+        (Some(w), _, _) => dealt = std::array::from_fn(|s| usize::from(w.referee.m.champs[s].def)),
+        (None, Some(c), _) => dealt = std::array::from_fn(|s| usize::from(c.world.champs[s].def)),
+        (None, None, Some(s)) => {
+            for (d, &p) in dealt.iter_mut().zip(&s.picks) {
+                *d = usize::from(p);
+            }
+        }
+        (None, None, None) => {}
+    }
     for d in dealt.into_iter().filter(|&d| d < CHAMPIONS.len()) {
         if models.asked[d].is_none() {
             let path = format!("models/champions/{}.glb", CHAMPIONS[d].name.to_lowercase());
@@ -509,14 +514,27 @@ pub(crate) fn play(
     fading: Option<Layer>,
 ) {
     let node = |c: Clip| nodes[Clip::ALL.iter().position(|&k| k == c).unwrap_or(0)];
-    let want: Vec<(AnimationNodeIndex, Layer)> =
-        [Some(main), fading].into_iter().flatten().filter_map(|l| node(l.clip).map(|n| (n, l))).collect();
-    let stale: Vec<AnimationNodeIndex> =
-        player.playing_animations().map(|(n, _)| *n).filter(|n| want.iter().all(|(w, _)| w != n)).collect();
-    for n in stale {
-        player.stop(n);
+    // Every figure, every frame: in fixed arrays, not two new vectors each time.
+    let want = [Some(main), fading].map(|l| l.and_then(|l| node(l.clip).map(|n| (n, l))));
+    let wanted = |n: &AnimationNodeIndex| want.iter().flatten().any(|(w, _)| w == n);
+    // What else plays stops (a few at a time, in the player's order, until none is left).
+    loop {
+        let mut stale = [None; 4];
+        let mut k = 0;
+        for (n, _) in player.playing_animations() {
+            if k < stale.len() && !wanted(n) {
+                stale[k] = Some(*n);
+                k += 1;
+            }
+        }
+        for n in stale.into_iter().flatten() {
+            player.stop(n);
+        }
+        if k < stale.len() {
+            break;
+        }
     }
-    for (n, l) in want {
+    for (n, l) in want.into_iter().flatten() {
         player.play(n).set_weight(l.weight).seek_to(l.time).pause();
     }
 }

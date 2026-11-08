@@ -2464,7 +2464,10 @@ fn tooltip(
         (Val::Auto, px(size.y - at.y + 8.0), at.x)
     };
     let left = px(left.clamp(4.0, (size.x - TIP_W - 4.0).max(4.0)));
-    node.display = Display::Flex;
+    // (Written only when it changes: a write marks the node changed, and lays the UI out again.)
+    if node.display != Display::Flex {
+        node.display = Display::Flex;
+    }
     if node.top != top || node.bottom != bottom || node.left != left {
         node.top = top;
         node.bottom = bottom;
