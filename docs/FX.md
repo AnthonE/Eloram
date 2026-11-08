@@ -561,6 +561,43 @@ smoke (`AnthonE/oneshot`, `tools/flipbooks/bake.py`), cut for the Causeway.
   pale blob: a hard point half its lane wide in a tight halo now, the trail a narrow streak
   bright only at the head; 5.5% of the dark card where it was 8.8%).
 
+- A third pass, on what Gates' engine and oneshot's effects learned after the stage came over
+  (`AnthonE/Gates` `crates/fx`, `AnthonE/oneshot` `crates/client/src/look/fx`), seven strips before
+  and after (Vessa's Q and W, Orrin's Q, Brakka's Q, Brun's Q, Liora's R, a turret's fall):
+  - Light covered what was behind it. Bevy blends an added material premultiplied
+    (`src + dst × (1 − a)`: `AlphaMode::Add` and `Premultiplied` are one pipeline), and only its
+    standard material writes no alpha for it; the bursts' light, the live pool's missiles,
+    telegraphs, fields and statuses, and the braziers' flame all wrote theirs. So a spark's core
+    blotted out what it crossed, light over light didn't add up, a telegraph's fill darkened the
+    floor it lay on, and a missile's head was a white ring round a grey middle (its core covered
+    the trail under it, and the tonemapped core alone was dimmer than core and trail together).
+    They write none now, as oneshot's shock shell, tracers and plasma do. On the stage: Vessa's
+    W's head a solid point; a hit no longer greys the light card round it (Vessa's Q took 0.06
+    of light from it, none now); the dark card's peaks a little higher at the same moments
+    (Vessa's Q 1.58 to 1.85, Orrin's Q 1.33 to 1.60, Brun's Q 12.99 to 13.54, Liora's R 23.53 to
+    24.23), every strip's peak, half and last-seen times as they were. Where a hit's parts
+    overlap they add now: its core clips for its first two frames (8 to 18% of what changed).
+  - The shield's rim took `pow` of `1 − |n·v|`, a hair under zero where the sphere faces the eye
+    and the dot rounds past 1: a NaN, which blends to black (oneshot's shock shell had it).
+    Clamped.
+  - A spark is Gates' true line: its head where it is, its tail where it was 25 ms before,
+    foreshortened toward the eye. It was centred on itself and a few times as long as wide at
+    any speed, a dot more than a streak at 27 m.
+  - A spark's line is never drawn under 1.6 px across, nor a glow, a shard or an ember under
+    2.5, each dimmed by what it was widened (oneshot's tracers): without multisampling (the low
+    tier) they broke into dots.
+  - What's thrown down (a spark, a blast's motes, rubble) strikes the floor once and lies on it
+    (Gates' bounce, solved in the shader: the moment it struck found by halving), where it fell
+    through the floor and out of the picture.
+  - A sheet's sprite (a puff, a fireball, a flash of petals) fades in its last 0.4 m over the
+    floor, oneshot's soft edge against the depth behind: the Causeway's floor is flat, so its
+    height is that depth, and a depth prepass would take textures the ground's pipeline needs.
+  - A burst's slot is written in place, its unused quads where it starts: Bevy sorts what's laid
+    over by its mesh's bounds, and quads left at the scene's zero stretched every burst's to the
+    middle of the map, so smoke lay over smoke in no order. Light sorts after smoke at the same
+    place, as Gates' two pools draw. A slot taken from a burst still burning is counted
+    (`fx_bursts_stolen`), as Gates' pools count what they steal.
+
 Not yet:
 - Nobody has listened: the sounds were judged by their spectrograms and measures, not by ear. The
   look on a real GPU hasn't been seen either (SwiftShader draws a frame every two seconds, so a
@@ -571,6 +608,9 @@ Not yet:
   by one.
 - A champion's model under a hit on the stage, to judge it against a body.
 - Step 6's frame numbers.
+- From Gates and oneshot, not taken yet: a pool in one mesh (Gates' world is two draws; ours is a
+  draw a live burst on WebGL2), oneshot's shock shell round a blast, its lit debris, and its
+  tracers' screen-space lines, held in pixels, for a missile's trail.
 
 ## Sources
 
