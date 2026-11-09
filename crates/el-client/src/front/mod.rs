@@ -926,6 +926,7 @@ fn publish(front: Res<Front>, session: Res<Session>, mut dev: ResMut<DevStatus>)
     dev.set("ranked_available", front.ranked_here);
     dev.set("ranked_state", front.ranked_state.clone().unwrap_or_default());
     dev.set("watch_rows", front.rows.len() as u32);
+    dev.set("watch_error", front.rows_error.clone().unwrap_or_default());
     dev.set("hub_news", hub_status(&front, Section::News).key());
     dev.set("hub_store", hub_status(&front, Section::Store).key());
     dev.set("front_status", front.status.clone());

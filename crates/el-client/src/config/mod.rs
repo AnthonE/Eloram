@@ -104,10 +104,13 @@ pub fn set_http_base(base: &str) {
 }
 
 /// `path` on the game server's HTTP side (`records.json`, `records/<id>`), or `None` before the
-/// server is found.
+/// server is found. A page with no base was served by the game server itself: the path is its own.
 pub fn server_url(path: &str) -> Option<String> {
     let b = HTTP_BASE.lock().ok()?.clone();
-    (!b.is_empty()).then(|| format!("{}{path}", if b.ends_with('/') { b } else { format!("{b}/") }))
+    if b.is_empty() {
+        return cfg!(target_arch = "wasm32").then(|| path.to_string());
+    }
+    Some(format!("{}{path}", if b.ends_with('/') { b } else { format!("{b}/") }))
 }
 
 impl LaunchConfig {

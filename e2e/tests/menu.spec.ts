@@ -38,6 +38,12 @@ test("the main menu: its pages, PLAY, and leaving a match for it", async ({ page
     expect(s.phase).toBe("lobby");
     expect(s.front).toBe(true);
 
+    // WATCH reads the server's records.json (an empty list here, but read).
+    await push(page, { t: "front", nav: "watch" });
+    await until(page, "the watch page", (s) => s.front_nav === "watch", 20_000);
+    await page.waitForTimeout(3000);
+    s = await el(page);
+    expect(s.watch_error).toBe("");
     for (const nav of ["watch", "practice", "store", "profile"]) {
       await push(page, { t: "front", nav });
       await until(page, `the ${nav} page`, (s) => s.front_nav === nav, 20_000);
