@@ -327,7 +327,12 @@ Changed on the way:
   waits for `window.__el.champion_stance`, the idle no longer being everyone's), then running, the
   walk still predicted exactly, all three tests in 6.5 minutes. In a practice match at the game's
   zoom the allies read in their own colours where they read blue on the blue stone. The golden
-  hashes held, native and on wasm.
+  hashes held, native and on wasm. `scripts/e2e.sh watch` passes (3.7 minutes), its bursts taken
+  from one still burning 17 as before (16): with every champion's steps kicking up dust they were
+  100, so only the player's own do. Twice its replay ran out before anyone died: the suite needs
+  a champion's death in the record's first 100 s, and the headless sim's first kill falls in the
+  second minute (six seeds: none by 1:00, one to nine by 2:00), so it fails now and then on the
+  match it's given, before this pass as after.
 
 Not yet:
 - Nobody has seen them on a real GPU, and the frame rate there isn't measured.
