@@ -54,6 +54,8 @@ pub struct LaunchConfig {
     /// places and a fight, its frame times summed up. `renderer` is what WebGL names the GPU.
     pub bench: bool,
     pub renderer: String,
+    /// What a match draws, drawn before it (`warm.rs`); `?warm=0` leaves it to the match.
+    pub warm: bool,
 }
 
 fn get(obj: &JsValue, key: &str) -> JsValue {
@@ -101,6 +103,8 @@ impl LaunchConfig {
             fxsize: get(&cfg, "fxsize").as_f64().map(|v| v as f32).filter(|v| *v > 0.0),
             bench: flag("bench"),
             renderer: string("renderer"),
+            // Off only when asked: a page whose loader predates it warms.
+            warm: get(&cfg, "warm").as_bool() != Some(false),
             fxcards: {
                 let c = string("fxcards");
                 let mut it = c.split(',').map(|v| v.trim().parse::<f32>().ok());

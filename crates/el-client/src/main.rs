@@ -19,6 +19,8 @@ mod dev_hooks;
 #[cfg(target_arch = "wasm32")]
 mod edges;
 #[cfg(target_arch = "wasm32")]
+mod frame;
+#[cfg(target_arch = "wasm32")]
 mod fx;
 #[cfg(target_arch = "wasm32")]
 mod ground;
@@ -60,6 +62,8 @@ mod stage;
 mod transport;
 #[cfg(target_arch = "wasm32")]
 mod view;
+#[cfg(target_arch = "wasm32")]
+mod warm;
 #[cfg(target_arch = "wasm32")]
 mod watch;
 

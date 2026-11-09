@@ -54,17 +54,17 @@ const FLASH_GLOW: f32 = 0.45;
 const WHEEL: f32 = 0.22;
 
 /// A model, once it's in: its scene, and its clips in a graph.
-struct Art {
-    scene: Handle<WorldAsset>,
+pub(crate) struct Art {
+    pub(crate) scene: Handle<WorldAsset>,
     graph: Handle<AnimationGraph>,
     nodes: [Option<AnimationNodeIndex>; Clip::ALL.len()],
 }
 
 #[derive(Resource, Default)]
-struct Models {
+pub(crate) struct Models {
     asked: [Option<Handle<Gltf>>; MINIONS.len()],
-    dusk: [Option<Handle<Image>>; MINIONS.len()],
-    ready: [Option<Art>; MINIONS.len()],
+    pub(crate) dusk: [Option<Handle<Image>>; MINIONS.len()],
+    pub(crate) ready: [Option<Art>; MINIONS.len()],
     /// A model's material as each team's, by the material its scene came with: unlit by a hit, then
     /// each step of a hit's flash.
     mats: HashMap<AssetId<StandardMaterial>, [[Handle<StandardMaterial>; FLASH_STEPS + 1]; 2]>,
@@ -222,7 +222,7 @@ fn team_mats(
 }
 
 /// A model's material as team `t`'s.
-fn team_mat(
+pub(crate) fn team_mat(
     original: &StandardMaterial,
     t: usize,
     team_band: bool,
