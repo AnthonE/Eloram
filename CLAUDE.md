@@ -75,9 +75,10 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   draws and `audio.rs` plays (Web Audio); a match watched is told to them by `el_client_core::spectator`.
   `python3 -I art/tools/sounds.py [--only prefix,...]` remakes `web/assets/audio/` from `manifest.json`
   (written by `cargo test -p el-client-core fx::sound -- --ignored write_manifest` when the table, the
-  announcer's words or a champion's script changes) and Kenney's CC0 packs (their pinned links
-  redirect now: only the synthesised sounds remake until they're pinned again); the music's files are
-  optional, dropped in by name.
+  announcer's words or a champion's script changes) and Kenney's CC0 packs, kept in
+  `art/vendor/kenney/` (pinned by hash; Impact Sounds isn't there yet, so the 40 sounds made from it
+  are reported not made and left as they are); a rebuild reproduces the shipped files byte for byte.
+  The music's files are optional, dropped in by name.
 - The voices (`docs/FX.md`, "The voices, and the rewards"): the announcer (`fx::voice`: every line
   aimed from the viewer's side, its words in `says`, shown on the banner `hud_banner.rs` as it's said)
   and the champions (`fx::vo`: each champion's script and casting note, Riot's moments and throttles,

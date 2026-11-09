@@ -105,6 +105,17 @@ water, wind, bells, glass, starlight, the warnings, the tones, the room, the amb
 synthesised by the tool; ours. Each file below is a mix of those: the recordings layered,
 pitched, filtered and enveloped under the synthesis.
 
+The packs are in the repository (`art/vendor/kenney/`), as Kenney published them, each pinned by
+its hash in `sounds.py`: kenney.nl's downloads now go through a signed link, and the links the
+tool had pinned lead to the packs' pages. Rebuilt from them, every sound they make comes out the
+same bytes as the files shipped.
+
+| Pack | Where it came from |
+|---|---|
+| `kenney_sci-fi-sounds.zip`, `kenney_interface-sounds.zip`, `kenney_casino-audio.zip` | Kenney's own uploads to OpenGameArt ([sci-fi](https://opengameart.org/content/sci-fi-sounds), [interface](https://opengameart.org/content/interface-sounds), [casino](https://opengameart.org/content/54-casino-sound-effects-cards-dice-chips)): the same bytes as kenney.nl's 2023 zips |
+| `kenney_rpg-audio.zip` | Kenney's own OpenGameArt upload ([50 RPG sound effects](https://opengameart.org/content/50-rpg-sound-effects), `RPGsounds_Kenney.zip`), older than kenney.nl's 2023 zip and laid out differently; the same recordings for every sound checked (11 of the 14 used; the other 3 are in sounds that need the impact pack too) |
+| `kenney_impact-sounds.zip` | not in the repository yet ([kenney.nl](https://kenney.nl/assets/impact-sounds) only): the sounds made from it can't be remade until it is |
+
 | Files | Kenney recordings in them (CC0) | Pure synthesis (ours) |
 |---|---|---|
 | `ember.*` | impact (punches), sci-fi (thruster, low explosion, crunch) | `cast`, `windup`, `dash`, `buff`, `ult` |

@@ -524,7 +524,8 @@ ten and the announcer.
     `localStorage` (a test sets them through the inbox: `{t:"volume",bus,v}`, `{t:"mute",on}`).
 - The sounds (`art/tools/sounds.py`, `art/LICENSES.md`):
   - The physical bodies are recordings from five of Kenney's CC0 packs, pinned by hash, their
-    licence checked. The elements are synthesised: fire's roar and crackle, water, wind bands,
+    licence checked. They're kept in the repository (`art/vendor/kenney/`) since kenney.nl moved
+    its downloads behind signed links; rebuilt from them, the sounds come out the same bytes. The elements are synthesised: fire's roar and crackle, water, wind bands,
     bell and glass partials, starlight, plucked strings, the warnings (rising sweeps, a shell's
     falling whistle).
   - Everything shares one small room, then is mastered by bus. A take's randomness is seeded by

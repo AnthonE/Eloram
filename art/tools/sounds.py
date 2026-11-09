@@ -15,9 +15,11 @@ the wrong channels or rate, a peak over -1 dBFS, more than half again its stated
 past 5 ms, a level off its bus's target, or either format's whole set past 3 MiB. With --sheets,
 a spectrogram contact sheet per family and one for the rest go in that directory (not shipped).
 
-The packs are downloaded once into the cache (default art/cache/sounds/, not in git), checked
-against their hashes and their licence files (CC0), and each extracted into its own directory;
-nothing in them is run. Every random choice comes from a generator seeded by the take's name, so
+The packs are in the repository (art/vendor/kenney/, CC0: kenney.nl's links now go through a
+signed download, so the tool no longer fetches them), checked against their hashes and their
+licence files (CC0), and each extracted into its own directory in the cache (default
+art/cache/sounds/, not in git); nothing in them is run. A pack that isn't there fails only the
+sounds made from it. Every random choice comes from a generator seeded by the take's name, so
 a run makes the same files every time. Needs numpy, Pillow (for --sheets) and an ffmpeg with
 libopus and libmp3lame.
 """
@@ -30,7 +32,6 @@ import re
 import shutil
 import subprocess
 import sys
-import urllib.request
 import zipfile
 import zlib
 from concurrent.futures import ThreadPoolExecutor
@@ -42,20 +43,21 @@ AUDIO = os.path.join(ROOT, "web", "assets", "audio")
 SR = 48000
 
 # ---------------------------------------------------------------------------------------------
-# Sources: Kenney's packs, pinned by URL and hash.
+# Sources: Kenney's packs, in the repository (art/vendor/kenney/kenney_<slug>.zip) as Kenney
+# published them, pinned by hash, with the folder their recordings are in (art/LICENSES.md says
+# where each came from).
 
-KENNEY = "https://kenney.nl/media/pages/assets"
+VENDOR = os.path.join(ROOT, "art", "vendor", "kenney")
 PACKS = {
-    "impact": ("impact-sounds", "87b4ddecda-1677589768",
-               "029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8"),
-    "rpg": ("rpg-audio", "8e99002d76-1677590336",
-            "6dbeaf8544da958d8f2adcb4a4a4b76c1ade34a05f8ab9edccd327da7375f38b"),
-    "scifi": ("sci-fi-sounds", "6b296f9ecf-1677589334",
-              "119340f351a5098ad814f78719438c0da355a9ce8a4c8a3af6a8d48aa3d49e04"),
-    "casino": ("casino-audio", "2472606a04-1721639069",
-               "f36250766ac5bc378c13708ddf12a23a8e54a3251f8d482c7536e51b5dbafa18"),
-    "interface": ("interface-sounds", "fa43c1dd4d-1677589452",
-                  "f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232"),
+    "impact": ("impact-sounds", "029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8", "Audio"),
+    # Kenney's own OpenGameArt upload of the pack: older than kenney.nl's 2023 zip and laid out
+    # differently, the same recordings (rebuilt from it, every sound made from it came out the
+    # same bytes as from the 2023 zip).
+    "rpg": ("rpg-audio", "3ae398ad63e293f9c450bda22d5d81c3af69c74df66fc1400f33c012c0bbc231", "OGG"),
+    "scifi": ("sci-fi-sounds", "119340f351a5098ad814f78719438c0da355a9ce8a4c8a3af6a8d48aa3d49e04", "Audio"),
+    "casino": ("casino-audio", "f36250766ac5bc378c13708ddf12a23a8e54a3251f8d482c7536e51b5dbafa18", "Audio"),
+    "interface": ("interface-sounds", "f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232",
+                  "Audio"),
 }
 
 
@@ -114,7 +116,7 @@ BANK = {
 
 
 class Sources:
-    """The packs, fetched and checked once, and their recordings decoded on demand."""
+    """The packs, checked and extracted once, and their recordings decoded on demand."""
 
     def __init__(self, cache):
         self.cache = cache
@@ -124,24 +126,15 @@ class Sources:
     def pack(self, key):
         if key in self.dirs:
             return self.dirs[key]
-        slug, ver, sha = PACKS[key]
+        slug, sha, _ = PACKS[key]
         os.makedirs(self.cache, exist_ok=True)
-        z = os.path.join(self.cache, f"kenney_{slug}.zip")
+        z = os.path.join(VENDOR, f"kenney_{slug}.zip")
         if not os.path.isfile(z):
-            url = f"{KENNEY}/{slug}/{ver}/kenney_{slug}.zip"
-            print("fetching", url, flush=True)
-            data = urllib.request.urlopen(url, timeout=180).read()
-            if hashlib.sha256(data).hexdigest() != sha:
-                # Not kept: a moved page (Kenney's links redirect to the pack's page now) or
-                # another pack. Only what's made from it fails.
-                raise OSError(f"{url}: not the pack we pinned (sha256 differs)")
-            with open(z + ".part", "wb") as f:
-                f.write(data)
-            os.replace(z + ".part", z)
-        else:
-            with open(z, "rb") as f:
-                if hashlib.sha256(f.read()).hexdigest() != sha:
-                    sys.exit(f"{z}: not the pack we pinned; delete it to fetch again")
+            # Only what's made from it fails.
+            raise OSError(f"{os.path.relpath(z, ROOT)} isn't there (Kenney's {slug}, CC0)")
+        with open(z, "rb") as f:
+            if hashlib.sha256(f.read()).hexdigest() != sha:
+                sys.exit(f"{z}: not the pack we pinned (sha256 differs)")
         d = os.path.join(self.cache, slug)
         if not os.path.isdir(d):
             # A fresh directory of its own, renamed into place once whole.
@@ -150,7 +143,8 @@ class Sources:
             os.makedirs(tmp)
             with zipfile.ZipFile(z) as zf:
                 zf.extractall(tmp)
-            lic = open(os.path.join(tmp, "License.txt"), encoding="utf-8", errors="replace").read()
+            name = next((f for f in os.listdir(tmp) if f.lower() == "license.txt"), "License.txt")
+            lic = open(os.path.join(tmp, name), encoding="utf-8", errors="replace").read()
             if "CC0" not in lic or "publicdomain/zero" not in lic:
                 sys.exit(f"{slug}: its licence file doesn't say CC0")
             os.replace(tmp, d)
@@ -164,7 +158,7 @@ class Sources:
         key = (pack, stem)
         if key not in self.decoded:
             d = self.pack(pack)
-            path = os.path.realpath(os.path.join(d, "Audio", stem + ".ogg"))
+            path = os.path.realpath(os.path.join(d, PACKS[pack][2], stem + ".ogg"))
             if not path.startswith(os.path.realpath(d) + os.sep) or not os.path.isfile(path):
                 sys.exit(f"{pack}: no {stem}.ogg")
             x = decode(path, 1)[:, 0]
@@ -2764,7 +2758,11 @@ def render(d, k):
 
 def job(args):
     d, k = args
-    y = render(d, k)
+    try:
+        y = render(d, k)
+    except OSError as e:
+        # A pack it's made from isn't there: its files are left as they are.
+        return d["name"], k, None, str(e)
     rows, decoded = write_take(y, d["files"][k], d)
     return d["name"], k, rows, spectrogram(decoded)
 
@@ -2782,13 +2780,12 @@ def main():
     sounds = [d for d in man["sounds"] if not d["optional"]]
     SRC = Sources(a.cache)
     for p in PACKS:
-        # Fetched and checked once here, before the workers fork; one that can't be reached is
-        # only a problem for the sounds made from it (they fail when they ask for it).
+        # Checked and extracted once here, before the workers fork; one that isn't there is only
+        # a problem for the sounds made from it (they fail when they ask for it).
         try:
             SRC.pack(p)
         except OSError as e:
-            print(f"the {p} pack couldn't be fetched ({e}): the sounds made from it will fail",
-                  flush=True)
+            print(f"the {p} pack: {e}; the sounds made from it will fail", flush=True)
     ROOM = make_room(np.random.default_rng(7))
     only = None if a.only is None else tuple(a.only.split(","))
     todo = [(d, k) for d in sounds for k in range(d["takes"])
@@ -2796,7 +2793,8 @@ def main():
     import multiprocessing as mp
     with mp.get_context("fork").Pool(a.jobs) as pool:
         done = pool.map(job, todo, chunksize=1)
-    by = {(name, k): (rows, img) for name, k, rows, img in done}
+    by = {(name, k): (rows, img) for name, k, rows, img in done if rows is not None}
+    unmade = sorted({f"{name}: not made ({why})" for name, k, rows, why in done if rows is None})
 
     # The report.
     bad = []
@@ -2837,6 +2835,7 @@ def main():
         print(f"{fmt}: {b / 2 ** 20:.2f} MiB")
         if b > 3 * 2 ** 20:
             bad.append(f"the {fmt} set is {b / 2 ** 20:.2f} MiB, over 3")
+    bad += unmade
     if a.sheets:
         os.makedirs(a.sheets, exist_ok=True)
         groups = {}
