@@ -1,6 +1,8 @@
 //! Eloram's browser client (Bevy 0.19 → wasm32).
 
 #[cfg(target_arch = "wasm32")]
+mod animstage;
+#[cfg(target_arch = "wasm32")]
 mod app;
 #[cfg(target_arch = "wasm32")]
 mod audio;
@@ -18,6 +20,8 @@ mod coords;
 mod dev_hooks;
 #[cfg(target_arch = "wasm32")]
 mod edges;
+#[cfg(target_arch = "wasm32")]
+mod figure;
 #[cfg(target_arch = "wasm32")]
 mod fx;
 #[cfg(target_arch = "wasm32")]
@@ -56,6 +60,8 @@ mod scenery;
 mod session;
 #[cfg(target_arch = "wasm32")]
 mod stage;
+#[cfg(target_arch = "wasm32")]
+mod trails;
 #[cfg(target_arch = "wasm32")]
 mod transport;
 #[cfg(target_arch = "wasm32")]

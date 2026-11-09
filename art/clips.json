@@ -8,9 +8,12 @@
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "punch",
+      "hook",
       "charge",
-      "thrust",
+      "throw",
       "shout",
       "slam"
     ],
@@ -21,20 +24,26 @@
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "smash",
+      "lunge",
       "charge",
       "slam",
       "shout",
-      "thrust"
+      "throw"
     ],
     "gorum": [
-      "idle",
+      "arms",
       "run",
       "hit",
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "smash",
+      "hook",
       "charge",
       "slam",
       "shout"
@@ -46,55 +55,70 @@
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "smash",
+      "lunge",
       "charge",
       "shout",
       "slam"
     ],
     "kesh": [
-      "idle",
+      "crouch",
       "run",
       "hit",
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "thrust",
+      "jab",
       "charge",
       "slam",
       "judgment"
     ],
     "liora": [
-      "idle",
+      "torch",
       "run",
       "hit",
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "flick",
+      "spell",
       "roll",
       "point",
       "channel"
     ],
     "marret": [
-      "idle",
+      "aim",
       "run",
       "hit",
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "shoot",
+      "fire",
       "roll",
       "point",
       "channel"
     ],
     "mira": [
-      "idle",
+      "lamp",
       "run",
       "hit",
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "flick",
+      "spell",
       "roll",
       "point",
       "channel"
@@ -106,7 +130,10 @@
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "bolt",
+      "spell",
       "roll",
       "point",
       "channel"
@@ -118,7 +145,10 @@
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "flick",
+      "spell",
       "roll",
       "point",
       "channel"
@@ -130,46 +160,58 @@
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "bolt",
+      "spell",
       "roll",
       "point",
       "flick",
       "channel"
     ],
     "pell": [
-      "idle",
+      "brace",
       "run",
       "hit",
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
+      "cut",
       "slash",
       "charge",
       "slam",
       "shout"
     ],
     "sable": [
-      "idle",
+      "torch",
       "run",
       "hit",
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "flick",
+      "spell",
       "roll",
       "point",
       "channel"
     ],
     "sefa": [
-      "idle",
+      "guard",
       "run",
       "hit",
       "death",
       "airborne",
       "victory",
-      "slash",
+      "flinch",
+      "reel",
+      "cut",
+      "sweep",
       "charge",
-      "thrust",
+      "throw",
       "slam"
     ],
     "seren": [
@@ -179,21 +221,28 @@
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "bolt",
+      "spell",
       "roll",
       "point",
       "flick",
       "channel"
     ],
     "talmar": [
-      "idle",
+      "guard",
       "run",
       "hit",
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "thrust",
+      "cut",
       "charge",
+      "throw",
       "slam"
     ],
     "torek": [
@@ -203,7 +252,10 @@
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "bolt",
+      "spell",
       "roll",
       "point",
       "flick",
@@ -216,30 +268,39 @@
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "flick",
+      "spell",
       "roll",
       "point",
       "channel"
     ],
     "vessa": [
-      "idle",
+      "aim",
       "run",
       "hit",
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "shoot",
+      "fire",
       "roll",
       "point"
     ],
     "vire": [
-      "idle",
+      "guard",
       "run",
       "hit",
       "death",
       "airborne",
       "victory",
+      "flinch",
+      "reel",
       "slash",
+      "sweep",
       "charge",
       "slam",
       "shout",
@@ -247,15 +308,30 @@
     ]
   },
   "clips": {
+    "aim": {
+      "length": 1.6670000553131104,
+      "loop": true,
+      "strike": 0.0
+    },
     "airborne": {
       "length": 0.800000011920929,
       "loop": false,
+      "strike": 0.0
+    },
+    "arms": {
+      "length": 2.5,
+      "loop": true,
       "strike": 0.0
     },
     "bolt": {
       "length": 1.600000023841858,
       "loop": false,
       "strike": 0.699999988079071
+    },
+    "brace": {
+      "length": 2.5,
+      "loop": true,
+      "strike": 0.0
     },
     "channel": {
       "length": 2.6670000553131104,
@@ -267,30 +343,80 @@
       "loop": true,
       "strike": 0.0
     },
+    "cross": {
+      "length": 1.0,
+      "loop": false,
+      "strike": 0.27000001072883606
+    },
+    "crouch": {
+      "length": 2.933000087738037,
+      "loop": true,
+      "strike": 0.0
+    },
+    "cut": {
+      "length": 1.399999976158142,
+      "loop": false,
+      "strike": 0.25
+    },
     "death": {
       "length": 1.899999976158142,
       "loop": false,
       "strike": 0.0
+    },
+    "fire": {
+      "length": 0.6330000162124634,
+      "loop": false,
+      "strike": 0.05000000074505806
     },
     "flick": {
       "length": 1.5,
       "loop": false,
       "strike": 0.5
     },
+    "flinch": {
+      "length": 0.3330000042915344,
+      "loop": false,
+      "strike": 0.0
+    },
+    "guard": {
+      "length": 1.6670000553131104,
+      "loop": true,
+      "strike": 0.0
+    },
     "hit": {
       "length": 1.6330000162124634,
       "loop": true,
       "strike": 0.0
+    },
+    "hook": {
+      "length": 1.0670000314712524,
+      "loop": false,
+      "strike": 0.25
     },
     "idle": {
       "length": 4.0,
       "loop": true,
       "strike": 0.0
     },
+    "jab": {
+      "length": 0.8669999837875366,
+      "loop": false,
+      "strike": 0.20000000298023224
+    },
     "judgment": {
       "length": 2.0999999046325684,
       "loop": false,
       "strike": 0.699999988079071
+    },
+    "lamp": {
+      "length": 2.5,
+      "loop": true,
+      "strike": 0.0
+    },
+    "lunge": {
+      "length": 1.5329999923706055,
+      "loop": false,
+      "strike": 0.4099999964237213
     },
     "point": {
       "length": 2.200000047683716,
@@ -301,6 +427,11 @@
       "length": 1.399999976158142,
       "loop": false,
       "strike": 0.5299999713897705
+    },
+    "reel": {
+      "length": 0.43299999833106995,
+      "loop": false,
+      "strike": 0.0
     },
     "roll": {
       "length": 1.2999999523162842,
@@ -325,22 +456,42 @@
     "slam": {
       "length": 2.0,
       "loop": false,
-      "strike": 1.0499999523162842
+      "strike": 1.1200000047683716
     },
     "slash": {
       "length": 1.2999999523162842,
       "loop": false,
-      "strike": 0.550000011920929
+      "strike": 0.6899999976158142
     },
     "smash": {
       "length": 1.2000000476837158,
       "loop": false,
       "strike": 0.9300000071525574
     },
+    "spell": {
+      "length": 1.4670000076293945,
+      "loop": false,
+      "strike": 0.5799999833106995
+    },
+    "sweep": {
+      "length": 1.5670000314712524,
+      "loop": false,
+      "strike": 0.25
+    },
+    "throw": {
+      "length": 1.3329999446868896,
+      "loop": false,
+      "strike": 0.38999998569488525
+    },
     "thrust": {
       "length": 1.2000000476837158,
       "loop": false,
       "strike": 0.7300000190734863
+    },
+    "torch": {
+      "length": 1.2669999599456787,
+      "loop": true,
+      "strike": 0.0
     },
     "victory": {
       "length": 3.200000047683716,
@@ -355,6 +506,7 @@
       "hit",
       "death",
       "airborne",
+      "flinch",
       "flick"
     ],
     "melee": [
@@ -363,6 +515,7 @@
       "hit",
       "death",
       "airborne",
+      "flinch",
       "slash"
     ],
     "super": [
@@ -371,6 +524,7 @@
       "hit",
       "death",
       "airborne",
+      "flinch",
       "smash"
     ]
   }

@@ -902,5 +902,190 @@
       "body": "siege",
       "turn": 90
     }
+  },
+  "ual": {
+    "_": "The clips from Quaternius's Universal Animation Library (CC0; python3 -I art/tools/ual.py fetches it into art/cache/ual/), by the name el_client_core::pose gives each: its parts from the set named, one after another, [clip, from, to] (s; to its end with no to). `node art/tools/champions.mjs --ual` puts them on the models already made (and the full build with the rest), retargeted from the library's T-pose onto each champion's (art/tools/retarget.mjs).",
+    "flinch": {
+      "from": "ual1",
+      "parts": [
+        [
+          "Hit_Chest",
+          0
+        ]
+      ]
+    },
+    "reel": {
+      "from": "ual1",
+      "parts": [
+        [
+          "Hit_Head",
+          0
+        ]
+      ]
+    },
+    "cut": {
+      "from": "ual2",
+      "parts": [
+        [
+          "Sword_Regular_A",
+          0
+        ],
+        [
+          "Sword_Regular_A_Rec",
+          0
+        ]
+      ]
+    },
+    "sweep": {
+      "from": "ual2",
+      "parts": [
+        [
+          "Sword_Regular_B",
+          0
+        ],
+        [
+          "Sword_Regular_B_Rec",
+          0
+        ]
+      ]
+    },
+    "lunge": {
+      "from": "ual1",
+      "parts": [
+        [
+          "Sword_Attack",
+          0
+        ]
+      ]
+    },
+    "jab": {
+      "from": "ual1",
+      "parts": [
+        [
+          "Punch_Jab",
+          0
+        ]
+      ]
+    },
+    "cross": {
+      "from": "ual1",
+      "parts": [
+        [
+          "Punch_Cross",
+          0
+        ]
+      ]
+    },
+    "hook": {
+      "from": "ual2",
+      "parts": [
+        [
+          "Melee_Hook",
+          0
+        ],
+        [
+          "Melee_Hook_Rec",
+          0
+        ]
+      ]
+    },
+    "fire": {
+      "from": "ual1",
+      "parts": [
+        [
+          "Pistol_Shoot",
+          0
+        ]
+      ]
+    },
+    "spell": {
+      "from": "ual1",
+      "parts": [
+        [
+          "Spell_Simple_Enter",
+          0
+        ],
+        [
+          "Spell_Simple_Shoot",
+          0
+        ],
+        [
+          "Spell_Simple_Exit",
+          0
+        ]
+      ]
+    },
+    "throw": {
+      "from": "ual2",
+      "parts": [
+        [
+          "OverhandThrow",
+          0
+        ]
+      ]
+    },
+    "guard": {
+      "from": "ual1",
+      "parts": [
+        [
+          "Sword_Idle",
+          0
+        ]
+      ]
+    },
+    "brace": {
+      "from": "ual2",
+      "parts": [
+        [
+          "Idle_Shield_Loop",
+          0
+        ]
+      ]
+    },
+    "crouch": {
+      "from": "ual1",
+      "parts": [
+        [
+          "Crouch_Idle_Loop",
+          0
+        ]
+      ]
+    },
+    "aim": {
+      "from": "ual1",
+      "parts": [
+        [
+          "Pistol_Idle_Loop",
+          0
+        ]
+      ]
+    },
+    "torch": {
+      "from": "ual1",
+      "parts": [
+        [
+          "Idle_Torch_Loop",
+          0
+        ]
+      ]
+    },
+    "lamp": {
+      "from": "ual2",
+      "parts": [
+        [
+          "Idle_Lantern_Loop",
+          0
+        ]
+      ]
+    },
+    "arms": {
+      "from": "ual2",
+      "parts": [
+        [
+          "Idle_FoldArms_Loop",
+          0
+        ]
+      ]
+    }
   }
 }

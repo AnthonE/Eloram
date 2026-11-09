@@ -65,10 +65,11 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   // The match's headliner, shown as it starts.
   expect(s.headliner).toBeTruthy();
   // The champions drawn (docs/CHAMPIONS.md): the team's five fetched in champion select, the
-  // other five with the match; the own champion's figure is its model, standing.
+  // other five with the match; the own champion's figure is its model, standing in its stance (a
+  // blade's guard, a shield, a light held up..., or the idle: `pose::Kit::idle`).
   s = await until(page, "the champions' models", (s) => s.champion_models >= 10, 120_000);
   const posing = (s: Record<string, any>, clip: string) => String(s.champion_poses).split(",").includes(`${s.seat}:${clip}`);
-  s = await until(page, "the own champion standing", (s) => posing(s, "idle"));
+  s = await until(page, "the own champion standing", (s) => !!s.champion_stance && posing(s, s.champion_stance));
   // The minions' four models, in before the first wave.
   s = await until(page, "the minions' models", (s) => s.minion_models === 4, 60_000);
   await page.screenshot({ path: `${shots}-start.png` });
