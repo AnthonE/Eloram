@@ -8,6 +8,7 @@ use crate::champions::ChampionsPlugin;
 use crate::config::{LaunchConfig, Prefs};
 use crate::dev_hooks::{DevHooksPlugin, InboxPlugin};
 use crate::edges::EdgesPlugin;
+use crate::frame::FramePlugin;
 use crate::fx::FxPlugin;
 use crate::ground::GroundPlugin;
 use crate::hud::HudPlugin;
@@ -27,6 +28,7 @@ use crate::scenery::SceneryPlugin;
 use crate::stage::StagePlugin;
 use crate::trails::TrailsPlugin;
 use crate::view::ViewPlugin;
+use crate::warm::WarmPlugin;
 use crate::watch::WatchPlugin;
 
 pub fn run() {
@@ -74,7 +76,16 @@ pub fn run() {
         ))
         // Past the sixteen a tuple of plugins takes.
         .add_plugins((ChampionsPlugin, MinionsPlugin, PortraitPlugin, DeathPlugin, TargetPlugin))
-        .add_plugins((SelectPlugin, LobbyPlugin, MenuPlugin, FirstPlugin, StagePlugin, BenchPlugin))
+        .add_plugins((
+            SelectPlugin,
+            LobbyPlugin,
+            MenuPlugin,
+            FirstPlugin,
+            StagePlugin,
+            BenchPlugin,
+            FramePlugin,
+            WarmPlugin,
+        ))
         .add_plugins((TrailsPlugin, AnimStagePlugin))
         .run();
 }

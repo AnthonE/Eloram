@@ -152,7 +152,10 @@ is what we built for it, client-side, with the sim, the wire and the record unto
   warmly against the night's cold light (the subject warm, the world cool), its team's rim
   softened so it no longer drowns the texture (an ally read blue on the blue stone), what it holds
   in hand drawn a quarter bigger (the "defining primary characteristic", at some 60 px tall), and
-  on the low tier, which has no shadows, a soft blob of shadow under it.
+  on the low tier, which has no shadows, a soft blob of shadow under it. What these add to a
+  match's drawing (the arcs', the hands' lights' and the blob's materials) is in the page from its
+  start, hidden, so the warm-up (`el-client/src/warm.rs`) builds their pipelines before the match
+  and `scripts/e2e.sh hitches` holds none built in it.
 
 The numbers are a `motion::Feel`, `Feel::GAME` in a match; the anim stage's knobs retune them
 without a rebuild.

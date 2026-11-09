@@ -280,9 +280,10 @@ fn ready(
             fig.player = Some(c);
         }
         if let Ok(m) = meshes.get(c)
-            && let Some(own) = materials.get(&m.0).cloned()
+            && let Some(own) = materials.get(&m.0)
         {
-            let (mat, glow) = champions::dress(own, 0);
+            let mat = champions::rim_material(own, 0);
+            let glow = mat.base.emissive;
             let h = rims.add(mat);
             commands.entity(c).remove::<MeshMaterial3d<StandardMaterial>>().insert(MeshMaterial3d(h.clone()));
             fig.mats.push((h, glow));

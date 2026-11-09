@@ -127,8 +127,8 @@ const BLOB: f32 = 2.3;
 const BLOB_DARK: f32 = 0.55;
 
 /// A champion's model, once it's in: its scene, and its clips in a graph.
-struct Art {
-    scene: Handle<WorldAsset>,
+pub(crate) struct Art {
+    pub(crate) scene: Handle<WorldAsset>,
     graph: Handle<AnimationGraph>,
     nodes: Nodes,
     /// Its bones are in their mask groups (done with the first figure of it).
@@ -136,9 +136,9 @@ struct Art {
 }
 
 #[derive(Resource, Default)]
-struct Models {
+pub(crate) struct Models {
     asked: [Option<Handle<Gltf>>; CHAMPIONS.len()],
-    ready: [Option<Art>; CHAMPIONS.len()],
+    pub(crate) ready: [Option<Art>; CHAMPIONS.len()],
 }
 
 /// A seat's figure.
@@ -201,12 +201,13 @@ impl Plugin for ChampionsPlugin {
 
 fn blob(
     mut commands: Commands,
+    look: Res<Look>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
 ) {
     let tex = figure::disc(&mut images);
-    commands.insert_resource(Blob {
+    let blob = Blob {
         mesh: meshes.add(Rectangle::new(1.0, 1.0)),
         mat: materials.add(StandardMaterial {
             base_color: Color::srgba(0.0, 0.0, 0.0, BLOB_DARK),
@@ -216,7 +217,19 @@ fn blob(
             fog_enabled: false,
             ..default()
         }),
-    });
+    };
+    // One hidden from the start on the tier that draws them, so the warm-up (`warm.rs`, `unseen`)
+    // builds its pipeline before a match: the champions' own are made as the match deals them.
+    if !look.high {
+        commands.spawn((
+            Mesh3d(blob.mesh.clone()),
+            MeshMaterial3d(blob.mat.clone()),
+            Transform::from_xyz(0.0, -50.0, 0.0),
+            Visibility::Hidden,
+            bevy::light::NotShadowCaster,
+        ));
+    }
+    commands.insert_resource(blob);
 }
 
 /// The champions to fetch: the match's ten, or in champion select the team's own (the other
@@ -404,9 +417,10 @@ fn ready(
             figure.player = Some(c);
         }
         if let Ok(m) = meshes.get(c)
-            && let Some(own) = materials.get(&m.0).cloned()
+            && let Some(own) = materials.get(&m.0)
         {
-            let (mat, glow) = dress(own, team_of_seat(seat));
+            let mat = rim_material(own, team_of_seat(seat));
+            let glow = mat.base.emissive;
             let h = rims.add(mat);
             commands.entity(c).remove::<MeshMaterial3d<StandardMaterial>>().insert(MeshMaterial3d(h.clone()));
             figure.mats.push((h, glow));
@@ -414,19 +428,20 @@ fn ready(
     }
 }
 
-/// A champion's material as it's drawn: lit as the rest of the Causeway is, and a little by its
-/// own colour so it reads against the night's stone (Riot's skinned meshes are lit by their own
-/// emissive as well as the scene), with its team's rim; and the glow it has unhit (a hit flashes
-/// it, a material of its own).
-pub fn dress(mut own: StandardMaterial, team: u8) -> (RimMat, LinearRgba) {
+/// A champion's mesh's own material as it's drawn: lit as the rest of the Causeway is, and a little
+/// by its own colour, warmly, so it reads against the night's stone (Riot's skinned meshes are lit
+/// by their own emissive as well as the scene), with its team's rim; a hit flashes this one alone
+/// (its glow unhit is its emissive). The warm-up (`warm.rs`) makes the same, so the pipeline it
+/// builds is the match's.
+pub(crate) fn rim_material(own: &StandardMaterial, team: u8) -> RimMat {
+    let mut own = own.clone();
     own.double_sided = true;
     own.cull_mode = None;
     if own.base_color_texture.is_some() && own.emissive_texture.is_none() {
         own.emissive_texture = own.base_color_texture.clone();
         own.emissive = LinearRgba::rgb(LIFT[0], LIFT[1], LIFT[2]);
     }
-    let glow = own.emissive;
-    (ExtendedMaterial { base: own, extension: rim(team) }, glow)
+    ExtendedMaterial { base: own, extension: rim(team) }
 }
 
 /// A hit's flash on a figure's materials: `step` of [`FLASH_STEPS`] (0: none).

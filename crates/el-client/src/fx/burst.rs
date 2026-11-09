@@ -171,8 +171,8 @@ const LONGEST: f32 = 600.0;
 pub struct Bursts {
     glow: Vec<Slot>,
     smoke: Vec<Slot>,
-    /// The two pools' materials, for the knobs.
-    mats: [Handle<BurstMat>; 2],
+    /// The two pools' materials, for the knobs (and the warm-up, `warm.rs`).
+    pub(crate) mats: [Handle<BurstMat>; 2],
     /// The flipbook sheet's two images.
     sheets: [Handle<Image>; 2],
     rng: u32,
@@ -186,7 +186,7 @@ pub struct Bursts {
     scratch: (Vec<P>, Vec<P>),
 }
 
-fn empty_mesh() -> Mesh {
+pub(crate) fn empty_mesh() -> Mesh {
     let n = QUADS * 4;
     let mut idx = Vec::with_capacity(QUADS * 6);
     for q in 0..QUADS as u32 {
