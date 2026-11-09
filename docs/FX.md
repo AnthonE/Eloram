@@ -269,8 +269,149 @@ shooter as they are, and keeps its own particles, which are closed forms moved i
 - **Format**: Opus in WebM for the browsers that take it, and AAC for the rest if Safari needs it
   (checked before choosing), mono at 48 kHz, normalised to a loudness by bus.
 - **Budget**: about 300 files, under 6 MiB for a match's set (the shared set and ten palettes).
-- **Not in this pass**: an announcer and champions' voices, and music. Both get buses now, so they
-  slot in later; each is its own pass.
+- **The voices** (the announcer and the champions) came in their own pass: "The voices, and the
+  rewards", below. The music is still to come; it has its bus and its states.
+
+## The voices, and the rewards
+
+The second sound pass: what makes a MOBA's sound more than effects (the announcer, the champions'
+voices, the rewards a player hears alone), as Riot does it, built with placeholder voices so the
+whole thing plays now and every line is ready for a recording.
+
+### What Riot does
+
+**The announcer** is information first, and it's aimed. Its lines are said from the listener's
+side: "you have slain an enemy", "an enemy has been slain" (your team scored), "an ally has been
+slain", "you have been slain". Multikills and sprees come twice over, an ally's and an enemy's
+("double kill", "enemy double kill"; "killing spree", "enemy killing spree"); then a shutdown (a
+spree ended), an ace, an execution (a champion killed by no champion), each structure by whose it
+was, an inhibitor respawning soon and respawned, each side's, and the result. A map has its own
+welcome and its own voice (the Howling Abyss), and an event announcer changes the voice, never the
+structure (the wiki's announcer pages). What's in fog is fog: an execution there was announced to
+both teams until patch 13.19 fixed it.
+
+**A champion's voice is a script of moments**, each line its own category (the League wiki's
+"Quote" and its manual of style): a pick and a ban in champion select; the match's first move;
+moves (at least 25 lines) and long moves (a click over 2,000 units away; 15 more, the lore);
+attacks on a champion (25); the first encounter with a champion (capped at five a game);
+taunts, jokes, laughs, dances; ability casts, their efforts, and the ultimate; kills, assists,
+sprees and multikills; ranking up an ability; the death and the respawn; the result. Each
+category is throttled, by chance and cooldown, and Riot tunes it champion by champion (patch 9.13
+made three champions' ability lines rarer): a move line no more than every 15 s, a basic attack's
+30 to 50% of the time, an ability's 50%, a respawn's 75% (datamined, on Vi's and Mel's pages).
+Lines that answer a player's own clicks are that player's to hear; the ultimate is everyone's who
+sees it (Riot: an ultimate has "an immediately recognisable callout").
+
+**How a voice is made** (Riot's "The Voice of the Visionary", 2023): writers draw up a casting
+sheet with "roster comparisons to flag vocal overlap"; a script goes scratch, audition,
+exploratory, final; the whole script is recorded in one four-hour session, several takes a line;
+a VO designer builds "voice filters" and finds "impactful game moments to trigger lines from";
+a champion's efforts are grouped by spell, kept "distinct by their energy, length and their
+beginning consonant". A processed voice is built in layers ("The Frequencies of Folklore", 2020,
+Spirit Blossom Thresh): one for intelligibility, a muffled deeper copy, low end "felt, more than
+heard", a reversed reverb. Lines can hang on conditions (a line only beside a certain champion:
+2017's Contextual Action Component).
+
+**The juice.** Riot's kill and takedown sounds "play for your ears only" and "escalate" with a
+multikill (patch 25.11). Attention matches importance: "the most important thing at any given
+moment (like a major ultimate or CC) should draw the most attention" ("Clarity in League", 2021),
+and "iconic doesn't mean louder. It means recognizable" (Sandy Zhou). Abilities cast out of
+sight are "no longer visible or audible in Fog of War" (patch 10.2); the few global ones are heard
+by all and shown on screen beside the kill callouts for those who can't hear them (13.19). Spells
+are panned by where they are on the screen (2024).
+
+### What makes it juice, as rules here
+
+1. **Sound is information before it's impact.** The announcer tells everyone what happened from
+   where they stand; an ultimate's callout warns as its sound does; nothing is heard that the
+   team wasn't told (the voices ride the same events as the effects, and the fog is the server's).
+2. **The player's reward is theirs alone, and it climbs.** A coin on every last hit; a kill's
+   sound climbing with the kills close together (one bell note up for a kill, five and a chord
+   for all five); a softer one for an assist. Never placed, never heard by anyone else.
+3. **The champion answers the player.** A move, a long walk, an attack on a champion, the first
+   enemy seen, the ultimate ranked up, the return from death: each can get a line, throttled by
+   Riot's numbers so it's character, not noise.
+4. **One voice a champion, three champions at most, the player's always.** A champion never
+   talks over itself, but its callout, its kill and its fall cut in; the player's own lines make
+   room; the announcer is over them all, and they sit a little under it.
+5. **The announcer is seen as well as heard.** The line said is a banner, in the colour of whose
+   news it is, naming who killed whom; with no recording it's still the banner.
+
+### What was built
+
+- `el_client_core::fx::voice` (the announcer): Riot's structure in the game's own words, each
+  line's words in `says` (what's recorded, and the banner's text), 44 lines: first blood; two to
+  five kills close together, ours and theirs ("Double kill!", "Enemy double kill."); three to eight
+  and more without falling, ours and theirs ("On a run!", "An enemy is on a run.", up to "Beyond
+  legend!"); "The run is broken!"; "Felled by the Causeway." (no champion's kill); "That's an ace!" and "Your
+  team is down."; turrets and inhibitors by whose; an inhibitor rising soon (fifteen seconds before)
+  and standing again, each side's; a surrender, each side's (one that lost with its nexus standing
+  gave up); the result. One moment's lines (a kill can call a multikill, a run broken, an ace and a
+  new run) are said together, in order, under the weight of the biggest; a bigger moment waiting
+  goes first; news more than 3 s old goes unsaid (5 s for big news), the end never.
+- `el_client_core::fx::vo` (the champions): the script, a `Script` a champion with a casting note
+  and its lines at eleven moments (pick, first move, three moves, two long moves, two attacks,
+  encounter, ultimate ranked up, the ultimate's callout, two kills, death, respawn: 320 takes in
+  all), each champion in its own voice (Vessa's dry watch, Orrin's hymns, Torek's reports...).
+  `rule` is each moment's throttle and aim, Riot's numbers where they're known; `Chatter` keeps
+  each champion's cooldowns, counts, takes (never one twice running) and whether it's talking.
+- The director gives each moment to the chatter: the player's orders (`Client::order_log`), the
+  casts, the deaths and kills, the respawn, the first sight of each enemy, the ultimate's rank.
+  The rewards come from the own champion's state (last hits, kills, assists), past a high-water
+  mark so a prediction put right never rings twice.
+- In the browser: a sixth bus, the champions' voices, with its own slider (the menu's Sound page:
+  Effects, Champions, Announcer, Interface, Ambience, Music). A champion's lines load once a match
+  or champion select deals it; the pick line plays as champion select deals, rerolls or swaps.
+  `hud_banner.rs` shows the announcer's line. `window.__el` has `vo_lines`, `vo_missing`,
+  `vo_dropped`, `vo_last`, `vo_talking`, `banner` and `banner_shown`.
+- The sounds: `gold.coin` (three takes), `takedown.x1` to `x5` and `takedown.assist`, synthesised
+  by `art/tools/sounds.py` (the interface's bus: unplaced, the player's alone).
+
+### The placeholders, and replacing them
+
+`art/tools/voices.py` speaks every line with Piper, a neural text-to-speech (the announcer
+`en_GB-cori-high`, public domain; each champion a speaker of `en_GB-vctk-medium`, CC BY 4.0),
+cast as Riot casts a roster, cut to what text-to-speech can do: twenty speakers whose measured
+pitches don't sit on top of each other (male 81 to 149 Hz, female 158 to 248), each pitched and
+paced to its casting note, then processed as Riot layers a processed voice: the family's traits
+quiet under a voice that stays clear (frost and starlight an octave-up shimmer; night and the
+deep a muffled octave down; tide a slow chorus; wind a breath of air; bronze a metal comb; the
+siege engine ring-modulated and crushed; a quiet knife whispered). `--listen` runs a speech
+recogniser over every file written and scores the words heard against the words meant: the
+nearest thing to a listener this pass has.
+
+To replace a line, record its `says` from `web/assets/audio/manifest.json` (the casting note is
+`cast`, the moment `when`, who hears it `heard_by`), and drop `<stem>.ogg` (Opus) and
+`<stem>.mp3` into `web/assets/audio/` with a line in `art/LICENSES.md`. `voices.py` keeps the hash
+of every placeholder it wrote (`art/voices.lock.json`) and never writes over a file that isn't one
+of its own, so a recording is never lost to a rerun; a placeholder whose words or casting changed
+is made again.
+
+**What the recogniser heard.** The first full render, against the first script: lines heard
+as other words where a voice or its processing muddied them (Orrin's hall took him from 62% of
+his words heard to 48%, Seren's from 84% to 64%), and lines a person would mishear too: one-word
+barks out of context ("Burn.", "Ring!", "Tolled."), and Gorum's ultimate, "Unbroken!", heard as
+"I'm broken." From it: the long rooms shortened and the layers made quieter, the weakest six
+voices auditioned against others over their whole scripts (five recast), and the hard lines
+rewritten in two to four words, still in each champion's voice ("Nothing breaks me!"). The
+render shipped: 364 lines, 91% alike on average (the letters heard against the letters meant),
+212 word for word, 301 at 80% or more; 17 the recogniser didn't follow, listed by the tool to be
+listened to (Piper's voices vary a little each render, so which seventeen moves). 1.7 MiB in
+Opus, 2.35 in MP3 (speech at 24 kHz), all twenty champions and the announcer; a match loads its
+ten and the announcer.
+
+### Not yet
+
+- Nobody has listened: the recogniser has (`voices.py --listen`), and a person should.
+- Efforts: Riot's grunts and shouts for each spell, kept distinct "by their energy, length and
+  their beginning consonant". Text-to-speech can't make them; they're an actor's.
+- Emotes (taunt, joke, laugh, dance): the game has no keys for them yet.
+- Interactions: lines that answer another champion (Riot's context lines), a first encounter
+  with a particular champion, kill lines for a particular victim. Item lines Riot has retired.
+- Captions for what's heard and not seen (13.19's global sounds beside the kill callouts): the
+  banner shows the announcer, not the champions' callouts.
+- A real announcer and twenty actors. The manifest is their script, the casting notes their brief.
+- The music.
 
 ## How we know it's done
 
@@ -624,3 +765,14 @@ Not yet:
 - Riot Games, [League Frequencies](https://riotgames.com/en/news/league-frequencies-audio-development-video-series), the audio team's video series.
 - Player One, [How Riot sound designer Sandy Zhou designs adaptive audio for clarity](https://www.player.one/teamfights-exploration-how-riot-games-sound-designer-sandy-zhou-designs-adaptive-environmental-162190) (an interview, not Riot's own post).
 - Tony Albrecht, Riot Games, [A trip down the LoL graphics pipeline](https://www.riotgames.com/en/news/trip-down-lol-graphics-pipeline).
+- Riot Games, [/dev: The Voice of the Visionary](https://www.leagueoflegends.com/en-us/news/dev/dev-the-voice-of-the-visionary/) (2023).
+- Riot Games, [The Frequencies of Folklore](https://www.leagueoflegends.com/en-us/news/dev/the-frequencies-of-folklore/) (2020).
+- Riot Games, patch notes [10.2](https://www.leagueoflegends.com/en-us/news/game-updates/patch-10-2-notes/)
+  (fog), [13.19](https://www.leagueoflegends.com/en-us/news/game-updates/patch-13-19-notes/)
+  (executions in fog, global sounds) and [25.11](https://www.leagueoflegends.com/en-us/news/game-updates/patch-25-11-notes/)
+  (kill and takedown sounds).
+- The League of Legends Wiki (a fan wiki, datamined): [Announcer](https://wiki.leagueoflegends.com/en-us/Announcer),
+  [Announcer/Thresh](https://wiki.leagueoflegends.com/en-us/Announcer/Thresh), [Quote](https://wiki.leagueoflegends.com/en-us/Quote),
+  [Vi/Audio](https://wiki.leagueoflegends.com/en-us/Vi/Audio), [Mel/Audio](https://wiki.leagueoflegends.com/en-us/Mel/Audio).
+- Player One, [Sandy Zhou: designing iconic combat sound](https://www.player.one/ip-half-second-how-sandy-zhou-designs-iconic-combat-sound-league-legends-162346)
+  (a contributor's piece, not Riot's own).

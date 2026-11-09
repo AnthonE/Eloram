@@ -1,0 +1,1822 @@
+{
+ "vo.brakka.attack.1": {
+  "recipe": "[\"Come here.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "9a7f742ebd9587d7dfe1a7af0e28a5dc5f8bbcdb508f2f226931d156b6d2d745",
+  "mp3": "45f99a4c4c0fe7831f6f81027ac1564c6aebbe8f51a583444e4be666e3579992"
+ },
+ "vo.brakka.attack.2": {
+  "recipe": "[\"I crush you!\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "18944094beffc0f66937fa11a4241619933ee518b14cd9b5e042b670e1d0b1b9",
+  "mp3": "7373840940b5b1e52a0345426bbf3f47e1a951903b03bc8a9e6c0425f5d8ecd1"
+ },
+ "vo.brakka.death": {
+  "recipe": "[\"I crumble.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "b9f8722f377f07f71d29b83c293ea0d6c7ed199c1a52011c58f6d48a3c7fd38a",
+  "mp3": "ae750960953d0204e226e37af68b4c4210aebb0c571dde2a022d28a5eb366b59"
+ },
+ "vo.brakka.encounter": {
+  "recipe": "[\"Something small. Something to break.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "ea4838a75ebe26deca20f3035a9baedc9d7cc4d4f9788d911def3d596a397576",
+  "mp3": "d48d46bfc5935ec18907ed9d5264a2a2be19b8ad7325cd252c3b637c51c18c13"
+ },
+ "vo.brakka.first_move": {
+  "recipe": "[\"Good ground here. Hard ground.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "50590ee02b2c9b26df550c70c8195443f0b0ba54b2dd298ad1996b62e30c7cbd",
+  "mp3": "584a79d243663faf0101dbb7dd33a09c887931993cc7e54bd95aff1ec663b6e2"
+ },
+ "vo.brakka.kill.1": {
+  "recipe": "[\"Broken.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "6225a8a534d2cce7c5465a7a7ee331d6ce3a0dbda9556528b06998dfa52946ab",
+  "mp3": "f79a60956d7babdf7003d9a44c33626852bbf624b38a1de3744ffb1254630d9d"
+ },
+ "vo.brakka.kill.2": {
+  "recipe": "[\"You are gravel.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "cfd7773c4681277a56a513905f65f66c4f48aeb0faa9433dcf7151afeeb1b7d8",
+  "mp3": "6c63887be3623044a131cbfa53e09f66265f8fa95a8a0427de1c973b36b208b7"
+ },
+ "vo.brakka.long_move.1": {
+  "recipe": "[\"They cut this bridge from my mountain. I walk it anyway.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "5fafdd2857b7e6c2c1ffc2b4dc677d2df10914fb2d8efb65a9b07aeb4623c1d4",
+  "mp3": "b291bab342e0bb660ebd25f775f7dfb48f7db8bdb057f120124ba4b58b9ecd00"
+ },
+ "vo.brakka.long_move.2": {
+  "recipe": "[\"Stone does not hurry. Stone arrives.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "1e67462bf849430dc52a2d7bb249b65c9ef185400254d65351b93532774cebd0",
+  "mp3": "da4df1bdbb4d749fcd5eec014bbf73ccc1aed3f411e86f13d37231cfb9edab3b"
+ },
+ "vo.brakka.move.1": {
+  "recipe": "[\"Rolling.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "7c1e9cc15ea349278f4aa7d76d3e300dacb13ff30d5e739b0ef225aac27d6ed5",
+  "mp3": "4b15fad7e894ce81a8f5f0d2069e27bdc83588a9803971c3234feb7f05d36ebf"
+ },
+ "vo.brakka.move.2": {
+  "recipe": "[\"Heavy footsteps.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "7c0d74d1066cd9da1c89da6870a730e50cdebf0d82190417daf2de61a29d828c",
+  "mp3": "98a26bfe5113c3971a79f9be7c7b325442c849f1221f2be37f71306c8b2dcc75"
+ },
+ "vo.brakka.move.3": {
+  "recipe": "[\"Out of my way.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "c9216bdc5fcb0c4368fd3ad9a0d4512495654c4bc9c5e48735c9085af72af5da",
+  "mp3": "9c8cc36b3efe70b680fbe9276d6c0bf05f57ec8937ee6a4af2c7c84f73a6b4ba"
+ },
+ "vo.brakka.pick": {
+  "recipe": "[\"Brakka stands. You break.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "24c30c2886d220755ad414f0ed76602aed02e0dc3b5e8e7d9cfb967d6e1d844c",
+  "mp3": "62322b770f8e32d06d57f1ebc9665ab3d29530dbadccf52f46c74e1bff21cb90"
+ },
+ "vo.brakka.respawn": {
+  "recipe": "[\"Stone, again.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "dded26399f6fdd9a02c5f7141ebe2b377702dbaae416fe61b790815f476f161b",
+  "mp3": "3ef784560fec32b799579c74158d7c1d0da689cd7de267775a1f065a82858636"
+ },
+ "vo.brakka.ult": {
+  "recipe": "[\"The ground is mine!\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "9eb19dc90f370b253ab599b7f4fb96b52318779d5ab3b645279653b4ba6d2f49",
+  "mp3": "25890bff953e94fe031d4a4aa8e7ae3934ce472f81bbbc02079e707580c81286"
+ },
+ "vo.brakka.ult_rank": {
+  "recipe": "[\"The mountain is waking.\", \"vctk\", \"p237\", -2.5, 1.12, [\"warm\", \"under\", \"close\"], [0.55, 0.7]]",
+  "ogg": "fca461ef24aedc9fc23e6dc613e939dd8284c71209c869331336363a85daed3e",
+  "mp3": "ddd5b4cd8afd0cabc8a339796a8da38209c68ce48cb792a99612b75fae8ed8a1"
+ },
+ "vo.brun.attack.1": {
+  "recipe": "[\"Hammer coming down!\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "76f39e92a434bb407f0a8eb13ca2c6345c9684769b18514116aa52448eb38aa3",
+  "mp3": "55489b67a10860321f3f2976dce0d59fbbf35ed074e08d527f7ab578b71aad7b"
+ },
+ "vo.brun.attack.2": {
+  "recipe": "[\"On the anvil!\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "14fdfc39c17d39432da8de3a59af7109c5d80351884504b3b90c092479924196",
+  "mp3": "1310010302da75dd175691c9f0948389a61a2ed8c789316d20e232f10420f94f"
+ },
+ "vo.brun.death": {
+  "recipe": "[\"The fire's going out.\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "2570fdc2a906c834797e37cb4cc37b3b4beb307f004b7ca2917f0a31195c54d8",
+  "mp3": "f1e541622fa8f784480d3829538e89289c1651e0d2a71d347523d078e49947c6"
+ },
+ "vo.brun.encounter": {
+  "recipe": "[\"Fresh metal to work.\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "a9b07c402f8bff11b7d3e39d22bd6e1afb330ebba2796672ff8df63144bd633e",
+  "mp3": "ee9e3755c4118634e5885bf43706b156baeb89be42d9fc0be51ab36d766739a6"
+ },
+ "vo.brun.first_move": {
+  "recipe": "[\"Good iron in these gates.\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "a280710c4619ace0a0ea6a5f7c3e8727e8c48e9c2d5168231e12599438837729",
+  "mp3": "e110c5acfa88bbe2b95df35b12097899f52537e2c2d84c0e6bc85304f377ea99"
+ },
+ "vo.brun.kill.1": {
+  "recipe": "[\"Flattened.\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "8b5c2190a206102f7afc856571a299c62a0bff31bd12b057504d20d33644b434",
+  "mp3": "2ba00d9b77d13b3864e0334c92779a983116858ca916c33a8683ca286b52d599"
+ },
+ "vo.brun.kill.2": {
+  "recipe": "[\"Hammered flat.\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "3c0d9899b81bab3041c2c99935f9a6968787f994c275faad0aca8b00bd954225",
+  "mp3": "aa8c7951c5c40046ead5ede38797611fdfff6f1f1dabb4f574f141bbbefa3519"
+ },
+ "vo.brun.long_move.1": {
+  "recipe": "[\"I forged the hinges on those gates. Built to last.\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "ff6243ec935b5e96cc6479e068fec7616b55cc7cbc78abd8b79a25cc2b1949ab",
+  "mp3": "6b93eb257e8b975da2bc2635aeedf54c0b921841fffd0dd9fd432a8a6fcc10a3"
+ },
+ "vo.brun.long_move.2": {
+  "recipe": "[\"Every blade I make is a promise.\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "7891c1376a6683445e02ec1853d9dc1385fe54fa1fd15b1211f957296faa9312",
+  "mp3": "306b786b7de9912b30f7d9b74702e08a7470be7c1e0251d8b7f4e38c098495ce"
+ },
+ "vo.brun.move.1": {
+  "recipe": "[\"The hammer's hungry.\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "9a1221dd35bec0e1e6389e3f129f4ecf279f36ab7896e0472a57c4324d8a82ff",
+  "mp3": "2bae71f64d3bb9fd3110315bd7216650ef8a29b4bfd47c07ccbacd4134c6b6fd"
+ },
+ "vo.brun.move.2": {
+  "recipe": "[\"Stoke the fire.\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "3a1d0cadc48e85acd04a2935c2202c68051d840816fdbcb976c5b1b3b0a53f69",
+  "mp3": "ccd6cbd1c93abc63bc6e44346dbf93c9359a8a13f2b7d854bc1e823c96426c31"
+ },
+ "vo.brun.move.3": {
+  "recipe": "[\"Heading out.\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "9a7ece97b9f50e43baeda8bfbcead9c4c6654ca09a00404af06178b86bd54409",
+  "mp3": "3abe55a145da7d5afff52446037512b648f962c197d1950a683598a67d8668c7"
+ },
+ "vo.brun.pick": {
+  "recipe": "[\"Strike while it's hot!\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "1f1d95d1f4ae13a1a4278cea1c483525a644456a69931d687817b50f7a4d044c",
+  "mp3": "e30c7861d431d473f3e6f928a79a2c3acaeb27b56708b3fe895eb5103354c280"
+ },
+ "vo.brun.respawn": {
+  "recipe": "[\"Back from the forge.\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "b7a8c1a299e706649d037e969ce3dbab44c0c9fee88e0546de95fbfa2c7090a0",
+  "mp3": "fe69a8d3575b316b2249d8f56b59703fc6c16750e10c4aa3e90df63f586aead5"
+ },
+ "vo.brun.ult": {
+  "recipe": "[\"Meet the anvil!\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "83744cdab858f6961684cdde9e8ccdd3403d9a6bc40bb1b61c6d7ae4f685ca5b",
+  "mp3": "84f6c95ebaa5354b74066e8f16389ef6c9fb4eebc7225004cb684548590e1d84"
+ },
+ "vo.brun.ult_rank": {
+  "recipe": "[\"Hotter forge.\", \"vctk\", \"p256\", -1.0, 1.0, [\"warm\", \"grit\", \"room\"], [0.55, 0.7]]",
+  "ogg": "be15ae9052a2e5aa965f1778f9e04a74df2bff06e310bdff186cf62b67e65e24",
+  "mp3": "d60320c1f6ba89dad6cda8fb7d186f40d6b9e53b61a04b30ce8740ab50723637"
+ },
+ "vo.gorum.attack.1": {
+  "recipe": "[\"Take the horns!\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "c0f4223f9bb5ab37e64f66b6d31c6afb32f09103cc9bdd133a0d772007074a67",
+  "mp3": "bc1f6ac5a5da83f3bcad2b38c01289de052a1a5378601ca2bbe0a58d51afca0e"
+ },
+ "vo.gorum.attack.2": {
+  "recipe": "[\"Out of my field.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "b8573902cca5af0cdad3aa06baa767339adc19643890782eeb8b802511ae321c",
+  "mp3": "5d5d824fa17e4f7a4ce2c282b269b67b2a89fa6268e0fcc6705860abb741151a"
+ },
+ "vo.gorum.death": {
+  "recipe": "[\"Rest, at last.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "dff4c4ac347c7318670dfaae6c2555bd0c86fc03ca0e49bd0b25c77657dd8d47",
+  "mp3": "8ba097dd81561fd5b54ba030d3901096eaa1cb986d0bb58126164c8fac1b6b41"
+ },
+ "vo.gorum.encounter": {
+  "recipe": "[\"Ah. Company.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "3fb7487845155fcd8cb72daaf0ec214bc6130f13756c4a66fd2edf19dbd97e88",
+  "mp3": "7af2b031b681eb5b5d2a8aaea5b8da43a25055f37e90ec693174ddf64f34b067"
+ },
+ "vo.gorum.first_move": {
+  "recipe": "[\"A long field.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "d1d2ea89e8eab64acc64d4bae9ac173cb65815d0679fdeb60fd5ac8f7da08709",
+  "mp3": "86de24aecac391972029ad500adb4652ce2077239c6ca1636d8d6c68cfd76433"
+ },
+ "vo.gorum.kill.1": {
+  "recipe": "[\"Trampled flat.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "167ed431bd9d693c78bc503c17d34121e3f84dd71757e431d9aec6a79045be2e",
+  "mp3": "aee0845e6410aac151256abde9f3378fbed8188b7b4e358fd6ec6df9b1d4978f"
+ },
+ "vo.gorum.kill.2": {
+  "recipe": "[\"Stay down.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "e03fc3bed19910e04052b6a501b68db740b31832f61c5801430dc3e8619d9112",
+  "mp3": "c134715f2940242089c087d676c056d78e4663552b3d69fab1421b430c4eb99c"
+ },
+ "vo.gorum.long_move.1": {
+  "recipe": "[\"I've pulled heavier loads than this bridge.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "f1c3fa79f8da6768fb9141d75e8b9a52f491e4cb8d6ec2c6471a9fad7ffacb8a",
+  "mp3": "6a9719e3dc3064166632815fda5b32bcb1c780e34504e0a7bbf0cf6ebded071c"
+ },
+ "vo.gorum.long_move.2": {
+  "recipe": "[\"The young ones run. The old ones arrive.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "e819a00f19baeeefffe92fc93e6f35674d2dd7b96b5c8736ba514d58638bd99b",
+  "mp3": "5fce07904e03552f2a0bc76a0265ad07417af73abb184613f336d14a5af8b162"
+ },
+ "vo.gorum.move.1": {
+  "recipe": "[\"Plodding on.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "d73b6d794c4a12db852cd16ee35c241fd586e677fc817aa90b0091288a62a84c",
+  "mp3": "837cb9549f077bf72310afce2e7bc7961a67884bb451ef6f1546a7c189f29048"
+ },
+ "vo.gorum.move.2": {
+  "recipe": "[\"Hooves on stone.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "4a179bb05f6d5e41c8110f88058c7f17bc82bbd4f97e3ab6830ac45b62d09580",
+  "mp3": "b1bca8d779ad79614f8ce9b8db59786a5e9d754ad4fd5e8f1fca15e6ecbf2810"
+ },
+ "vo.gorum.move.3": {
+  "recipe": "[\"Slow, and sure.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "2ef0e17f2279bab31dbaec76faa2f34db2692f3d5994149fb6a54aa805a59c4f",
+  "mp3": "786bef5513a8c9193952f43bb300aeb8bc55dcf67ca80ba12939f0c2348aca27"
+ },
+ "vo.gorum.pick": {
+  "recipe": "[\"Old. Not done.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "74dceaa869469524db3e6e62c7fee4cef2ff6bd038db1308c5380af67397a1c3",
+  "mp3": "81b909f16504dc12381d07b76a49c949372563ba01c87c6683004cef580b24dd"
+ },
+ "vo.gorum.respawn": {
+  "recipe": "[\"Back to the yoke.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "6ee49e9b0a8d17c9705c3719303b08a1505f7dd9b0761a6b5f167b593fff28eb",
+  "mp3": "3388245d782fa7cb6a9a9b4d566f8fb035a86bb29d5f542d7b0d7d4e20732c68"
+ },
+ "vo.gorum.ult": {
+  "recipe": "[\"Nothing breaks me!\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "5945440d0d53f003c3c91c8d00fa440ac8668e6850a75834fdea6a2ffb180d68",
+  "mp3": "2d9f1d6184b7e5943bba0ed585170cb53092df652e8633ad12f63002635249b5"
+ },
+ "vo.gorum.ult_rank": {
+  "recipe": "[\"Still standing.\", \"vctk\", \"p254\", -2.0, 1.15, [\"under\", \"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "9d0e950a52a8c91fc886a78099b55ae6e05a837e560ff0234a0ce7266ea5d7b7",
+  "mp3": "5331fff49546709e94c0cab11660e5756663b9f282f37dd531e3594d6d84a17b"
+ },
+ "vo.hollis.attack.1": {
+  "recipe": "[\"Hear the bell toll.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "f2324ce6d21c1420d70fe82fb8043f749b037d9e0810cdeaf269e1860486ca0d",
+  "mp3": "f9ab4dacc9e175df7e898b28d8b1a681fc621523d7efa47ca103a0ae0fd6c9af"
+ },
+ "vo.hollis.attack.2": {
+  "recipe": "[\"Ring out!\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "3a53cd5840d1b5293d07db1f7923a955b7c1a3042ba6e6b63703fb899f60c9ea",
+  "mp3": "90706a9efe70597b07de855bcb53bd4a69532ee38e610700cb8459a8212ad874"
+ },
+ "vo.hollis.death": {
+  "recipe": "[\"The bell falls silent.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "3b8524bbe5a0f4c5b5c63f6150bfe2e608777120f36e7f9952bbb450ccdf98f9",
+  "mp3": "e8a5f7c3932a276cc6713907190cf9cc4fa8cee11729de7ef455926e9efedd6c"
+ },
+ "vo.hollis.encounter": {
+  "recipe": "[\"Strangers at the gate.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "2da71072f75ed3fa99730e467d1a98766e677639529ae45edea9b407519e1536",
+  "mp3": "98345ac2cdf1d092cd031c6e979400e7e893d68d88c427b347ee57a733a1d299"
+ },
+ "vo.hollis.first_move": {
+  "recipe": "[\"Ring out, and hold.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "13abdc42c6357f8677cdc3e2ad1c4c7fbd1fae04c2c19e6af1af4c9dd8f13db9",
+  "mp3": "f25db8d870f9a1b70de755f7f1e37e9e626fec0d9c839e6b1fbd7612fb259b11"
+ },
+ "vo.hollis.kill.1": {
+  "recipe": "[\"Your hour is rung.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "2fc323ce7a4420f19133646f7ee28f2e8c1bb05899502e24954a8cafab8b750d",
+  "mp3": "abb2548be7bc0ebc15106b56162d98b007567585f8fb02f6931f335cfa2e2274"
+ },
+ "vo.hollis.kill.2": {
+  "recipe": "[\"The bell tolls for you.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "9e5215d60fca13f74057fe326f4b6233d8c0714dd2a86048ad637e53fc5856ec",
+  "mp3": "c2774c24ec38b2cc295d98c85aea3ca4f42a9e1043d40229e805b9bc45ac0c1c"
+ },
+ "vo.hollis.long_move.1": {
+  "recipe": "[\"A bell does not fight. It reminds.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "22934c394ee13ea35913ffd2121cca63feaa48fa27a8a8045de371c96d46cdbb",
+  "mp3": "c7cd0ace3e1133af5c30a74fe98515eba93d2dd823870f4b17b67d1b7bde369d"
+ },
+ "vo.hollis.long_move.2": {
+  "recipe": "[\"I have rung the hours of every watch on this bridge.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "db146e102b4696a2d7ceb78e86877e799b18dd51d24ea77efc716f038848e801",
+  "mp3": "6a641ba462b36896c1d6662d00b66d16a43746e7d912278eea23331612bffcd7"
+ },
+ "vo.hollis.move.1": {
+  "recipe": "[\"Right on the hour.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "4066b69d9effbc31b643c40a0db06e1db163395db50c90c7249370da434c808b",
+  "mp3": "5b5244d53679e9d06b9f78639bed4492d0d07afc82eacce6d96d4b924da36e65"
+ },
+ "vo.hollis.move.2": {
+  "recipe": "[\"Steady as bronze.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "cb46be8d60d6d03c2bb7fcd66293ec5630b48f8b2f7994a1a588472d239396f7",
+  "mp3": "079d4e83b1c80dfe7b6bd2f37c0152d27ea3d73d838e0e43d729d853d6ed9e70"
+ },
+ "vo.hollis.move.3": {
+  "recipe": "[\"Keep time.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "f4ddf120a36866108093adb6ec45dd55118cfb2147f0d2e89a1bd70023093626",
+  "mp3": "66669db74b49eca1f9a4f7ebddb8781124e69cfe3759efbbf4bbb24ba4ff8eb2"
+ },
+ "vo.hollis.pick": {
+  "recipe": "[\"The bell rings for us.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "5fc96eaf8873268f08f3e7a06a8ed06c539996706430d87028ad80e2ee8a87a8",
+  "mp3": "507f574e15f1d7e6d2837a5b7f1bf5a611258082b299d70415f92fc0f7de81c2"
+ },
+ "vo.hollis.respawn": {
+  "recipe": "[\"The bell rings again.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "62f7dad45f7b5c710269f0ff70d955f411eaa44eee72410a635bf15a4816d0d0",
+  "mp3": "9ec9e0284a1dbee4de261d415e8883eb5b81076e1a8806b7945f345d68c50d13"
+ },
+ "vo.hollis.ult": {
+  "recipe": "[\"Hold the bell!\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "80bb3fe2243b9df93ca0ae3d4b4050e0d6c828cb21e5df87199a73eadfc66688",
+  "mp3": "98b3cf5ba7686ece8e148d6679e87fc7ec79ecd39b5744071e83641659562073"
+ },
+ "vo.hollis.ult_rank": {
+  "recipe": "[\"Louder, old bell.\", \"vctk\", \"p245\", -2.0, 1.14, [\"bronze\", \"under\", \"room\"], [0.55, 0.7]]",
+  "ogg": "5b3a480fa077a13c71b113b586830ebe6ea7bb42ff627737bdda5720cf53b3f1",
+  "mp3": "746f7559cc89e5047df1fb921f44fecee558bf85e0e7237d1c71ff4e98bdcb68"
+ },
+ "vo.kesh.attack.1": {
+  "recipe": "[\"There you are.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "c0e14287275d49bdffcb270e5adbce6a52d1bdfce547ae27f78a68c7394da622",
+  "mp3": "1638b9102241d45466df2919d1f452a8a8487b4c8fe2b13bb7e5518d9148f4ff"
+ },
+ "vo.kesh.attack.2": {
+  "recipe": "[\"Hush now.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "bd8918c7e67e29876b6413368dfc920d5b13394dca1ae8e09be6ab8f2b677a7c",
+  "mp3": "8d0344a5c5b56d94fdb16897402035089524cf9750cd8e7ef27223ce49414cc7"
+ },
+ "vo.kesh.death": {
+  "recipe": "[\"Too loud.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "d14c1a0cab356078874969aa9c3d76baa5a83205c78273c65f511fc2578756c6",
+  "mp3": "70ad37aefe3785052f4b8a79dfbce819bc4266daaa7e851483b298386cdce025"
+ },
+ "vo.kesh.encounter": {
+  "recipe": "[\"I see you. You don't see me.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "50c1f9dee3233ae593d31f41f0ef4dbe1fe1ed2e4dcfb63a239ef2e285541a01",
+  "mp3": "67608c0f2a76f01267c43abee89ff53c389f446d2d73b83314006c0698c16c88"
+ },
+ "vo.kesh.first_move": {
+  "recipe": "[\"Now, we go quietly.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "529d0497f94f64b87779c54ba16f52855f698c43ffaadb0121ef1290dba7cb9c",
+  "mp3": "4dabd24e154896db4b7e06afa269df49a4269e25e8cc886cbc7f5be312b7f48e"
+ },
+ "vo.kesh.kill.1": {
+  "recipe": "[\"Done, and quietly.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "2ee8f5d0f6cb9d54570320486a50f2ab1cb8efbc9ab00ec1895036e390e58832",
+  "mp3": "ee71b379e88e90b17a1f1ec8b9904d9d7bc00936baf6eba97205a0ff0f60d085"
+ },
+ "vo.kesh.kill.2": {
+  "recipe": "[\"Nothing to hear.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "754632ee16e286ce6e9a52bcd8eb9ac2bff65d020bd862f1385a86fd510726bd",
+  "mp3": "d4f25ff3b4c49a084e4032f9c1c440681099a2b1cae57994cdb67dc0a4fe8b13"
+ },
+ "vo.kesh.long_move.1": {
+  "recipe": "[\"I was paid in silence. I spend it well.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "a79e6d74468a1173d89250bc2dd6451e2e2a39329cfa42d35d9dcb6d5a89c6b9",
+  "mp3": "70a280839ab1e85211a0795db1977643671f24332dae2865018d7412062f540f"
+ },
+ "vo.kesh.long_move.2": {
+  "recipe": "[\"A quiet knife cuts deepest.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "bf2d7cd49ab4254f65955b9d847da102d5d26f3e00622473ce5c6bf15cc1498d",
+  "mp3": "41f96a1f6d8fe1b87e16779358777e0a14f447b867b08fdc5bd1cc2d7d81ff5b"
+ },
+ "vo.kesh.move.1": {
+  "recipe": "[\"Out of sight.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "a7e69f30ccd3a1a13a136a649ea8aec98eb8e06acacc27abd83a645311591184",
+  "mp3": "0e05734737109c9d0b0a359309d3592b0bbb415af31e0eb6ef25d023f9088432"
+ },
+ "vo.kesh.move.2": {
+  "recipe": "[\"Softly.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "39ac050464981e6859024f472164a3c78b64d83e9b02ddd9277799795131d079",
+  "mp3": "018ceb4c15348d04bb4c06a77e83bbfba709360a62dc01daefaa36c940f46308"
+ },
+ "vo.kesh.move.3": {
+  "recipe": "[\"Between the lights.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "efdfbe59ea2c29446940a24ef49368586faed63ff08593dcf11720575df5b7c8",
+  "mp3": "f3bc8c8935fc27552a6cc6a2757c2bd3b63b6dd36604c01efd3cd782574fbd7a"
+ },
+ "vo.kesh.pick": {
+  "recipe": "[\"No one hears the second blade.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "186ca0cd76777afcb78cb675344fba17f7ac23a69011fb41f2d4b4fb0a735516",
+  "mp3": "8b1d9cbd79ac47b53e9967ac8b528575a1521cc85a25a994d066bb7f6973fc88"
+ },
+ "vo.kesh.respawn": {
+  "recipe": "[\"Back again. Quietly.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "f71dd0561eaeb987d1f8b23f64adee4024ac2b76bf1edd2075dc5bfe8faf2169",
+  "mp3": "74d06723e0cc1c3036822acd8a278864bea31395931cf986789b8890d23b18ab"
+ },
+ "vo.kesh.ult": {
+  "recipe": "[\"Your sentence is now.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "d2ed688106a7923a0dbb2d7140b59f6e10dd2c947868a3f5e8d388995f15daa0",
+  "mp3": "36422f73ec4271eeb7fa86ea3f387625ad94dbae438edbb6dd552e994515383b"
+ },
+ "vo.kesh.ult_rank": {
+  "recipe": "[\"A sharper edge.\", \"vctk\", \"p334\", -0.5, 1.02, [\"whisper\", \"close\"], [0.55, 0.7]]",
+  "ogg": "17be2c72e5f837e4d4e1bc64762ca1b0338b76e4fad99cb30c502ec58d856b03",
+  "mp3": "eea6f1324bc8938a3bd11b5aeb2f8438e5775565ae459b9a64290b0f80ef41ef"
+ },
+ "vo.liora.attack.1": {
+  "recipe": "[\"Be still.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "d6b87bc862788edb0b11dca81d278842cc11448840b62436edf3cf01fb70c03e",
+  "mp3": "b1d98bca81ad1008d93ffba4eb7aa8aa3af631b609e4295de2f6d733e950107b"
+ },
+ "vo.liora.attack.2": {
+  "recipe": "[\"The light finds you.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "f4fe2212c92d7b69e35233a6d564635dc9092eba03f0ab04fce5bc781b95962a",
+  "mp3": "e599217d72d447d378334dee2216235de8b2837af13571b9189d86f699ca3610"
+ },
+ "vo.liora.death": {
+  "recipe": "[\"The light dims.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "9de11be248b4dd3651a7614f3d300ac4923cecfcdafd2655ac72016ecff1dbd8",
+  "mp3": "5e7fe61c3765e92e56bb0e2c438f4f0e2d1c8f6806ad2753a81c7afc73b95f75"
+ },
+ "vo.liora.encounter": {
+  "recipe": "[\"Shadows ahead. Stay near me.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "55315b32b87bdd1e17d44ebd9cb90ca5aef6ff105ffe6547d95c98d17fa90c9b",
+  "mp3": "b13187199c9c4daead4b284e4328ab1eda74e809e4f1bd2eea6fa6aad51c2935"
+ },
+ "vo.liora.first_move": {
+  "recipe": "[\"Stay close to the lantern.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "9e97708a92726b3e0711f84c10a104b3bccffd50032ea4d041274a6b059104ec",
+  "mp3": "ecd472eb4ef4f5a625a6b6bb48934e0bc8549a4bb5ad26003a01266c27051d5c"
+ },
+ "vo.liora.kill.1": {
+  "recipe": "[\"Rest now.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "c047b73b3e50177ba1f4e7b03fed948ae03f219dce746640a708a526aa954918",
+  "mp3": "2dadedcd62b99f43876ae9ea15f3f417e896e607bcdbe172d0400004a14c2ecf"
+ },
+ "vo.liora.kill.2": {
+  "recipe": "[\"Go gently.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "9a0a43a69678d6e0fdb6ce16bd7d5a79fd3c039440dd0c15c3fea38537e0864b",
+  "mp3": "686f820f158ab1c66f2f7b683e1a0c85432ea0ccb126ad79147b857048aad81c"
+ },
+ "vo.liora.long_move.1": {
+  "recipe": "[\"Every lantern on this bridge was lit by someone who stayed.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "df5f12d29094749aec71d4fcf8a3772f79bc1a41945142d44a7806228f791261",
+  "mp3": "246d7998c651d788e57ebd9ca2653f9771f62a13793226f88d164f80b4d8f029"
+ },
+ "vo.liora.long_move.2": {
+  "recipe": "[\"The night is long. So is my oil.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "0edbd7fe947e9ee7adc074f305f97958f64becce940df166071a4eb93b0b38a1",
+  "mp3": "024b44d78b04c83468c71aa073e47de3bccd5ba44be0a6d0cbdb1dec09105600"
+ },
+ "vo.liora.move.1": {
+  "recipe": "[\"Follow the light.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "015a1e5694a03ce3fc0c9399ffc1f57ef10f34487295fe2882bd21e7f408e192",
+  "mp3": "430785fe0a4b0bb48903b2289fd629fa4d670c548bd1fc95a0b46060cab44ef7"
+ },
+ "vo.liora.move.2": {
+  "recipe": "[\"I'm with you.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "f2afd85b84240ec53a9173300741c90c7bb7d5180d607af394a892a949846fc3",
+  "mp3": "2ec3e83d2eb31273f93f84a0294933e02a8a5366f65bc1b73d457ac9abe692f1"
+ },
+ "vo.liora.move.3": {
+  "recipe": "[\"Steady now.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "11dbfcd153d2fe6ec758e9ba0652cc08d7405ad6230333f5d4df3348edcaa192",
+  "mp3": "ed1b0acf3c9a7bfc51d231c4c7e8441c1bb977dcc0925c31f91100ca7f6c10f2"
+ },
+ "vo.liora.pick": {
+  "recipe": "[\"I'll keep the light for you.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "b870a6b34b9604b589aac1c31b79c4243d8bbc50dc903a2f621d4a43c70bbbb6",
+  "mp3": "01204c7a1398376c645a88d210ee19c0ec743b29f1132e3b5e14951404f8ff95"
+ },
+ "vo.liora.respawn": {
+  "recipe": "[\"The lantern is relit.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "1d07097960d116441c64a02324caac4d0c8c2136bacccec72d643c2404297e73",
+  "mp3": "32ed5ed21ce5893279629502ccb29c01201fffaa781abc0306d673456e7daec7"
+ },
+ "vo.liora.ult": {
+  "recipe": "[\"Stand in the light!\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "3fd0a573ddc55eb95b1f6c46a3235c0ae50ef86a7e6e9c809099fdcf93e51307",
+  "mp3": "8d9ba186629a5b24c5a856f390bf91c98a71c1f3bfbfb6a0597b01d6b39a09ae"
+ },
+ "vo.liora.ult_rank": {
+  "recipe": "[\"The flame burns brighter.\", \"vctk\", \"p225\", 0.0, 1.04, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "695f43302bfde00575ced0383199fa2cd767bfd68d3e8d1b679b869182b05a87",
+  "mp3": "05843ef85711b2041e6c402ded838f3060c75090724d42b771f6de66e834cfbe"
+ },
+ "vo.marret.attack.1": {
+  "recipe": "[\"Lining it up.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "c2d41f8069a41b38c20360d44384773cca44f0d7e78ff2823cb1a4eafb6fe226",
+  "mp3": "af177a77ea3b72186affe156feba96a6a6a410a3a503aae3ad9664d1afc33cff"
+ },
+ "vo.marret.attack.2": {
+  "recipe": "[\"Bang, bang.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "3b6853c3c2501bf018dc28969d5d768e711d4161f8567bbba10242cf7803da12",
+  "mp3": "59da1b2f8fc88c891b5815cd932fc6d2dd8a41fd9c632b470c8142e4749691ee"
+ },
+ "vo.marret.death": {
+  "recipe": "[\"The gun's jammed.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "0d837c5cc2db618498c03ca1432d66c1b2e3c6b5aea03a195d9172ff320fbf25",
+  "mp3": "498d2e87be4d12833bf84cfc4fc541aeb35a5d8da10596abecfe90a91de8a8d1"
+ },
+ "vo.marret.encounter": {
+  "recipe": "[\"Targets, down range.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "dbda5f4f804d13d5dcb932beb1538867d41ada321c5771af34875fb7347cd8c1",
+  "mp3": "a3f53c8a29c84874f240d34e4c441aed154cafed3877b24aa819749d61e1284c"
+ },
+ "vo.marret.first_move": {
+  "recipe": "[\"Let's see what this barrel can do.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "7221561a128939aaaaf3ac65539231ffb806d3f307bc12988bd06894415090b5",
+  "mp3": "ed5a7826667ca921481f6baa0bf3ffaaa85edbd4f4acbb30bb5999eb5e8ddec2"
+ },
+ "vo.marret.kill.1": {
+  "recipe": "[\"Spent, like the brass.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "b59f96f8d769c0b894e42a7a354ab3852250f0b749a49006d0402abebf669bfe",
+  "mp3": "895ed04fd04054ab5a2f9e2fd2b29bc22ac30226cd127f344af4c671183ff9b6"
+ },
+ "vo.marret.kill.2": {
+  "recipe": "[\"That's one for the ledger.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "50976177364930fcfa96adff92a929ced3f5f67920f9c85081710d3e11f8c328",
+  "mp3": "a78f8933f14f1d2a22c01fcaefd397a1a2b9b8168aaf8229733f4d4f3d1c4a14"
+ },
+ "vo.marret.long_move.1": {
+  "recipe": "[\"I built every gun I carry. Named none of them.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "1745757927e337a86d11692a4349f070810832ab04344f87926126f9aa8ff282",
+  "mp3": "088b4e7beb53d964316d15b7d5eeb4d938ef91f1d12c17f7c9b50ec5742c9d0a"
+ },
+ "vo.marret.long_move.2": {
+  "recipe": "[\"Brass is cheap. Good aim isn't.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "956a3ad8d7f8c2c071aadbc4c4d8ef28d548fb1091b0174cd68e18fccbaab622",
+  "mp3": "7825cc79aa87eeb45424692f071c64a447b550acf37f2dfb934c814abd8b9f83"
+ },
+ "vo.marret.move.1": {
+  "recipe": "[\"Reloading on the move.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "8559e88d15d0a7907c9d92dcb997bc1b31195dbb1cec294ec4b673629d1f4885",
+  "mp3": "46c8382334245b01d1aa47624ba18554118492017eca7f8474d18a509163fe86"
+ },
+ "vo.marret.move.2": {
+  "recipe": "[\"Keep the powder dry.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "104b6d2b2896c8168473c4c0f513ba4b7a53e23d93143359c32d95669fe2620f",
+  "mp3": "9c94dc6067276277271031d46b1ed1df0256cbc41c497baccab11ac4ffd57edc"
+ },
+ "vo.marret.move.3": {
+  "recipe": "[\"Walking.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "47768be80ebf8a9c4b73d587e4a7bd62e268cc53913807653605fc75e81475f9",
+  "mp3": "23b93fba53f3505fa8b5a2e9a766ea2aa0e1286dea4c7298d096035fcc240f56"
+ },
+ "vo.marret.pick": {
+  "recipe": "[\"Loaded, oiled and ready to fire.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "2c0bc6f38fea6a68097a51f0fdfbfa38169d6aba5b41e0b7901a1bc5086c1292",
+  "mp3": "a76ed77f3499964a719c32af493c90dbedc08606a8e85e18267e3298e0fe3d60"
+ },
+ "vo.marret.respawn": {
+  "recipe": "[\"Fresh powder.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "8ff79ab289e140164bd1e027017a8027d4a3cd7e4cf1e8d95354971763319a54",
+  "mp3": "2de919b0174d0565ef416b32fdbe95bc1322c193347e04b07ca0c9cc7a7a6ce3"
+ },
+ "vo.marret.ult": {
+  "recipe": "[\"All barrels, fire!\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "8448361ffe98c209217e99211ce21ce2dac76c5800d66cf0ae8246dcae83831d",
+  "mp3": "3199e010e367af720043886e7a19ce9fd4f97151055716f46d6d4a5b7dc28e8f"
+ },
+ "vo.marret.ult_rank": {
+  "recipe": "[\"Bigger guns.\", \"vctk\", \"p345\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "64e8199f00b934c10bf292adca578d1d4033b37444056abaf99d220de9937ac2",
+  "mp3": "3f8fef3f3f3d38569f96e4e22b569f7cc8c7feb05b62f2f199f36680dcd46e04"
+ },
+ "vo.mira.attack.1": {
+  "recipe": "[\"Burn nice and bright!\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "3850888b93c3573e6f8507d8b6ab7497c8ba033541bfe1dd0c0dc7f256f7f458",
+  "mp3": "0f94e2424590024a51512083596a39d50bfefa0f971b29e6afff931d9e654b08"
+ },
+ "vo.mira.attack.2": {
+  "recipe": "[\"Snuffed!\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "c45bc6ca7883b4cef1fc61654b6fad9e97c5bd5fc83618f0fa0fa0a7258931b3",
+  "mp3": "26c47227b3255db8ff1a127f315b1fbdab9b4f1d8bbce9fdfdfe65b2c1cb9b62"
+ },
+ "vo.mira.death": {
+  "recipe": "[\"Burning out.\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "6f96fec4a714744f37c13b6ff1c0eb6fd1f22dbc3ec4d9127e8ea2d7fd4396dd",
+  "mp3": "e611241d7a8c5b7434df46edfebbba58e283fa01d48485587dfb4077bebb6f48"
+ },
+ "vo.mira.encounter": {
+  "recipe": "[\"Someone's out past dark.\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "4a53a7eded498b78eb329b9620084336276cb396c50f39f636ce55ac7c8a57eb",
+  "mp3": "159cb2bac14617678386b03c5ef98237f0a82e72cb098658b94cd34a8b2e6fc8"
+ },
+ "vo.mira.first_move": {
+  "recipe": "[\"The lamps are lit. Let's go!\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "9bec717fcd5ec6cd81e8d90600965965ff7cf2493f82215d18497e3dee41a4c6",
+  "mp3": "2d7011f16b15bd596e2d9f460f48b8f792fff7b8ebb655ea77ce1919b8ff2434"
+ },
+ "vo.mira.kill.1": {
+  "recipe": "[\"Lights out.\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "79b5fd1851a97f270923cfef284db32f4c5a300400d3f4c687886f421995d6c5",
+  "mp3": "fe4d2e9d9e998b960a824c0d39e3436c980e3ddc60d5c2d01bffe5c75bbecb07"
+ },
+ "vo.mira.kill.2": {
+  "recipe": "[\"Snuffed out.\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "adac625a2aed66338dc9e0213cdee42b866c8f105fc4cd473a85bec88b1da6cc",
+  "mp3": "996a7fff4ebb67d63c08c6308a405f5ff0fa468b4e9159c4a0e112c867a09b3a"
+ },
+ "vo.mira.long_move.1": {
+  "recipe": "[\"I light the lamps so nobody walks the bridge alone.\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "bfc35a88e3f6dff9b7c55c01edfcd0bd944da9ebaee451d23794313c59077478",
+  "mp3": "26d34d638e3c37bb454dde08cea2632e809874c6ebc91ed25d5a863148e019f5"
+ },
+ "vo.mira.long_move.2": {
+  "recipe": "[\"My grandmother lit these lamps. And hers before her.\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "32e64a9fb440687850a75744721538f55cd6f2ed4a14565ffd70e59cd136f03a",
+  "mp3": "3816a3de637e0cff319409467acf4ceeda5f9c874d6f25ee819c552778e249f4"
+ },
+ "vo.mira.move.1": {
+  "recipe": "[\"Lighting the way.\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "a24957f0d3a06520f7a22de37e523e3126de67bc0c61d43932759edb52455aa4",
+  "mp3": "5d568e488b3e8c17ba5575f7542e710f9f74c21762f262738c1381626d08cf2e"
+ },
+ "vo.mira.move.2": {
+  "recipe": "[\"Mind the dark corners.\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "89c5df2977e36f371b76e54fe9a49a8bb8f94e138c51701796deb643def20afd",
+  "mp3": "0070c601973c20f84103f8fa433b0b182076d2d4813643427aa44815ea8c01d0"
+ },
+ "vo.mira.move.3": {
+  "recipe": "[\"Up bright and early.\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "021b4952eae6a02ddbfd80993cfe12d13252cb981ad13086e6c8ed5bf0f6baa3",
+  "mp3": "0af65018af1bf0f3e96384aa7d13f537286161bccd27fa0ab963518b9e54146f"
+ },
+ "vo.mira.pick": {
+  "recipe": "[\"Someone has to light the way.\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "70469db3237771890119193891e0cb4f149182facf6ed2dde44f4d4815a52e46",
+  "mp3": "6307834e342493ac190ca0a94d4cf4a4716d14f9148aac7d0c7f768be8f96be8"
+ },
+ "vo.mira.respawn": {
+  "recipe": "[\"Lit again!\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "17544a70b4a388b12d25c29d65b4bd147827ddb78afb95c5cb4be873971be994",
+  "mp3": "82ac522d6b0dea370265b5a9931e20d1de89fa0c01ee275a622f0ec8e120c858"
+ },
+ "vo.mira.ult": {
+  "recipe": "[\"Light the bonfire!\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "9fecc404b27497b5fc0d5b74b2026fec310336459167cd1dc7657420db11cde9",
+  "mp3": "39615902f06793259f9d8dffc4a96525b2605bcce6f626282992c509d0994972"
+ },
+ "vo.mira.ult_rank": {
+  "recipe": "[\"A bigger flame!\", \"vctk\", \"p307\", 0.5, 0.96, [\"warm\", \"room\"], [0.55, 0.7]]",
+  "ogg": "16e24a0e8eade56fae7c18479816cbeef4d0743807021d1794027808e9a08fc5",
+  "mp3": "7fc3c53597b84af21719f6760c1c8cb9286a9c7cffbd4c43aabd76e87dc49c2d"
+ },
+ "vo.nimra.attack.1": {
+  "recipe": "[\"Freeze.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "8983694d05e0c1e1049babbaea3e468e267d905653800f288861d583a98104c0",
+  "mp3": "0688cd427c066e7ce2721cd0c2ee7bf10bc758aeaaa18f039878ca61c5f440bb"
+ },
+ "vo.nimra.attack.2": {
+  "recipe": "[\"Shatter like glass.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "a2da1b9c217e6855d3a561a3688f70c8e96367a3247f06fbad1a3ea544edc7aa",
+  "mp3": "a2431ffc59f8c7fd30d772bcfcc7166e9ca603a6b1d97877268a8622a92d1652"
+ },
+ "vo.nimra.death": {
+  "recipe": "[\"Broken glass.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "470a52960f8226684f43e0329d4dbfd830dbbbd26236b913249cf17f3004aa6e",
+  "mp3": "7056ea3f5fcd323b856c5c99db84aee5292d3fb7749bba327e3b8333285f621b"
+ },
+ "vo.nimra.encounter": {
+  "recipe": "[\"Warm blood. How quaint.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "280b09ca1f9b81bf4507eee3cbf34e9d1dcc5b78c55fefb91eba13ef58bfcb2b",
+  "mp3": "9acba73ea41c609626d6a7ed5277e2e87b8eadeb48306acba6ede3a336f68a3d"
+ },
+ "vo.nimra.first_move": {
+  "recipe": "[\"The air is thin and cold. Lovely.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "0c56c175b040c8413d436a5dd00688dd03dbf09969cf9fdad2fabd30611fdae8",
+  "mp3": "b708a921e8426be538d472df484247ddcad1af8b64a71f8b2aa82a96ce674980"
+ },
+ "vo.nimra.kill.1": {
+  "recipe": "[\"Frozen still.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "dd7b5d2333d5e594765c6a6f710c60a31030153a06544c8d578327a9c9d201db",
+  "mp3": "23400351ed85378a9d733221f579e87d350bf3287988589d26d0bc310e634bb3"
+ },
+ "vo.nimra.kill.2": {
+  "recipe": "[\"Brittle as glass.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "9477838bc9456ae0d4789e8615ad1b797fd8081ae86d2085374bb4a25dee0f43",
+  "mp3": "8b8de3a319d754391bd1433d93c1f30cb5145a9f45e9ad46efc469472ee578a0"
+ },
+ "vo.nimra.long_move.1": {
+  "recipe": "[\"Glass remembers every crack. So do I.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "aece8b53b4f4566a5bf5abcd0097048029e0d11898e0679140e434aa9bd95be5",
+  "mp3": "c4f610d9e5454194a1d0855fb1899fd0afa3876a91befad2c91f69126c63112c"
+ },
+ "vo.nimra.long_move.2": {
+  "recipe": "[\"Winter isn't cruel. It's honest.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "90540abcce3e9bef8935b63905df9f6d43955b6fed2d22fe79935ad293a1a087",
+  "mp3": "3349d6b2042178e3650496d468b0a4b8273bc6338549e5cdab3c9ca7fff5a689"
+ },
+ "vo.nimra.move.1": {
+  "recipe": "[\"Gliding.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "b8be82c0257416ab8076ee5ed56b944c8a7754ae3e4dea43de9a4549387f2fb7",
+  "mp3": "1585a1dfa17aca8ec6c2abeb6ff1bca98d686492ed869f5b2fbfea49a4f37155"
+ },
+ "vo.nimra.move.2": {
+  "recipe": "[\"Mind the frost.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "e1a9b0bc815e262dabdf3dfb9102cd3ceaede91af01915c983a611600345d78a",
+  "mp3": "20ae8fc7a6f6d3a7d9f215891149843b77c0970687f0fd11c80f40086b77cf77"
+ },
+ "vo.nimra.move.3": {
+  "recipe": "[\"Clear as crystal.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "a5283758e66608caaa861e09e1235c99487d732acf0023363a9b94d2c5f5bab5",
+  "mp3": "1d213c171d41688c550088c3ebe1f4bd5a0b66d5caf48823c143e4335af57384"
+ },
+ "vo.nimra.pick": {
+  "recipe": "[\"Clear as glass, and just as cold.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "aa46eb7121d4602696328fc7106ae0c46820939131fd30a345185e49f6d9f1dd",
+  "mp3": "c03f9fd1b86b2cb91b40ca491076d818003370019435711cb45c91bfd945b447"
+ },
+ "vo.nimra.respawn": {
+  "recipe": "[\"Whole again.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "8e2c1b3cdad6ae5f27bc38e40773a5a3801349078978bcdb5779e353f1b134b2",
+  "mp3": "2a0866dfb75527bebc0a250bf3300da161742be8050bb99eaafc7bb9cfb9dc72"
+ },
+ "vo.nimra.ult": {
+  "recipe": "[\"Into the whiteout!\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "a7d40e80775270487790fed8b6bcc11a84625a45c1c6f50ad55ff2fedfe717ff",
+  "mp3": "65577fa46cba4982240b76f4794eb20d5f8643f362c684948ac770120804cd46"
+ },
+ "vo.nimra.ult_rank": {
+  "recipe": "[\"The cold deepens.\", \"vctk\", \"p248\", 0.0, 1.0, [\"shimmer\", \"room\"], [0.55, 0.7]]",
+  "ogg": "cff32286aa4047a1c5056471dafe673c121946a340b1bf8a0f95e8ca63311f63",
+  "mp3": "dff179c7da4d27df993b6eb25459363e92421e7ae828c469c5ecc54160877a2a"
+ },
+ "vo.oda.attack.1": {
+  "recipe": "[\"Stay right there.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "cdaeeea8ba9e81347f73c98db08fd25599a998c6126f725998f39c2a36a2ca09",
+  "mp3": "6b9122060de57dc6b9694d1ec2d98006f11b9f6c90036c3d1b4c03a2e16b189e"
+ },
+ "vo.oda.attack.2": {
+  "recipe": "[\"Off the road!\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "f582cc2737e77e0f7a9e12b143217e9a10e0f06f60f69d4a16a491f3d6b027bb",
+  "mp3": "b775e62eda324e6839d247da3e502d3f8d29cc26d7ceb8a4d9204b0a87ade89b"
+ },
+ "vo.oda.death": {
+  "recipe": "[\"The road goes on without me.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "bdc31758a1b2f5ffaa11ff659db999a030803bf1bc10998e646e6520e87ad00c",
+  "mp3": "e1170730426ba3e56dbee180c3ed7c457c8d6e6c747cf747e3f481b4c403be58"
+ },
+ "vo.oda.encounter": {
+  "recipe": "[\"Travellers. Not friendly ones.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "658e4d7ff8ca1b4a0bd360beb2392a1163906e773f1a4a272dd831d707f61bd9",
+  "mp3": "ba70ceac4b857c48c3d65a503cc376f68d480981c82a2955bd07e96f36fa8af4"
+ },
+ "vo.oda.first_move": {
+  "recipe": "[\"One more step on the long road.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "295ce4f3c905c7a041384cd57d1e8da2c5971d40e31ed6256a61770c24a055b9",
+  "mp3": "bba2fccee50971f858ac0ff5535be7623ee9db740d205b2baf8a38f81022da34"
+ },
+ "vo.oda.kill.1": {
+  "recipe": "[\"Your road ends here.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "ef2173973ca320a8df0f70dae944cba735f3307602a0f44f7bbc277d1c484daf",
+  "mp3": "83ade60be8b984e5ea87bac0d39dac55c8e88c37917a8f5c71850b18d12b395a"
+ },
+ "vo.oda.kill.2": {
+  "recipe": "[\"Rest by the wayside.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "8b176bf1eaeb65906f48e8778f818334ffd7ba583c40333d90165137721abd2d",
+  "mp3": "61a0a8c68deb0bdae26f7a430074ec56ccdba188d89a60b660a59e6cd7decb15"
+ },
+ "vo.oda.long_move.1": {
+  "recipe": "[\"I've walked further than this bridge is long, and back again.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "a5e63f14183772a9e88ff6d18485af3f2b3590738be31a868b02512171d8874f",
+  "mp3": "ef1e9075ead4ff79bef743a45834656326faf40b69dce43e16c422d1b96b14a6"
+ },
+ "vo.oda.long_move.2": {
+  "recipe": "[\"A good road remembers who walked it.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "2f5443d5a42074c47b5dbfbc68f29e2f1e8584088f1774664b505a36afb6a42a",
+  "mp3": "559f7fadbf496adfead70712d30d1cae984e2d3740f9f3f87c9c13186809d1d2"
+ },
+ "vo.oda.move.1": {
+  "recipe": "[\"Onward.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "63309a9769ca2a3b2ea4da49ed8bf3daf53b425becfe8992d46ab8d24825c47b",
+  "mp3": "9314d234280fa6978ee04ce4f2ef6e93214966bfc5cd5888c484e2d868326c61"
+ },
+ "vo.oda.move.2": {
+  "recipe": "[\"Mind the stones.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "2e9bf045fabbec81d1e944a509a94962a724ad16c8978d49754b7dd1cddbb220",
+  "mp3": "1ae49c8b57e5f2c594025c76383af963d55a43b4745e12a3d0015a0f9de4cba6"
+ },
+ "vo.oda.move.3": {
+  "recipe": "[\"The road goes on.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "350c95e65eddd76f86a27061686a19437f79072d4b98cd9784cfc3c6eb96bd00",
+  "mp3": "5fa3fceaf3ea7e2c52800bc43c34f3a23756c26a7dc2e96fb54e2aa58d2a93c5"
+ },
+ "vo.oda.pick": {
+  "recipe": "[\"Every road leads here, sooner or later.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "a96570d4ab41296bf32f50bf7c0a992cd5cb822629b49877d91e3a7a56b3455e",
+  "mp3": "fe03ebf50eb3af6b7808a4da7a590adc0d4e543829e400c6605444a3e552dc50"
+ },
+ "vo.oda.respawn": {
+  "recipe": "[\"Back on the road.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "eb2a650d3f0e23c57f01017f7214721b709afa2cfbb67b5ce748abb9ff25605b",
+  "mp3": "162a038f6cb7ec4bead988220e7023ef32bcacd9f5fe2b0b0cc45b67c09a28f1"
+ },
+ "vo.oda.ult": {
+  "recipe": "[\"Walk with me!\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "6c6141fc2dd9f304ca86c96932b8614288e51700b30c0e08c451772b87a02f0e",
+  "mp3": "238a36bb8374fd8c2fd03c33ea7fbd78b89bdde1c7dfc0ce863d1fd7d50cd6aa"
+ },
+ "vo.oda.ult_rank": {
+  "recipe": "[\"The road grows longer.\", \"vctk\", \"p262\", -1.0, 1.12, [\"bronze\", \"close\"], [0.55, 0.7]]",
+  "ogg": "9ecdc51f313ad7d29ab34f06371e4ad5db11d9a41a5702b1f2eaf77ffc56c9b2",
+  "mp3": "b35d23483d6e3dac68ff85a68925827b2f80591299ddea2ab536fe729df1dcbb"
+ },
+ "vo.orrin.attack.1": {
+  "recipe": "[\"Burn for me.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "2bb84eb1eed550ed1409e58d81cfdb3406c795d42c9775648e00d989ae810f52",
+  "mp3": "40904f5298a9fb60f70b17b78825f5521f271ed5a462509d67bb9492aeb20d09"
+ },
+ "vo.orrin.attack.2": {
+  "recipe": "[\"Catch fire!\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "c34796b86b7b12c9268838d22339b6d031f855fd6a29cb1d2ced7664709d7e9d",
+  "mp3": "af032aee0dbfb1141e6871ba90c435a7bd75ce976fe77fdefdaeebbe7a0fd650"
+ },
+ "vo.orrin.death": {
+  "recipe": "[\"And so, the hymn ends.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "8701747e6778756cda1ced7de82bac30f704fa1bc28c7fdf8d55a6f3380b99d2",
+  "mp3": "7d7d2b0c37daa83f5e515c4821a7fca5409aa5aa46ddd175f4db9669d9340493"
+ },
+ "vo.orrin.encounter": {
+  "recipe": "[\"New voices for the choir.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "a9f9e2eaa6b27855fbf58e4367d571a2cbcfc016c9d8584c70408294ec932cea",
+  "mp3": "ca64292f21936a70ab134aec8a6083ff58bf42f74d5d8250eb3293911d6347a2"
+ },
+ "vo.orrin.first_move": {
+  "recipe": "[\"Let the braziers hear us.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "c31bb37c53fc952ad3dcb05070ede353858fc5bcd731a0ac73ecbbfdf2e2bcf3",
+  "mp3": "664c8cefde11d80f9cf266cfb9aa7bebc5e778ddf68327c5888886b0c1cd1768"
+ },
+ "vo.orrin.kill.1": {
+  "recipe": "[\"Sung to silence.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "4aac551ad58122daad1926149cf2a1a02c1e5f7a93fea6439bea4e225868bb81",
+  "mp3": "84621ea5e5a4219fe4da941cb48f73ce3740afde96ed220812e4fed6b776cce3"
+ },
+ "vo.orrin.kill.2": {
+  "recipe": "[\"Ash, at last.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "539c7aa69ff0118103dbe924fb34eb37e43ba61f550692bfe65bcd6913679cae",
+  "mp3": "56ce512f88ff9bc17481647664fa8b8847ad9ed0ff826c05c603a301ab749d4d"
+ },
+ "vo.orrin.long_move.1": {
+  "recipe": "[\"We sang before the bridge was stone. We will sing after.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "36041f69aa3038b0978c26868c86a89ce9141e1ca60dc10be03a740f13b9aede",
+  "mp3": "6573e75a96eccf69f76e1d7dce0e77f0ed5eaeb32b4ce37d8532a32a73945dfb"
+ },
+ "vo.orrin.long_move.2": {
+  "recipe": "[\"Every ember remembers the fire it came from.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "56717cab382f76dc20068f7533cfcdab97d337ab69e1f24d30dded9e047edd09",
+  "mp3": "b763b893b1745126510bc8f1f5e6a54fb4a9bbd0d2367e68167f0105894ce5ab"
+ },
+ "vo.orrin.move.1": {
+  "recipe": "[\"The hymn moves on.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "b64aa2d07adfecdb7cc2c4acbbadee8f14799337a24e2310482cfbcaeed631d5",
+  "mp3": "02e3392a7a320106f4048178e683dfc2c92917262688502173fa0f95ffe5fdc9"
+ },
+ "vo.orrin.move.2": {
+  "recipe": "[\"Walk in the warm.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "b19017524c91c61bbd25a5357c05375bd42e1b379c277dd867b35592be1db3b1",
+  "mp3": "bdb7ab2866b678a5742291319a3cbf63cb7062fdf7b88b72a91c6e2bfab30846"
+ },
+ "vo.orrin.move.3": {
+  "recipe": "[\"Ashes to ashes.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "5103ecf9b3a41dfe79d6e966bb7c0cc04f076d98be484f0d4d165186a9d17993",
+  "mp3": "46c04b2d55d34fe5b4eb4d006c6363f2211bdeb56f5efb2c0f6992d38b76f915"
+ },
+ "vo.orrin.pick": {
+  "recipe": "[\"Our choir sings in fire and ash.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "2f03de6e0774418bec13896ab0bf887d115a234e86fb10476b3aabeead1bfb02",
+  "mp3": "c8e54e9fd37b7836e0468a2e3bbce36902a9980cef83f07c49bb68e4fc658765"
+ },
+ "vo.orrin.respawn": {
+  "recipe": "[\"The choir calls me back.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "f15fd8cef996490fbc0433b7b6537d28e725a1ec82d31bcfe271771ae52bbdf4",
+  "mp3": "3fa78804cbc2a69bef6d72d6c906cf74246de95339e4c4acf2257a13120d6341"
+ },
+ "vo.orrin.ult": {
+  "recipe": "[\"Let the heavens burn!\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "53aa79e7ff249e2deb4ede803c17d14066394beebeb13650ed867fcf561bb5d8",
+  "mp3": "098499313b62c584c0609bd995f5b617e6810f651d9c66df4b530e70e64662d8"
+ },
+ "vo.orrin.ult_rank": {
+  "recipe": "[\"The hymn grows louder.\", \"vctk\", \"p316\", 0.0, 1.08, [\"warm\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "7a7cdbdb98db05702eff21f7fb23034bf2b3e82956152545e9cc29e9f2ed953a",
+  "mp3": "8bde36e3407f63158b5dd15bba5fa65945452aef9feae151e94f79bf9ddf81ba"
+ },
+ "vo.pell.attack.1": {
+  "recipe": "[\"Have at you!\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "8f0e56735061d7ff93694d8437972c243d63061c22290bf943e2aed51b671336",
+  "mp3": "2a24fc216046759031b28dda1c95afd382e9e2d148fd8f175b264303cbf31561"
+ },
+ "vo.pell.attack.2": {
+  "recipe": "[\"Guard yourself!\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "3d87eb2b6b154f72a2f62ae561011414ce95cc7200519e02ba98aa1ce42c5900",
+  "mp3": "77a2d968eb0b17acbad327c5f1ee60aabe06203665ffbf826c22aaf6c99888f5"
+ },
+ "vo.pell.death": {
+  "recipe": "[\"My banner falls.\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "dce6963341fcfc98523daa7b3207758a115b7d2c6543cd6783d31f75a39f4510",
+  "mp3": "9718bb8a943a6c2cacf50ae1efa8abe8bff2ebefc58d0d9c1c170afddab90405"
+ },
+ "vo.pell.encounter": {
+  "recipe": "[\"A worthy foe!\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "7907ad787d8e5a446eab49fe8bd9c901636b5f686dbbb52f3245fee237bdea06",
+  "mp3": "b60a45945ffdb06ed33bbddde4e92db518cff8b1ab654385348403b7ff274225"
+ },
+ "vo.pell.first_move": {
+  "recipe": "[\"Banner up! Let's ride.\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "65830cba501001c57e525c989d80ada755a37024760f6a3004f641fcf7839d59",
+  "mp3": "185bcc9eae190093ead950361a5f469cf4b9ad0c99cd7e3a77583452eb20e281"
+ },
+ "vo.pell.kill.1": {
+  "recipe": "[\"Do you yield?\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "6255a72ad2944a2000339837ca0e342010b188967b7d4db269e792d721ddc8f4",
+  "mp3": "baf13f061f8bfca534db70da8320fd07d18cfcff97aabad7c0613b32bf4f1646"
+ },
+ "vo.pell.kill.2": {
+  "recipe": "[\"Honour is served.\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "431be25577f8674b790fb76962b4e0e881f37c8fb1ca78f5bd3d7d818516abd7",
+  "mp3": "ff588029b7da27ef9fecbb11b88192c11549de2f7f6e0f42fd6b715e07f63c66"
+ },
+ "vo.pell.long_move.1": {
+  "recipe": "[\"A knight of the hedge sleeps under the stars. I don't mind.\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "eb6ce48c1e56aaeeaf55b8122b35288937eb80a4070e2e5697704831377274ec",
+  "mp3": "6debb398c67d5a45b83f2f3ed594284ed70b759263e4e41cddb785358a5c61ac"
+ },
+ "vo.pell.long_move.2": {
+  "recipe": "[\"No one knighted me. I knighted myself.\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "13abc2303b41082af5db4da052426e7ddca67b8c6f289492d7bdebe1b873b6ba",
+  "mp3": "1832dacbf56fb210dc08c5daf6c516efd035adf58e52c80276805adfb3aee943"
+ },
+ "vo.pell.move.1": {
+  "recipe": "[\"Onward!\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "db412f83d34a7b832a10f3aad0c1a8cd228a7e79ecaf626713cbc7bd5ab5e0f2",
+  "mp3": "27dfa7b8c034af018aa16c6773bdc788394f88bdb43398ee0c8ea56afcafbc63"
+ },
+ "vo.pell.move.2": {
+  "recipe": "[\"For the hedge!\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "53a96880c940ea20baf6e029aab6621822bb5a278636037f3804df16c45af858",
+  "mp3": "faba09a78512032d030b112b66aa00d2fa1e0f35761713868e5ebf1a63cba2b4"
+ },
+ "vo.pell.move.3": {
+  "recipe": "[\"Shield first.\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "ac2ef407c86a3f70bd0cf7c1fd5ad88bfe61ef42d9edd97c24e8c967c767bfa3",
+  "mp3": "72dc2bda29af7c2ed1c5f63491a0a322c0af270d093dfc5bb04f6fb5225c658b"
+ },
+ "vo.pell.pick": {
+  "recipe": "[\"No lord, no lands, but a good shield!\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "7c95a82a1553d8f8ff82eef5dd3caa17aac74cba94eb6e5ff4af2adb22580a46",
+  "mp3": "fc7a6ba9dfb011eb9ba1137f7114f7c1439011d0c8c66b0ad063856d18145905"
+ },
+ "vo.pell.respawn": {
+  "recipe": "[\"Back up again!\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "39ccc5fdf8513fb36f8bdcca05898b8309b10765228ba0050b574881d21fb936",
+  "mp3": "ae95bbc814ff84afe49f490ba9e78cfcdeaf0e24dba0a8035fe8aaf62af59167"
+ },
+ "vo.pell.ult": {
+  "recipe": "[\"To the banner!\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "16d0d467a36a5a366b1a968dd8577003f86a26ae2b2ccdbcd76b23fe4a3c8ea8",
+  "mp3": "d50fd1dc852906d2be0fa497dec14d505f3c5cbc240a6fa4abd3305e2be8227b"
+ },
+ "vo.pell.ult_rank": {
+  "recipe": "[\"My banner flies higher!\", \"vctk\", \"p298\", 0.0, 0.95, [\"bronze\", \"room\"], [0.55, 0.7]]",
+  "ogg": "ebdf36e1f8de337fb133076234cd5b9a7f4af206b28fe40cbe487b1fc1a7a68c",
+  "mp3": "b175361e0286fcd2230b5fdbeb22a8ff68d84dfa2e7345cd3f792db8a9b57f8a"
+ },
+ "vo.sable.attack.1": {
+  "recipe": "[\"Signed for.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "480a1d9633e18b2c8a7b075ccc1297c5826c39ee05c06718945068ffd75be5c1",
+  "mp3": "23b3d3ca3da3423686cfdcbdd4559dc9b9d4143e3785a7e63ab6cd7387e7a11e"
+ },
+ "vo.sable.attack.2": {
+  "recipe": "[\"You're hexed.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "02626f2a83b0869c60783cfabf20a1954e656a81ad43bb44954d803b6f81ba0a",
+  "mp3": "2d51c07f0e7a564dc4b4bc51ee8d925016292f775ce6aa2a417164b7bdaf06fb"
+ },
+ "vo.sable.death": {
+  "recipe": "[\"Lost in the post.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "39da146ef877bfcd1e05425ce002fb13aa4cf104f9cc6b5b0ab8cc404551df05",
+  "mp3": "3e5ee7350f5540fb127df3d1bd7e2077ddf18d76ee031b0434cdfca26f712dc4"
+ },
+ "vo.sable.encounter": {
+  "recipe": "[\"A name on my list.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "bec0efff258ca08cb25af937c9d051eb4fde08427ce5fada4495f47939ce26af",
+  "mp3": "fc9b07f51cfff7f80cb1ae2188a430d1345f0e1adbd5d7fefeee341bafed1de4"
+ },
+ "vo.sable.first_move": {
+  "recipe": "[\"The night's young. So are they.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "50135fb033daba9998e30b0192920c589424e4c1fb775cf8330e56a70d14006f",
+  "mp3": "de24d483eb11e89c674c04b1c2867b6403a5aed4e2ac662693c311c736217741"
+ },
+ "vo.sable.kill.1": {
+  "recipe": "[\"Delivered.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "47be483e78c7c74fe96541f760aa7c35e349432bf599a89e498dec29ee77851e",
+  "mp3": "18f7bfc0ea47e7760ed2896c6847d2bc0062d3a06d5803f4baac5092048cbbb0"
+ },
+ "vo.sable.kill.2": {
+  "recipe": "[\"Return to sender.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "cb3c30121b98db2f7fa4b789a7752e01fff0c2ed95f8c02f5a03a51febdf57e6",
+  "mp3": "b69370a8de32f9da5e4c3b5d55eb8f37ab090fa0dd2602ec3cf9d4be71034d26"
+ },
+ "vo.sable.long_move.1": {
+  "recipe": "[\"I've never lost a letter. Or a mark.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "c5d99d83f409a7ef3df3c0e94799f26448ba3240fcff43ca96e3ad2f9eef8f0e",
+  "mp3": "b6cd239d6383d84408da29100308bec08ffc6500fcc1460014d2e979a3258e89"
+ },
+ "vo.sable.long_move.2": {
+  "recipe": "[\"The night carries everything, if you know how to ask.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "9743ba59215872f610c5a84a71a671a807e0ab1ed87103271095784769608d26",
+  "mp3": "7a78bf8586ec6378bc97be4233af36cc283e874f52f2f3c4d73a7f8565787efd"
+ },
+ "vo.sable.move.1": {
+  "recipe": "[\"On my route.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "bc75a58c1fdf24d7b0e1b05eca47afe342cf46e8459985ad926254ccd1d26cf3",
+  "mp3": "fb5b71d1155eb8d64ce1c4b8b0fa072471bb051436c24b99c33db1ca76746050"
+ },
+ "vo.sable.move.2": {
+  "recipe": "[\"Through the shade.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "fce2ce30b5ee167811cab8b1ff07a4628118189d77860f81fe651e68a86dbb74",
+  "mp3": "948584121761ef569f038a872c463264a5fc3cd4689e93130d98013e5c16b271"
+ },
+ "vo.sable.move.3": {
+  "recipe": "[\"Swift and silent.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "163dbe7d37ec3469380ce6ae23adb7f78240a1bbb617c00a40a35ae000daa676",
+  "mp3": "359564b081da8e15d2b729e60db410e705d705e137e3c25a59aef398cfde6434"
+ },
+ "vo.sable.pick": {
+  "recipe": "[\"Special delivery.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "19cdfaa276f61be3ed70f44577da10a126d1a75172701503633ccbbbd0664a46",
+  "mp3": "a9c61cd60c861c1a41b3033393b4b6ab3ecccacaf0a9a98dd58600f89c90ef49"
+ },
+ "vo.sable.respawn": {
+  "recipe": "[\"Back on the route.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "0427f58323468fc352f65e9bdc13c3985acbb93e4146ca2145f2a0c1ac7904c5",
+  "mp3": "cc00e759163977c43a53e77f59651efb2612831ac3148da9e286d7a2ea96255e"
+ },
+ "vo.sable.ult": {
+  "recipe": "[\"This is the dark hour.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "63044e4b40fc6db006236cf7cb4c95ca8e5202da8eda386bb2ad8de7f7138735",
+  "mp3": "015f10b8b5f093c290a48d91459bf9ea1f0dff889d3b4e72703d6075b3b61125"
+ },
+ "vo.sable.ult_rank": {
+  "recipe": "[\"The night grows longer.\", \"vctk\", \"p294\", 0.0, 0.97, [\"under\", \"whisper\", \"room\"], [0.55, 0.7]]",
+  "ogg": "60d2a404cfd8241f73e27fe3af8ed7f9bfa68aefcc5b8bb2aeadc6a8691a7a24",
+  "mp3": "1249220459205537fd5552d067ed1e7e533e0817c853f66ddd6968728d1f0e6d"
+ },
+ "vo.sefa.attack.1": {
+  "recipe": "[\"Keep up!\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "f05d054082d0f164f1c88a2e6cd80bed5738b92dd3c4505d079c68caa0d8848a",
+  "mp3": "107d1601de42c5d0137a8315cc031d4b313416dbeac0c2fa466cd75324c99a01"
+ },
+ "vo.sefa.attack.2": {
+  "recipe": "[\"One, two!\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "6937e8d1827c453684c16440fbd32621e736a14057b4781503f01bd0a39da2d2",
+  "mp3": "724277cf57e18d5b784e36c65a49a49ca45882b72852a9e596a859aae9327a3f"
+ },
+ "vo.sefa.death": {
+  "recipe": "[\"The music stops.\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "534c3454256637bcdc4db8a34488860d7b31ae5b729a18ee67ed9a3b747c3f79",
+  "mp3": "b36ecf7e387259ced42b8d3968a6a7b78e153cd23d11a4039e951625a94bc902"
+ },
+ "vo.sefa.encounter": {
+  "recipe": "[\"Partners! Shall we?\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "c6c71a1524aff7660a9b14dd72301cfbd39318f6081962346049b45ea9635b66",
+  "mp3": "01bcba1627afa24a3a4f014b7a2edb9909a626d4bc48815f1d295bdbf6fa3f75"
+ },
+ "vo.sefa.first_move": {
+  "recipe": "[\"Feel that breeze!\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "afc346aff24643805bfc3459432153e64caf3dae510a36759d0831487c3ca52c",
+  "mp3": "556c60d7e930fa0afddb1c2b49b922d1217528461ad60689380474f57bc4384b"
+ },
+ "vo.sefa.kill.1": {
+  "recipe": "[\"Swept off your feet.\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "a1968bd85b2a524178bc9f1d2411d73d549cdcc7b11e2d30d680afc086c969fb",
+  "mp3": "b8aea0526bf959a3d39e7b577f835e4129a21036b8f4570f59f070e7288b3af5"
+ },
+ "vo.sefa.kill.2": {
+  "recipe": "[\"Much too slow!\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "0a24a75543d6d8ba025c749b56687e3414d5e91e41f5794bca6485ebc092932e",
+  "mp3": "d629a6b32f62fb619dc47fdc6d8d5ff5483d900fda8aa8709fd0118bc36e4662"
+ },
+ "vo.sefa.long_move.1": {
+  "recipe": "[\"The wind never walks the same road twice.\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "a5b6c5485403bcf409cba0afdedd5edcf5cfde17295cd6109d9295275996fe9c",
+  "mp3": "9b3cae14c5c3ce00d6095b2d8c3e3f80ad2dee63adb11692972d0cc02b1a26c4"
+ },
+ "vo.sefa.long_move.2": {
+  "recipe": "[\"Dance like the bridge is falling. It might.\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "0bde8a8720fc2e79146bc00919f887dca57f3a0e69f745a553a7b8d88ed682e5",
+  "mp3": "55cd394ba2f2fdb374a505a85e404d10dc2f849ae249ad61727bdb96d17f7ff0"
+ },
+ "vo.sefa.move.1": {
+  "recipe": "[\"Light on my feet.\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "16b3fb90327f256705745fe6c48c3f3d424975c74db05b117d8f609e47dafac7",
+  "mp3": "87ff0a82e8326b87494a9a5ad477a65f3c794590dfac38f4f48dae275f837181"
+ },
+ "vo.sefa.move.2": {
+  "recipe": "[\"With the wind.\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "e253d1ca8111ef3c2643df3fc265acb751f1dba81de95769a8013c221a09e1ab",
+  "mp3": "f1b8a0634814ed3768368993a04be26e2764d27c6f86588fe399e7ab83bdef87"
+ },
+ "vo.sefa.move.3": {
+  "recipe": "[\"Spinning!\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "599cdb9202f4bfbb843d203c04f76fa313086235b8dfa3a4f8875f923e2b79df",
+  "mp3": "319815d30d08ecb1bcce77893de98c64dfde41a20f0df32d002e320c60cd496d"
+ },
+ "vo.sefa.pick": {
+  "recipe": "[\"Let's dance!\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "9c5a17e8e42e5a93e9fa40a90f020fc07e767f5d4172b0ab8862658b22b98d88",
+  "mp3": "4a378254f56708b9a1ee3c92bdb4ed31235d42f1c41feaf3d6bd39d190dabcde"
+ },
+ "vo.sefa.respawn": {
+  "recipe": "[\"Time for an encore!\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "c21a9c51dc170071f19e83cab48c949168949019146076db90151db98925af98",
+  "mp3": "482365f250a41bef0e0ab385a942fe78b854d9635d5e9da9922125786e80dfd9"
+ },
+ "vo.sefa.ult": {
+  "recipe": "[\"Dance in the storm!\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "b0f889ca6f25204b69d8c2e2f0d9dd9291ec1ddd8a8beaa7b52db400835ed86f",
+  "mp3": "780865e4e66921561aff4033775cf24ec94fd0c2118ac46b825af94174b7a5a3"
+ },
+ "vo.sefa.ult_rank": {
+  "recipe": "[\"The wind picks up!\", \"vctk\", \"p310\", 0.5, 0.94, [\"breath\", \"room\"], [0.55, 0.7]]",
+  "ogg": "5358f1fda2346c796af265332657f0fb5d3744be23ec60d43ebcee4e5e9ff6b5",
+  "mp3": "2b544ce760044911b8ddb1657635cf1b2720866655383aee13c51b262ea8bb94"
+ },
+ "vo.seren.attack.1": {
+  "recipe": "[\"Fade away.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "0a8e4fa236776f2c2d9ab963088665ee544add3595fe6ac1d3c8ac1b9ab63819",
+  "mp3": "8ebea85aa4d1d92035991146c43ad9e31ac8e2736dceba54e41be053d1b5ad16"
+ },
+ "vo.seren.attack.2": {
+  "recipe": "[\"Your light dims.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "8ab1ea7fe23ff02ccb3a2e5570f95d19046838800c8357c1166069411e282282",
+  "mp3": "0f362fbdc7bae6da4faefb1e00e0a9c99accc0734369c101f365913b889ac8e9"
+ },
+ "vo.seren.death": {
+  "recipe": "[\"Falling again.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "01476233a224e0670024c49aabe7d916e0910c429a6b99481e0940283a46a77d",
+  "mp3": "b94194c5be7a1e27a5e59c5e40c4450fe461c89aac1ec688e1920d314cc7e3ef"
+ },
+ "vo.seren.encounter": {
+  "recipe": "[\"Small lights, burning so brightly.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "556320c6ad41c39b7f774e468d1c1e74bf4b3947d8a8a70ef74fc225d2917a8b",
+  "mp3": "df0d598036bdb7f34d8bf3a16754e47086bfced5249b5f15356cd7b18385d440"
+ },
+ "vo.seren.first_move": {
+  "recipe": "[\"The sky is listening.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "56104f3f78f1a98f5834e94f2e7192feaed2a4375031a4b5ed64d490dd393964",
+  "mp3": "d8d776f48607f61216b01a4e85c4c336e7168873ccf05c1b6f3b22d256ae5693"
+ },
+ "vo.seren.kill.1": {
+  "recipe": "[\"Another light goes out.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "d8a04cb1403869fb0fa4f7b2979799691991e9871bdccda7576a1ba8c9d64d7c",
+  "mp3": "0bee758771153189d4a8eaa99823ddd6f8e55f5fd4142801568b0e47ed45eada"
+ },
+ "vo.seren.kill.2": {
+  "recipe": "[\"Gone to the dark.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "56357cc08e357f188df7b91933609b730998a7f201b6efcd989a9ec7561b40dc",
+  "mp3": "4a08334bc10086bee53573618715b8faa1df6e938a3ce0857e8884abdc137c2c"
+ },
+ "vo.seren.long_move.1": {
+  "recipe": "[\"Every star is a door left open.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "f72199bfd53c0bdf3cd3c12e8c8c81ccd98ddba5d69fb71d01a2e9f863a723d6",
+  "mp3": "d8a0965a344ee33717eb443472073fd2fdd1147f2eada3652413bbf3ed6cb50c"
+ },
+ "vo.seren.long_move.2": {
+  "recipe": "[\"I have watched this bridge from very far away.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "5eb9e1f36554760684128511a1bc35e939564e67d523b6952668a7d6047399b4",
+  "mp3": "bda3e3523534b69b98efbc11bbe30c6d9d0639317be83faef33eb956015ea22e"
+ },
+ "vo.seren.move.1": {
+  "recipe": "[\"Drifting.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "3d94774f3be5c1b43cff5af37ab321cc626f8fd86282e819b723d2b989ff5bab",
+  "mp3": "b623c28804fd3817351c5c564157a999e1d0acca6dde64156fedef0b52a6ca3c"
+ },
+ "vo.seren.move.2": {
+  "recipe": "[\"As the stars turn.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "4d311c814d256ff1d542be5895d32cbdc1ccff4ff477decc2bbead25a86660e3",
+  "mp3": "93354d48a108d19cb3436f77f96853a8586c615bd533e3cd5b795ab01d7aa9a5"
+ },
+ "vo.seren.move.3": {
+  "recipe": "[\"Quietly.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "8573608f09bbb084c412cbafb1e4fedd99b28bea18ab4cb89684a7f9e07ad321",
+  "mp3": "6a34465114ab4eb6cb019b77f721dfd1b3c876678f88305e3db478d5f3cd8eaf"
+ },
+ "vo.seren.pick": {
+  "recipe": "[\"I fell so that you could look up.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "99e278fd2d9725ddf64ce095ed5241cb3d09d5c98173be0aa372378348fc6a2e",
+  "mp3": "924c3ec05752d78a1fb5d27b12b9aa522a21250ffac81321aebefb4a3faf7b57"
+ },
+ "vo.seren.respawn": {
+  "recipe": "[\"I rise again.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "a49d470473906d8f7b0eb4b353b9158ab78c6ca2ad92057a3b7e87af35151fb8",
+  "mp3": "f74221e131421954fc9b46d5e687abd67794b03efb085fd1ffed9881d6c7ebbe"
+ },
+ "vo.seren.ult": {
+  "recipe": "[\"Look to the sky!\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "5d2b79211482c52f45d21d96e38c16e4f626afc82e94906d56c1398a47d7bb18",
+  "mp3": "fc5fdbee057a0165c76c387c6764c9ec706c04a01b12b3731854ea1178305c16"
+ },
+ "vo.seren.ult_rank": {
+  "recipe": "[\"The sky draws nearer.\", \"vctk\", \"p276\", 0.5, 1.12, [\"shimmer\", \"hall\"], [0.55, 0.7]]",
+  "ogg": "a3a7829a86d5a8827057e3beda81c59580b358dbb2db87faff7f39bc6b5aa543",
+  "mp3": "2eb2be5c0c6defdeba89ac3ef00e5271282d47eca0bac15ac73d7baeb6fed420"
+ },
+ "vo.talmar.attack.1": {
+  "recipe": "[\"Overboard with you!\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "641ed0aa833c5c8e518b699f79c3eeb535df1c6162759fb58d291cf25b25c03f",
+  "mp3": "abbd765e426da7e8454259b6b2ec1948c18f6322d7ad480c575bccc9f239fc9b"
+ },
+ "vo.talmar.attack.2": {
+  "recipe": "[\"Wash out!\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "5ded221355e2dce0fc756e1e0c228fcaedcb4d2e76b0e0e5d6cf1d15391a3297",
+  "mp3": "76fbd7597a1d65a7b7d691a00161024c35546fe742d1806404bb1720288d529b"
+ },
+ "vo.talmar.death": {
+  "recipe": "[\"Pulled under.\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "df9361f89565acd2268ee829938765d9aa37ca7a8f820bbd846bf6813bf96c58",
+  "mp3": "fc92f0fc0d0ce0d428e5cab7fe45eed6a4e3bba830024bdc924dcd64ffcdb837"
+ },
+ "vo.talmar.encounter": {
+  "recipe": "[\"Sails on the horizon!\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "8c64e639f1730e5a010bc733d0ca03a4e35d7ae37af1039a88f72b1d11d66bf4",
+  "mp3": "d178eb74027b22efc451c1e09278be68ec8fcf75ed93bda1978c89470fb9d801"
+ },
+ "vo.talmar.first_move": {
+  "recipe": "[\"Smell that? The sea, far below.\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "c8b09a649afe5345a933c72c4ef2f9096669a3cd91f10e9c24740a1a208e654b",
+  "mp3": "975540447c01fe631b6c3e97f4d2f922069d8cb715f06ae45adc9636ede3b8dc"
+ },
+ "vo.talmar.kill.1": {
+  "recipe": "[\"Swept away.\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "a001f44c36d73cc876997098be71d10b3f0e6743582814b2eeb7d7a67298e1e2",
+  "mp3": "4d88bfeb4315e817d94c15a66cbb5f6dd4f4687c7181fa7d9c0e875eba4a2d25"
+ },
+ "vo.talmar.kill.2": {
+  "recipe": "[\"The tide's out for you.\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "22e3ffae8b89a10d501d06c5476303bf777cd0fe4d0efeb67d8f4bff226924bc",
+  "mp3": "0311fae795302dce5092706692819c2b0c489b90b221bd244984c4ccb5b2cf22"
+ },
+ "vo.talmar.long_move.1": {
+  "recipe": "[\"The sea took the old bridge. It'll take this one too, in time.\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "92b89f1ad4a5e057a66ee949b0126f073d838590501f4fe2ee6e899c539381fb",
+  "mp3": "4118eb03524a9c0a56385e26a6af0131276a3e5ad62ffd18bd44ddf73ad5ac62"
+ },
+ "vo.talmar.long_move.2": {
+  "recipe": "[\"I've stood watch over worse water than this.\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "fbe7b4d089ce4ef4cf497df74ef3ae3ee81fb650f6f0bb4d939c88b719a5548c",
+  "mp3": "13d4d9cd1cda2d61f2138613506ee026f327c282f7dd00af950abcae04d98094"
+ },
+ "vo.talmar.move.1": {
+  "recipe": "[\"With the current.\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "631286105ec3dff9281d9f47eafa07b7b85aff913249af584e55d9b8b5e6bb95",
+  "mp3": "36db9a14eef8e3996156716886b8f57add24c60d22aff89e484f6f748741c488"
+ },
+ "vo.talmar.move.2": {
+  "recipe": "[\"Rolling in.\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "7ea04ea2f00c76c259a0e5e725606a388c857e850b2ae40b90f9e11975810f14",
+  "mp3": "c135e705f0016257d9dfbc0aff401ba1d475d9f81554da40061ca9f9cd1b362e"
+ },
+ "vo.talmar.move.3": {
+  "recipe": "[\"The tide's turning.\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "58ee2ade453fc97b5e9b56345b7cfcc3159e91fb062f01dfa6895971d7e3ccef",
+  "mp3": "bac6ae73abeb299f2d13ea19c7e12280bd3330b4392c825ab1cd3a8a7511612f"
+ },
+ "vo.talmar.pick": {
+  "recipe": "[\"The tide answers to me.\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "cca6cad7acfbe52cb19bba0212ce1207ddc7e5c10b5bc2e23a5af5d543d867ad",
+  "mp3": "aa67230b9a0a288dc36ac3fc81fb70dd5e51dc7f6c45cfe6d396b42da6b94910"
+ },
+ "vo.talmar.respawn": {
+  "recipe": "[\"High tide again.\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "ae9b10bf008d077a1a4553ded6a6c4b1a85ffe9a40eecb9228ccbe5e6fe8824d",
+  "mp3": "7b6a74bc3c86a0c73fcca46b8e82c5fadf6440f586b3ccfbbff5725fb5397a5f"
+ },
+ "vo.talmar.ult": {
+  "recipe": "[\"Into the deep!\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "5ded4b0305970d648c0b9df11b55e1dcd499732dd068773c499ecd6e5ec11069",
+  "mp3": "c5b9543469c80aaa96792b825d77a228b60848e698d244a98f4a6ef4858909ee"
+ },
+ "vo.talmar.ult_rank": {
+  "recipe": "[\"The deep rises.\", \"vctk\", \"p326\", -1.0, 1.0, [\"chorus\", \"room\"], [0.55, 0.7]]",
+  "ogg": "c4ca1eb0df5be92a4321a404cf13f5dcbe4c47616aa7051d573368e3ec815c3b",
+  "mp3": "9dcb07239ba09baa1c31683e869441f584334f22f169330c24cc819d720351cb"
+ },
+ "vo.torek.attack.1": {
+  "recipe": "[\"Target acquired.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "218df549c4cdf8938588c68c0ae8ba1418f5e98fade383f73131529af59231ef",
+  "mp3": "51655fa278b0a0d6ed1c66b83478585364b2182f1fa17e4df47937390b2c8739"
+ },
+ "vo.torek.attack.2": {
+  "recipe": "[\"Firing.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "2c6511fed3c28dbc5d27c067693f9e33b6174e7339b4dc4cd458b20ad7a46711",
+  "mp3": "adc3e0a86bb8d90257bd27c785c76b9ae5c5d96c0f5e7467b5575f0512629b55"
+ },
+ "vo.torek.death": {
+  "recipe": "[\"All systems failing.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "2b95a5c19682f100c49a8ec1b3a90f67053e0b4f6b7931bb65127992731c7c42",
+  "mp3": "818b6f5e3051552188559f7ea6c2423998990498298d8f0ff628a5294902aeb9"
+ },
+ "vo.torek.encounter": {
+  "recipe": "[\"Hostiles detected.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "cead60dd057b63965fb02e396c1ce94798468494a28b9a311c177f77f97f9031",
+  "mp3": "6c93e561b10f296adf3f67c3a5397c7b422e4a2c1313ab531389a588302bc4c7"
+ },
+ "vo.torek.first_move": {
+  "recipe": "[\"Calculating range.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "526a2cb1508167fdc9ae78a83c9f6bf1128599e6d6c183a342c4abac2dd1d6d6",
+  "mp3": "db9ad32409d21f9203b674d540f111209fa67a1ba414cfc37f80591713eedaa2"
+ },
+ "vo.torek.kill.1": {
+  "recipe": "[\"Target destroyed.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "28bc8f02b3df0ec5165bbfd4b75f4e1ddb62f3cfc93926a0de024ff4f9012ea3",
+  "mp3": "c51d62032e56b66ca3aa01585560fa1667280ed4ab8b1601b9a7c22a8fc6ee5b"
+ },
+ "vo.torek.kill.2": {
+  "recipe": "[\"Range confirmed.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "b10919035d2714db9e9037b9159a74860f393797460c8becdafb2df5ffea30d5",
+  "mp3": "06ea6ec8bf08224dc1ae89f6665f08d1d6f5b75c3a191695a6d66238bc960672"
+ },
+ "vo.torek.long_move.1": {
+  "recipe": "[\"They built me to break walls. A bridge is a wall lying down.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "76c6d61b2be3cbea6c66ab0286a112d3dad41d73126a96fa1875be6a956a8491",
+  "mp3": "aa546f7fa1a73fc59a88d82e36f7eb41c1dba631863b0ca84977087f89f99c51"
+ },
+ "vo.torek.long_move.2": {
+  "recipe": "[\"Every shell is a question. The answer is always yes.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "5c9adcd405642450d558b32be78f0efad87ece0800616e30b0f192e692f88169",
+  "mp3": "0866325c7fd80bf1d723f7fa0655e9e02d5a169400ffb736cbfa1e17640574e8"
+ },
+ "vo.torek.move.1": {
+  "recipe": "[\"Repositioning.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "f04fb60b112e0e1edfadde0994c1a3f703c609aec3e580af5470d7bde6fccd74",
+  "mp3": "398afdbbe5d92851b35f4ec3b59f14366eeddee502e426fdae5f7bf0a440ac70"
+ },
+ "vo.torek.move.2": {
+  "recipe": "[\"Treads turning.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "79bb47ede01bd8887749de843e2a5b79e72d1ee2e6c1723a7422eb740eea8955",
+  "mp3": "0cf35bfa9bdbc2e017626e1eb5b67b25211401e41c4596a7cd278b2572981e3a"
+ },
+ "vo.torek.move.3": {
+  "recipe": "[\"Advancing.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "911452d23035255e4605609ce647b9cb6c59eb559ea92fa8fd681b3e0166895c",
+  "mp3": "586a82752c5f8e0bb162db247258148450fec886109544c9ed754eb8a4e8336e"
+ },
+ "vo.torek.pick": {
+  "recipe": "[\"Siege engine, ready.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "05aebbda77824d6a1e7f5411238962513bde9d25d78cbe0f08ecdcdb7dcecf70",
+  "mp3": "e6e70c8bddb0a5b8882570c19d70133c0943245c80c89bfa7793639c1a63573d"
+ },
+ "vo.torek.respawn": {
+  "recipe": "[\"Rebuilt.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "f97c5358bdb5a0d8a4275c5c747b5f1911d1bed08840c8532d4445b0de4841c0",
+  "mp3": "eb1ab10f39e8e6d3069992ede35fb7060933e990b510795940e1835eaf5ea971"
+ },
+ "vo.torek.ult": {
+  "recipe": "[\"Commencing bombardment!\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "bb0807c03df0f60ac0ff7e5c213018590b1452d5a520839c9534dcfbba2a47ac",
+  "mp3": "0321f07dd1c4fa2b46491f09a49baacaf1c1d0296052fb1ebe7928f9ad1e0040"
+ },
+ "vo.torek.ult_rank": {
+  "recipe": "[\"Payload upgraded.\", \"vctk\", \"p311\", -1.0, 1.06, [\"machine\", \"close\"], [0.55, 0.7]]",
+  "ogg": "9bd8108d01ea0887be4f067fdb057b0ff6ad0717f06bb6086bdae51068064aa4",
+  "mp3": "7ba3a2886d7ff96e746f387f9054b5913619e859705a77d81fbb60a098c8c200"
+ },
+ "vo.ulla.attack.1": {
+  "recipe": "[\"Thorns for you.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "579db2a1cc906bd7d580bbb73a6c7b9f7dff473af46d56312f977adc1f67781b",
+  "mp3": "bdc0acced0a2dbffbdcd6aa9abf38a295fd673fac071dbab2dd797cc986dfdc5"
+ },
+ "vo.ulla.attack.2": {
+  "recipe": "[\"I'll sap you dry.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "a65ff747f2e21afa3be761fec193e034df7da7411cff6948cda0a7a8e1c3049d",
+  "mp3": "b83e4bb24cca2a06e3679cd45f6b5d1056c3f0461f62910e4b5ec3e3d98c4287"
+ },
+ "vo.ulla.death": {
+  "recipe": "[\"I'm wilting.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "578ce37c8b9ce82108ff1cd84d54eee502ee69ce38378b0e49e0c315225a2474",
+  "mp3": "3ddafe6ce6251d81fbf2af850feb611936bfe0035d97d51f1e55f6021132f95e"
+ },
+ "vo.ulla.encounter": {
+  "recipe": "[\"Weeds in the garden.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "7d8cdde4f06e451b2f61f3c3fdac99ab24446926e1903d41dfdf603b15ba531d",
+  "mp3": "dc6ad371680661751afd843e7357a9b81a54e0ed99f62ba83b0b40a2846a56e7"
+ },
+ "vo.ulla.first_move": {
+  "recipe": "[\"Even here, something grows.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "8a59dd948d58e768ff53ad2f3fa63c421fb6f40dcec13209abc2c598430a4f2e",
+  "mp3": "8209f46028ab87ef4a709f893a8f1619f72514f84cecda9de816755a54242480"
+ },
+ "vo.ulla.kill.1": {
+  "recipe": "[\"Back to the soil.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "e195faadfa3e63a1af523d651afeb68f37e1c13346d98816206eda531a70b5b6",
+  "mp3": "2ceddd84d4b3965fe05d9b940a713605ef66311447b5a59f680382a116b3127f"
+ },
+ "vo.ulla.kill.2": {
+  "recipe": "[\"Into the compost.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "b7641c60cd36290471d70f558e914615aedcd445458ab97b526876bdabda9168",
+  "mp3": "b4d679de05b9c0f65bb835d5bd9faffd126e2300a435e456422faa0aec5a5e67"
+ },
+ "vo.ulla.long_move.1": {
+  "recipe": "[\"Stone is only soil that forgot how to grow.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "9ba72b32abfbb772c42f55c0e787907f97616400d9e0e6c9b84becb895e95c72",
+  "mp3": "d5ca72d295caa4658ba0707fddcda05a8fa8fa54c92498ec9a3c463b6fc484ee"
+ },
+ "vo.ulla.long_move.2": {
+  "recipe": "[\"I've mended worse than a broken bridge.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "4445d1245e2ece0dd958b83b49edebf648077a6aab8f824b26c3a04f95628cae",
+  "mp3": "e5c044574f7521d08cb6e39aa087294b404e122ae2057126f18010ee127b0d7c"
+ },
+ "vo.ulla.move.1": {
+  "recipe": "[\"Growing, growing.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "86f3b2f123de9119d7aac1d31081649e8fead6db74e4d54a7991128c267be691",
+  "mp3": "b362ab80c06209943897cfde2031760c3cdc148c1a3f3190576d0f4f45a6c095"
+ },
+ "vo.ulla.move.2": {
+  "recipe": "[\"Root and branch.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "e4e6384c80b80d8bc4b663f9a7dd5b51f22dbae001d5b45699ace63daeb69d26",
+  "mp3": "06b78370bed750b48c7712b33404e0f0a68bd2af360fe6254a7552ff78bbae1c"
+ },
+ "vo.ulla.move.3": {
+  "recipe": "[\"Gently now.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "02fb4b50f2f2c177078491eeef47dbe48c4c93b572d8ceedeba99181ccdbf90f",
+  "mp3": "f78bdb2ba121dd8cc344842b89a3dd9ca53d9024763939ef251bada6e743a51e"
+ },
+ "vo.ulla.pick": {
+  "recipe": "[\"Everything grows back.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "75002fa7766f296da68200a1caa68ef6537b6532ada23d700a9cbc3acbfd3397",
+  "mp3": "246c25878d14672c591b3e30913b8bab5cf615127a93a582e49509549e029cd4"
+ },
+ "vo.ulla.respawn": {
+  "recipe": "[\"Spring again.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "efef91c8b5782e6602dec9a2cb4adc8166b6f4f1bce01f9c60c862d263bf9ed4",
+  "mp3": "cafa206f27d7476f9452d561389ec0f9b415e3be90febb47f36d80d3eb79f485"
+ },
+ "vo.ulla.ult": {
+  "recipe": "[\"Let it all bloom!\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "414058ef4399de13c08d22b47e6de8300aad6df71346cbb6a12eb1357047369e",
+  "mp3": "b6bc928ebc4306fd1bc520f7b9decea55877384ef1388848a0d150dd7a81ee27"
+ },
+ "vo.ulla.ult_rank": {
+  "recipe": "[\"Deeper roots.\", \"vctk\", \"p249\", -0.5, 1.1, [\"warm\", \"close\"], [0.55, 0.7]]",
+  "ogg": "551460e21cc7875ced37402e099a1343351ce6108f8237b6d914f9e657a5b096",
+  "mp3": "416ba41dcf0f6dde262cd85e7232b9821061aafd427ca809c8d7f6c8d6c3f5f0"
+ },
+ "vo.vessa.attack.1": {
+  "recipe": "[\"In my sights.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "fc2862a96bb782d6a8e10cae4ddafa5903e76ffc58cc89bb369b71a15683229b",
+  "mp3": "0d5062a38d8a730311be5edc3cae1b6a67fc9352c1dd23d9851628a12c9e03c4"
+ },
+ "vo.vessa.attack.2": {
+  "recipe": "[\"Hold still.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "46b238e21c99ccba8b051e2e4d1f0716aa4375969be7d9ec189daf7433326645",
+  "mp3": "dc240422fb744cc5715b75bdac93ef0185f814fb9dc5c4c44000c5f993366875"
+ },
+ "vo.vessa.death": {
+  "recipe": "[\"Lost the light.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "4de41ace2f01838386cb95bcec935ea79e2c5cea466109c5c850dcddf7ae3788",
+  "mp3": "a7241e3f46ec7334357f57cccfbd9af4dd434fa5201bd9694795b45990c907e9"
+ },
+ "vo.vessa.encounter": {
+  "recipe": "[\"There. Movement on the bridge.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "de53b9764f4151d338b577ab11da420bb4993380ad6816bf4d65703270c25f20",
+  "mp3": "3ba71a7acc633b6b961475843c44d4fa364331fb9cde97a26cf89df0d407215b"
+ },
+ "vo.vessa.first_move": {
+  "recipe": "[\"Eyes on the far end of the bridge.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "0cf8f83c4a89e1c9deabd255f3adb3aab93931b2a4cbd59d04b0bbbda24bdf09",
+  "mp3": "cef6657fe7711105f54a17a8f5ba4653234c64e2c710ccd73fd71a7d4bc4a804"
+ },
+ "vo.vessa.kill.1": {
+  "recipe": "[\"One less to watch.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "8a8796391b964494170a9083dc80ff8a8c375e52082371e829403f21cd61c5dc",
+  "mp3": "4e9a26196561e6fa13e49ab23fdedab214c0dfebba87816cff3a0bc76b4c71c7"
+ },
+ "vo.vessa.kill.2": {
+  "recipe": "[\"Just as I called it.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "a98852e5fa1ddfd7bead74f3b5ccb9f94b460c70e1c13d94e0acf547fc676962",
+  "mp3": "7c36fa8afac2baa670e3a49d8d8faf031d064addb6dd260e12fd3ca59dce3dbd"
+ },
+ "vo.vessa.long_move.1": {
+  "recipe": "[\"Every watch ends at dawn. Not this one.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "125a71dddca17f12e2cd2f522880ae74a1a81bdcab973bc0ecf7722d70e63db5",
+  "mp3": "00da99b973ecaa791dc5bbdaab5aa0c9933b13b9e4851e86b7e204572bf5fbe7"
+ },
+ "vo.vessa.long_move.2": {
+  "recipe": "[\"I've counted every stone of this bridge. Twice.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "34d93dbae455a893aeb805ae2b7bbf25c62c52d38669aadc588cefda85a7087b",
+  "mp3": "7b007094245408467ae16161e3f50ae663346ef6f644bf6a38eed49bec2a4cef"
+ },
+ "vo.vessa.move.1": {
+  "recipe": "[\"Moving to cover.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "ce6c71dc79c2ba40c565b00ca3c55ac5bc13bfc4a7b2f3124ad9275c4743da8c",
+  "mp3": "184b2c78b6b5abc7f226dd1e343188bf569d14311e1a8b6e4f133f1d06a73e76"
+ },
+ "vo.vessa.move.2": {
+  "recipe": "[\"Keep the line.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "52c8ebfddff4d908cfc90bd88363616c759885a146b222df8bf433d97b39c96f",
+  "mp3": "9a8686698bb89de5f88a7fa0ab36acf0bd366a8fe6a8fa9e6fb0a3de10981354"
+ },
+ "vo.vessa.move.3": {
+  "recipe": "[\"I see further from here.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "a830fa155dd0284fe8714de18075643824171b86301be2b938d3b884cf9fa0f3",
+  "mp3": "9b2b22b1c38f941299799ec921bf99da29b775eaa432ee6386d88e76d1550871"
+ },
+ "vo.vessa.pick": {
+  "recipe": "[\"The watch is mine tonight.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "1c2894bf55b7e65ebe321ba414e12230d23498f21efeb1b819948e1db78d039d",
+  "mp3": "65c6f75de122cf6709db3c0ab85ea217994c47ca9278b6f4d8f3f96d8c48f7cc"
+ },
+ "vo.vessa.respawn": {
+  "recipe": "[\"Back on the watch.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "07cf9f3a9553cb87570802fdb009a72826cffe2d20bde761870d071a380e4693",
+  "mp3": "e4dddbea7cc78d7ead41775ddde6cb5f0ca1f620c860aeb508a9e7510d55bd6a"
+ },
+ "vo.vessa.ult": {
+  "recipe": "[\"There's nowhere to hide!\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "6ff30cd378a91740d8026a7c5aabba72a010af01aebdf9ab2f8af01b8c14077e",
+  "mp3": "50f05215843039bbbae563ba50d41d8b8fa84e7aaaf983492e7bc143dbe85d0e"
+ },
+ "vo.vessa.ult_rank": {
+  "recipe": "[\"A longer reach.\", \"vctk\", \"p231\", 0.0, 1.0, [\"close\", \"grit\"], [0.55, 0.7]]",
+  "ogg": "5ab53321fb4acccdd5d77da1ceb88556c180f9835fe32db19ae7d9428746796c",
+  "mp3": "e7e6aeb2b35cc11d9ac9d31e0ff824d8338a10839bf4cdd458bc77bf9a4f3d48"
+ },
+ "vo.vire.attack.1": {
+  "recipe": "[\"Face me!\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "7c26005ca0a2a2ef3296003292954f640f7a2786f4b2a23c0e3be2bcc3646d15",
+  "mp3": "d09914926da7bb803d1e72234cd2bd78cf4cc078fac6efcc9b214cda2f48342d"
+ },
+ "vo.vire.attack.2": {
+  "recipe": "[\"Cut down!\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "021b65cdb1d93196db3808dedad5fb251401d23981ff17860d978c2399722b0b",
+  "mp3": "0bcc22fba0671b05c682d8421e109f47ab23570fc16960c8326107f490792e00"
+ },
+ "vo.vire.death": {
+  "recipe": "[\"This isn't finished.\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "785a0919e0dd32f195ee9ca7fa48cb901f59dd567cd3e9078d949679201fff06",
+  "mp3": "d02a145a2af40b6870b47c367eb7a47d4aa0e8b9cbaffe109f7813ee8e00e01f"
+ },
+ "vo.vire.encounter": {
+  "recipe": "[\"The accused approach.\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "7cf49d46830447a651622247efe4741b25739f101c1c38591ed9b17b484099ea",
+  "mp3": "63b33796b82016da20e5ed12ab027331506ffeccc7ac224a59c85bc93aac89d4"
+ },
+ "vo.vire.first_move": {
+  "recipe": "[\"Ash on the wind. Good.\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "e257e04414f3561919201f2d63ab4f9e3e4683acb0ccc8148e40c39b2a76d693",
+  "mp3": "a6e2cc539fe54efb669cfc15fe0cee15e025d96cf57c39f4a57c25b7da3c4d7f"
+ },
+ "vo.vire.kill.1": {
+  "recipe": "[\"You have been judged.\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "012d54b908443f0a3f25c1486c6dffe96308fcbe96fd268765e71ec0d401777e",
+  "mp3": "2295349781d2a13cdbb68b32da8d193db2e1e662c17cf1db08f36b025bcce655"
+ },
+ "vo.vire.kill.2": {
+  "recipe": "[\"Sentence carried out.\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "dc6b01ab8619fa9f5f59126381780773bb23d7377e5903a14c2dcca6b0fc7b40",
+  "mp3": "6bb8de6435669a200ef1444402b364f0233f20fedaf6b9d0f55699befb78740e"
+ },
+ "vo.vire.long_move.1": {
+  "recipe": "[\"They burned my order. I kept the blade.\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "956751caa74eb2edf75e84f1265b3aceac1813a3e89d0f941bfac32c94847348",
+  "mp3": "b07f56b0a83e3fcac8d8b8f66a1e086a2e05877e5fa31881603845329fd1aa06"
+ },
+ "vo.vire.long_move.2": {
+  "recipe": "[\"Judgment doesn't need a court.\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "dd1735f09f6aac5a0ee889b87e2a617e91db7073c9eca8ac22aed4ed856712b5",
+  "mp3": "add27edc719eb6264416c3bf42d779e7d0491d74fa52a701251e2e0d9ef5b1ce"
+ },
+ "vo.vire.move.1": {
+  "recipe": "[\"Pressing on.\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "25d18552b3aad6e3870144d497683fe41cb1da8d1443cf2ae660de0326082a58",
+  "mp3": "ca130e4cf74a012f86e786eacbbe02e40026aa6393d5019ed1a5fb47a52c4a05"
+ },
+ "vo.vire.move.2": {
+  "recipe": "[\"Closing.\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "badce5778525da3d1718af88e99fe034f98c7b8d4cc7c77c586ced9cd315f1ef",
+  "mp3": "fc66bf4220c312de61645f7cc6a9a1ca7797b7184154d0415ca27b3065a52486"
+ },
+ "vo.vire.move.3": {
+  "recipe": "[\"Blade ready.\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "d058bab7299d65730b140c620b7fde3cc24497ddecce10278e1ce1a66fe6cafe",
+  "mp3": "3b63505ce6a64e2a32a49c22ec1df1872be861c09b30f1bf65a250cb310e1ac0"
+ },
+ "vo.vire.pick": {
+  "recipe": "[\"My blade has a verdict for you.\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "413582bbe93f273ca04df41de3782ce216cfaec349981f87128ee1d392038d94",
+  "mp3": "2c880850ffe6d5065895526c3c970149e5f6d1a2288b1328a594b55e354d32e8"
+ },
+ "vo.vire.respawn": {
+  "recipe": "[\"The blade returns.\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "6325d3f42bf45403c514a839f8206d4237c27c0a57a8ad3341b3d94f5d5a6a97",
+  "mp3": "a48e6afdc95ea339e789e6bf790a104e379fc994b8bf583dc17cac0513913785"
+ },
+ "vo.vire.ult": {
+  "recipe": "[\"You are guilty!\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "849bbe9210f806feec6305c5c480cdb117831201a69e301600523bc2ddf74f3f",
+  "mp3": "ebe80932c5f69a7b4ae137261502a7bde1787a25fc8d9333c41bdfd865044193"
+ },
+ "vo.vire.ult_rank": {
+  "recipe": "[\"Judgment sharpens.\", \"vctk\", \"p343\", -0.5, 0.95, [\"grit\", \"close\"], [0.55, 0.7]]",
+  "ogg": "9d64bc972e1a1b4ef1674e6b47089321edfcc4b0ad31ef7f1ae9711ce0736709",
+  "mp3": "3e54cc0cd32ec85abdb8760a01193baebe93b2b1a4348f6af290a0daee7c34a7"
+ },
+ "voice.ace": {
+  "recipe": "[\"That's an ace!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "fd953464ae2841ca7c97e0213e78a9246544f43da7c9e7d7e8a76651e7a32247",
+  "mp3": "8a480b5205d07b15449b6ab666bb0795e7bac34ab9a5fc5363bf476d5bb93101"
+ },
+ "voice.aced": {
+  "recipe": "[\"Your team is down.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "0027234267621c1265b1a28515aa7a9229fe461fd5c8a3590ff7b221dfbb827c",
+  "mp3": "cdde21fb8c6cf3fdbfafc37171589a0a2540b9ab951257d2cfa9c61a4ebd0450"
+ },
+ "voice.ally_fell": {
+  "recipe": "[\"An ally has fallen.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "a2f792ba2107110c235943ba1833dbc340948b0eae741535929ca82dd6acb641",
+  "mp3": "5db8a3cad86cb93adb5284dd2859627f43dba4cb93e0645683e38d51d14545b1"
+ },
+ "voice.defeat": {
+  "recipe": "[\"Defeat.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "a3d50affb8e8d7e978eebc0f1685122076f947ac328d153be6c7717681793386",
+  "mp3": "5d818d3752fa4d2dd9656bd27f0dc72ac5112d5a432b399c2bea38a99af7f8c0"
+ },
+ "voice.enemy_fell": {
+  "recipe": "[\"An enemy has fallen.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "de35aeace255f86aebe4d8ca47c112ee1fef7cb49ea5c7de1d59cdf08a3b65b9",
+  "mp3": "580a622c10f4aeb439ac9b5f5bac1716a1cbde00bed5c0d224023497b297a297"
+ },
+ "voice.enemy_inhibitor_back": {
+  "recipe": "[\"The enemy inhibitor stands again.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "6b962e47ade036c06638862c923681594e46578254470166dd0d4e13ab7e36fc",
+  "mp3": "36b31cffe2575fdad9515cd2b1e8fb48d1d9380e384c49d7d1d312a5e9e04b22"
+ },
+ "voice.enemy_inhibitor_soon": {
+  "recipe": "[\"The enemy inhibitor rises soon.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "d825fb7ba15d4fa6c9abe756e8d146e56edc2992db6cd03bcf024524b82c9286",
+  "mp3": "65811db6ee4813ce6419c998e6233745033a9770730fec1464fee050f6b12748"
+ },
+ "voice.enemy_multi_2": {
+  "recipe": "[\"Enemy double kill.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "de4f86d4491e88d626e3967e9f37d45573e1cd24a392dbaaf3705857bf6ea12c",
+  "mp3": "6758612799c4cf7ce7f4378afd5330e600c4e4471444479bcd414549705749e7"
+ },
+ "voice.enemy_multi_3": {
+  "recipe": "[\"Enemy triple kill.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "70234b2238370381716829be036d8f00d76d571360a9fd8814f854889b4ff298",
+  "mp3": "705a6f66c6592d10e55cd844fb975cf62766d082db163f577d56ba71b830948e"
+ },
+ "voice.enemy_multi_4": {
+  "recipe": "[\"Enemy fourfold.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "45b930ac7c05c45f8f07f7ef4d749079e5c24029a1286abcc788c3a9512da173",
+  "mp3": "c17608236843a8e46e76dec58ed27cb3c533eb649c2180883fd5671e7dc32c54"
+ },
+ "voice.enemy_multi_5": {
+  "recipe": "[\"An enemy swept your team.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "9faa322891605b66f6989e0c3cea013ff651f34556d131075c3eb949675937c0",
+  "mp3": "3d352ddf4ed6a70269fc2623a899326a6ff44389584fcc28f6bf3271b969837a"
+ },
+ "voice.enemy_spree_3": {
+  "recipe": "[\"An enemy is on a run.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "1bb1362d0bbbdc9a4dd31b5f0051c6f917167f029c68739d94d2f9d4cae6583e",
+  "mp3": "72adec172ff616d5927281a5d0def47ed2cd9fa798ed37cea689019f1546a877"
+ },
+ "voice.enemy_spree_4": {
+  "recipe": "[\"An enemy is rampant.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "f6e45d0110d68b7e891c08a245e1e5e6fa52a669c839fc6478a75173c8c85828",
+  "mp3": "9c21f03ff20e6d7c2bbcfaed906dc010339bf227412739ec348ee7a575cccdd9"
+ },
+ "voice.enemy_spree_5": {
+  "recipe": "[\"An enemy is untouchable.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "d405118202c9b050e0f864bb77321235f3bb38d80b18269f1131f59f629a2b3c",
+  "mp3": "aa610193b0e4adf7cd9198866bea5a10ce60d535e1cc9f357341e0a0881ac2ae"
+ },
+ "voice.enemy_spree_6": {
+  "recipe": "[\"An enemy is merciless.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "0ec5966da7d7f85e3bd6c12a77333ebc9957670db63f5b68183a0ad32e6c81a5",
+  "mp3": "4df7b0510ccb339bfd1e9272bef0a7b90d7ca0baa235a1aa9b989013ee88789f"
+ },
+ "voice.enemy_spree_7": {
+  "recipe": "[\"An enemy is fearsome.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "ff4e3a2f0671ff96705fe45d701b2811f21b3d6ef33293a47f9f405f046af6c0",
+  "mp3": "992e15877148ed45810ac73035b9e2f89665db1b3c5e46f5dafea9ef8f47bdbd"
+ },
+ "voice.enemy_spree_8": {
+  "recipe": "[\"An enemy is beyond legend!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "0c0a8a8e4624fdecdaaf502e01aa351e14fbb7680fe91932104a94f254b87002",
+  "mp3": "c0e5411ec549adb88d4e45b2636e60477d1a3663f39c862fc325fec71c09f802"
+ },
+ "voice.enemy_surrender": {
+  "recipe": "[\"The enemy has surrendered.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "4abaadfc82fbee5cd2a71b23fc8ca1b098c1ce530d7c4fa8acf4926a89ca6092",
+  "mp3": "29194dfdffe60fec226ed17bf731077ed11045a29f65a63bb9cf4e2525394bc2"
+ },
+ "voice.executed": {
+  "recipe": "[\"Felled by the Causeway.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "5a47d71d4e5ba19d64c13fb5ef1a41bf76a24563df452f37628952a30ef6e516",
+  "mp3": "c9114fbf728bab8c62fbfafbf7eddc275c3fb6a447e55f52f9ab95221267c265"
+ },
+ "voice.first_blood": {
+  "recipe": "[\"First blood!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "b0fb9d6bd543d77f4979d0340863b67ac7f215907c33f936b28eabdf733e5825",
+  "mp3": "f20cc6c071bef815f1b0a593af3508b56bcd23d37711b85cae11c56617bf2b67"
+ },
+ "voice.inhibitor_back": {
+  "recipe": "[\"Your inhibitor stands again.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "00452ad573dd74f90121d9f150d26893f8255d752b9e173620977205eed067bc",
+  "mp3": "4296561941d909d941678d54ae7001d0077ae160e5d985955e9e76f8764319ef"
+ },
+ "voice.inhibitor_down": {
+  "recipe": "[\"Your team has destroyed an inhibitor!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "5f99328ca3d7fac63bb290ad3e40b7e1956519389722bf7e150cb6f72e88af1f",
+  "mp3": "edfa54c977b58c4965bb29508c878176b957dd9eba8cda18fe3fc9aeaf333493"
+ },
+ "voice.inhibitor_lost": {
+  "recipe": "[\"Your inhibitor has fallen.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "128b3e014a4f48f3ca8c59b6173a21be58706cb3cafc2d86afe869d87dce0e2d",
+  "mp3": "d70d9eb72f348e046a8bf80b0febe120b1eaf14e9ed061565036d463ddec32e2"
+ },
+ "voice.inhibitor_soon": {
+  "recipe": "[\"Your inhibitor rises soon.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "4040b0c50cb2a1d775ec187ba3940c13c56a691b0ab18a6e5e0d302ecbb7bb0d",
+  "mp3": "454848a2df4bdc566ff3f44548bc3d51708450ef161c7dfac37beed1e511b571"
+ },
+ "voice.minions": {
+  "recipe": "[\"The minions march.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "29593152582b8589f786386796bfe281471eaf207dd46acf1cfdc9da1ed7253c",
+  "mp3": "16b8d2070de0fd66b0d10cb6b72dc00c584a4e26d9a07fb468ee856ada8bd64d"
+ },
+ "voice.minions_soon": {
+  "recipe": "[\"Thirty seconds until the minions march.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "1973f37c43db9ec57f0c4898364edc81fab2e106f14b78c04b447f8199a5ef14",
+  "mp3": "1e2ebeb04d67409cefd88a0d602f64ecd9ba2db5af7d07ec9bcc487177083836"
+ },
+ "voice.multi_2": {
+  "recipe": "[\"Double kill!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "5892a0b383c79a7f9076253e4843f9d88571f7148c9a96197febfb203d2bdcf3",
+  "mp3": "95bdb0e8cfaeac9771e63faf3bc9f6bbe71e60979e29ab1473f222e5c6cc2f80"
+ },
+ "voice.multi_3": {
+  "recipe": "[\"Triple kill!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "2df5f0bd966dab098278a7d3644a745070ebb37396217eea180e550007dbd1cb",
+  "mp3": "92b5277c14a4fdd537c03b7a2b19c4be0879dd0bf1e248976d0b5efad69db0d2"
+ },
+ "voice.multi_4": {
+  "recipe": "[\"Fourfold!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "34b5bf3d11ddeecc79fd016fedb936f8e136e3ee0d5b480ae8bfd4fd75b714ae",
+  "mp3": "6256eeba5996d22136e30e22f2af9b523ba65e3bdd6e9b6cae248508ca036f4a"
+ },
+ "voice.multi_5": {
+  "recipe": "[\"Clean sweep!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "c2f34efd9fa1ce8147fbc1cf66995982a40f67fd5a83caf3c4d4c09094ef04c8",
+  "mp3": "c0f686bb6d760b259709405f103fdaf2bb44fef5c288671b76626373c55183d4"
+ },
+ "voice.shutdown": {
+  "recipe": "[\"The run is broken!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "130aa1392c9dfea4c8117b40936fa2aada409107410cd076c0d37faa1517018f",
+  "mp3": "c1cde79b256745908d9ffc9f042d953df455441d701c89585efa6728a023fbd7"
+ },
+ "voice.spree_3": {
+  "recipe": "[\"On a run!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "b236f3d1fb0bbb880370dbd788cb1f964c50ed26e40f0d858e2c9e37a53b8eb8",
+  "mp3": "091bceccd539ea0de44d776e63a54ce79fda46693d2edfb315697a6ffaaafd11"
+ },
+ "voice.spree_4": {
+  "recipe": "[\"Rampant!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "0394dd72c104f536b8c4bead60febf420266880611359c9050617abbd8054ede",
+  "mp3": "6f21c6c5c90de923b3dfd483479f931c8aa05eefba611f88ef455590ddb0c310"
+ },
+ "voice.spree_5": {
+  "recipe": "[\"Untouchable!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "9e64271582ee68f71f40dffc4faa39f43281f01b8efe87f533ef9f04432128bc",
+  "mp3": "a4bde1805f6aa1a1567021124d77f12b68db0d35b00965aa4b2829fe0dbafe71"
+ },
+ "voice.spree_6": {
+  "recipe": "[\"Merciless!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "383db9760c17cc7fb637fe88af05fa191be2be4909d76eccca30770556a7ef16",
+  "mp3": "ce410bbb188c51bdb02b3295073314ad24a3f977996c3dc368de1a2e9c7faa1d"
+ },
+ "voice.spree_7": {
+  "recipe": "[\"Fearsome!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "775389ac8acb1e4161027412ddb1ab7e0569a01caebac4465bfb6a0938cfe6b2",
+  "mp3": "2421ff1bcadcc99f4f4d8eaa2c34437ae18941ed0587cfc2fc0e318271e60a5f"
+ },
+ "voice.spree_8": {
+  "recipe": "[\"Beyond legend!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "1f69a722fae67e8f4a151fc8b2adb5eca72cdbc93fa0945befcabb2c9511f640",
+  "mp3": "9909b3f4a82b20a02c400268fde13388ace9407876465fa892583abff50bdb7d"
+ },
+ "voice.surrender": {
+  "recipe": "[\"Your team has surrendered.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "160d5b40fee749a8ce00789556d23a40cdb3594ef8806b9d66f03b7740b1e067",
+  "mp3": "4407fd7bb8d399e4a707bf99b31e3a62736d05cf3cae06b0d873084db686f31f"
+ },
+ "voice.turret_down": {
+  "recipe": "[\"Your team has destroyed a turret.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "184a3965d012ae6f1d7d93a73f17426c8462f7a3d3635462e402fe5c12a915b3",
+  "mp3": "449f035d3c2bb54c0b58b95f60b8e89d182daa6972e7b2cbbb123864789057c7"
+ },
+ "voice.turret_lost": {
+  "recipe": "[\"Your turret has fallen.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "4aa455b83720a7a04d457054d0a5ca1d5119b552f291a368bf18e5b887c84d25",
+  "mp3": "7f8785a927e70636c8356a15d62e95aaa79a0a5b14bd5c052f0d58a76ca7fb1e"
+ },
+ "voice.victory": {
+  "recipe": "[\"Victory!\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "b0ec1b27c3b1a23a6ee5e2d34293c58396bb1bc606876f16b853b3354d5412d5",
+  "mp3": "d2afcc04b09bfa0b52c9c9abb6401330624c89600092618541f7a30e36b7d1d6"
+ },
+ "voice.welcome": {
+  "recipe": "[\"Welcome to the Causeway.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "eded5412c0fd9953a4f8d109d3f7465efd7595f0ffe3efb42d535ced7ac87db9",
+  "mp3": "fc4778b5968933224a40bd6d3d5c25730ba74fa92a2f3ce9ddf5c93c3cfab34f"
+ },
+ "voice.you_fell": {
+  "recipe": "[\"You have fallen.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "e7cd529f1eb1d78fc049d1012f4a1b1de9f9084261d58e13899fbe8fb0cd78e1",
+  "mp3": "3b670e2021b143e7486ca7c942795ca98a44733d65d300705164b3a6dd6350af"
+ },
+ "voice.you_slew": {
+  "recipe": "[\"You slew an enemy.\", \"cori\", null, 0.0, 1.06, [\"presence\", \"plate\"], [0.55, 0.7]]",
+  "ogg": "7fe43cadbe4636ffb7dff40902c1b26bc51adab76af98cd4441db97c7e75ea4a",
+  "mp3": "0c8e46440ebcf945e90528c2e211536867426f04e6df360e8173216d011fbf48"
+ }
+}

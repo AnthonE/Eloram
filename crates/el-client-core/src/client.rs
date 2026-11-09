@@ -36,6 +36,8 @@ pub const FEED: usize = 256;
 /// The own champion's predicted casts and blinks kept for the page (`docs/FX.md`: its effects
 /// start from the prediction, a round trip before the server's say).
 pub const OWN_FEED: usize = 16;
+/// The orders the player gave lately, kept for what answers them (the champion's own lines).
+pub const ORDER_LOG: usize = 8;
 
 /// Something the own champion did in the prediction, the first time it was stepped.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -170,6 +172,9 @@ pub struct Client {
     /// The newest [`OWN_FEED`] of the own champion's predicted [`OwnEvent`]s, by tick, as the feed.
     pub own_feed: [(u32, OwnEvent); OWN_FEED],
     pub own_feed_n: u64,
+    /// The newest [`ORDER_LOG`] orders the player gave, and how many in all.
+    pub order_log: [Order; ORDER_LOG],
+    pub order_log_n: u64,
     scratch: PathScratch,
     /// The next tick to make a command for; the prediction is at this tick.
     next_cmd: u32,
@@ -237,6 +242,8 @@ impl Client {
             feed_n: 0,
             own_feed: [(0, OwnEvent::Nothing); OWN_FEED],
             own_feed_n: 0,
+            order_log: [Order::Stop; ORDER_LOG],
+            order_log_n: 0,
             scratch: PathScratch::new(),
             next_cmd: 0,
             unsent: 0,
@@ -275,6 +282,12 @@ impl Client {
     }
 
     /// Whether the own champion's state has come (before it, there's nothing to predict or send).
+    /// The own champion's state as if it had come (for the tests of what reads a client).
+    #[cfg(test)]
+    pub(crate) fn start_for_test(&mut self) {
+        self.started = true;
+    }
+
     pub fn started(&self) -> bool {
         self.started
     }
@@ -286,7 +299,12 @@ impl Client {
 
     /// Gives an order, for the next command's tick: it shows in the prediction at once.
     pub fn order(&mut self, o: Order) -> Option<u16> {
-        self.orders.give(o, self.next_cmd)
+        let seq = self.orders.give(o, self.next_cmd);
+        if seq.is_some() {
+            self.order_log[(self.order_log_n % ORDER_LOG as u64) as usize] = o;
+            self.order_log_n += 1;
+        }
+        seq
     }
 
     // -----------------------------------------------------------------------------------------

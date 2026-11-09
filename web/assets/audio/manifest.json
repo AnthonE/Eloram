@@ -1,5 +1,5 @@
 {
-  "about": "Every sound the game plays (el_client_core::fx::sound). Written by `cargo test -p el-client-core fx::sound -- --ignored write_manifest`; art/tools/sounds.py makes the files of every line that isn't optional.",
+  "about": "Every sound the game plays (el_client_core::fx::sound), and every champion's lines (el_client_core::fx::vo). Written by `cargo test -p el-client-core fx::sound -- --ignored write_manifest`; art/tools/sounds.py makes the files of every sound that isn't optional, art/tools/voices.py the announcer's and the champions' placeholders (a recording of the same name replaces one).",
   "formats": [
     "ogg",
     "mp3"
@@ -1510,6 +1510,99 @@
     {
       "bus": "ui",
       "files": [
+        "gold.coin.1",
+        "gold.coin.2",
+        "gold.coin.3"
+      ],
+      "gain_db": -7.0,
+      "loop": false,
+      "name": "gold.coin",
+      "optional": false,
+      "stereo": false,
+      "takes": 3,
+      "what": "your last hit's gold: one bright coin's plink, 0.3 s"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "takedown.x1"
+      ],
+      "gain_db": -3.0,
+      "loop": false,
+      "name": "takedown.x1",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "your kill: a punchy low hit, one bright note up and a few coins, 0.8 s"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "takedown.x2"
+      ],
+      "gain_db": -2.5,
+      "loop": false,
+      "name": "takedown.x2",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "your second kill running: the hit, two notes up and more coins, 0.9 s"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "takedown.x3"
+      ],
+      "gain_db": -2.0,
+      "loop": false,
+      "name": "takedown.x3",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "your third kill running: the hit, three notes up and a spill of coins, 1.0 s"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "takedown.x4"
+      ],
+      "gain_db": -1.5,
+      "loop": false,
+      "name": "takedown.x4",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "your fourth kill running: a heavier hit, four notes up and a shower of coins, 1.1 s"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "takedown.x5"
+      ],
+      "gain_db": -1.0,
+      "loop": false,
+      "name": "takedown.x5",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "all five by your hand: the heaviest hit, a run of five notes to a ringing chord and coins pouring, 1.4 s"
+    },
+    {
+      "bus": "ui",
+      "files": [
+        "takedown.assist"
+      ],
+      "gain_db": -6.0,
+      "loop": false,
+      "name": "takedown.assist",
+      "optional": false,
+      "stereo": false,
+      "takes": 1,
+      "what": "your assist: a soft two-note chime and a coin or two, 0.6 s"
+    },
+    {
+      "bus": "ui",
+      "files": [
         "ui.click"
       ],
       "gain_db": -6.0,
@@ -1776,6 +1869,7 @@
       "loop": false,
       "name": "voice.welcome",
       "optional": true,
+      "says": "Welcome to the Causeway.",
       "stereo": false,
       "takes": 1,
       "what": "the match begins: welcome to the Causeway"
@@ -1789,6 +1883,7 @@
       "loop": false,
       "name": "voice.minions_soon",
       "optional": true,
+      "says": "Thirty seconds until the minions march.",
       "stereo": false,
       "takes": 1,
       "what": "thirty seconds until the minions march"
@@ -1802,6 +1897,7 @@
       "loop": false,
       "name": "voice.minions",
       "optional": true,
+      "says": "The minions march.",
       "stereo": false,
       "takes": 1,
       "what": "the minions march"
@@ -1815,6 +1911,7 @@
       "loop": false,
       "name": "voice.first_blood",
       "optional": true,
+      "says": "First blood!",
       "stereo": false,
       "takes": 1,
       "what": "the first kill of the match"
@@ -1828,6 +1925,7 @@
       "loop": false,
       "name": "voice.you_slew",
       "optional": true,
+      "says": "You slew an enemy.",
       "stereo": false,
       "takes": 1,
       "what": "you killed an enemy"
@@ -1841,6 +1939,7 @@
       "loop": false,
       "name": "voice.you_fell",
       "optional": true,
+      "says": "You have fallen.",
       "stereo": false,
       "takes": 1,
       "what": "you were killed"
@@ -1854,6 +1953,7 @@
       "loop": false,
       "name": "voice.ally_fell",
       "optional": true,
+      "says": "An ally has fallen.",
       "stereo": false,
       "takes": 1,
       "what": "an ally was killed"
@@ -1867,6 +1967,7 @@
       "loop": false,
       "name": "voice.enemy_fell",
       "optional": true,
+      "says": "An enemy has fallen.",
       "stereo": false,
       "takes": 1,
       "what": "an enemy was killed"
@@ -1880,6 +1981,7 @@
       "loop": false,
       "name": "voice.multi_2",
       "optional": true,
+      "says": "Double kill!",
       "stereo": false,
       "takes": 1,
       "what": "two kills in a row, quickly"
@@ -1893,6 +1995,7 @@
       "loop": false,
       "name": "voice.multi_3",
       "optional": true,
+      "says": "Triple kill!",
       "stereo": false,
       "takes": 1,
       "what": "three kills in a row"
@@ -1906,6 +2009,7 @@
       "loop": false,
       "name": "voice.multi_4",
       "optional": true,
+      "says": "Fourfold!",
       "stereo": false,
       "takes": 1,
       "what": "four kills in a row"
@@ -1919,6 +2023,7 @@
       "loop": false,
       "name": "voice.multi_5",
       "optional": true,
+      "says": "Clean sweep!",
       "stereo": false,
       "takes": 1,
       "what": "all five, by one hand"
@@ -1932,6 +2037,7 @@
       "loop": false,
       "name": "voice.ace",
       "optional": true,
+      "says": "That's an ace!",
       "stereo": false,
       "takes": 1,
       "what": "a whole team down"
@@ -1945,6 +2051,7 @@
       "loop": false,
       "name": "voice.turret_down",
       "optional": true,
+      "says": "Your team has destroyed a turret.",
       "stereo": false,
       "takes": 1,
       "what": "your team destroyed a turret"
@@ -1958,6 +2065,7 @@
       "loop": false,
       "name": "voice.turret_lost",
       "optional": true,
+      "says": "Your turret has fallen.",
       "stereo": false,
       "takes": 1,
       "what": "your team lost a turret"
@@ -1971,6 +2079,7 @@
       "loop": false,
       "name": "voice.inhibitor_down",
       "optional": true,
+      "says": "Your team has destroyed an inhibitor!",
       "stereo": false,
       "takes": 1,
       "what": "your team destroyed an inhibitor"
@@ -1984,6 +2093,7 @@
       "loop": false,
       "name": "voice.inhibitor_lost",
       "optional": true,
+      "says": "Your inhibitor has fallen.",
       "stereo": false,
       "takes": 1,
       "what": "your team lost an inhibitor"
@@ -1997,9 +2107,10 @@
       "loop": false,
       "name": "voice.inhibitor_back",
       "optional": true,
+      "says": "Your inhibitor stands again.",
       "stereo": false,
       "takes": 1,
-      "what": "an inhibitor stands again"
+      "what": "your inhibitor stands again"
     },
     {
       "bus": "voice",
@@ -2010,6 +2121,7 @@
       "loop": false,
       "name": "voice.victory",
       "optional": true,
+      "says": "Victory!",
       "stereo": false,
       "takes": 1,
       "what": "victory"
@@ -2023,6 +2135,7 @@
       "loop": false,
       "name": "voice.defeat",
       "optional": true,
+      "says": "Defeat.",
       "stereo": false,
       "takes": 1,
       "what": "defeat"
@@ -2036,9 +2149,332 @@
       "loop": false,
       "name": "voice.surrender",
       "optional": true,
+      "says": "Your team has surrendered.",
       "stereo": false,
       "takes": 1,
-      "what": "a team has surrendered"
+      "what": "your team surrendered"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_surrender"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_surrender",
+      "optional": true,
+      "says": "The enemy has surrendered.",
+      "stereo": false,
+      "takes": 1,
+      "what": "the enemy surrendered"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_multi_2"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_multi_2",
+      "optional": true,
+      "says": "Enemy double kill.",
+      "stereo": false,
+      "takes": 1,
+      "what": "an enemy's two kills in a row"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_multi_3"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_multi_3",
+      "optional": true,
+      "says": "Enemy triple kill.",
+      "stereo": false,
+      "takes": 1,
+      "what": "an enemy's three kills in a row"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_multi_4"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_multi_4",
+      "optional": true,
+      "says": "Enemy fourfold.",
+      "stereo": false,
+      "takes": 1,
+      "what": "an enemy's four kills in a row"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_multi_5"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_multi_5",
+      "optional": true,
+      "says": "An enemy swept your team.",
+      "stereo": false,
+      "takes": 1,
+      "what": "all five of your team, by one enemy's hand"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.aced"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.aced",
+      "optional": true,
+      "says": "Your team is down.",
+      "stereo": false,
+      "takes": 1,
+      "what": "your whole team down"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.spree_3"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.spree_3",
+      "optional": true,
+      "says": "On a run!",
+      "stereo": false,
+      "takes": 1,
+      "what": "one of yours: three kills without falling"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.spree_4"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.spree_4",
+      "optional": true,
+      "says": "Rampant!",
+      "stereo": false,
+      "takes": 1,
+      "what": "one of yours: four kills without falling"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.spree_5"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.spree_5",
+      "optional": true,
+      "says": "Untouchable!",
+      "stereo": false,
+      "takes": 1,
+      "what": "one of yours: five kills without falling"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.spree_6"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.spree_6",
+      "optional": true,
+      "says": "Merciless!",
+      "stereo": false,
+      "takes": 1,
+      "what": "one of yours: six kills without falling"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.spree_7"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.spree_7",
+      "optional": true,
+      "says": "Fearsome!",
+      "stereo": false,
+      "takes": 1,
+      "what": "one of yours: seven kills without falling"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.spree_8"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.spree_8",
+      "optional": true,
+      "says": "Beyond legend!",
+      "stereo": false,
+      "takes": 1,
+      "what": "one of yours: eight kills and more without falling"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_spree_3"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_spree_3",
+      "optional": true,
+      "says": "An enemy is on a run.",
+      "stereo": false,
+      "takes": 1,
+      "what": "an enemy: three kills without falling"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_spree_4"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_spree_4",
+      "optional": true,
+      "says": "An enemy is rampant.",
+      "stereo": false,
+      "takes": 1,
+      "what": "an enemy: four kills without falling"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_spree_5"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_spree_5",
+      "optional": true,
+      "says": "An enemy is untouchable.",
+      "stereo": false,
+      "takes": 1,
+      "what": "an enemy: five kills without falling"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_spree_6"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_spree_6",
+      "optional": true,
+      "says": "An enemy is merciless.",
+      "stereo": false,
+      "takes": 1,
+      "what": "an enemy: six kills without falling"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_spree_7"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_spree_7",
+      "optional": true,
+      "says": "An enemy is fearsome.",
+      "stereo": false,
+      "takes": 1,
+      "what": "an enemy: seven kills without falling"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_spree_8"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_spree_8",
+      "optional": true,
+      "says": "An enemy is beyond legend!",
+      "stereo": false,
+      "takes": 1,
+      "what": "an enemy: eight kills and more without falling"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.shutdown"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.shutdown",
+      "optional": true,
+      "says": "The run is broken!",
+      "stereo": false,
+      "takes": 1,
+      "what": "a champion's run of three or more ended"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.executed"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.executed",
+      "optional": true,
+      "says": "Felled by the Causeway.",
+      "stereo": false,
+      "takes": 1,
+      "what": "a champion killed by no champion (a turret, minions, the platform)"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.inhibitor_soon"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.inhibitor_soon",
+      "optional": true,
+      "says": "Your inhibitor rises soon.",
+      "stereo": false,
+      "takes": 1,
+      "what": "your inhibitor stands again in fifteen seconds"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_inhibitor_soon"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_inhibitor_soon",
+      "optional": true,
+      "says": "The enemy inhibitor rises soon.",
+      "stereo": false,
+      "takes": 1,
+      "what": "the enemy's inhibitor stands again in fifteen seconds"
+    },
+    {
+      "bus": "voice",
+      "files": [
+        "voice.enemy_inhibitor_back"
+      ],
+      "gain_db": 0.0,
+      "loop": false,
+      "name": "voice.enemy_inhibitor_back",
+      "optional": true,
+      "says": "The enemy inhibitor stands again.",
+      "stereo": false,
+      "takes": 1,
+      "what": "the enemy's inhibitor stands again"
     },
     {
       "bus": "music",
@@ -2091,6 +2527,3948 @@
       "stereo": true,
       "takes": 1,
       "what": "a loss"
+    }
+  ],
+  "voices": [
+    {
+      "bus": "champions",
+      "cast": "Vessa, the Long Watch: a woman in her thirties, a sentry with a long crossbow. Calm, dry, exact; she never raises her voice, even at the ultimate. Close-miked, little room.",
+      "champion": "Vessa",
+      "family": "steel",
+      "files": [
+        "vo.vessa.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.vessa.pick",
+      "says": [
+        "The watch is mine tonight."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vessa, the Long Watch: a woman in her thirties, a sentry with a long crossbow. Calm, dry, exact; she never raises her voice, even at the ultimate. Close-miked, little room.",
+      "champion": "Vessa",
+      "family": "steel",
+      "files": [
+        "vo.vessa.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.vessa.first_move",
+      "says": [
+        "Eyes on the far end of the bridge."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vessa, the Long Watch: a woman in her thirties, a sentry with a long crossbow. Calm, dry, exact; she never raises her voice, even at the ultimate. Close-miked, little room.",
+      "champion": "Vessa",
+      "family": "steel",
+      "files": [
+        "vo.vessa.move.1",
+        "vo.vessa.move.2",
+        "vo.vessa.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.vessa.move",
+      "says": [
+        "Moving to cover.",
+        "Keep the line.",
+        "I see further from here."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vessa, the Long Watch: a woman in her thirties, a sentry with a long crossbow. Calm, dry, exact; she never raises her voice, even at the ultimate. Close-miked, little room.",
+      "champion": "Vessa",
+      "family": "steel",
+      "files": [
+        "vo.vessa.long_move.1",
+        "vo.vessa.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.vessa.long_move",
+      "says": [
+        "Every watch ends at dawn. Not this one.",
+        "I've counted every stone of this bridge. Twice."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vessa, the Long Watch: a woman in her thirties, a sentry with a long crossbow. Calm, dry, exact; she never raises her voice, even at the ultimate. Close-miked, little room.",
+      "champion": "Vessa",
+      "family": "steel",
+      "files": [
+        "vo.vessa.attack.1",
+        "vo.vessa.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.vessa.attack",
+      "says": [
+        "In my sights.",
+        "Hold still."
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vessa, the Long Watch: a woman in her thirties, a sentry with a long crossbow. Calm, dry, exact; she never raises her voice, even at the ultimate. Close-miked, little room.",
+      "champion": "Vessa",
+      "family": "steel",
+      "files": [
+        "vo.vessa.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.vessa.encounter",
+      "says": [
+        "There. Movement on the bridge."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vessa, the Long Watch: a woman in her thirties, a sentry with a long crossbow. Calm, dry, exact; she never raises her voice, even at the ultimate. Close-miked, little room.",
+      "champion": "Vessa",
+      "family": "steel",
+      "files": [
+        "vo.vessa.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.vessa.ult_rank",
+      "says": [
+        "A longer reach."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vessa, the Long Watch: a woman in her thirties, a sentry with a long crossbow. Calm, dry, exact; she never raises her voice, even at the ultimate. Close-miked, little room.",
+      "champion": "Vessa",
+      "family": "steel",
+      "files": [
+        "vo.vessa.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.vessa.ult",
+      "says": [
+        "There's nowhere to hide!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vessa, the Long Watch: a woman in her thirties, a sentry with a long crossbow. Calm, dry, exact; she never raises her voice, even at the ultimate. Close-miked, little room.",
+      "champion": "Vessa",
+      "family": "steel",
+      "files": [
+        "vo.vessa.kill.1",
+        "vo.vessa.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.vessa.kill",
+      "says": [
+        "One less to watch.",
+        "Just as I called it."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vessa, the Long Watch: a woman in her thirties, a sentry with a long crossbow. Calm, dry, exact; she never raises her voice, even at the ultimate. Close-miked, little room.",
+      "champion": "Vessa",
+      "family": "steel",
+      "files": [
+        "vo.vessa.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.vessa.death",
+      "says": [
+        "Lost the light."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vessa, the Long Watch: a woman in her thirties, a sentry with a long crossbow. Calm, dry, exact; she never raises her voice, even at the ultimate. Close-miked, little room.",
+      "champion": "Vessa",
+      "family": "steel",
+      "files": [
+        "vo.vessa.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.vessa.respawn",
+      "says": [
+        "Back on the watch."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Orrin of the Ash Choir: a man in his fifties, a fire-priest who sings his spells. Sonorous, unhurried, a little ecstatic; warm, with the room of a hall round him.",
+      "champion": "Orrin",
+      "family": "ember",
+      "files": [
+        "vo.orrin.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.orrin.pick",
+      "says": [
+        "Our choir sings in fire and ash."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Orrin of the Ash Choir: a man in his fifties, a fire-priest who sings his spells. Sonorous, unhurried, a little ecstatic; warm, with the room of a hall round him.",
+      "champion": "Orrin",
+      "family": "ember",
+      "files": [
+        "vo.orrin.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.orrin.first_move",
+      "says": [
+        "Let the braziers hear us."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Orrin of the Ash Choir: a man in his fifties, a fire-priest who sings his spells. Sonorous, unhurried, a little ecstatic; warm, with the room of a hall round him.",
+      "champion": "Orrin",
+      "family": "ember",
+      "files": [
+        "vo.orrin.move.1",
+        "vo.orrin.move.2",
+        "vo.orrin.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.orrin.move",
+      "says": [
+        "The hymn moves on.",
+        "Walk in the warm.",
+        "Ashes to ashes."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Orrin of the Ash Choir: a man in his fifties, a fire-priest who sings his spells. Sonorous, unhurried, a little ecstatic; warm, with the room of a hall round him.",
+      "champion": "Orrin",
+      "family": "ember",
+      "files": [
+        "vo.orrin.long_move.1",
+        "vo.orrin.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.orrin.long_move",
+      "says": [
+        "We sang before the bridge was stone. We will sing after.",
+        "Every ember remembers the fire it came from."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Orrin of the Ash Choir: a man in his fifties, a fire-priest who sings his spells. Sonorous, unhurried, a little ecstatic; warm, with the room of a hall round him.",
+      "champion": "Orrin",
+      "family": "ember",
+      "files": [
+        "vo.orrin.attack.1",
+        "vo.orrin.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.orrin.attack",
+      "says": [
+        "Burn for me.",
+        "Catch fire!"
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Orrin of the Ash Choir: a man in his fifties, a fire-priest who sings his spells. Sonorous, unhurried, a little ecstatic; warm, with the room of a hall round him.",
+      "champion": "Orrin",
+      "family": "ember",
+      "files": [
+        "vo.orrin.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.orrin.encounter",
+      "says": [
+        "New voices for the choir."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Orrin of the Ash Choir: a man in his fifties, a fire-priest who sings his spells. Sonorous, unhurried, a little ecstatic; warm, with the room of a hall round him.",
+      "champion": "Orrin",
+      "family": "ember",
+      "files": [
+        "vo.orrin.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.orrin.ult_rank",
+      "says": [
+        "The hymn grows louder."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Orrin of the Ash Choir: a man in his fifties, a fire-priest who sings his spells. Sonorous, unhurried, a little ecstatic; warm, with the room of a hall round him.",
+      "champion": "Orrin",
+      "family": "ember",
+      "files": [
+        "vo.orrin.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.orrin.ult",
+      "says": [
+        "Let the heavens burn!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Orrin of the Ash Choir: a man in his fifties, a fire-priest who sings his spells. Sonorous, unhurried, a little ecstatic; warm, with the room of a hall round him.",
+      "champion": "Orrin",
+      "family": "ember",
+      "files": [
+        "vo.orrin.kill.1",
+        "vo.orrin.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.orrin.kill",
+      "says": [
+        "Sung to silence.",
+        "Ash, at last."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Orrin of the Ash Choir: a man in his fifties, a fire-priest who sings his spells. Sonorous, unhurried, a little ecstatic; warm, with the room of a hall round him.",
+      "champion": "Orrin",
+      "family": "ember",
+      "files": [
+        "vo.orrin.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.orrin.death",
+      "says": [
+        "And so, the hymn ends."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Orrin of the Ash Choir: a man in his fifties, a fire-priest who sings his spells. Sonorous, unhurried, a little ecstatic; warm, with the room of a hall round him.",
+      "champion": "Orrin",
+      "family": "ember",
+      "files": [
+        "vo.orrin.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.orrin.respawn",
+      "says": [
+        "The choir calls me back."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brakka, the Quarry: a huge man of the mountains, slow and deep; few words, each one set down like a block. Pitched down, gravel in the low end.",
+      "champion": "Brakka",
+      "family": "stone",
+      "files": [
+        "vo.brakka.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.brakka.pick",
+      "says": [
+        "Brakka stands. You break."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brakka, the Quarry: a huge man of the mountains, slow and deep; few words, each one set down like a block. Pitched down, gravel in the low end.",
+      "champion": "Brakka",
+      "family": "stone",
+      "files": [
+        "vo.brakka.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.brakka.first_move",
+      "says": [
+        "Good ground here. Hard ground."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brakka, the Quarry: a huge man of the mountains, slow and deep; few words, each one set down like a block. Pitched down, gravel in the low end.",
+      "champion": "Brakka",
+      "family": "stone",
+      "files": [
+        "vo.brakka.move.1",
+        "vo.brakka.move.2",
+        "vo.brakka.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.brakka.move",
+      "says": [
+        "Rolling.",
+        "Heavy footsteps.",
+        "Out of my way."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brakka, the Quarry: a huge man of the mountains, slow and deep; few words, each one set down like a block. Pitched down, gravel in the low end.",
+      "champion": "Brakka",
+      "family": "stone",
+      "files": [
+        "vo.brakka.long_move.1",
+        "vo.brakka.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.brakka.long_move",
+      "says": [
+        "They cut this bridge from my mountain. I walk it anyway.",
+        "Stone does not hurry. Stone arrives."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brakka, the Quarry: a huge man of the mountains, slow and deep; few words, each one set down like a block. Pitched down, gravel in the low end.",
+      "champion": "Brakka",
+      "family": "stone",
+      "files": [
+        "vo.brakka.attack.1",
+        "vo.brakka.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.brakka.attack",
+      "says": [
+        "Come here.",
+        "I crush you!"
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brakka, the Quarry: a huge man of the mountains, slow and deep; few words, each one set down like a block. Pitched down, gravel in the low end.",
+      "champion": "Brakka",
+      "family": "stone",
+      "files": [
+        "vo.brakka.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.brakka.encounter",
+      "says": [
+        "Something small. Something to break."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brakka, the Quarry: a huge man of the mountains, slow and deep; few words, each one set down like a block. Pitched down, gravel in the low end.",
+      "champion": "Brakka",
+      "family": "stone",
+      "files": [
+        "vo.brakka.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.brakka.ult_rank",
+      "says": [
+        "The mountain is waking."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brakka, the Quarry: a huge man of the mountains, slow and deep; few words, each one set down like a block. Pitched down, gravel in the low end.",
+      "champion": "Brakka",
+      "family": "stone",
+      "files": [
+        "vo.brakka.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.brakka.ult",
+      "says": [
+        "The ground is mine!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brakka, the Quarry: a huge man of the mountains, slow and deep; few words, each one set down like a block. Pitched down, gravel in the low end.",
+      "champion": "Brakka",
+      "family": "stone",
+      "files": [
+        "vo.brakka.kill.1",
+        "vo.brakka.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.brakka.kill",
+      "says": [
+        "Broken.",
+        "You are gravel."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brakka, the Quarry: a huge man of the mountains, slow and deep; few words, each one set down like a block. Pitched down, gravel in the low end.",
+      "champion": "Brakka",
+      "family": "stone",
+      "files": [
+        "vo.brakka.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.brakka.death",
+      "says": [
+        "I crumble."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brakka, the Quarry: a huge man of the mountains, slow and deep; few words, each one set down like a block. Pitched down, gravel in the low end.",
+      "champion": "Brakka",
+      "family": "stone",
+      "files": [
+        "vo.brakka.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.brakka.respawn",
+      "says": [
+        "Stone, again."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Kesh, the Quiet Knife: a man of any age, a hired blade. Half a whisper, close and dry, amused; never loud, even when he kills. A breathy double under the voice.",
+      "champion": "Kesh",
+      "family": "steel",
+      "files": [
+        "vo.kesh.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.kesh.pick",
+      "says": [
+        "No one hears the second blade."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Kesh, the Quiet Knife: a man of any age, a hired blade. Half a whisper, close and dry, amused; never loud, even when he kills. A breathy double under the voice.",
+      "champion": "Kesh",
+      "family": "steel",
+      "files": [
+        "vo.kesh.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.kesh.first_move",
+      "says": [
+        "Now, we go quietly."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Kesh, the Quiet Knife: a man of any age, a hired blade. Half a whisper, close and dry, amused; never loud, even when he kills. A breathy double under the voice.",
+      "champion": "Kesh",
+      "family": "steel",
+      "files": [
+        "vo.kesh.move.1",
+        "vo.kesh.move.2",
+        "vo.kesh.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.kesh.move",
+      "says": [
+        "Out of sight.",
+        "Softly.",
+        "Between the lights."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Kesh, the Quiet Knife: a man of any age, a hired blade. Half a whisper, close and dry, amused; never loud, even when he kills. A breathy double under the voice.",
+      "champion": "Kesh",
+      "family": "steel",
+      "files": [
+        "vo.kesh.long_move.1",
+        "vo.kesh.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.kesh.long_move",
+      "says": [
+        "I was paid in silence. I spend it well.",
+        "A quiet knife cuts deepest."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Kesh, the Quiet Knife: a man of any age, a hired blade. Half a whisper, close and dry, amused; never loud, even when he kills. A breathy double under the voice.",
+      "champion": "Kesh",
+      "family": "steel",
+      "files": [
+        "vo.kesh.attack.1",
+        "vo.kesh.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.kesh.attack",
+      "says": [
+        "There you are.",
+        "Hush now."
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Kesh, the Quiet Knife: a man of any age, a hired blade. Half a whisper, close and dry, amused; never loud, even when he kills. A breathy double under the voice.",
+      "champion": "Kesh",
+      "family": "steel",
+      "files": [
+        "vo.kesh.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.kesh.encounter",
+      "says": [
+        "I see you. You don't see me."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Kesh, the Quiet Knife: a man of any age, a hired blade. Half a whisper, close and dry, amused; never loud, even when he kills. A breathy double under the voice.",
+      "champion": "Kesh",
+      "family": "steel",
+      "files": [
+        "vo.kesh.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.kesh.ult_rank",
+      "says": [
+        "A sharper edge."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Kesh, the Quiet Knife: a man of any age, a hired blade. Half a whisper, close and dry, amused; never loud, even when he kills. A breathy double under the voice.",
+      "champion": "Kesh",
+      "family": "steel",
+      "files": [
+        "vo.kesh.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.kesh.ult",
+      "says": [
+        "Your sentence is now."
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Kesh, the Quiet Knife: a man of any age, a hired blade. Half a whisper, close and dry, amused; never loud, even when he kills. A breathy double under the voice.",
+      "champion": "Kesh",
+      "family": "steel",
+      "files": [
+        "vo.kesh.kill.1",
+        "vo.kesh.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.kesh.kill",
+      "says": [
+        "Done, and quietly.",
+        "Nothing to hear."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Kesh, the Quiet Knife: a man of any age, a hired blade. Half a whisper, close and dry, amused; never loud, even when he kills. A breathy double under the voice.",
+      "champion": "Kesh",
+      "family": "steel",
+      "files": [
+        "vo.kesh.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.kesh.death",
+      "says": [
+        "Too loud."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Kesh, the Quiet Knife: a man of any age, a hired blade. Half a whisper, close and dry, amused; never loud, even when he kills. A breathy double under the voice.",
+      "champion": "Kesh",
+      "family": "steel",
+      "files": [
+        "vo.kesh.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.kesh.respawn",
+      "says": [
+        "Back again. Quietly."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Liora, the Lantern: a woman in her forties, a keeper of lights. Warm, kind and firm, the voice that tells you you're safe. A faint bright ring on her vowels.",
+      "champion": "Liora",
+      "family": "bronze",
+      "files": [
+        "vo.liora.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.liora.pick",
+      "says": [
+        "I'll keep the light for you."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Liora, the Lantern: a woman in her forties, a keeper of lights. Warm, kind and firm, the voice that tells you you're safe. A faint bright ring on her vowels.",
+      "champion": "Liora",
+      "family": "bronze",
+      "files": [
+        "vo.liora.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.liora.first_move",
+      "says": [
+        "Stay close to the lantern."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Liora, the Lantern: a woman in her forties, a keeper of lights. Warm, kind and firm, the voice that tells you you're safe. A faint bright ring on her vowels.",
+      "champion": "Liora",
+      "family": "bronze",
+      "files": [
+        "vo.liora.move.1",
+        "vo.liora.move.2",
+        "vo.liora.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.liora.move",
+      "says": [
+        "Follow the light.",
+        "I'm with you.",
+        "Steady now."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Liora, the Lantern: a woman in her forties, a keeper of lights. Warm, kind and firm, the voice that tells you you're safe. A faint bright ring on her vowels.",
+      "champion": "Liora",
+      "family": "bronze",
+      "files": [
+        "vo.liora.long_move.1",
+        "vo.liora.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.liora.long_move",
+      "says": [
+        "Every lantern on this bridge was lit by someone who stayed.",
+        "The night is long. So is my oil."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Liora, the Lantern: a woman in her forties, a keeper of lights. Warm, kind and firm, the voice that tells you you're safe. A faint bright ring on her vowels.",
+      "champion": "Liora",
+      "family": "bronze",
+      "files": [
+        "vo.liora.attack.1",
+        "vo.liora.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.liora.attack",
+      "says": [
+        "Be still.",
+        "The light finds you."
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Liora, the Lantern: a woman in her forties, a keeper of lights. Warm, kind and firm, the voice that tells you you're safe. A faint bright ring on her vowels.",
+      "champion": "Liora",
+      "family": "bronze",
+      "files": [
+        "vo.liora.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.liora.encounter",
+      "says": [
+        "Shadows ahead. Stay near me."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Liora, the Lantern: a woman in her forties, a keeper of lights. Warm, kind and firm, the voice that tells you you're safe. A faint bright ring on her vowels.",
+      "champion": "Liora",
+      "family": "bronze",
+      "files": [
+        "vo.liora.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.liora.ult_rank",
+      "says": [
+        "The flame burns brighter."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Liora, the Lantern: a woman in her forties, a keeper of lights. Warm, kind and firm, the voice that tells you you're safe. A faint bright ring on her vowels.",
+      "champion": "Liora",
+      "family": "bronze",
+      "files": [
+        "vo.liora.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.liora.ult",
+      "says": [
+        "Stand in the light!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Liora, the Lantern: a woman in her forties, a keeper of lights. Warm, kind and firm, the voice that tells you you're safe. A faint bright ring on her vowels.",
+      "champion": "Liora",
+      "family": "bronze",
+      "files": [
+        "vo.liora.kill.1",
+        "vo.liora.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.liora.kill",
+      "says": [
+        "Rest now.",
+        "Go gently."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Liora, the Lantern: a woman in her forties, a keeper of lights. Warm, kind and firm, the voice that tells you you're safe. A faint bright ring on her vowels.",
+      "champion": "Liora",
+      "family": "bronze",
+      "files": [
+        "vo.liora.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.liora.death",
+      "says": [
+        "The light dims."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Liora, the Lantern: a woman in her forties, a keeper of lights. Warm, kind and firm, the voice that tells you you're safe. A faint bright ring on her vowels.",
+      "champion": "Liora",
+      "family": "bronze",
+      "files": [
+        "vo.liora.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.liora.respawn",
+      "says": [
+        "The lantern is relit."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Talmar, the Tidewarden: a big man in his forties, a sea-warden, booming and cheerful, used to shouting over surf. A slow chorus on him, like water moving.",
+      "champion": "Talmar",
+      "family": "tide",
+      "files": [
+        "vo.talmar.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.talmar.pick",
+      "says": [
+        "The tide answers to me."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Talmar, the Tidewarden: a big man in his forties, a sea-warden, booming and cheerful, used to shouting over surf. A slow chorus on him, like water moving.",
+      "champion": "Talmar",
+      "family": "tide",
+      "files": [
+        "vo.talmar.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.talmar.first_move",
+      "says": [
+        "Smell that? The sea, far below."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Talmar, the Tidewarden: a big man in his forties, a sea-warden, booming and cheerful, used to shouting over surf. A slow chorus on him, like water moving.",
+      "champion": "Talmar",
+      "family": "tide",
+      "files": [
+        "vo.talmar.move.1",
+        "vo.talmar.move.2",
+        "vo.talmar.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.talmar.move",
+      "says": [
+        "With the current.",
+        "Rolling in.",
+        "The tide's turning."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Talmar, the Tidewarden: a big man in his forties, a sea-warden, booming and cheerful, used to shouting over surf. A slow chorus on him, like water moving.",
+      "champion": "Talmar",
+      "family": "tide",
+      "files": [
+        "vo.talmar.long_move.1",
+        "vo.talmar.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.talmar.long_move",
+      "says": [
+        "The sea took the old bridge. It'll take this one too, in time.",
+        "I've stood watch over worse water than this."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Talmar, the Tidewarden: a big man in his forties, a sea-warden, booming and cheerful, used to shouting over surf. A slow chorus on him, like water moving.",
+      "champion": "Talmar",
+      "family": "tide",
+      "files": [
+        "vo.talmar.attack.1",
+        "vo.talmar.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.talmar.attack",
+      "says": [
+        "Overboard with you!",
+        "Wash out!"
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Talmar, the Tidewarden: a big man in his forties, a sea-warden, booming and cheerful, used to shouting over surf. A slow chorus on him, like water moving.",
+      "champion": "Talmar",
+      "family": "tide",
+      "files": [
+        "vo.talmar.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.talmar.encounter",
+      "says": [
+        "Sails on the horizon!"
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Talmar, the Tidewarden: a big man in his forties, a sea-warden, booming and cheerful, used to shouting over surf. A slow chorus on him, like water moving.",
+      "champion": "Talmar",
+      "family": "tide",
+      "files": [
+        "vo.talmar.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.talmar.ult_rank",
+      "says": [
+        "The deep rises."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Talmar, the Tidewarden: a big man in his forties, a sea-warden, booming and cheerful, used to shouting over surf. A slow chorus on him, like water moving.",
+      "champion": "Talmar",
+      "family": "tide",
+      "files": [
+        "vo.talmar.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.talmar.ult",
+      "says": [
+        "Into the deep!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Talmar, the Tidewarden: a big man in his forties, a sea-warden, booming and cheerful, used to shouting over surf. A slow chorus on him, like water moving.",
+      "champion": "Talmar",
+      "family": "tide",
+      "files": [
+        "vo.talmar.kill.1",
+        "vo.talmar.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.talmar.kill",
+      "says": [
+        "Swept away.",
+        "The tide's out for you."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Talmar, the Tidewarden: a big man in his forties, a sea-warden, booming and cheerful, used to shouting over surf. A slow chorus on him, like water moving.",
+      "champion": "Talmar",
+      "family": "tide",
+      "files": [
+        "vo.talmar.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.talmar.death",
+      "says": [
+        "Pulled under."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Talmar, the Tidewarden: a big man in his forties, a sea-warden, booming and cheerful, used to shouting over surf. A slow chorus on him, like water moving.",
+      "champion": "Talmar",
+      "family": "tide",
+      "files": [
+        "vo.talmar.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.talmar.respawn",
+      "says": [
+        "High tide again."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Seren, the Quiet Star: a fallen star in a woman's shape, ageless. Soft, distant, a little sad; she speaks as if from far above. A shimmer an octave up, a long bright room.",
+      "champion": "Seren",
+      "family": "dusk",
+      "files": [
+        "vo.seren.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.seren.pick",
+      "says": [
+        "I fell so that you could look up."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Seren, the Quiet Star: a fallen star in a woman's shape, ageless. Soft, distant, a little sad; she speaks as if from far above. A shimmer an octave up, a long bright room.",
+      "champion": "Seren",
+      "family": "dusk",
+      "files": [
+        "vo.seren.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.seren.first_move",
+      "says": [
+        "The sky is listening."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Seren, the Quiet Star: a fallen star in a woman's shape, ageless. Soft, distant, a little sad; she speaks as if from far above. A shimmer an octave up, a long bright room.",
+      "champion": "Seren",
+      "family": "dusk",
+      "files": [
+        "vo.seren.move.1",
+        "vo.seren.move.2",
+        "vo.seren.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.seren.move",
+      "says": [
+        "Drifting.",
+        "As the stars turn.",
+        "Quietly."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Seren, the Quiet Star: a fallen star in a woman's shape, ageless. Soft, distant, a little sad; she speaks as if from far above. A shimmer an octave up, a long bright room.",
+      "champion": "Seren",
+      "family": "dusk",
+      "files": [
+        "vo.seren.long_move.1",
+        "vo.seren.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.seren.long_move",
+      "says": [
+        "Every star is a door left open.",
+        "I have watched this bridge from very far away."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Seren, the Quiet Star: a fallen star in a woman's shape, ageless. Soft, distant, a little sad; she speaks as if from far above. A shimmer an octave up, a long bright room.",
+      "champion": "Seren",
+      "family": "dusk",
+      "files": [
+        "vo.seren.attack.1",
+        "vo.seren.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.seren.attack",
+      "says": [
+        "Fade away.",
+        "Your light dims."
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Seren, the Quiet Star: a fallen star in a woman's shape, ageless. Soft, distant, a little sad; she speaks as if from far above. A shimmer an octave up, a long bright room.",
+      "champion": "Seren",
+      "family": "dusk",
+      "files": [
+        "vo.seren.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.seren.encounter",
+      "says": [
+        "Small lights, burning so brightly."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Seren, the Quiet Star: a fallen star in a woman's shape, ageless. Soft, distant, a little sad; she speaks as if from far above. A shimmer an octave up, a long bright room.",
+      "champion": "Seren",
+      "family": "dusk",
+      "files": [
+        "vo.seren.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.seren.ult_rank",
+      "says": [
+        "The sky draws nearer."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Seren, the Quiet Star: a fallen star in a woman's shape, ageless. Soft, distant, a little sad; she speaks as if from far above. A shimmer an octave up, a long bright room.",
+      "champion": "Seren",
+      "family": "dusk",
+      "files": [
+        "vo.seren.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.seren.ult",
+      "says": [
+        "Look to the sky!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Seren, the Quiet Star: a fallen star in a woman's shape, ageless. Soft, distant, a little sad; she speaks as if from far above. A shimmer an octave up, a long bright room.",
+      "champion": "Seren",
+      "family": "dusk",
+      "files": [
+        "vo.seren.kill.1",
+        "vo.seren.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.seren.kill",
+      "says": [
+        "Another light goes out.",
+        "Gone to the dark."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Seren, the Quiet Star: a fallen star in a woman's shape, ageless. Soft, distant, a little sad; she speaks as if from far above. A shimmer an octave up, a long bright room.",
+      "champion": "Seren",
+      "family": "dusk",
+      "files": [
+        "vo.seren.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.seren.death",
+      "says": [
+        "Falling again."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Seren, the Quiet Star: a fallen star in a woman's shape, ageless. Soft, distant, a little sad; she speaks as if from far above. A shimmer an octave up, a long bright room.",
+      "champion": "Seren",
+      "family": "dusk",
+      "files": [
+        "vo.seren.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.seren.respawn",
+      "says": [
+        "I rise again."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Hollis, the Bell Warden: an old man, deep and steady, a voice that has called the hours for fifty years. Unhurried even at the ultimate. A bronze resonance under him.",
+      "champion": "Hollis",
+      "family": "bronze",
+      "files": [
+        "vo.hollis.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.hollis.pick",
+      "says": [
+        "The bell rings for us."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Hollis, the Bell Warden: an old man, deep and steady, a voice that has called the hours for fifty years. Unhurried even at the ultimate. A bronze resonance under him.",
+      "champion": "Hollis",
+      "family": "bronze",
+      "files": [
+        "vo.hollis.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.hollis.first_move",
+      "says": [
+        "Ring out, and hold."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Hollis, the Bell Warden: an old man, deep and steady, a voice that has called the hours for fifty years. Unhurried even at the ultimate. A bronze resonance under him.",
+      "champion": "Hollis",
+      "family": "bronze",
+      "files": [
+        "vo.hollis.move.1",
+        "vo.hollis.move.2",
+        "vo.hollis.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.hollis.move",
+      "says": [
+        "Right on the hour.",
+        "Steady as bronze.",
+        "Keep time."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Hollis, the Bell Warden: an old man, deep and steady, a voice that has called the hours for fifty years. Unhurried even at the ultimate. A bronze resonance under him.",
+      "champion": "Hollis",
+      "family": "bronze",
+      "files": [
+        "vo.hollis.long_move.1",
+        "vo.hollis.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.hollis.long_move",
+      "says": [
+        "A bell does not fight. It reminds.",
+        "I have rung the hours of every watch on this bridge."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Hollis, the Bell Warden: an old man, deep and steady, a voice that has called the hours for fifty years. Unhurried even at the ultimate. A bronze resonance under him.",
+      "champion": "Hollis",
+      "family": "bronze",
+      "files": [
+        "vo.hollis.attack.1",
+        "vo.hollis.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.hollis.attack",
+      "says": [
+        "Hear the bell toll.",
+        "Ring out!"
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Hollis, the Bell Warden: an old man, deep and steady, a voice that has called the hours for fifty years. Unhurried even at the ultimate. A bronze resonance under him.",
+      "champion": "Hollis",
+      "family": "bronze",
+      "files": [
+        "vo.hollis.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.hollis.encounter",
+      "says": [
+        "Strangers at the gate."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Hollis, the Bell Warden: an old man, deep and steady, a voice that has called the hours for fifty years. Unhurried even at the ultimate. A bronze resonance under him.",
+      "champion": "Hollis",
+      "family": "bronze",
+      "files": [
+        "vo.hollis.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.hollis.ult_rank",
+      "says": [
+        "Louder, old bell."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Hollis, the Bell Warden: an old man, deep and steady, a voice that has called the hours for fifty years. Unhurried even at the ultimate. A bronze resonance under him.",
+      "champion": "Hollis",
+      "family": "bronze",
+      "files": [
+        "vo.hollis.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.hollis.ult",
+      "says": [
+        "Hold the bell!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Hollis, the Bell Warden: an old man, deep and steady, a voice that has called the hours for fifty years. Unhurried even at the ultimate. A bronze resonance under him.",
+      "champion": "Hollis",
+      "family": "bronze",
+      "files": [
+        "vo.hollis.kill.1",
+        "vo.hollis.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.hollis.kill",
+      "says": [
+        "Your hour is rung.",
+        "The bell tolls for you."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Hollis, the Bell Warden: an old man, deep and steady, a voice that has called the hours for fifty years. Unhurried even at the ultimate. A bronze resonance under him.",
+      "champion": "Hollis",
+      "family": "bronze",
+      "files": [
+        "vo.hollis.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.hollis.death",
+      "says": [
+        "The bell falls silent."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Hollis, the Bell Warden: an old man, deep and steady, a voice that has called the hours for fifty years. Unhurried even at the ultimate. A bronze resonance under him.",
+      "champion": "Hollis",
+      "family": "bronze",
+      "files": [
+        "vo.hollis.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.hollis.respawn",
+      "says": [
+        "The bell rings again."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vire, the Ashen Blade: a woman in her thirties, the last of a burned order of judges. Hard, clipped, contemptuous; fierce at the verdict. Dry, a little grit in the top.",
+      "champion": "Vire",
+      "family": "steel",
+      "files": [
+        "vo.vire.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.vire.pick",
+      "says": [
+        "My blade has a verdict for you."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vire, the Ashen Blade: a woman in her thirties, the last of a burned order of judges. Hard, clipped, contemptuous; fierce at the verdict. Dry, a little grit in the top.",
+      "champion": "Vire",
+      "family": "steel",
+      "files": [
+        "vo.vire.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.vire.first_move",
+      "says": [
+        "Ash on the wind. Good."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vire, the Ashen Blade: a woman in her thirties, the last of a burned order of judges. Hard, clipped, contemptuous; fierce at the verdict. Dry, a little grit in the top.",
+      "champion": "Vire",
+      "family": "steel",
+      "files": [
+        "vo.vire.move.1",
+        "vo.vire.move.2",
+        "vo.vire.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.vire.move",
+      "says": [
+        "Pressing on.",
+        "Closing.",
+        "Blade ready."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vire, the Ashen Blade: a woman in her thirties, the last of a burned order of judges. Hard, clipped, contemptuous; fierce at the verdict. Dry, a little grit in the top.",
+      "champion": "Vire",
+      "family": "steel",
+      "files": [
+        "vo.vire.long_move.1",
+        "vo.vire.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.vire.long_move",
+      "says": [
+        "They burned my order. I kept the blade.",
+        "Judgment doesn't need a court."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vire, the Ashen Blade: a woman in her thirties, the last of a burned order of judges. Hard, clipped, contemptuous; fierce at the verdict. Dry, a little grit in the top.",
+      "champion": "Vire",
+      "family": "steel",
+      "files": [
+        "vo.vire.attack.1",
+        "vo.vire.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.vire.attack",
+      "says": [
+        "Face me!",
+        "Cut down!"
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vire, the Ashen Blade: a woman in her thirties, the last of a burned order of judges. Hard, clipped, contemptuous; fierce at the verdict. Dry, a little grit in the top.",
+      "champion": "Vire",
+      "family": "steel",
+      "files": [
+        "vo.vire.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.vire.encounter",
+      "says": [
+        "The accused approach."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vire, the Ashen Blade: a woman in her thirties, the last of a burned order of judges. Hard, clipped, contemptuous; fierce at the verdict. Dry, a little grit in the top.",
+      "champion": "Vire",
+      "family": "steel",
+      "files": [
+        "vo.vire.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.vire.ult_rank",
+      "says": [
+        "Judgment sharpens."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vire, the Ashen Blade: a woman in her thirties, the last of a burned order of judges. Hard, clipped, contemptuous; fierce at the verdict. Dry, a little grit in the top.",
+      "champion": "Vire",
+      "family": "steel",
+      "files": [
+        "vo.vire.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.vire.ult",
+      "says": [
+        "You are guilty!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vire, the Ashen Blade: a woman in her thirties, the last of a burned order of judges. Hard, clipped, contemptuous; fierce at the verdict. Dry, a little grit in the top.",
+      "champion": "Vire",
+      "family": "steel",
+      "files": [
+        "vo.vire.kill.1",
+        "vo.vire.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.vire.kill",
+      "says": [
+        "You have been judged.",
+        "Sentence carried out."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vire, the Ashen Blade: a woman in her thirties, the last of a burned order of judges. Hard, clipped, contemptuous; fierce at the verdict. Dry, a little grit in the top.",
+      "champion": "Vire",
+      "family": "steel",
+      "files": [
+        "vo.vire.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.vire.death",
+      "says": [
+        "This isn't finished."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Vire, the Ashen Blade: a woman in her thirties, the last of a burned order of judges. Hard, clipped, contemptuous; fierce at the verdict. Dry, a little grit in the top.",
+      "champion": "Vire",
+      "family": "steel",
+      "files": [
+        "vo.vire.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.vire.respawn",
+      "says": [
+        "The blade returns."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Oda of the Long Road: an old woman, a wanderer and healer; warm, wry, patient, a little out of breath from the walking. Close and natural, a soft bronze ring.",
+      "champion": "Oda",
+      "family": "bronze",
+      "files": [
+        "vo.oda.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.oda.pick",
+      "says": [
+        "Every road leads here, sooner or later."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Oda of the Long Road: an old woman, a wanderer and healer; warm, wry, patient, a little out of breath from the walking. Close and natural, a soft bronze ring.",
+      "champion": "Oda",
+      "family": "bronze",
+      "files": [
+        "vo.oda.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.oda.first_move",
+      "says": [
+        "One more step on the long road."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Oda of the Long Road: an old woman, a wanderer and healer; warm, wry, patient, a little out of breath from the walking. Close and natural, a soft bronze ring.",
+      "champion": "Oda",
+      "family": "bronze",
+      "files": [
+        "vo.oda.move.1",
+        "vo.oda.move.2",
+        "vo.oda.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.oda.move",
+      "says": [
+        "Onward.",
+        "Mind the stones.",
+        "The road goes on."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Oda of the Long Road: an old woman, a wanderer and healer; warm, wry, patient, a little out of breath from the walking. Close and natural, a soft bronze ring.",
+      "champion": "Oda",
+      "family": "bronze",
+      "files": [
+        "vo.oda.long_move.1",
+        "vo.oda.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.oda.long_move",
+      "says": [
+        "I've walked further than this bridge is long, and back again.",
+        "A good road remembers who walked it."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Oda of the Long Road: an old woman, a wanderer and healer; warm, wry, patient, a little out of breath from the walking. Close and natural, a soft bronze ring.",
+      "champion": "Oda",
+      "family": "bronze",
+      "files": [
+        "vo.oda.attack.1",
+        "vo.oda.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.oda.attack",
+      "says": [
+        "Stay right there.",
+        "Off the road!"
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Oda of the Long Road: an old woman, a wanderer and healer; warm, wry, patient, a little out of breath from the walking. Close and natural, a soft bronze ring.",
+      "champion": "Oda",
+      "family": "bronze",
+      "files": [
+        "vo.oda.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.oda.encounter",
+      "says": [
+        "Travellers. Not friendly ones."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Oda of the Long Road: an old woman, a wanderer and healer; warm, wry, patient, a little out of breath from the walking. Close and natural, a soft bronze ring.",
+      "champion": "Oda",
+      "family": "bronze",
+      "files": [
+        "vo.oda.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.oda.ult_rank",
+      "says": [
+        "The road grows longer."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Oda of the Long Road: an old woman, a wanderer and healer; warm, wry, patient, a little out of breath from the walking. Close and natural, a soft bronze ring.",
+      "champion": "Oda",
+      "family": "bronze",
+      "files": [
+        "vo.oda.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.oda.ult",
+      "says": [
+        "Walk with me!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Oda of the Long Road: an old woman, a wanderer and healer; warm, wry, patient, a little out of breath from the walking. Close and natural, a soft bronze ring.",
+      "champion": "Oda",
+      "family": "bronze",
+      "files": [
+        "vo.oda.kill.1",
+        "vo.oda.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.oda.kill",
+      "says": [
+        "Your road ends here.",
+        "Rest by the wayside."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Oda of the Long Road: an old woman, a wanderer and healer; warm, wry, patient, a little out of breath from the walking. Close and natural, a soft bronze ring.",
+      "champion": "Oda",
+      "family": "bronze",
+      "files": [
+        "vo.oda.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.oda.death",
+      "says": [
+        "The road goes on without me."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Oda of the Long Road: an old woman, a wanderer and healer; warm, wry, patient, a little out of breath from the walking. Close and natural, a soft bronze ring.",
+      "champion": "Oda",
+      "family": "bronze",
+      "files": [
+        "vo.oda.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.oda.respawn",
+      "says": [
+        "Back on the road."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Marret, the Gunwright: a man in his forties, a gunsmith who tests his own work. Gruff, wry, matter-of-fact; pleased by a good shot. Dry and close.",
+      "champion": "Marret",
+      "family": "steel",
+      "files": [
+        "vo.marret.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.marret.pick",
+      "says": [
+        "Loaded, oiled and ready to fire."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Marret, the Gunwright: a man in his forties, a gunsmith who tests his own work. Gruff, wry, matter-of-fact; pleased by a good shot. Dry and close.",
+      "champion": "Marret",
+      "family": "steel",
+      "files": [
+        "vo.marret.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.marret.first_move",
+      "says": [
+        "Let's see what this barrel can do."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Marret, the Gunwright: a man in his forties, a gunsmith who tests his own work. Gruff, wry, matter-of-fact; pleased by a good shot. Dry and close.",
+      "champion": "Marret",
+      "family": "steel",
+      "files": [
+        "vo.marret.move.1",
+        "vo.marret.move.2",
+        "vo.marret.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.marret.move",
+      "says": [
+        "Reloading on the move.",
+        "Keep the powder dry.",
+        "Walking."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Marret, the Gunwright: a man in his forties, a gunsmith who tests his own work. Gruff, wry, matter-of-fact; pleased by a good shot. Dry and close.",
+      "champion": "Marret",
+      "family": "steel",
+      "files": [
+        "vo.marret.long_move.1",
+        "vo.marret.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.marret.long_move",
+      "says": [
+        "I built every gun I carry. Named none of them.",
+        "Brass is cheap. Good aim isn't."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Marret, the Gunwright: a man in his forties, a gunsmith who tests his own work. Gruff, wry, matter-of-fact; pleased by a good shot. Dry and close.",
+      "champion": "Marret",
+      "family": "steel",
+      "files": [
+        "vo.marret.attack.1",
+        "vo.marret.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.marret.attack",
+      "says": [
+        "Lining it up.",
+        "Bang, bang."
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Marret, the Gunwright: a man in his forties, a gunsmith who tests his own work. Gruff, wry, matter-of-fact; pleased by a good shot. Dry and close.",
+      "champion": "Marret",
+      "family": "steel",
+      "files": [
+        "vo.marret.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.marret.encounter",
+      "says": [
+        "Targets, down range."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Marret, the Gunwright: a man in his forties, a gunsmith who tests his own work. Gruff, wry, matter-of-fact; pleased by a good shot. Dry and close.",
+      "champion": "Marret",
+      "family": "steel",
+      "files": [
+        "vo.marret.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.marret.ult_rank",
+      "says": [
+        "Bigger guns."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Marret, the Gunwright: a man in his forties, a gunsmith who tests his own work. Gruff, wry, matter-of-fact; pleased by a good shot. Dry and close.",
+      "champion": "Marret",
+      "family": "steel",
+      "files": [
+        "vo.marret.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.marret.ult",
+      "says": [
+        "All barrels, fire!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Marret, the Gunwright: a man in his forties, a gunsmith who tests his own work. Gruff, wry, matter-of-fact; pleased by a good shot. Dry and close.",
+      "champion": "Marret",
+      "family": "steel",
+      "files": [
+        "vo.marret.kill.1",
+        "vo.marret.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.marret.kill",
+      "says": [
+        "Spent, like the brass.",
+        "That's one for the ledger."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Marret, the Gunwright: a man in his forties, a gunsmith who tests his own work. Gruff, wry, matter-of-fact; pleased by a good shot. Dry and close.",
+      "champion": "Marret",
+      "family": "steel",
+      "files": [
+        "vo.marret.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.marret.death",
+      "says": [
+        "The gun's jammed."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Marret, the Gunwright: a man in his forties, a gunsmith who tests his own work. Gruff, wry, matter-of-fact; pleased by a good shot. Dry and close.",
+      "champion": "Marret",
+      "family": "steel",
+      "files": [
+        "vo.marret.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.marret.respawn",
+      "says": [
+        "Fresh powder."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Nimra, the Frostglass: a young woman, a glass-maker who works in ice. Cool, crisp and precise, a little haughty. A glassy shimmer an octave up, very light.",
+      "champion": "Nimra",
+      "family": "frost",
+      "files": [
+        "vo.nimra.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.nimra.pick",
+      "says": [
+        "Clear as glass, and just as cold."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Nimra, the Frostglass: a young woman, a glass-maker who works in ice. Cool, crisp and precise, a little haughty. A glassy shimmer an octave up, very light.",
+      "champion": "Nimra",
+      "family": "frost",
+      "files": [
+        "vo.nimra.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.nimra.first_move",
+      "says": [
+        "The air is thin and cold. Lovely."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Nimra, the Frostglass: a young woman, a glass-maker who works in ice. Cool, crisp and precise, a little haughty. A glassy shimmer an octave up, very light.",
+      "champion": "Nimra",
+      "family": "frost",
+      "files": [
+        "vo.nimra.move.1",
+        "vo.nimra.move.2",
+        "vo.nimra.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.nimra.move",
+      "says": [
+        "Gliding.",
+        "Mind the frost.",
+        "Clear as crystal."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Nimra, the Frostglass: a young woman, a glass-maker who works in ice. Cool, crisp and precise, a little haughty. A glassy shimmer an octave up, very light.",
+      "champion": "Nimra",
+      "family": "frost",
+      "files": [
+        "vo.nimra.long_move.1",
+        "vo.nimra.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.nimra.long_move",
+      "says": [
+        "Glass remembers every crack. So do I.",
+        "Winter isn't cruel. It's honest."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Nimra, the Frostglass: a young woman, a glass-maker who works in ice. Cool, crisp and precise, a little haughty. A glassy shimmer an octave up, very light.",
+      "champion": "Nimra",
+      "family": "frost",
+      "files": [
+        "vo.nimra.attack.1",
+        "vo.nimra.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.nimra.attack",
+      "says": [
+        "Freeze.",
+        "Shatter like glass."
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Nimra, the Frostglass: a young woman, a glass-maker who works in ice. Cool, crisp and precise, a little haughty. A glassy shimmer an octave up, very light.",
+      "champion": "Nimra",
+      "family": "frost",
+      "files": [
+        "vo.nimra.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.nimra.encounter",
+      "says": [
+        "Warm blood. How quaint."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Nimra, the Frostglass: a young woman, a glass-maker who works in ice. Cool, crisp and precise, a little haughty. A glassy shimmer an octave up, very light.",
+      "champion": "Nimra",
+      "family": "frost",
+      "files": [
+        "vo.nimra.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.nimra.ult_rank",
+      "says": [
+        "The cold deepens."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Nimra, the Frostglass: a young woman, a glass-maker who works in ice. Cool, crisp and precise, a little haughty. A glassy shimmer an octave up, very light.",
+      "champion": "Nimra",
+      "family": "frost",
+      "files": [
+        "vo.nimra.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.nimra.ult",
+      "says": [
+        "Into the whiteout!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Nimra, the Frostglass: a young woman, a glass-maker who works in ice. Cool, crisp and precise, a little haughty. A glassy shimmer an octave up, very light.",
+      "champion": "Nimra",
+      "family": "frost",
+      "files": [
+        "vo.nimra.kill.1",
+        "vo.nimra.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.nimra.kill",
+      "says": [
+        "Frozen still.",
+        "Brittle as glass."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Nimra, the Frostglass: a young woman, a glass-maker who works in ice. Cool, crisp and precise, a little haughty. A glassy shimmer an octave up, very light.",
+      "champion": "Nimra",
+      "family": "frost",
+      "files": [
+        "vo.nimra.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.nimra.death",
+      "says": [
+        "Broken glass."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Nimra, the Frostglass: a young woman, a glass-maker who works in ice. Cool, crisp and precise, a little haughty. A glassy shimmer an octave up, very light.",
+      "champion": "Nimra",
+      "family": "frost",
+      "files": [
+        "vo.nimra.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.nimra.respawn",
+      "says": [
+        "Whole again."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Gorum, the Old Ox: a very old, very big man, a beast of burden who stood up. The deepest and slowest voice of the twenty; kind, stubborn. Pitched down, felt in the chest.",
+      "champion": "Gorum",
+      "family": "stone",
+      "files": [
+        "vo.gorum.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.gorum.pick",
+      "says": [
+        "Old. Not done."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Gorum, the Old Ox: a very old, very big man, a beast of burden who stood up. The deepest and slowest voice of the twenty; kind, stubborn. Pitched down, felt in the chest.",
+      "champion": "Gorum",
+      "family": "stone",
+      "files": [
+        "vo.gorum.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.gorum.first_move",
+      "says": [
+        "A long field."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Gorum, the Old Ox: a very old, very big man, a beast of burden who stood up. The deepest and slowest voice of the twenty; kind, stubborn. Pitched down, felt in the chest.",
+      "champion": "Gorum",
+      "family": "stone",
+      "files": [
+        "vo.gorum.move.1",
+        "vo.gorum.move.2",
+        "vo.gorum.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.gorum.move",
+      "says": [
+        "Plodding on.",
+        "Hooves on stone.",
+        "Slow, and sure."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Gorum, the Old Ox: a very old, very big man, a beast of burden who stood up. The deepest and slowest voice of the twenty; kind, stubborn. Pitched down, felt in the chest.",
+      "champion": "Gorum",
+      "family": "stone",
+      "files": [
+        "vo.gorum.long_move.1",
+        "vo.gorum.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.gorum.long_move",
+      "says": [
+        "I've pulled heavier loads than this bridge.",
+        "The young ones run. The old ones arrive."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Gorum, the Old Ox: a very old, very big man, a beast of burden who stood up. The deepest and slowest voice of the twenty; kind, stubborn. Pitched down, felt in the chest.",
+      "champion": "Gorum",
+      "family": "stone",
+      "files": [
+        "vo.gorum.attack.1",
+        "vo.gorum.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.gorum.attack",
+      "says": [
+        "Take the horns!",
+        "Out of my field."
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Gorum, the Old Ox: a very old, very big man, a beast of burden who stood up. The deepest and slowest voice of the twenty; kind, stubborn. Pitched down, felt in the chest.",
+      "champion": "Gorum",
+      "family": "stone",
+      "files": [
+        "vo.gorum.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.gorum.encounter",
+      "says": [
+        "Ah. Company."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Gorum, the Old Ox: a very old, very big man, a beast of burden who stood up. The deepest and slowest voice of the twenty; kind, stubborn. Pitched down, felt in the chest.",
+      "champion": "Gorum",
+      "family": "stone",
+      "files": [
+        "vo.gorum.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.gorum.ult_rank",
+      "says": [
+        "Still standing."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Gorum, the Old Ox: a very old, very big man, a beast of burden who stood up. The deepest and slowest voice of the twenty; kind, stubborn. Pitched down, felt in the chest.",
+      "champion": "Gorum",
+      "family": "stone",
+      "files": [
+        "vo.gorum.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.gorum.ult",
+      "says": [
+        "Nothing breaks me!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Gorum, the Old Ox: a very old, very big man, a beast of burden who stood up. The deepest and slowest voice of the twenty; kind, stubborn. Pitched down, felt in the chest.",
+      "champion": "Gorum",
+      "family": "stone",
+      "files": [
+        "vo.gorum.kill.1",
+        "vo.gorum.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.gorum.kill",
+      "says": [
+        "Trampled flat.",
+        "Stay down."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Gorum, the Old Ox: a very old, very big man, a beast of burden who stood up. The deepest and slowest voice of the twenty; kind, stubborn. Pitched down, felt in the chest.",
+      "champion": "Gorum",
+      "family": "stone",
+      "files": [
+        "vo.gorum.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.gorum.death",
+      "says": [
+        "Rest, at last."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Gorum, the Old Ox: a very old, very big man, a beast of burden who stood up. The deepest and slowest voice of the twenty; kind, stubborn. Pitched down, felt in the chest.",
+      "champion": "Gorum",
+      "family": "stone",
+      "files": [
+        "vo.gorum.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.gorum.respawn",
+      "says": [
+        "Back to the yoke."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sable, the Night Courier: a woman in her twenties, a courier of curses. Smooth, sly, amused, quick. A dark octave-down double under her, a little night air.",
+      "champion": "Sable",
+      "family": "dusk",
+      "files": [
+        "vo.sable.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.sable.pick",
+      "says": [
+        "Special delivery."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sable, the Night Courier: a woman in her twenties, a courier of curses. Smooth, sly, amused, quick. A dark octave-down double under her, a little night air.",
+      "champion": "Sable",
+      "family": "dusk",
+      "files": [
+        "vo.sable.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.sable.first_move",
+      "says": [
+        "The night's young. So are they."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sable, the Night Courier: a woman in her twenties, a courier of curses. Smooth, sly, amused, quick. A dark octave-down double under her, a little night air.",
+      "champion": "Sable",
+      "family": "dusk",
+      "files": [
+        "vo.sable.move.1",
+        "vo.sable.move.2",
+        "vo.sable.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.sable.move",
+      "says": [
+        "On my route.",
+        "Through the shade.",
+        "Swift and silent."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sable, the Night Courier: a woman in her twenties, a courier of curses. Smooth, sly, amused, quick. A dark octave-down double under her, a little night air.",
+      "champion": "Sable",
+      "family": "dusk",
+      "files": [
+        "vo.sable.long_move.1",
+        "vo.sable.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.sable.long_move",
+      "says": [
+        "I've never lost a letter. Or a mark.",
+        "The night carries everything, if you know how to ask."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sable, the Night Courier: a woman in her twenties, a courier of curses. Smooth, sly, amused, quick. A dark octave-down double under her, a little night air.",
+      "champion": "Sable",
+      "family": "dusk",
+      "files": [
+        "vo.sable.attack.1",
+        "vo.sable.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.sable.attack",
+      "says": [
+        "Signed for.",
+        "You're hexed."
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sable, the Night Courier: a woman in her twenties, a courier of curses. Smooth, sly, amused, quick. A dark octave-down double under her, a little night air.",
+      "champion": "Sable",
+      "family": "dusk",
+      "files": [
+        "vo.sable.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.sable.encounter",
+      "says": [
+        "A name on my list."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sable, the Night Courier: a woman in her twenties, a courier of curses. Smooth, sly, amused, quick. A dark octave-down double under her, a little night air.",
+      "champion": "Sable",
+      "family": "dusk",
+      "files": [
+        "vo.sable.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.sable.ult_rank",
+      "says": [
+        "The night grows longer."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sable, the Night Courier: a woman in her twenties, a courier of curses. Smooth, sly, amused, quick. A dark octave-down double under her, a little night air.",
+      "champion": "Sable",
+      "family": "dusk",
+      "files": [
+        "vo.sable.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.sable.ult",
+      "says": [
+        "This is the dark hour."
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sable, the Night Courier: a woman in her twenties, a courier of curses. Smooth, sly, amused, quick. A dark octave-down double under her, a little night air.",
+      "champion": "Sable",
+      "family": "dusk",
+      "files": [
+        "vo.sable.kill.1",
+        "vo.sable.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.sable.kill",
+      "says": [
+        "Delivered.",
+        "Return to sender."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sable, the Night Courier: a woman in her twenties, a courier of curses. Smooth, sly, amused, quick. A dark octave-down double under her, a little night air.",
+      "champion": "Sable",
+      "family": "dusk",
+      "files": [
+        "vo.sable.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.sable.death",
+      "says": [
+        "Lost in the post."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sable, the Night Courier: a woman in her twenties, a courier of curses. Smooth, sly, amused, quick. A dark octave-down double under her, a little night air.",
+      "champion": "Sable",
+      "family": "dusk",
+      "files": [
+        "vo.sable.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.sable.respawn",
+      "says": [
+        "Back on the route."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Pell, the Hedge Knight: a young man, a knight with no lord, earnest and brave and a little too loud. Bright, open; a bronze ring on the battle cries.",
+      "champion": "Pell",
+      "family": "bronze",
+      "files": [
+        "vo.pell.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.pell.pick",
+      "says": [
+        "No lord, no lands, but a good shield!"
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Pell, the Hedge Knight: a young man, a knight with no lord, earnest and brave and a little too loud. Bright, open; a bronze ring on the battle cries.",
+      "champion": "Pell",
+      "family": "bronze",
+      "files": [
+        "vo.pell.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.pell.first_move",
+      "says": [
+        "Banner up! Let's ride."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Pell, the Hedge Knight: a young man, a knight with no lord, earnest and brave and a little too loud. Bright, open; a bronze ring on the battle cries.",
+      "champion": "Pell",
+      "family": "bronze",
+      "files": [
+        "vo.pell.move.1",
+        "vo.pell.move.2",
+        "vo.pell.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.pell.move",
+      "says": [
+        "Onward!",
+        "For the hedge!",
+        "Shield first."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Pell, the Hedge Knight: a young man, a knight with no lord, earnest and brave and a little too loud. Bright, open; a bronze ring on the battle cries.",
+      "champion": "Pell",
+      "family": "bronze",
+      "files": [
+        "vo.pell.long_move.1",
+        "vo.pell.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.pell.long_move",
+      "says": [
+        "A knight of the hedge sleeps under the stars. I don't mind.",
+        "No one knighted me. I knighted myself."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Pell, the Hedge Knight: a young man, a knight with no lord, earnest and brave and a little too loud. Bright, open; a bronze ring on the battle cries.",
+      "champion": "Pell",
+      "family": "bronze",
+      "files": [
+        "vo.pell.attack.1",
+        "vo.pell.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.pell.attack",
+      "says": [
+        "Have at you!",
+        "Guard yourself!"
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Pell, the Hedge Knight: a young man, a knight with no lord, earnest and brave and a little too loud. Bright, open; a bronze ring on the battle cries.",
+      "champion": "Pell",
+      "family": "bronze",
+      "files": [
+        "vo.pell.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.pell.encounter",
+      "says": [
+        "A worthy foe!"
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Pell, the Hedge Knight: a young man, a knight with no lord, earnest and brave and a little too loud. Bright, open; a bronze ring on the battle cries.",
+      "champion": "Pell",
+      "family": "bronze",
+      "files": [
+        "vo.pell.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.pell.ult_rank",
+      "says": [
+        "My banner flies higher!"
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Pell, the Hedge Knight: a young man, a knight with no lord, earnest and brave and a little too loud. Bright, open; a bronze ring on the battle cries.",
+      "champion": "Pell",
+      "family": "bronze",
+      "files": [
+        "vo.pell.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.pell.ult",
+      "says": [
+        "To the banner!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Pell, the Hedge Knight: a young man, a knight with no lord, earnest and brave and a little too loud. Bright, open; a bronze ring on the battle cries.",
+      "champion": "Pell",
+      "family": "bronze",
+      "files": [
+        "vo.pell.kill.1",
+        "vo.pell.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.pell.kill",
+      "says": [
+        "Do you yield?",
+        "Honour is served."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Pell, the Hedge Knight: a young man, a knight with no lord, earnest and brave and a little too loud. Bright, open; a bronze ring on the battle cries.",
+      "champion": "Pell",
+      "family": "bronze",
+      "files": [
+        "vo.pell.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.pell.death",
+      "says": [
+        "My banner falls."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Pell, the Hedge Knight: a young man, a knight with no lord, earnest and brave and a little too loud. Bright, open; a bronze ring on the battle cries.",
+      "champion": "Pell",
+      "family": "bronze",
+      "files": [
+        "vo.pell.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.pell.respawn",
+      "says": [
+        "Back up again!"
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Ulla, the Mender: an old woman, a gardener and healer. Gentle, earthy, unhurried, with a smile in it; firm when the thorns come out. Warm and close.",
+      "champion": "Ulla",
+      "family": "growth",
+      "files": [
+        "vo.ulla.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.ulla.pick",
+      "says": [
+        "Everything grows back."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Ulla, the Mender: an old woman, a gardener and healer. Gentle, earthy, unhurried, with a smile in it; firm when the thorns come out. Warm and close.",
+      "champion": "Ulla",
+      "family": "growth",
+      "files": [
+        "vo.ulla.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.ulla.first_move",
+      "says": [
+        "Even here, something grows."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Ulla, the Mender: an old woman, a gardener and healer. Gentle, earthy, unhurried, with a smile in it; firm when the thorns come out. Warm and close.",
+      "champion": "Ulla",
+      "family": "growth",
+      "files": [
+        "vo.ulla.move.1",
+        "vo.ulla.move.2",
+        "vo.ulla.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.ulla.move",
+      "says": [
+        "Growing, growing.",
+        "Root and branch.",
+        "Gently now."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Ulla, the Mender: an old woman, a gardener and healer. Gentle, earthy, unhurried, with a smile in it; firm when the thorns come out. Warm and close.",
+      "champion": "Ulla",
+      "family": "growth",
+      "files": [
+        "vo.ulla.long_move.1",
+        "vo.ulla.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.ulla.long_move",
+      "says": [
+        "Stone is only soil that forgot how to grow.",
+        "I've mended worse than a broken bridge."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Ulla, the Mender: an old woman, a gardener and healer. Gentle, earthy, unhurried, with a smile in it; firm when the thorns come out. Warm and close.",
+      "champion": "Ulla",
+      "family": "growth",
+      "files": [
+        "vo.ulla.attack.1",
+        "vo.ulla.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.ulla.attack",
+      "says": [
+        "Thorns for you.",
+        "I'll sap you dry."
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Ulla, the Mender: an old woman, a gardener and healer. Gentle, earthy, unhurried, with a smile in it; firm when the thorns come out. Warm and close.",
+      "champion": "Ulla",
+      "family": "growth",
+      "files": [
+        "vo.ulla.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.ulla.encounter",
+      "says": [
+        "Weeds in the garden."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Ulla, the Mender: an old woman, a gardener and healer. Gentle, earthy, unhurried, with a smile in it; firm when the thorns come out. Warm and close.",
+      "champion": "Ulla",
+      "family": "growth",
+      "files": [
+        "vo.ulla.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.ulla.ult_rank",
+      "says": [
+        "Deeper roots."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Ulla, the Mender: an old woman, a gardener and healer. Gentle, earthy, unhurried, with a smile in it; firm when the thorns come out. Warm and close.",
+      "champion": "Ulla",
+      "family": "growth",
+      "files": [
+        "vo.ulla.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.ulla.ult",
+      "says": [
+        "Let it all bloom!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Ulla, the Mender: an old woman, a gardener and healer. Gentle, earthy, unhurried, with a smile in it; firm when the thorns come out. Warm and close.",
+      "champion": "Ulla",
+      "family": "growth",
+      "files": [
+        "vo.ulla.kill.1",
+        "vo.ulla.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.ulla.kill",
+      "says": [
+        "Back to the soil.",
+        "Into the compost."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Ulla, the Mender: an old woman, a gardener and healer. Gentle, earthy, unhurried, with a smile in it; firm when the thorns come out. Warm and close.",
+      "champion": "Ulla",
+      "family": "growth",
+      "files": [
+        "vo.ulla.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.ulla.death",
+      "says": [
+        "I'm wilting."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Ulla, the Mender: an old woman, a gardener and healer. Gentle, earthy, unhurried, with a smile in it; firm when the thorns come out. Warm and close.",
+      "champion": "Ulla",
+      "family": "growth",
+      "files": [
+        "vo.ulla.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.ulla.respawn",
+      "says": [
+        "Spring again."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Torek, the Siege Engine: a war machine that learned to talk. Flat, measured, mechanical; reports, never feels. The one voice processed hard: ring-modulated, a little crushed.",
+      "champion": "Torek",
+      "family": "stone",
+      "files": [
+        "vo.torek.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.torek.pick",
+      "says": [
+        "Siege engine, ready."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Torek, the Siege Engine: a war machine that learned to talk. Flat, measured, mechanical; reports, never feels. The one voice processed hard: ring-modulated, a little crushed.",
+      "champion": "Torek",
+      "family": "stone",
+      "files": [
+        "vo.torek.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.torek.first_move",
+      "says": [
+        "Calculating range."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Torek, the Siege Engine: a war machine that learned to talk. Flat, measured, mechanical; reports, never feels. The one voice processed hard: ring-modulated, a little crushed.",
+      "champion": "Torek",
+      "family": "stone",
+      "files": [
+        "vo.torek.move.1",
+        "vo.torek.move.2",
+        "vo.torek.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.torek.move",
+      "says": [
+        "Repositioning.",
+        "Treads turning.",
+        "Advancing."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Torek, the Siege Engine: a war machine that learned to talk. Flat, measured, mechanical; reports, never feels. The one voice processed hard: ring-modulated, a little crushed.",
+      "champion": "Torek",
+      "family": "stone",
+      "files": [
+        "vo.torek.long_move.1",
+        "vo.torek.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.torek.long_move",
+      "says": [
+        "They built me to break walls. A bridge is a wall lying down.",
+        "Every shell is a question. The answer is always yes."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Torek, the Siege Engine: a war machine that learned to talk. Flat, measured, mechanical; reports, never feels. The one voice processed hard: ring-modulated, a little crushed.",
+      "champion": "Torek",
+      "family": "stone",
+      "files": [
+        "vo.torek.attack.1",
+        "vo.torek.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.torek.attack",
+      "says": [
+        "Target acquired.",
+        "Firing."
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Torek, the Siege Engine: a war machine that learned to talk. Flat, measured, mechanical; reports, never feels. The one voice processed hard: ring-modulated, a little crushed.",
+      "champion": "Torek",
+      "family": "stone",
+      "files": [
+        "vo.torek.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.torek.encounter",
+      "says": [
+        "Hostiles detected."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Torek, the Siege Engine: a war machine that learned to talk. Flat, measured, mechanical; reports, never feels. The one voice processed hard: ring-modulated, a little crushed.",
+      "champion": "Torek",
+      "family": "stone",
+      "files": [
+        "vo.torek.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.torek.ult_rank",
+      "says": [
+        "Payload upgraded."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Torek, the Siege Engine: a war machine that learned to talk. Flat, measured, mechanical; reports, never feels. The one voice processed hard: ring-modulated, a little crushed.",
+      "champion": "Torek",
+      "family": "stone",
+      "files": [
+        "vo.torek.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.torek.ult",
+      "says": [
+        "Commencing bombardment!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Torek, the Siege Engine: a war machine that learned to talk. Flat, measured, mechanical; reports, never feels. The one voice processed hard: ring-modulated, a little crushed.",
+      "champion": "Torek",
+      "family": "stone",
+      "files": [
+        "vo.torek.kill.1",
+        "vo.torek.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.torek.kill",
+      "says": [
+        "Target destroyed.",
+        "Range confirmed."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Torek, the Siege Engine: a war machine that learned to talk. Flat, measured, mechanical; reports, never feels. The one voice processed hard: ring-modulated, a little crushed.",
+      "champion": "Torek",
+      "family": "stone",
+      "files": [
+        "vo.torek.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.torek.death",
+      "says": [
+        "All systems failing."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Torek, the Siege Engine: a war machine that learned to talk. Flat, measured, mechanical; reports, never feels. The one voice processed hard: ring-modulated, a little crushed.",
+      "champion": "Torek",
+      "family": "stone",
+      "files": [
+        "vo.torek.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.torek.respawn",
+      "says": [
+        "Rebuilt."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sefa, the Wind Dancer: a young woman, a dancer who fights. Light, playful, laughing, always moving; breathless at the tempest. Airy, a little breath round her.",
+      "champion": "Sefa",
+      "family": "wind",
+      "files": [
+        "vo.sefa.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.sefa.pick",
+      "says": [
+        "Let's dance!"
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sefa, the Wind Dancer: a young woman, a dancer who fights. Light, playful, laughing, always moving; breathless at the tempest. Airy, a little breath round her.",
+      "champion": "Sefa",
+      "family": "wind",
+      "files": [
+        "vo.sefa.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.sefa.first_move",
+      "says": [
+        "Feel that breeze!"
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sefa, the Wind Dancer: a young woman, a dancer who fights. Light, playful, laughing, always moving; breathless at the tempest. Airy, a little breath round her.",
+      "champion": "Sefa",
+      "family": "wind",
+      "files": [
+        "vo.sefa.move.1",
+        "vo.sefa.move.2",
+        "vo.sefa.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.sefa.move",
+      "says": [
+        "Light on my feet.",
+        "With the wind.",
+        "Spinning!"
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sefa, the Wind Dancer: a young woman, a dancer who fights. Light, playful, laughing, always moving; breathless at the tempest. Airy, a little breath round her.",
+      "champion": "Sefa",
+      "family": "wind",
+      "files": [
+        "vo.sefa.long_move.1",
+        "vo.sefa.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.sefa.long_move",
+      "says": [
+        "The wind never walks the same road twice.",
+        "Dance like the bridge is falling. It might."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sefa, the Wind Dancer: a young woman, a dancer who fights. Light, playful, laughing, always moving; breathless at the tempest. Airy, a little breath round her.",
+      "champion": "Sefa",
+      "family": "wind",
+      "files": [
+        "vo.sefa.attack.1",
+        "vo.sefa.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.sefa.attack",
+      "says": [
+        "Keep up!",
+        "One, two!"
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sefa, the Wind Dancer: a young woman, a dancer who fights. Light, playful, laughing, always moving; breathless at the tempest. Airy, a little breath round her.",
+      "champion": "Sefa",
+      "family": "wind",
+      "files": [
+        "vo.sefa.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.sefa.encounter",
+      "says": [
+        "Partners! Shall we?"
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sefa, the Wind Dancer: a young woman, a dancer who fights. Light, playful, laughing, always moving; breathless at the tempest. Airy, a little breath round her.",
+      "champion": "Sefa",
+      "family": "wind",
+      "files": [
+        "vo.sefa.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.sefa.ult_rank",
+      "says": [
+        "The wind picks up!"
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sefa, the Wind Dancer: a young woman, a dancer who fights. Light, playful, laughing, always moving; breathless at the tempest. Airy, a little breath round her.",
+      "champion": "Sefa",
+      "family": "wind",
+      "files": [
+        "vo.sefa.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.sefa.ult",
+      "says": [
+        "Dance in the storm!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sefa, the Wind Dancer: a young woman, a dancer who fights. Light, playful, laughing, always moving; breathless at the tempest. Airy, a little breath round her.",
+      "champion": "Sefa",
+      "family": "wind",
+      "files": [
+        "vo.sefa.kill.1",
+        "vo.sefa.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.sefa.kill",
+      "says": [
+        "Swept off your feet.",
+        "Much too slow!"
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sefa, the Wind Dancer: a young woman, a dancer who fights. Light, playful, laughing, always moving; breathless at the tempest. Airy, a little breath round her.",
+      "champion": "Sefa",
+      "family": "wind",
+      "files": [
+        "vo.sefa.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.sefa.death",
+      "says": [
+        "The music stops."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Sefa, the Wind Dancer: a young woman, a dancer who fights. Light, playful, laughing, always moving; breathless at the tempest. Airy, a little breath round her.",
+      "champion": "Sefa",
+      "family": "wind",
+      "files": [
+        "vo.sefa.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.sefa.respawn",
+      "says": [
+        "Time for an encore!"
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brun, the Smith: a man in his fifties, a blacksmith; gruff, hearty, proud of his work, loud from the forge. Warm, a little saturated, the forge's room.",
+      "champion": "Brun",
+      "family": "ember",
+      "files": [
+        "vo.brun.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.brun.pick",
+      "says": [
+        "Strike while it's hot!"
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brun, the Smith: a man in his fifties, a blacksmith; gruff, hearty, proud of his work, loud from the forge. Warm, a little saturated, the forge's room.",
+      "champion": "Brun",
+      "family": "ember",
+      "files": [
+        "vo.brun.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.brun.first_move",
+      "says": [
+        "Good iron in these gates."
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brun, the Smith: a man in his fifties, a blacksmith; gruff, hearty, proud of his work, loud from the forge. Warm, a little saturated, the forge's room.",
+      "champion": "Brun",
+      "family": "ember",
+      "files": [
+        "vo.brun.move.1",
+        "vo.brun.move.2",
+        "vo.brun.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.brun.move",
+      "says": [
+        "The hammer's hungry.",
+        "Stoke the fire.",
+        "Heading out."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brun, the Smith: a man in his fifties, a blacksmith; gruff, hearty, proud of his work, loud from the forge. Warm, a little saturated, the forge's room.",
+      "champion": "Brun",
+      "family": "ember",
+      "files": [
+        "vo.brun.long_move.1",
+        "vo.brun.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.brun.long_move",
+      "says": [
+        "I forged the hinges on those gates. Built to last.",
+        "Every blade I make is a promise."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brun, the Smith: a man in his fifties, a blacksmith; gruff, hearty, proud of his work, loud from the forge. Warm, a little saturated, the forge's room.",
+      "champion": "Brun",
+      "family": "ember",
+      "files": [
+        "vo.brun.attack.1",
+        "vo.brun.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.brun.attack",
+      "says": [
+        "Hammer coming down!",
+        "On the anvil!"
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brun, the Smith: a man in his fifties, a blacksmith; gruff, hearty, proud of his work, loud from the forge. Warm, a little saturated, the forge's room.",
+      "champion": "Brun",
+      "family": "ember",
+      "files": [
+        "vo.brun.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.brun.encounter",
+      "says": [
+        "Fresh metal to work."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brun, the Smith: a man in his fifties, a blacksmith; gruff, hearty, proud of his work, loud from the forge. Warm, a little saturated, the forge's room.",
+      "champion": "Brun",
+      "family": "ember",
+      "files": [
+        "vo.brun.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.brun.ult_rank",
+      "says": [
+        "Hotter forge."
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brun, the Smith: a man in his fifties, a blacksmith; gruff, hearty, proud of his work, loud from the forge. Warm, a little saturated, the forge's room.",
+      "champion": "Brun",
+      "family": "ember",
+      "files": [
+        "vo.brun.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.brun.ult",
+      "says": [
+        "Meet the anvil!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brun, the Smith: a man in his fifties, a blacksmith; gruff, hearty, proud of his work, loud from the forge. Warm, a little saturated, the forge's room.",
+      "champion": "Brun",
+      "family": "ember",
+      "files": [
+        "vo.brun.kill.1",
+        "vo.brun.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.brun.kill",
+      "says": [
+        "Flattened.",
+        "Hammered flat."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brun, the Smith: a man in his fifties, a blacksmith; gruff, hearty, proud of his work, loud from the forge. Warm, a little saturated, the forge's room.",
+      "champion": "Brun",
+      "family": "ember",
+      "files": [
+        "vo.brun.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.brun.death",
+      "says": [
+        "The fire's going out."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Brun, the Smith: a man in his fifties, a blacksmith; gruff, hearty, proud of his work, loud from the forge. Warm, a little saturated, the forge's room.",
+      "champion": "Brun",
+      "family": "ember",
+      "files": [
+        "vo.brun.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.brun.respawn",
+      "says": [
+        "Back from the forge."
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Mira, the Lamplighter: a girl of about seventeen, the bridge's lamplighter. Bright, quick, cheerful and brave; fierce when she snuffs. Warm, a little crackle round her.",
+      "champion": "Mira",
+      "family": "ember",
+      "files": [
+        "vo.mira.pick"
+      ],
+      "heard_by": "the player alone",
+      "line": "pick",
+      "name": "vo.mira.pick",
+      "says": [
+        "Someone has to light the way."
+      ],
+      "takes": 1,
+      "when": "champion select: the champion dealt, rerolled or swapped to"
+    },
+    {
+      "bus": "champions",
+      "cast": "Mira, the Lamplighter: a girl of about seventeen, the bridge's lamplighter. Bright, quick, cheerful and brave; fierce when she snuffs. Warm, a little crackle round her.",
+      "champion": "Mira",
+      "family": "ember",
+      "files": [
+        "vo.mira.first_move"
+      ],
+      "heard_by": "the player alone",
+      "line": "first_move",
+      "name": "vo.mira.first_move",
+      "says": [
+        "The lamps are lit. Let's go!"
+      ],
+      "takes": 1,
+      "when": "the match's first move order"
+    },
+    {
+      "bus": "champions",
+      "cast": "Mira, the Lamplighter: a girl of about seventeen, the bridge's lamplighter. Bright, quick, cheerful and brave; fierce when she snuffs. Warm, a little crackle round her.",
+      "champion": "Mira",
+      "family": "ember",
+      "files": [
+        "vo.mira.move.1",
+        "vo.mira.move.2",
+        "vo.mira.move.3"
+      ],
+      "heard_by": "the player alone",
+      "line": "move",
+      "name": "vo.mira.move",
+      "says": [
+        "Lighting the way.",
+        "Mind the dark corners.",
+        "Up bright and early."
+      ],
+      "takes": 3,
+      "when": "a move order (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Mira, the Lamplighter: a girl of about seventeen, the bridge's lamplighter. Bright, quick, cheerful and brave; fierce when she snuffs. Warm, a little crackle round her.",
+      "champion": "Mira",
+      "family": "ember",
+      "files": [
+        "vo.mira.long_move.1",
+        "vo.mira.long_move.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "long_move",
+      "name": "vo.mira.long_move",
+      "says": [
+        "I light the lamps so nobody walks the bridge alone.",
+        "My grandmother lit these lamps. And hers before her."
+      ],
+      "takes": 2,
+      "when": "a move order 2,000 units or more away (no more than every 30 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Mira, the Lamplighter: a girl of about seventeen, the bridge's lamplighter. Bright, quick, cheerful and brave; fierce when she snuffs. Warm, a little crackle round her.",
+      "champion": "Mira",
+      "family": "ember",
+      "files": [
+        "vo.mira.attack.1",
+        "vo.mira.attack.2"
+      ],
+      "heard_by": "the player alone",
+      "line": "attack",
+      "name": "vo.mira.attack",
+      "says": [
+        "Burn nice and bright!",
+        "Snuffed!"
+      ],
+      "takes": 2,
+      "when": "an attack ordered on an enemy champion (one in two, no more than every 15 s)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Mira, the Lamplighter: a girl of about seventeen, the bridge's lamplighter. Bright, quick, cheerful and brave; fierce when she snuffs. Warm, a little crackle round her.",
+      "champion": "Mira",
+      "family": "ember",
+      "files": [
+        "vo.mira.encounter"
+      ],
+      "heard_by": "the player alone",
+      "line": "encounter",
+      "name": "vo.mira.encounter",
+      "says": [
+        "Someone's out past dark."
+      ],
+      "takes": 1,
+      "when": "the first enemy champion seen in a match"
+    },
+    {
+      "bus": "champions",
+      "cast": "Mira, the Lamplighter: a girl of about seventeen, the bridge's lamplighter. Bright, quick, cheerful and brave; fierce when she snuffs. Warm, a little crackle round her.",
+      "champion": "Mira",
+      "family": "ember",
+      "files": [
+        "vo.mira.ult_rank"
+      ],
+      "heard_by": "the player alone",
+      "line": "ult_rank",
+      "name": "vo.mira.ult_rank",
+      "says": [
+        "A bigger flame!"
+      ],
+      "takes": 1,
+      "when": "the ultimate ranked up (levels 6, 11, 16)"
+    },
+    {
+      "bus": "champions",
+      "cast": "Mira, the Lamplighter: a girl of about seventeen, the bridge's lamplighter. Bright, quick, cheerful and brave; fierce when she snuffs. Warm, a little crackle round her.",
+      "champion": "Mira",
+      "family": "ember",
+      "files": [
+        "vo.mira.ult"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "ult",
+      "name": "vo.mira.ult",
+      "says": [
+        "Light the bonfire!"
+      ],
+      "takes": 1,
+      "when": "the ultimate cast: heard by everyone who sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Mira, the Lamplighter: a girl of about seventeen, the bridge's lamplighter. Bright, quick, cheerful and brave; fierce when she snuffs. Warm, a little crackle round her.",
+      "champion": "Mira",
+      "family": "ember",
+      "files": [
+        "vo.mira.kill.1",
+        "vo.mira.kill.2"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "kill",
+      "name": "vo.mira.kill",
+      "says": [
+        "Lights out.",
+        "Snuffed out."
+      ],
+      "takes": 2,
+      "when": "a champion killed: heard by the killer and whoever sees them"
+    },
+    {
+      "bus": "champions",
+      "cast": "Mira, the Lamplighter: a girl of about seventeen, the bridge's lamplighter. Bright, quick, cheerful and brave; fierce when she snuffs. Warm, a little crackle round her.",
+      "champion": "Mira",
+      "family": "ember",
+      "files": [
+        "vo.mira.death"
+      ],
+      "heard_by": "whoever sees the champion",
+      "line": "death",
+      "name": "vo.mira.death",
+      "says": [
+        "Burning out."
+      ],
+      "takes": 1,
+      "when": "the champion falls: heard by whoever sees it"
+    },
+    {
+      "bus": "champions",
+      "cast": "Mira, the Lamplighter: a girl of about seventeen, the bridge's lamplighter. Bright, quick, cheerful and brave; fierce when she snuffs. Warm, a little crackle round her.",
+      "champion": "Mira",
+      "family": "ember",
+      "files": [
+        "vo.mira.respawn"
+      ],
+      "heard_by": "the player alone",
+      "line": "respawn",
+      "name": "vo.mira.respawn",
+      "says": [
+        "Lit again!"
+      ],
+      "takes": 1,
+      "when": "back on the platform (three times in four)"
     }
   ]
 }

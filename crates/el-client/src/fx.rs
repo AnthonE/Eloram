@@ -12,6 +12,7 @@ pub mod live;
 use bevy::prelude::*;
 use el_client_core::fx::director::{Cue, Director, NO_SEAT, Scene, Status, What};
 use el_client_core::fx::sound::Part;
+use el_client_core::fx::vo::Spoken;
 use el_client_core::missiles::Shot;
 use el_sim::missile::Source;
 
@@ -22,6 +23,8 @@ use crate::session::Session;
 #[derive(Resource, Default)]
 pub struct Cues {
     pub list: Vec<Cue>,
+    /// This frame's champion lines (`el_client_core::fx::vo`), for the sound.
+    pub voice: Vec<Spoken>,
     director: Option<Director>,
     /// The client the director was made for (its seat, or [`NO_SEAT`] for a match watched, and how
     /// much of its feed it had read).
@@ -193,17 +196,20 @@ pub(crate) fn direct(
         cues.director = Some(d);
     }
     cues.of = Some((seat, feed_n));
-    let Cues { list, director, .. } = &mut *cues;
+    let Cues { list, director, voice, .. } = &mut *cues;
+    voice.clear();
     if let Some(d) = director.as_mut()
         && (!fresh || seat == NO_SEAT)
     {
         d.frame(scene, now_s(), list);
+        voice.append(&mut d.spoken);
     }
     // Run fast, a match watched is drawn and not heard: its sounds would come many at once.
     if session.watch.as_deref().is_some_and(|w| w.speed > 2.0) {
         for q in list.iter_mut() {
             q.sound = None;
         }
+        voice.clear();
     }
     cues.total += cues.list.len() as u64;
     cues.sounded += cues.list.iter().filter(|q| q.sound.is_some()).count() as u64;

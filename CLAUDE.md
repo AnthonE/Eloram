@@ -71,11 +71,22 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   checks every model carries its kit's clips, and each minion's). `window.__el` has `champion_models` and `champion_poses`
   (`seat:clip,...`), `minion_models`, `minions_drawn` and `minion_clips` (`clip:count,...`).
 - The effects and sounds (`docs/FX.md`): `el_client_core::fx` decides (the sound table, a look a
-  source, the director's cues, the mixer, the announcer), `el-client/src/fx.rs` draws and
-  `audio.rs` plays (Web Audio); a match watched is told to them by `el_client_core::spectator`.
-  `python3 -I art/tools/sounds.py` remakes `web/assets/audio/` from `manifest.json` (written by
-  `cargo test -p el-client-core fx::sound -- --ignored write_manifest` when the table changes)
-  and Kenney's CC0 packs; the announcer's and the music's files are optional, dropped in by name.
+  source, the director's cues, the mixer, the announcer, the champions' voices), `el-client/src/fx.rs`
+  draws and `audio.rs` plays (Web Audio); a match watched is told to them by `el_client_core::spectator`.
+  `python3 -I art/tools/sounds.py [--only prefix,...]` remakes `web/assets/audio/` from `manifest.json`
+  (written by `cargo test -p el-client-core fx::sound -- --ignored write_manifest` when the table, the
+  announcer's words or a champion's script changes) and Kenney's CC0 packs (their pinned links
+  redirect now: only the synthesised sounds remake until they're pinned again); the music's files are
+  optional, dropped in by name.
+- The voices (`docs/FX.md`, "The voices, and the rewards"): the announcer (`fx::voice`: every line
+  aimed from the viewer's side, its words in `says`, shown on the banner `hud_banner.rs` as it's said)
+  and the champions (`fx::vo`: each champion's script and casting note, Riot's moments and throttles,
+  who hears what; the director gives it each moment). The files are placeholders from
+  `art/tools/voices.py` (Piper text-to-speech, a speaker and processing a champion; needs
+  `pip install piper-tts` and `faster-whisper` for `--listen`, which scores each line by a speech
+  recogniser); a recording dropped in under the same name replaces one and is never written over
+  (`art/voices.lock.json`). `window.__el` has `vo_lines`, `vo_missing`, `vo_dropped`, `vo_last`,
+  `vo_talking`, `banner` and `banner_shown`.
   `window.__el` has `fx_cues`, `fx_own_casts`, `fx_bursts`, `fx_bursts_stolen` (a burst's slot taken
   from one still burning: the pools are big enough while it's 0), `fx_missiles`, `fx_zones`, `champion_casts`,
   `minion_flashes`, `wheels_turning` and `audio_*`; the inbox takes `{t:"volume",bus,v}` and

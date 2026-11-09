@@ -25,6 +25,8 @@ mod ground;
 #[cfg(target_arch = "wasm32")]
 mod hud;
 #[cfg(target_arch = "wasm32")]
+mod hud_banner;
+#[cfg(target_arch = "wasm32")]
 mod hud_death;
 #[cfg(target_arch = "wasm32")]
 mod hud_first;

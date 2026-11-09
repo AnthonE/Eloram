@@ -10,6 +10,7 @@ use crate::edges::EdgesPlugin;
 use crate::fx::FxPlugin;
 use crate::ground::GroundPlugin;
 use crate::hud::HudPlugin;
+use crate::hud_banner::BannerPlugin;
 use crate::hud_death::DeathPlugin;
 use crate::hud_first::FirstPlugin;
 use crate::hud_lobby::LobbyPlugin;
@@ -72,6 +73,14 @@ pub fn run() {
         ))
         // Past the sixteen a tuple of plugins takes.
         .add_plugins((ChampionsPlugin, MinionsPlugin, PortraitPlugin, DeathPlugin, TargetPlugin))
-        .add_plugins((SelectPlugin, LobbyPlugin, MenuPlugin, FirstPlugin, StagePlugin, BenchPlugin))
+        .add_plugins((
+            SelectPlugin,
+            LobbyPlugin,
+            MenuPlugin,
+            FirstPlugin,
+            StagePlugin,
+            BenchPlugin,
+            BannerPlugin,
+        ))
         .run();
 }

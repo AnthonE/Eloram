@@ -12,6 +12,7 @@
 //! Every event has its own line, with no catch-all, as replication's team rules do: a new event
 //! can't be silently ignored here either.
 
+use el_proto::Order;
 use el_proto::event::WireEvent;
 use el_proto::quant::pos_from_code;
 use el_proto::unit::{QUnit, flags};
@@ -25,8 +26,9 @@ use glam::Vec2;
 use super::look::{self, Look, Reach, Side, world};
 use super::mix;
 use super::sound::{Part, Sfx};
-use super::voice::Announcer;
-use crate::client::{OWN_FEED, OwnEvent};
+use super::vo::{self, Chatter, Line, Spoken};
+use super::voice::{Announcer, MULTI_SECS};
+use crate::client::{ORDER_LOG, OWN_FEED, OwnEvent};
 use crate::interp::Sample;
 use crate::missiles::Shot;
 use crate::spectator::Spectator;
@@ -295,6 +297,20 @@ struct Ui {
     n_aug: u8,
     screen_open: bool,
     offers: [u8; 3],
+    last_hits: u16,
+    kills: u16,
+    assists: u16,
+    rank_r: u8,
+}
+
+/// The most the own champion's last hits, kills, assists and ultimate's rank have been: what's
+/// heard is a rise past them (a prediction put right doesn't ring twice).
+#[derive(Clone, Copy, Debug, Default)]
+struct Best {
+    last_hits: u16,
+    kills: u16,
+    assists: u16,
+    rank_r: u8,
 }
 
 pub struct Director {
@@ -313,14 +329,31 @@ pub struct Director {
     /// Each champion's latest cast seen: its tick and slot.
     cast: [(u32, u8); SEATS],
     ui: Option<Ui>,
+    best: Best,
+    /// The own champion's kills close together (how many, the last's time): the takedown's sound
+    /// climbs with them.
+    own_streak: (u8, f64),
     pub announcer: Announcer,
+    /// The champions' voices: when each last said what.
+    pub chatter: Chatter,
+    /// This frame's champion lines.
+    pub spoken: Vec<Spoken>,
+    /// The player's orders read so far; whether the match's first move is made; the enemy
+    /// champions seen at least once.
+    orders_read: u64,
+    moved: bool,
+    met: [bool; SEATS],
     welcomed: bool,
     vote_open: bool,
-    surrendered: bool,
+    /// The team whose vote to surrender passed.
+    surrendered: Option<u8>,
     over: bool,
     /// The server tick last frame (for what the clock says: the waves).
     tick: u32,
     inhibitors: [bool; 2],
+    /// When each team's inhibitor fell (a tick), and whether its coming back soon was called.
+    inhib_down: [Option<u32>; 2],
+    inhib_soon: [bool; 2],
 }
 
 impl Director {
@@ -338,13 +371,22 @@ impl Director {
             own_blink: u32::MAX,
             cast: [(u32::MAX, 0); SEATS],
             ui: None,
+            best: Best::default(),
+            own_streak: (0, f64::NEG_INFINITY),
             announcer: Announcer::new(seat),
+            chatter: Chatter::new(0x51ED_0000 ^ seat as u32),
+            spoken: Vec::with_capacity(16),
+            orders_read: 0,
+            moved: false,
+            met: [false; SEATS],
             welcomed: false,
             vote_open: false,
-            surrendered: false,
+            surrendered: None,
             over: false,
             tick: 0,
             inhibitors: [true; 2],
+            inhib_down: [None; 2],
+            inhib_soon: [false; 2],
         }
     }
 
@@ -405,6 +447,22 @@ impl Director {
         (i < SEATS).then(|| c.world().champs[i].def)
     }
 
+    /// The champion in `seat` has a moment for `line`: whether it speaks, and who hears, is the
+    /// chatter's to decide (`vo::rule`).
+    fn speak(&mut self, c: &dyn Scene, seat: usize, line: Line, now: f64) {
+        if seat >= SEATS {
+            return;
+        }
+        let champ = c.world().champs[seat].def;
+        let side = self.side(team_of_seat(seat), Some(seat));
+        let at = self.pos(c, seat, now);
+        if let Some(s) = self.chatter.moment(seat, champ, line, side, Some(at), now)
+            && self.spoken.len() < 16
+        {
+            self.spoken.push(s);
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn cue(
         &self,
@@ -428,6 +486,7 @@ impl Director {
 
     /// This frame's cues, into `out`.
     pub fn frame(&mut self, c: &dyn Scene, now: f64, out: &mut Vec<Cue>) {
+        self.spoken.clear();
         if !self.welcomed && c.started() {
             self.welcomed = true;
             self.announcer.welcome(now);
@@ -521,6 +580,45 @@ impl Director {
             }
         }
         self.own_read = p.own_feed_n;
+        // The player's own clicks, which the champion answers.
+        let from = self.orders_read.max(p.order_log_n.saturating_sub(ORDER_LOG as u64));
+        let alive = p.pred.units[me].alive && c.started();
+        for n in from..p.order_log_n {
+            if !alive {
+                break;
+            }
+            match p.order_log[(n % ORDER_LOG as u64) as usize] {
+                Order::Move { to } | Order::AttackMove { to } => {
+                    let line = if !self.moved && c.world().tick < el_sim::ticks(120.0) {
+                        Line::FirstMove
+                    } else if p.own_pos(now).distance(to) >= vo::LONG_MOVE {
+                        Line::LongMove
+                    } else {
+                        Line::Move
+                    };
+                    self.moved = true;
+                    self.speak(c, me, line, now);
+                }
+                Order::Attack { unit } => {
+                    let s = usize::from(unit.slot);
+                    if s < SEATS && team_of_seat(s) != self.team {
+                        self.speak(c, me, Line::Attack, now);
+                    }
+                }
+                Order::Cast { .. }
+                | Order::Stop
+                | Order::Hold
+                | Order::LevelSkill { .. }
+                | Order::PickAugment { .. }
+                | Order::Reroll { .. }
+                | Order::Buy { .. }
+                | Order::Sell { .. }
+                | Order::Ping { .. }
+                | Order::Surrender { .. }
+                | Order::Use { .. } => {}
+            }
+        }
+        self.orders_read = p.order_log_n;
     }
 
     /// Champion `unit` (number `def`) began casting `slot` at `at`.
@@ -546,6 +644,8 @@ impl Director {
         out.push(cue);
         if l.ult {
             out.push(self.cue(What::Part(Part::Ult), src, l, pos, u, side, own, l.sound(Part::Ult)));
+            // Its callout: heard by whoever sees it cast, as its sound is.
+            self.speak(c, unit, Line::Ult, now);
         }
         if l.reach == Reach::Dash {
             let mut d = self.cue(What::Part(Part::Dash), src, l, at, u, side, own, l.sound(Part::Dash));
@@ -850,6 +950,19 @@ impl Director {
                 out.push(cue);
                 if kind == Kind::Inhibitor {
                     self.inhibitors[usize::from(team.min(1))] = false;
+                    self.inhib_down[usize::from(team.min(1))] = Some(tick);
+                    self.inhib_soon[usize::from(team.min(1))] = false;
+                }
+                if kind == Kind::Champion && u < SEATS {
+                    // Its fall, heard by whoever saw it; the killer's line, by its player and
+                    // whoever sees the killer.
+                    if u == me || c.known(u) || self.seen[u].known {
+                        self.speak(c, u, Line::Death, now);
+                    }
+                    let k = usize::from(killer);
+                    if k < SEATS && team_of_seat(k) != team && (k == me || c.known(k)) {
+                        self.speak(c, k, Line::Kill, now);
+                    }
                 }
                 self.announcer.death(u, kind, team, usize::from(killer), now);
             }
@@ -857,6 +970,7 @@ impl Director {
                 let u = usize::from(unit);
                 self.announcer.respawn(u);
                 if u == me {
+                    self.speak(c, me, Line::Respawn, now);
                     let l = look::look(Source::Auto, self.champ(c, u), self.team);
                     out.push(self.cue(
                         What::Respawn,
@@ -965,17 +1079,25 @@ impl Director {
                     Some(sound),
                 ));
             }
-            WireEvent::Vote { open, passed, .. } => {
+            WireEvent::Vote { team, open, passed, .. } => {
                 if open && !self.vote_open {
                     out.push(self.ui(c, Sfx::UiVote, now));
                 }
                 self.vote_open = open;
-                self.surrendered |= passed;
+                if passed {
+                    self.surrendered = Some(team);
+                }
             }
             WireEvent::Outcome { winner } => {
                 if !self.over {
                     self.over = true;
-                    self.announcer.outcome(winner, self.surrendered, now);
+                    // A side that lost with its nexus standing gave up (the vote that passed is
+                    // told only to its own team).
+                    let loser = 1 - winner.min(1);
+                    let nexus = el_sim::units::structure_slot(loser, el_sim::units::structure::NEXUS);
+                    let standing = c.world().units.get(nexus).is_some_and(|n| n.alive);
+                    let gave_up = self.surrendered.or(standing.then_some(loser));
+                    self.announcer.outcome(winner, gave_up, now);
                 }
             }
             // Its sound is the interface's (an augment taken: see `interface`).
@@ -1010,6 +1132,13 @@ impl Director {
                 continue;
             };
             let was = self.seen[i];
+            // The first sight of an enemy champion.
+            if i < SEATS && team != self.team && !was.known && !self.met[i] && c.started() {
+                self.met[i] = true;
+                if self.seat < SEATS {
+                    self.speak(c, me, Line::Encounter, now);
+                }
+            }
             let same = was.known && was.generation == generation;
             let rose = if same { f & !was.flags } else { 0 };
             for (bit, s) in Status::FLAGS {
@@ -1072,10 +1201,40 @@ impl Director {
             n_aug: ch.n_aug,
             screen_open: ch.screen.open,
             offers: ch.screen.offers,
+            last_hits: ch.last_hits,
+            kills: ch.kills,
+            assists: ch.assists,
+            rank_r: ch.ranks[3],
         };
-        let Some(was) = self.ui.replace(ui) else { return };
+        let Some(was) = self.ui.replace(ui) else {
+            self.best =
+                Best { last_hits: ui.last_hits, kills: ui.kills, assists: ui.assists, rank_r: ui.rank_r };
+            return;
+        };
         if ui == was {
             return;
+        }
+        // The rewards, for the player's ears alone (Riot's kill and takedown sounds, patch 25.11):
+        // a last hit's coin, a kill's sound climbing with the kills close together, an assist's.
+        if ui.last_hits > self.best.last_hits {
+            self.best.last_hits = ui.last_hits;
+            out.push(self.ui(c, Sfx::GoldCoin, now));
+        }
+        if ui.kills > self.best.kills {
+            self.best.kills = ui.kills;
+            let s = &mut self.own_streak;
+            s.0 = if now - s.1 <= MULTI_SECS { s.0.saturating_add(1) } else { 1 };
+            s.1 = now;
+            let climb = [Sfx::TakedownX1, Sfx::TakedownX2, Sfx::TakedownX3, Sfx::TakedownX4, Sfx::TakedownX5];
+            let n = usize::from(s.0.clamp(1, 5));
+            out.push(self.ui(c, climb[n - 1], now));
+        } else if ui.assists > self.best.assists {
+            out.push(self.ui(c, Sfx::TakedownAssist, now));
+        }
+        self.best.assists = self.best.assists.max(ui.assists);
+        if ui.rank_r > self.best.rank_r {
+            self.best.rank_r = ui.rank_r;
+            self.speak(c, self.seat, Line::UltRank, now);
         }
         let none = el_sim::content::items::NONE;
         let count = |items: &[u8]| items.iter().filter(|&&i| i != none).count();
@@ -1114,8 +1273,20 @@ impl Director {
             let slot = el_sim::units::structure_slot(team, el_sim::units::structure::INHIBITOR);
             let up = c.world().units.get(slot).is_some_and(|u| u.alive);
             let k = usize::from(team);
+            // Fifteen seconds before it stands again, and as it does.
+            if let Some(down) = self.inhib_down[k]
+                && !up
+                && !self.inhib_soon[k]
+            {
+                let back = down + at(rules::INHIBITOR_RESPAWN);
+                if t + at(15.0) >= back && t < back {
+                    self.inhib_soon[k] = true;
+                    self.announcer.inhibitor(team, true, now);
+                }
+            }
             if up && !self.inhibitors[k] {
-                self.announcer.inhibitor_back(now);
+                self.announcer.inhibitor(team, false, now);
+                self.inhib_down[k] = None;
             }
             self.inhibitors[k] = up;
         }
@@ -1269,6 +1440,98 @@ mod tests {
     }
 
     #[test]
+    fn the_own_champion_answers_its_clicks() {
+        let mut c = client(2);
+        c.start_for_test();
+        let mut d = Director::new(2);
+        let mut out = Vec::new();
+        d.frame(&c, 1.0, &mut out);
+        let mut lines = Vec::new();
+        let here = c.pred.units[2].pos;
+        // A click a second for two minutes, near; then one far off; then attacks on an enemy
+        // champion and on a minion.
+        for k in 0..120 {
+            let to = here + Vec2::new(300.0 + (k % 3) as f32 * 50.0, 0.0);
+            // No server acks them here: the queue would fill.
+            c.orders.clear();
+            c.order(Order::Move { to });
+            d.frame(&c, 2.0 + f64::from(k), &mut out);
+            lines.extend(d.spoken.iter().map(|s| (s.line, s.at, 2.0 + f64::from(k))));
+        }
+        assert_eq!(lines.first().map(|l| l.0), Some(Line::FirstMove), "{lines:?}");
+        let moves: Vec<f64> = lines.iter().filter(|l| l.0 == Line::Move).map(|l| l.2).collect();
+        assert!(moves.len() >= 2 && moves.windows(2).all(|w| w[1] - w[0] >= 15.0), "{moves:?}");
+        assert!(lines.iter().all(|l| l.1.is_none()), "the own lines are heard in the middle");
+        let mut long = false;
+        for k in 0..10 {
+            c.orders.clear();
+            c.order(Order::Move { to: here + Vec2::new(4_000.0, 0.0) });
+            d.frame(&c, 200.0 + 31.0 * f64::from(k), &mut out);
+            long |= d.spoken.iter().any(|s| s.line == Line::LongMove);
+        }
+        assert!(long, "a long walk has its own lines");
+        let mut attacks = 0;
+        for k in 0..10 {
+            c.orders.clear();
+            c.order(Order::Attack { unit: el_proto::UnitRef { slot: 20, generation: 1 } });
+            c.order(Order::Attack { unit: el_proto::UnitRef { slot: 7, generation: 1 } });
+            d.frame(&c, 600.0 + 16.0 * f64::from(k), &mut out);
+            attacks += d.spoken.iter().filter(|s| s.line == Line::Attack).count();
+        }
+        assert!((2..=10).contains(&attacks), "half the attacks on a champion, none on a minion: {attacks}");
+    }
+
+    #[test]
+    fn a_kill_is_heard_by_its_killer_and_rewards_the_player_alone() {
+        let mut c = client(2);
+        c.start_for_test();
+        let mut d = Director::new(2);
+        let mut out = Vec::new();
+        d.frame(&c, 1.0, &mut out);
+        // Seat 7 seen, then slain by the own champion.
+        let rec = QUnit {
+            slot: 7,
+            generation: 1,
+            kind: Kind::Champion as u8,
+            team: 1,
+            pos: pos_code(Vec2::new(3_000.0, 1_900.0)),
+            hp: 10,
+            max_hp: 1_000,
+            target: el_proto::unit::NO_TARGET,
+            ..QUnit::default()
+        };
+        c.tracks[7].push(10, rec);
+        d.frame(&c, 1.1, &mut out);
+        told(&mut c, 20, WireEvent::Death { unit: 7, killer: 2 });
+        c.pred.champs[2].kills = 1;
+        out.clear();
+        d.frame(&c, 2.0, &mut out);
+        let said: Vec<(u8, Line)> = d.spoken.iter().map(|s| (s.seat, s.line)).collect();
+        assert!(said.contains(&(7, Line::Death)) && said.contains(&(2, Line::Kill)), "{said:?}");
+        assert_eq!(sounds(&out).iter().filter(|&&s| s == Sfx::TakedownX1).count(), 1, "{:?}", sounds(&out));
+        assert!(out.iter().filter(|q| q.what == What::Ui).all(|q| q.own && q.rung == 0));
+        // A second kill close behind climbs; a last hit rings a coin.
+        out.clear();
+        c.pred.champs[2].kills = 2;
+        c.pred.champs[2].last_hits = 1;
+        d.frame(&c, 6.0, &mut out);
+        let s = sounds(&out);
+        assert!(s.contains(&Sfx::TakedownX2) && s.contains(&Sfx::GoldCoin), "{s:?}");
+        // Seen by an enemy of the killer's, the kill line is heard there too, and the death.
+        let mut e = client(7);
+        e.start_for_test();
+        let mut de = Director::new(7);
+        de.frame(&e, 1.0, &mut out);
+        e.tracks[2].push(10, QUnit { slot: 2, team: 0, ..rec });
+        de.frame(&e, 1.1, &mut out);
+        told(&mut e, 20, WireEvent::Death { unit: 7, killer: 2 });
+        de.frame(&e, 2.0, &mut out);
+        let kill = de.spoken.iter().find(|s| s.line == Line::Kill).expect("the killer's line");
+        assert!(kill.at.is_some() && kill.side == Side::Enemy && kill.rung == 2, "{kill:?}");
+        assert!(de.spoken.iter().any(|s| s.line == Line::Death && s.side == Side::Own));
+    }
+
+    #[test]
     fn a_match_watched_shows_and_sounds_both_sides_and_owns_nothing() {
         use el_sim::game::SeatInput;
         use el_sim::path::PathScratch;
@@ -1280,6 +1543,7 @@ mod tests {
         let mut out = Vec::new();
         let mut cues = Vec::new();
         let mut lines = Vec::new();
+        let mut spoken = Vec::new();
         for _ in 0..el_sim::ticks(240.0) {
             for (p, u) in prev.iter_mut().zip(m.units.iter()) {
                 *p = u.pos;
@@ -1296,7 +1560,8 @@ mod tests {
             let now = at / f64::from(el_sim::TICK_HZ);
             d.frame(&scene, now, &mut out);
             cues.extend_from_slice(&out);
-            lines.extend(d.announcer.next(now, false));
+            spoken.extend_from_slice(&d.spoken);
+            lines.extend(d.announcer.next(now, false).map(|s| s.line));
         }
         let n = |f: &dyn Fn(&Cue) -> bool| cues.iter().filter(|q| f(q)).count();
         assert_eq!(n(&|q| q.own), 0, "a watcher has no champion of their own");
@@ -1315,5 +1580,9 @@ mod tests {
         // The announcer welcomes the watcher and calls the first blood.
         assert!(lines.contains(&Sfx::VoiceWelcome), "{lines:?}");
         assert!(lines.contains(&Sfx::VoiceFirstBlood), "{lines:?}");
+        // The champions' voices: what a watcher hears is what anyone who sees would (the callouts,
+        // the kills, the falls), never a player's own (their moves, their respawns).
+        assert!(spoken.iter().all(|s| s.side != Side::Own && vo::rule(s.line).aim == vo::Aim::Seen));
+        assert!(spoken.iter().any(|s| s.line == Line::Death), "{spoken:?}");
     }
 }

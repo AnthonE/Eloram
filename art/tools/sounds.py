@@ -6,7 +6,7 @@ elemental and magical layers (fire, water, wind, bells, glass partials, starligh
 are synthesised here. Each sound is layered, pitched, filtered and enveloped, put in one shared
 small room (effects; the interface stays dry), trimmed to its onset and levelled by bus.
 
-    python3 -I art/tools/sounds.py [--cache dir] [--sheets dir] [--only prefix]
+    python3 -I art/tools/sounds.py [--cache dir] [--sheets dir] [--only prefix,...]
 
 Writes web/assets/audio/<stem>.ogg (Opus in Ogg, 48 kHz, 64 kb/s mono or 96 kb/s stereo) and
 <stem>.mp3 (LAME VBR -q:a 5), then decodes every file back and prints a report (duration, true
@@ -132,7 +132,9 @@ class Sources:
             print("fetching", url, flush=True)
             data = urllib.request.urlopen(url, timeout=180).read()
             if hashlib.sha256(data).hexdigest() != sha:
-                sys.exit(f"{url}: not the pack we pinned (sha256 differs)")
+                # Not kept: a moved page (Kenney's links redirect to the pack's page now) or
+                # another pack. Only what's made from it fails.
+                raise OSError(f"{url}: not the pack we pinned (sha256 differs)")
             with open(z + ".part", "wb") as f:
                 f.write(data)
             os.replace(z + ".part", z)
@@ -2110,6 +2112,61 @@ def notes_seq(n, seq, kind="bell", tau=0.3, gains=None):
     return out
 
 
+def gold_coin(n, rng, f0, tau=0.1):
+    """One coin's plink: its partials, a hair of a tick on its strike."""
+    c = coin(n, rng, f0, tau)
+    tick = ffilt(white(T(0.003), rng), lambda q: hp(q, 5000, 2)) * np.exp(-tt(T(0.003)) / 0.0006)
+    return unit(c) + 0.15 * at(n, unit(tick), 0)
+
+
+@sound("gold.coin")
+def _(v):
+    # A last hit's gold: one bright coin, and a second, smaller one a moment after. The take
+    # moves its pitch a little (the mixer draws another each time).
+    r, n = v.rng, T(0.3)
+    f = 3150 * v.j(0.03)
+    return gold_coin(n, r, f, 0.11) + 0.4 * at(n, gold_coin(T(0.2), r, f * 1.335, 0.06), 0.04)
+
+
+def takedown(v, k):
+    """A kill, the k-th close together: a punchy low hit, k bell notes climbing an arpeggio, more
+    coins each time; the fifth rings out in a chord (Riot's kill and takedown sounds, patch 25.11:
+    for the player alone, climbing with the multikill)."""
+    r = v.rng
+    n = T([0.8, 0.9, 1.0, 1.1, 1.4][k - 1])
+    out = np.zeros(n)
+    hit = thump(T(0.4), 150 + 12 * k, 48, 0.006, 0.09 + 0.02 * k, click=0.35, rng=r)
+    body = ffilt(pink(T(0.12), r), lambda q: lp(q, 1800, 2)) * np.exp(-tt(T(0.12)) / 0.03)
+    place(out, unit(hit), 0, 0.85 + 0.04 * k)
+    place(out, unit(body), 0, 0.25)
+    arp = [0, 4, 7, 12, 16]
+    seq = [(mf(74 + arp[i]), 0.05 + 0.075 * i) for i in range(k)]
+    bells = notes_seq(n, seq, "bell", 0.28 + 0.05 * k, [0.55 + 0.1 * i for i in range(k)])
+    out += 0.75 * unit(bells)
+    if k == 5:
+        ring = notes_seq(n, [(mf(86), 0.42), (mf(90), 0.42), (mf(93), 0.42)], "bell", 0.6, [0.5, 0.4, 0.35])
+        out += 0.45 * unit(ring)
+    for i in range(2 + 3 * k):
+        when = 0.07 + r.uniform(0, 0.2 + 0.08 * k)
+        place(out, gold_coin(T(0.22), r, r.uniform(2700, 3900), r.uniform(0.05, 0.09)), when,
+              r.uniform(0.12, 0.28))
+    return out
+
+
+for _k in range(1, 6):
+    sound(f"takedown.x{_k}")(lambda v, k=_k: takedown(v, k))
+
+
+@sound("takedown.assist")
+def _(v):
+    r, n = v.rng, T(0.6)
+    bells = notes_seq(n, [(mf(79), 0.0), (mf(86), 0.07)], "bell", 0.3, [0.6, 0.8])
+    out = 0.7 * unit(bells)
+    for when in (0.08, 0.17):
+        place(out, gold_coin(T(0.2), r, r.uniform(2800, 3500), 0.07), when, 0.25)
+    return out
+
+
 @sound("ui.click")
 def _(v):
     n = T(0.07)
@@ -2717,17 +2774,25 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cache", default=os.path.join(ROOT, "art", "cache", "sounds"))
     ap.add_argument("--sheets", default=None)
-    ap.add_argument("--only", default=None, help="make only the sounds whose names start so")
+    ap.add_argument("--only", default=None,
+                    help="make only the sounds whose names start so (several, comma-separated)")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 1)
     a = ap.parse_args()
     man = json.load(open(os.path.join(AUDIO, "manifest.json"), encoding="utf-8"))
     sounds = [d for d in man["sounds"] if not d["optional"]]
     SRC = Sources(a.cache)
     for p in PACKS:
-        SRC.pack(p)
+        # Fetched and checked once here, before the workers fork; one that can't be reached is
+        # only a problem for the sounds made from it (they fail when they ask for it).
+        try:
+            SRC.pack(p)
+        except OSError as e:
+            print(f"the {p} pack couldn't be fetched ({e}): the sounds made from it will fail",
+                  flush=True)
     ROOM = make_room(np.random.default_rng(7))
+    only = None if a.only is None else tuple(a.only.split(","))
     todo = [(d, k) for d in sounds for k in range(d["takes"])
-            if a.only is None or d["name"].startswith(a.only)]
+            if only is None or d["name"].startswith(only)]
     import multiprocessing as mp
     with mp.get_context("fork").Pool(a.jobs) as pool:
         done = pool.map(job, todo, chunksize=1)

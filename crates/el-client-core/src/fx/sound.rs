@@ -15,6 +15,9 @@ pub enum Bus {
     Effects,
     /// The announcer.
     Voice,
+    /// The champions' own voices: their lines as they move, fight, cast their ultimates, kill and
+    /// fall ([`super::vo`]).
+    Champions,
     /// The interface: the shop, the cards, pings.
     Ui,
     /// The Causeway itself: the wind, the braziers.
@@ -23,12 +26,19 @@ pub enum Bus {
 }
 
 impl Bus {
-    pub const ALL: [Bus; 5] = [Bus::Effects, Bus::Voice, Bus::Ui, Bus::Ambience, Bus::Music];
+    /// The buses, in the menu's order (the settings keep each by its name).
+    pub const ALL: [Bus; 6] = [Bus::Effects, Bus::Champions, Bus::Voice, Bus::Ui, Bus::Ambience, Bus::Music];
+
+    /// Its place in [`Bus::ALL`].
+    pub fn index(self) -> usize {
+        Bus::ALL.iter().position(|&b| b == self).unwrap_or(0)
+    }
 
     pub fn name(self) -> &'static str {
         match self {
             Bus::Effects => "effects",
             Bus::Voice => "voice",
+            Bus::Champions => "champions",
             Bus::Ui => "ui",
             Bus::Ambience => "ambience",
             Bus::Music => "music",
@@ -50,7 +60,8 @@ pub struct SoundDef {
     pub stereo: bool,
     /// It loops.
     pub looped: bool,
-    /// Not ours to make: the announcer and the music, which come as files when they come.
+    /// Not `sounds.py`'s to make: the music, which comes as files when it comes, and the
+    /// announcer's lines, which `voices.py` makes as placeholders until recordings replace them.
     pub optional: bool,
     /// What it is: what the sound tool makes from.
     pub what: &'static str,
@@ -236,6 +247,13 @@ sounds! {
     RelicTake = "relic.take", Effects, 1, 2, -3.0, "", "a relic taken: a bright bubbling heal, 0.7 s";
     RelicBeam = "relic.beam", Effects, 1, 1, -4.0, "", "a relic's beam about to fall: a rising hum, 1.0 s";
     AugmentProc = "augment.proc", Effects, 2, 4, -9.0, "", "an augment answering: a small magical tick, 0.25 s";
+    GoldCoin = "gold.coin", Ui, 3, 3, -7.0, "", "your last hit's gold: one bright coin's plink, 0.3 s";
+    TakedownX1 = "takedown.x1", Ui, 1, 1, -3.0, "", "your kill: a punchy low hit, one bright note up and a few coins, 0.8 s";
+    TakedownX2 = "takedown.x2", Ui, 1, 1, -2.5, "", "your second kill running: the hit, two notes up and more coins, 0.9 s";
+    TakedownX3 = "takedown.x3", Ui, 1, 1, -2.0, "", "your third kill running: the hit, three notes up and a spill of coins, 1.0 s";
+    TakedownX4 = "takedown.x4", Ui, 1, 1, -1.5, "", "your fourth kill running: a heavier hit, four notes up and a shower of coins, 1.1 s";
+    TakedownX5 = "takedown.x5", Ui, 1, 1, -1.0, "", "all five by your hand: the heaviest hit, a run of five notes to a ringing chord and coins pouring, 1.4 s";
+    TakedownAssist = "takedown.assist", Ui, 1, 1, -6.0, "", "your assist: a soft two-note chime and a coin or two, 0.6 s";
 
     UiClick = "ui.click", Ui, 1, 2, -6.0, "", "a button: a soft dry click";
     UiBuy = "ui.buy", Ui, 1, 2, -4.0, "", "an item bought: a coin clink";
@@ -276,16 +294,43 @@ sounds! {
     VoiceTurretLost = "voice.turret_lost", Voice, 1, 1, 0.0, "o", "your team lost a turret";
     VoiceInhibitorDown = "voice.inhibitor_down", Voice, 1, 1, 0.0, "o", "your team destroyed an inhibitor";
     VoiceInhibitorLost = "voice.inhibitor_lost", Voice, 1, 1, 0.0, "o", "your team lost an inhibitor";
-    VoiceInhibitorBack = "voice.inhibitor_back", Voice, 1, 1, 0.0, "o", "an inhibitor stands again";
+    VoiceInhibitorBack = "voice.inhibitor_back", Voice, 1, 1, 0.0, "o", "your inhibitor stands again";
     VoiceVictory = "voice.victory", Voice, 1, 1, 0.0, "o", "victory";
     VoiceDefeat = "voice.defeat", Voice, 1, 1, 0.0, "o", "defeat";
-    VoiceSurrender = "voice.surrender", Voice, 1, 1, 0.0, "o", "a team has surrendered";
+    VoiceSurrender = "voice.surrender", Voice, 1, 1, 0.0, "o", "your team surrendered";
+    VoiceEnemySurrender = "voice.enemy_surrender", Voice, 1, 1, 0.0, "o", "the enemy surrendered";
+    VoiceEnemyMulti2 = "voice.enemy_multi_2", Voice, 1, 1, 0.0, "o", "an enemy's two kills in a row";
+    VoiceEnemyMulti3 = "voice.enemy_multi_3", Voice, 1, 1, 0.0, "o", "an enemy's three kills in a row";
+    VoiceEnemyMulti4 = "voice.enemy_multi_4", Voice, 1, 1, 0.0, "o", "an enemy's four kills in a row";
+    VoiceEnemyMulti5 = "voice.enemy_multi_5", Voice, 1, 1, 0.0, "o", "all five of your team, by one enemy's hand";
+    VoiceAced = "voice.aced", Voice, 1, 1, 0.0, "o", "your whole team down";
+    VoiceSpree3 = "voice.spree_3", Voice, 1, 1, 0.0, "o", "one of yours: three kills without falling";
+    VoiceSpree4 = "voice.spree_4", Voice, 1, 1, 0.0, "o", "one of yours: four kills without falling";
+    VoiceSpree5 = "voice.spree_5", Voice, 1, 1, 0.0, "o", "one of yours: five kills without falling";
+    VoiceSpree6 = "voice.spree_6", Voice, 1, 1, 0.0, "o", "one of yours: six kills without falling";
+    VoiceSpree7 = "voice.spree_7", Voice, 1, 1, 0.0, "o", "one of yours: seven kills without falling";
+    VoiceSpree8 = "voice.spree_8", Voice, 1, 1, 0.0, "o", "one of yours: eight kills and more without falling";
+    VoiceEnemySpree3 = "voice.enemy_spree_3", Voice, 1, 1, 0.0, "o", "an enemy: three kills without falling";
+    VoiceEnemySpree4 = "voice.enemy_spree_4", Voice, 1, 1, 0.0, "o", "an enemy: four kills without falling";
+    VoiceEnemySpree5 = "voice.enemy_spree_5", Voice, 1, 1, 0.0, "o", "an enemy: five kills without falling";
+    VoiceEnemySpree6 = "voice.enemy_spree_6", Voice, 1, 1, 0.0, "o", "an enemy: six kills without falling";
+    VoiceEnemySpree7 = "voice.enemy_spree_7", Voice, 1, 1, 0.0, "o", "an enemy: seven kills without falling";
+    VoiceEnemySpree8 = "voice.enemy_spree_8", Voice, 1, 1, 0.0, "o", "an enemy: eight kills and more without falling";
+    VoiceShutdown = "voice.shutdown", Voice, 1, 1, 0.0, "o", "a champion's run of three or more ended";
+    VoiceExecuted = "voice.executed", Voice, 1, 1, 0.0, "o", "a champion killed by no champion (a turret, minions, the platform)";
+    VoiceInhibitorSoon = "voice.inhibitor_soon", Voice, 1, 1, 0.0, "o", "your inhibitor stands again in fifteen seconds";
+    VoiceEnemyInhibitorSoon = "voice.enemy_inhibitor_soon", Voice, 1, 1, 0.0, "o", "the enemy's inhibitor stands again in fifteen seconds";
+    VoiceEnemyInhibitorBack = "voice.enemy_inhibitor_back", Voice, 1, 1, 0.0, "o", "the enemy's inhibitor stands again";
 
     MusicSelect = "music.select", Music, 1, 1, 0.0, "slo", "champion select, looped";
     MusicMatch = "music.match", Music, 1, 1, -4.0, "slo", "the match, looped under it all";
     MusicVictory = "music.victory", Music, 1, 1, 0.0, "so", "a win";
     MusicDefeat = "music.defeat", Music, 1, 1, 0.0, "so", "a loss";
 }
+
+use el_sim::content::champions::CHAMPIONS;
+
+use super::vo;
 
 /// The first family sound in the table.
 const FAMILIES_AT: usize = 0;
@@ -312,13 +357,13 @@ impl Sfx {
     }
 }
 
-/// The table as `web/assets/audio/manifest.json` has it, for the sound tool.
+/// The table as `web/assets/audio/manifest.json` has it, for the sound tool and the voices'.
 pub fn manifest() -> String {
     let lines: Vec<serde_json::Value> = Sfx::ALL
         .iter()
         .map(|&s| {
             let d = s.def();
-            serde_json::json!({
+            let mut v = serde_json::json!({
                 "name": d.name,
                 "bus": d.bus.name(),
                 "takes": d.takes,
@@ -328,15 +373,44 @@ pub fn manifest() -> String {
                 "loop": d.looped,
                 "optional": d.optional,
                 "what": d.what,
+            });
+            if let Some(t) = super::voice::says(s) {
+                v["says"] = serde_json::json!(t);
+            }
+            v
+        })
+        .collect();
+    let voices: Vec<serde_json::Value> = (0..CHAMPIONS.len() as u8)
+        .flat_map(|c| {
+            let sc = vo::script(c);
+            vo::Line::ALL.iter().map(move |&line| {
+                let takes = sc.takes(line);
+                let r = vo::rule(line);
+                serde_json::json!({
+                    "name": format!("vo.{}.{}", CHAMPIONS[usize::from(c)].name.to_lowercase(), line.name()),
+                    "champion": CHAMPIONS[usize::from(c)].name,
+                    "family": super::look::Family::of(c).name(),
+                    "line": line.name(),
+                    "when": line.when(),
+                    "heard_by": match r.aim { vo::Aim::Own => "the player alone", vo::Aim::Seen => "whoever sees the champion" },
+                    "bus": Bus::Champions.name(),
+                    "takes": takes.len(),
+                    "files": (0..takes.len() as u8).map(|k| vo::file(c, line, k)).collect::<Vec<_>>(),
+                    "says": takes,
+                    "cast": sc.cast,
+                })
             })
         })
         .collect();
     let mut out = serde_json::to_string_pretty(&serde_json::json!({
-        "about": "Every sound the game plays (el_client_core::fx::sound). Written by `cargo test -p \
-                  el-client-core fx::sound -- --ignored write_manifest`; art/tools/sounds.py makes \
-                  the files of every line that isn't optional.",
+        "about": "Every sound the game plays (el_client_core::fx::sound), and every champion's lines \
+                  (el_client_core::fx::vo). Written by `cargo test -p el-client-core fx::sound -- \
+                  --ignored write_manifest`; art/tools/sounds.py makes the files of every sound that \
+                  isn't optional, art/tools/voices.py the announcer's and the champions' placeholders \
+                  (a recording of the same name replaces one).",
         "formats": ["ogg", "mp3"],
         "sounds": lines,
+        "voices": voices,
     }))
     .unwrap_or_default();
     out.push('\n');
@@ -408,6 +482,28 @@ mod tests {
                     let f = dir.join(format!("{}.{ext}", s.file(k)));
                     assert!(f.is_file(), "{} is missing: python3 -I art/tools/sounds.py", f.display());
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn every_voice_has_its_files() {
+        // The announcer's lines and every champion's takes: placeholders from voices.py, or the
+        // recordings that replaced them.
+        let dir = audio_dir();
+        let mut stems: Vec<String> =
+            Sfx::ALL.iter().filter(|s| s.def().bus == Bus::Voice).map(|s| s.file(0)).collect();
+        for c in 0..CHAMPIONS.len() as u8 {
+            for line in vo::Line::ALL {
+                for k in 0..vo::script(c).takes(line).len() as u8 {
+                    stems.push(vo::file(c, line, k));
+                }
+            }
+        }
+        for stem in stems {
+            for ext in ["ogg", "mp3"] {
+                let f = dir.join(format!("{stem}.{ext}"));
+                assert!(f.is_file(), "{} is missing: python3 -I art/tools/voices.py", f.display());
             }
         }
     }

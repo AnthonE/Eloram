@@ -130,7 +130,7 @@ enum Words {
 struct Pending;
 
 /// The volumes' rows: the master's, then each bus's.
-const VOLUMES: [&str; 6] = ["Master", "Effects", "Announcer", "Interface", "Ambience", "Music"];
+const VOLUMES: [&str; 7] = ["Master", "Effects", "Champions", "Announcer", "Interface", "Ambience", "Music"];
 
 /// The panel's size, in the HUD's pixels (1600 by 900, scaled: `hud.rs`).
 const W: f32 = 1_000.0;
