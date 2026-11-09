@@ -7,9 +7,13 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "t", rename_all = "snake_case")]
 pub enum ToServer {
-    /// Find me a match.
+    /// Find me a match (NORMAL: bots fill the seats no one takes, nothing rated).
     Queue,
-    /// Not any more.
+    /// Find me a ranked match: ten wallets, no bots, every match rated on Elo Pros. Answered with
+    /// [`ToClient::Ranked`] while it waits, or [`ToClient::Refused`].
+    QueueRanked,
+    /// Not any more: out of the queue or champion select, or (seated) out of the match for good:
+    /// its rejoin token forgotten, a bot in the seat.
     Leave,
     /// In champion select: this champion back to the team's bench, a new one dealt.
     Reroll,
@@ -74,6 +78,49 @@ pub enum ToClient {
     NoSeat,
     /// The match is over; `winner` is the team whose nexus stands.
     Over { winner: u8 },
+    /// Who the server knows this session as (its wallet or account id, none for a guest), and
+    /// what it holds. Sent once, after the Welcome (and the Token).
+    About {
+        #[serde(default)]
+        player: Option<String>,
+        #[serde(default)]
+        practice: bool,
+        #[serde(default)]
+        ranked: bool,
+    },
+    /// The ranked queue, as the store has it: `state` one of `waiting`, `matched`, `gathering`,
+    /// `expired`, `failed`; the seconds waited; why, when it ended.
+    Ranked {
+        state: String,
+        #[serde(default)]
+        waited_s: u32,
+        #[serde(default)]
+        why: Option<String>,
+    },
+    /// Something asked for that this server won't do (`what`: `ranked`, `practice`...), and why,
+    /// in words to show.
+    Refused { what: String, why: String },
+}
+
+/// The ranked queue's state in words, for the menu.
+pub fn ranked_line(state: &str, waited_s: u32, why: Option<&str>) -> String {
+    let waited = if waited_s >= 60 {
+        format!("{}:{:02}", waited_s / 60, waited_s % 60)
+    } else {
+        format!("{waited_s}s")
+    };
+    match (state, why) {
+        ("waiting", _) => format!("In the ranked queue, {waited}"),
+        ("matched" | "gathering", _) => "Matched: gathering the ten players".into(),
+        ("expired", _) => "The ranked queue gave up after its wait. Queue again?".into(),
+        (_, Some(w)) => format!("Ranked: {w}"),
+        _ => format!("Ranked: {state}"),
+    }
+}
+
+/// The ranked wait is over without a match.
+pub fn ranked_ended(state: &str) -> bool {
+    matches!(state, "expired" | "failed" | "off")
 }
 
 impl ToClient {
@@ -115,8 +162,37 @@ mod tests {
             (r#"{"t":"ready"}"#, ToServer::Ready),
             (r#"{"t":"rejoin","token":"ab"}"#, ToServer::Rejoin { token: "ab".into() }),
             (r#"{"t":"practice","champ":12}"#, ToServer::Practice { champ: 12 }),
+            (r#"{"t":"queue_ranked"}"#, ToServer::QueueRanked),
         ] {
             assert_eq!(serde_json::from_str::<ToServer>(json).unwrap(), msg);
+        }
+        for (json, msg) in [
+            (
+                r#"{"t":"about","player":"0xab","practice":true,"ranked":false}"#,
+                ToClient::About { player: Some("0xab".into()), practice: true, ranked: false },
+            ),
+            (r#"{"t":"about"}"#, ToClient::About { player: None, practice: false, ranked: false }),
+            (
+                r#"{"t":"ranked","state":"waiting","waited_s":75}"#,
+                ToClient::Ranked { state: "waiting".into(), waited_s: 75, why: None },
+            ),
+            (
+                r#"{"t":"refused","what":"ranked","why":"no"}"#,
+                ToClient::Refused { what: "ranked".into(), why: "no".into() },
+            ),
+        ] {
+            assert_eq!(serde_json::from_str::<ToClient>(json).unwrap(), msg);
+        }
+    }
+
+    #[test]
+    fn the_ranked_queue_in_words() {
+        assert_eq!(ranked_line("waiting", 75, None), "In the ranked queue, 1:15");
+        assert_eq!(ranked_line("waiting", 9, None), "In the ranked queue, 9s");
+        assert_eq!(ranked_line("failed", 0, Some("no server with room")), "Ranked: no server with room");
+        assert!(ranked_ended("expired") && !ranked_ended("waiting"));
+        for s in ["waiting", "matched", "expired", "failed", "odd"] {
+            assert!(ranked_line(s, 3, None).is_ascii());
         }
     }
 }

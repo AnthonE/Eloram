@@ -10,6 +10,15 @@ step "clippy (wasm client)";  cargo clippy -p el-client --target wasm32-unknown-
 step "clippy (wasm, webgpu)"; cargo clippy -p el-client --target wasm32-unknown-unknown --features webgpu -- -D warnings
 step "tests";                 cargo test --workspace --release
 step "determinism on wasm";   cargo test -p el-sim --target wasm32-unknown-unknown --release --test determinism
+# The desktop client's prediction runs without glam's scalar maths (Bevy's glam won't take them):
+# the same goldens must hold without them.
+step "determinism, no scalar maths"; cargo test -p el-sim --release --test determinism
+# The desktop client (needs libudev-dev, libwayland-dev, libasound2-dev, libxkbcommon-dev). Never
+# in one cargo run with el-server or el-bot, which turn scalar maths on.
+if [ "${EL_DESKTOP:-0}" = "1" ]; then
+  step "clippy (desktop)";    cargo clippy -p el-client --features desktop --all-targets -- -D warnings
+  step "tests (desktop)";     cargo test -p el-client --features desktop --lib
+fi
 if [ "${EL_E2E:-0}" = "1" ]; then
   step "web build";           ./scripts/build-web.sh webgl2
   step "e2e: transport";      ./scripts/e2e.sh spike webgl2

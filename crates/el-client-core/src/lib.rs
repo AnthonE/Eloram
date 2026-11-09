@@ -8,6 +8,7 @@ pub mod client;
 pub mod clock;
 pub mod controls;
 pub mod fog;
+pub mod front;
 pub mod fx;
 pub mod icons;
 pub mod inputs;

@@ -18,6 +18,7 @@ use el_client_core::fx::look::Side;
 use el_client_core::fx::stage::{self as core, Clock, Knobs, Staged};
 use el_sim::MAP_W;
 use el_sim::map::MID_Y;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsValue;
 
 use crate::camera::{MainCamera, Rig, VIEW};
@@ -49,6 +50,7 @@ pub struct Stage {
     fire: bool,
     clear: bool,
     /// A `?knobs=` that didn't parse.
+    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
     pub bad_knobs: Option<String>,
 }
 
@@ -71,9 +73,7 @@ impl Plugin for StagePlugin {
         let cfg = &app.world().resource::<LaunchConfigRes>().0;
         let Some(name) = cfg.fxstage.clone() else { return };
         let Some(staged) = core::find(&name) else {
-            web_sys::console::error_1(
-                &format!("fxstage: nothing named {name:?} (scripts/fx.sh list)").into(),
-            );
+            error!("fxstage: nothing named {name:?} (scripts/fx.sh list)");
             return;
         };
         let (knobs, bad_knobs) = match Knobs::parse(&cfg.fxknobs) {
@@ -197,7 +197,14 @@ fn hide_world(
     }
 }
 
+/// The fx stage is the browser's (`scripts/fx.sh` shoots the page): the desktop runs it free.
+#[cfg(not(target_arch = "wasm32"))]
+fn wanted() -> Option<u32> {
+    None
+}
+
 /// The step a shooter asks for (`window.__fxStep`), or none: run free.
+#[cfg(target_arch = "wasm32")]
 fn wanted() -> Option<u32> {
     let window = web_sys::window()?;
     let v = js_sys::Reflect::get(&window, &JsValue::from_str("__fxStep")).ok()?;
@@ -259,6 +266,10 @@ fn fire(
 }
 
 /// `window.__fx`: where the stage stands, for the shooter.
+#[cfg(not(target_arch = "wasm32"))]
+fn publish(_stage: Res<Stage>, _knobs: Res<KnobsRes>, _bursts: Res<Bursts>, _look: Res<Look>) {}
+
+#[cfg(target_arch = "wasm32")]
 fn publish(stage: Res<Stage>, knobs: Res<KnobsRes>, bursts: Res<Bursts>, look: Res<Look>) {
     let Some(window) = web_sys::window() else { return };
     let obj = js_sys::Object::new();

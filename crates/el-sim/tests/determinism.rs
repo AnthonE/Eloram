@@ -1,9 +1,11 @@
 //! The same match must produce bit-identical state on every machine and on wasm32 (the browser
-//! re-steps it to watch, and predicts with it). Native runs need `--features deterministic` (glam
-//! scalar math, which is what wasm32 uses too); `cargo test --workspace` gets it through feature
-//! unification.
+//! re-steps it to watch, and predicts with it). It holds with glam's scalar maths
+//! (`--features deterministic`, what the server builds with and what wasm32 has anyway) and
+//! without them (`cargo test -p el-sim --release --test determinism`, what the desktop client
+//! builds with: Bevy's glam won't take the feature). Both must pass on the same goldens, which they
+//! can because the sim uses `glam::Vec2` alone, which has no SIMD form (`clippy.toml` bans the
+//! types that do).
 #![allow(clippy::disallowed_types, clippy::disallowed_methods, clippy::disallowed_macros)]
-#![cfg(any(feature = "deterministic", target_arch = "wasm32"))]
 
 mod common;
 

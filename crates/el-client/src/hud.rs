@@ -160,6 +160,8 @@ pub(crate) enum Act {
     Leave,
     /// The page loaded again (after the link failed for good).
     Reload,
+    /// Back to the main menu (a match over).
+    Menu,
 }
 
 /// What a tooltip over this says.
@@ -2583,8 +2585,9 @@ fn minimap(
 /// A button pressed: its order, or champion select's message.
 fn press(
     q: Query<(&Interaction, &Act), Changed<Interaction>>,
-    session: Res<Session>,
+    mut session: ResMut<Session>,
     mut controls: ResMut<Controls>,
+    mut front: ResMut<crate::front::Front>,
 ) {
     for (i, act) in &q {
         if *i != Interaction::Pressed {
@@ -2612,7 +2615,15 @@ fn press(
                 continue;
             }
             Act::Queue => {
-                controls.lobby.push(ToServer::Queue);
+                // Again as the menu last played: a ranked match's PLAY AGAIN queues ranked.
+                controls.lobby.push(match front.mode {
+                    el_client_core::front::PlayMode::Ranked => ToServer::QueueRanked,
+                    el_client_core::front::PlayMode::Normal => ToServer::Queue,
+                });
+                continue;
+            }
+            Act::Menu => {
+                front.back(&mut session);
                 continue;
             }
             Act::Leave => {
@@ -2620,9 +2631,7 @@ fn press(
                 continue;
             }
             Act::Reload => {
-                if let Some(w) = web_sys::window() {
-                    let _ = w.location().reload();
-                }
+                crate::platform::reload();
                 continue;
             }
         };

@@ -1,6 +1,9 @@
-//! `window.__el`: a small status object the Playwright tests (and curious humans) can read.
+//! `window.__el`: a small status object the Playwright tests (and curious humans) can read, and
+//! `window.__elInbox`, the commands they send. The desktop's are a file each (`--status`, written
+//! four times a second; `--inbox`, read a line at a time), for the same tests natively.
 
 use bevy::prelude::*;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::{JsCast, JsValue};
 
 /// Fields published to `window.__el` a few times a second (every frame on a slow page). Kept as
@@ -52,6 +55,7 @@ impl From<String> for Field {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 impl From<&Field> for JsValue {
     fn from(f: &Field) -> JsValue {
         match f {
@@ -121,6 +125,11 @@ fn publish(
     *last = now;
     let frames = *frames;
     status.set("frames", frames);
+    publish_now(&status);
+}
+
+#[cfg(target_arch = "wasm32")]
+fn publish_now(status: &DevStatus) {
     let Some(window) = web_sys::window() else { return };
     let obj = js_sys::Object::new();
     for (k, v) in &status.fields {
@@ -129,8 +138,34 @@ fn publish(
     let _ = js_sys::Reflect::set(&window, &JsValue::from_str("__el"), &obj);
 }
 
+/// The desktop writes the status to `--status`'s file whole (a temporary file, then a rename).
+#[cfg(not(target_arch = "wasm32"))]
+fn publish_now(status: &DevStatus) {
+    let Some(path) = STATUS_FILE.get().and_then(|p| p.as_ref()) else { return };
+    let mut doc = serde_json::Map::new();
+    for (k, v) in &status.fields {
+        let v = match v {
+            Field::Num(n) => serde_json::json!(n),
+            Field::Bool(b) => serde_json::json!(b),
+            Field::Text(t) => serde_json::json!(t),
+        };
+        doc.insert((*k).to_string(), v);
+    }
+    let tmp = format!("{path}.tmp");
+    if std::fs::write(&tmp, serde_json::Value::Object(doc).to_string()).is_ok() {
+        let _ = std::fs::rename(tmp, path);
+    }
+}
+
+/// The desktop's test hooks' files (`--status`, `--inbox`), set once at the start.
+#[cfg(not(target_arch = "wasm32"))]
+pub static STATUS_FILE: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+#[cfg(not(target_arch = "wasm32"))]
+pub static INBOX_FILE: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+
 /// Fades out the HTML "loading" overlay once Bevy renders its first frame (the page's
 /// `elHideBoot`, which hides it once it has faded; or at once, without it).
+#[cfg(target_arch = "wasm32")]
 fn hide_boot_overlay() {
     let Some(window) = web_sys::window() else { return };
     let fade = js_sys::Reflect::get(&window, &JsValue::from_str("elHideBoot"))
@@ -141,6 +176,41 @@ fn hide_boot_overlay() {
     } else if let Some(el) = window.document().and_then(|d| d.get_element_by_id("boot")) {
         let _ = el.class_list().add_1("hidden");
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn hide_boot_overlay() {}
+
+/// The commands waiting: the page's `window.__elInbox`, emptied; the desktop's `--inbox` file's
+/// lines written since the last look.
+#[cfg(target_arch = "wasm32")]
+fn take_commands(_read: &mut u64) -> Vec<String> {
+    let Some(window) = web_sys::window() else { return Vec::new() };
+    let Ok(arr) = js_sys::Reflect::get(&window, &JsValue::from_str("__elInbox")) else { return Vec::new() };
+    let Ok(arr) = arr.dyn_into::<js_sys::Array>() else { return Vec::new() };
+    let mut out = Vec::new();
+    while arr.length() > 0 {
+        let v = arr.shift();
+        out.push(js_sys::JSON::stringify(&v).ok().and_then(|s| s.as_string()).unwrap_or_default());
+    }
+    out
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn take_commands(read: &mut u64) -> Vec<String> {
+    let Some(path) = INBOX_FILE.get().and_then(|p| p.as_ref()) else { return Vec::new() };
+    let Ok(bytes) = std::fs::read(path) else { return Vec::new() };
+    let from = (*read as usize).min(bytes.len());
+    // Whole lines only: a line still being written waits for the next frame.
+    let Some(end) = bytes[from..].iter().rposition(|b| *b == b'\n').map(|e| from + e + 1) else {
+        return Vec::new();
+    };
+    *read = end as u64;
+    String::from_utf8_lossy(&bytes[from..end])
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(str::to_owned)
+        .collect()
 }
 
 /// What a test (or the console) can tell the champion through `window.__elInbox`: an array of
@@ -205,6 +275,17 @@ enum Cmd {
     PracticeChamp {
         champ: u8,
     },
+    /// The main menu (`front`): up or down, a page by its name (`play`, `watch`...).
+    Front {
+        open: Option<bool>,
+        nav: Option<String>,
+    },
+    /// The menu's PLAY in a mode (`normal`, `ranked`).
+    Play {
+        mode: Option<String>,
+    },
+    /// Back to the menu (a match over, a watch left).
+    BackToMenu,
     /// An ability's indicator shown, as if its key were held (`slot: null` lets go without casting).
     Aim {
         slot: Option<u8>,
@@ -300,23 +381,21 @@ fn inbox(
     mut menu: ResMut<crate::menu::Menu>,
     mut prefs: ResMut<crate::config::Prefs>,
     drawn: Res<crate::view::Drawn>,
+    mut read: Local<u64>,
+    mut front: ResMut<crate::front::Front>,
+    mut session: ResMut<crate::session::Session>,
 ) {
     use el_client_core::lobby::ToServer;
     use el_proto::{Aim, Order, UnitRef};
-    let Some(window) = web_sys::window() else { return };
-    let Ok(arr) = js_sys::Reflect::get(&window, &JsValue::from_str("__elInbox")) else { return };
-    let Ok(arr) = arr.dyn_into::<js_sys::Array>() else { return };
     let unit = |slot: u8| UnitRef {
         slot,
         generation: drawn.units.get(usize::from(slot)).copied().flatten().map_or(0, |d| d.generation),
     };
-    while arr.length() > 0 {
-        let v = arr.shift();
-        let text = js_sys::JSON::stringify(&v).ok().and_then(|s| s.as_string()).unwrap_or_default();
+    for text in take_commands(&mut read) {
         let cmd = match serde_json::from_str::<Cmd>(&text) {
             Ok(c) => c,
             Err(e) => {
-                web_sys::console::warn_1(&format!("__elInbox: {e}: {text}").into());
+                warn!("__elInbox: {e}: {text}");
                 continue;
             }
         };
@@ -396,7 +475,7 @@ fn inbox(
                     ("indicators", "on" | "off", _) => prefs.set_indicators(value == "on"),
                     ("camera", "locked" | "free", _) => rig.set_locked(value == "locked"),
                     ("quality", "low" | "high", _) => prefs.set_low_next(value == "low"),
-                    _ => web_sys::console::warn_1(&format!("__elInbox: no setting {key} = {value}").into()),
+                    _ => warn!("__elInbox: no setting {key} = {value}"),
                 }
                 continue;
             }
@@ -413,9 +492,7 @@ fn inbox(
                 let want = match want {
                     Some(w) => w,
                     None => {
-                        web_sys::console::warn_1(
-                            &format!("__elInbox: nothing to catch called {what}").into(),
-                        );
+                        warn!("__elInbox: nothing to catch called {what}");
                         continue;
                     }
                 };
@@ -454,6 +531,31 @@ fn inbox(
             }
             Cmd::PracticeChamp { champ } => {
                 controls.lobby.push(ToServer::Practice { champ });
+                continue;
+            }
+            Cmd::Front { open, nav } => {
+                if let Some(n) = nav.as_deref().and_then(el_client_core::front::Nav::parse) {
+                    front.nav = n;
+                }
+                match open {
+                    Some(true) if !front.up => front.back(&mut session),
+                    Some(false) => front.up = false,
+                    _ => {}
+                }
+                continue;
+            }
+            Cmd::Play { mode } => {
+                let mode =
+                    mode.as_deref().and_then(el_client_core::front::PlayMode::parse).unwrap_or_default();
+                front.mode = mode;
+                controls.lobby.push(match mode {
+                    el_client_core::front::PlayMode::Ranked => ToServer::QueueRanked,
+                    el_client_core::front::PlayMode::Normal => ToServer::Queue,
+                });
+                continue;
+            }
+            Cmd::BackToMenu => {
+                front.back(&mut session);
                 continue;
             }
             Cmd::Aim { slot } => {

@@ -234,7 +234,8 @@ impl BotClient {
                 }
                 ToClient::NoSeat => self.no_seat = true,
                 ToClient::Over { winner } => self.over = Some(winner),
-                ToClient::Queued { .. } => {}
+                ToClient::Queued { .. } | ToClient::About { .. } | ToClient::Ranked { .. } => {}
+                ToClient::Refused { .. } => self.no_seat = true,
                 ToClient::Select { .. } => self.ready_due = true,
             },
             Incoming::Msg(ControlMsg::Bye { reason }) => anyhow::bail!("the server said goodbye ({reason})"),

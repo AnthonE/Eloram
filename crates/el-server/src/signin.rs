@@ -122,6 +122,18 @@ struct Entry {
     agent: bool,
     since: u64,
     session: u32,
+    /// What they're doing, in words (at most 64 printable characters), for the store's friends
+    /// list and presence: "At the menu", "Finding a match", "Champion select", "In a match"...
+    status: &'static str,
+}
+
+/// What a session is doing, as `/online.json` says it.
+pub mod status {
+    pub const MENU: &str = "At the menu";
+    pub const QUEUED: &str = "Finding a match";
+    pub const SELECT: &str = "Champion select";
+    pub const PLAYING: &str = "In a match";
+    pub const PRACTICE: &str = "Practising";
 }
 
 /// The wallets on now, by id (so the document reads in a stable order). The store's playtime polls
@@ -137,12 +149,15 @@ impl Online {
     /// takes the entry over, and the older one's guard then leaves it be.
     pub fn enter(self: &Arc<Self>, address: PlayerId, session: u32, name: &str, agent: bool) -> Here {
         if let Ok(mut on) = self.0.lock() {
-            on.insert(address, Entry { name: name.to_string(), agent, since: unix_now(), session });
+            on.insert(
+                address,
+                Entry { name: name.to_string(), agent, since: unix_now(), session, status: status::MENU },
+            );
         }
         Here { online: self.clone(), address, session }
     }
 
-    /// `{"at": unix, "online": [{"wallet", "name", "agent", "since"}]}`.
+    /// `{"at": unix, "online": [{"wallet", "name", "agent", "since", "status"}]}`.
     pub fn json(&self) -> serde_json::Value {
         let online: Vec<serde_json::Value> = self.0.lock().map_or_else(
             |_| Vec::new(),
@@ -154,6 +169,7 @@ impl Online {
                             "name": e.name,
                             "agent": e.agent,
                             "since": e.since,
+                            "status": e.status,
                         })
                     })
                     .collect()
@@ -168,6 +184,17 @@ pub struct Here {
     online: Arc<Online>,
     address: PlayerId,
     session: u32,
+}
+
+impl Here {
+    /// What this session is doing now ([`status`]).
+    pub fn set_status(&self, now: &'static str) {
+        if let Ok(mut on) = self.online.0.lock()
+            && let Some(e) = on.get_mut(&self.address).filter(|e| e.session == self.session)
+        {
+            e.status = now;
+        }
+    }
 }
 
 impl Drop for Here {
@@ -371,6 +398,9 @@ mod tests {
         let doc = online.json();
         assert_eq!(doc["online"][0]["wallet"], format!("0x{}", "ab".repeat(20)));
         assert_eq!(doc["online"][0]["name"], "Ace");
+        assert_eq!(doc["online"][0]["status"], status::MENU);
+        second.set_status(status::QUEUED);
+        assert_eq!(online.json()["online"][0]["status"], status::QUEUED);
         drop(second);
         assert_eq!(online.json()["online"], serde_json::json!([]));
     }

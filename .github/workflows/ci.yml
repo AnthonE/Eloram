@@ -22,6 +22,25 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Tests, including the zero-allocation and determinism proofs (release for speed)
         run: cargo test --workspace --release
+      - name: The same golden hashes without glam's scalar maths (the desktop client's prediction)
+        run: cargo test -p el-sim --release --test determinism
+
+  desktop:
+    name: desktop client (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: The window's, the input's and the sound's libraries
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev libwayland-dev libasound2-dev libxkbcommon-dev
+      # Its own cargo runs: el-server and el-bot turn glam's scalar maths on, which Bevy won't take.
+      - name: Clippy (desktop client)
+        run: cargo clippy -p el-client --features desktop --all-targets -- -D warnings
+      - name: Tests (desktop client)
+        run: cargo test -p el-client --features desktop --lib
+      - name: Build
+        run: cargo build -p el-client --features desktop --release --bin eloram
 
   wasm:
     name: browser client + wasm determinism

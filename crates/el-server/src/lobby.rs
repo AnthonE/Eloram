@@ -398,6 +398,23 @@ impl Lobby {
         self.practice.store(true, std::sync::atomic::Ordering::Relaxed);
     }
 
+    /// Whether this server holds practice matches.
+    pub fn practice_allowed(&self) -> bool {
+        self.practice.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// A seated session leaves its match on purpose: its rejoin token is forgotten (a reload
+    /// doesn't pull the player back in), then the seat goes to a bot as any unseat's does.
+    pub fn leave_seat(&self, s: Seating) {
+        {
+            let mut inner = self.inner();
+            if let Some(l) = inner.live.iter_mut().find(|l| l.shard == s.shard && l.m == s.m) {
+                l.tokens[usize::from(s.seat)] = [0; 32];
+            }
+        }
+        self.unseat(s);
+    }
+
     /// Starts a practice match for `session` as champion `champ` (`el_sim::practice`): seat 0 its,
     /// the other nine dummies, no champion select. False if practice isn't allowed here or no
     /// match is free.

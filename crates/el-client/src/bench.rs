@@ -17,6 +17,7 @@ use el_sim::content::Target;
 use el_sim::content::champions::ability;
 use el_sim::map::{MAP_W_HALF, MID_Y};
 use el_sim::practice;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsValue;
 
 use crate::camera::Rig;
@@ -206,7 +207,6 @@ fn summary(results: &[Result]) -> String {
 
 /// `window.__elBench` (the JSON a person copies into `ROADMAP.md`) and the console.
 fn publish(cfg: &crate::config::LaunchConfig, results: &[Result], text: &str) {
-    let Some(window) = web_sys::window() else { return };
     let phases: Vec<serde_json::Value> = results
         .iter()
         .map(|r| {
@@ -219,12 +219,19 @@ fn publish(cfg: &crate::config::LaunchConfig, results: &[Result], text: &str) {
             })
         })
         .collect();
-    let size = window
-        .document()
+    #[cfg(target_arch = "wasm32")]
+    let size = web_sys::window()
+        .and_then(|w| w.document())
         .and_then(|d| d.get_element_by_id("el"))
         .map(|c| (c.client_width(), c.client_height()));
+    #[cfg(not(target_arch = "wasm32"))]
+    let size: Option<(i32, i32)> = None;
     let out = serde_json::json!({
-        "gfx": if crate::look::WEBGPU { "webgpu" } else { "webgl2" },
+        "gfx": match (crate::platform::DESKTOP, crate::look::WEBGPU) {
+            (true, _) => "native",
+            (false, true) => "webgpu",
+            (false, false) => "webgl2",
+        },
         "tier": if cfg.low { "low" } else { "high" },
         "renderer": cfg.renderer,
         "canvas": size.map(|(w, h)| vec![w, h]),
@@ -232,6 +239,9 @@ fn publish(cfg: &crate::config::LaunchConfig, results: &[Result], text: &str) {
         "phases": phases,
     });
     let json = out.to_string();
-    let _ = js_sys::Reflect::set(&window, &JsValue::from_str("__elBench"), &JsValue::from_str(&json));
-    web_sys::console::log_1(&format!("eloram bench\n{text}\n{json}").into());
+    #[cfg(target_arch = "wasm32")]
+    if let Some(window) = web_sys::window() {
+        let _ = js_sys::Reflect::set(&window, &JsValue::from_str("__elBench"), &JsValue::from_str(&json));
+    }
+    info!("eloram bench\n{text}\n{json}");
 }

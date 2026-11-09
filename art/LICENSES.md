@@ -3,6 +3,11 @@
 Every file under `web/assets/` is listed here with its source and licence. A file without a line
 here doesn't ship. Nothing is traced, sampled or named from Riot's games (`CLAUDE.md`).
 
+## The icon (`crates/el-client/icon/`)
+
+`eloram-256.png`, `eloram.ico` and `eloram.rc`, the desktop's window and program icon: drawn by
+`art/tools/icon.py` from `web/favicon.svg`'s shapes (the lane between the two bases). Ours.
+
 ## The ground (`web/assets/ground/`)
 
 Made by `art/tools/textures.py` from [ambientCG](https://ambientcg.com) sets, all

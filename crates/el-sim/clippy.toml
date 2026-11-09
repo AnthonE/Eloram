@@ -1,6 +1,16 @@
 # Hot-path rules for the simulation core. Storage is sized once at construction
 # (src/storage.rs is the only allocation site, explicitly allowed there).
 disallowed-types = [
+  { path = "glam::Vec3A", reason = "SIMD natively: prediction must take the server's bits with scalar-math or without (tests/determinism.rs)" },
+  { path = "glam::Vec4", reason = "SIMD natively: prediction must take the server's bits with scalar-math or without (tests/determinism.rs)" },
+  { path = "glam::Quat", reason = "SIMD natively: prediction must take the server's bits with scalar-math or without (tests/determinism.rs)" },
+  { path = "glam::Mat2", reason = "SIMD natively: prediction must take the server's bits with scalar-math or without (tests/determinism.rs)" },
+  { path = "glam::Mat3A", reason = "SIMD natively: prediction must take the server's bits with scalar-math or without (tests/determinism.rs)" },
+  { path = "glam::Mat4", reason = "SIMD natively: prediction must take the server's bits with scalar-math or without (tests/determinism.rs)" },
+  { path = "glam::Affine2", reason = "SIMD natively: prediction must take the server's bits with scalar-math or without (tests/determinism.rs)" },
+  { path = "glam::Affine3A", reason = "SIMD natively: prediction must take the server's bits with scalar-math or without (tests/determinism.rs)" },
+  { path = "glam::BVec3A", reason = "SIMD natively: prediction must take the server's bits with scalar-math or without (tests/determinism.rs)" },
+  { path = "glam::BVec4A", reason = "SIMD natively: prediction must take the server's bits with scalar-math or without (tests/determinism.rs)" },
   { path = "alloc::string::String", reason = "no heap strings in the simulation" },
   { path = "alloc::rc::Rc", reason = "no shared ownership in the tick" },
   { path = "alloc::sync::Arc", reason = "no shared ownership in the tick" },

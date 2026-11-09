@@ -15,10 +15,14 @@ glam.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
-# The prediction steps the server's own code, so it must take the same bits: natively that means
-# glam's scalar maths; wasm (no `simd128`) has nothing else, and Bevy's glam won't build with it.
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# The prediction steps the server's own code, so it must take the same bits. The server builds
+# with glam's scalar maths (`el-sim/deterministic`); the clients can't (Bevy's glam won't take
+# the feature) and needn't: the sim and this crate use `glam::Vec2` alone, which has no SIMD form
+# (`clippy.toml` bans the types that do), and `el-sim/tests/determinism.rs` holds the same goldens
+# with the feature and without. This crate's own tests run with it, as the server does.
+[dev-dependencies]
 el-sim = { workspace = true, features = ["deterministic"] }
+el-alloc.workspace = true
 
 [lints]
 workspace = true

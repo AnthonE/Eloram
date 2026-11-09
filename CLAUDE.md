@@ -18,10 +18,23 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
 ## Commands
 
 - `scripts/ci.sh`: everything CI runs (`EL_E2E=1` adds the browser tests).
-- `cargo test --workspace --release`: all native tests (el-client is a no-op natively; release
-  because the simulation-heavy tests are slow unoptimised).
+- `cargo test --workspace --release`: all native tests (el-client is empty natively without its
+  `desktop` feature; release because the simulation-heavy tests are slow unoptimised).
 - `cargo clippy --workspace --all-targets -- -D warnings`, and for the client
   `cargo clippy -p el-client --target wasm32-unknown-unknown [--features webgpu] -- -D warnings`.
+- The desktop client: `cargo run -p el-client --features desktop --release --bin eloram -- --http
+  http://127.0.0.1:8080` against a local server (`--help` lists the rest: `--server host:port`,
+  `--queue`, `--practice`, `--watch`, `--status`/`--inbox`/`--screenshot` for tests). Linux needs
+  `libudev-dev libwayland-dev libasound2-dev libxkbcommon-dev` to build and `libxkbcommon-x11-0` and a
+  Vulkan driver to run (headless: `xvfb-run` with `mesa-vulkan-drivers`). The same client as the
+  browser's: the browser-only halves are `web.rs` files beside `native.rs` ones (`platform/`,
+  `transport/`, `net/`, `config/`, `audio/`). **Never build `-p el-client --features desktop` in one
+  cargo run with el-server or el-bot**: they turn on `el-sim/deterministic` (glam's scalar maths),
+  which Bevy's glam won't build with; the prediction needs neither (`glam::Vec2` only, the other glam
+  types banned in `clippy.toml`; `cargo test -p el-sim --release --test determinism` holds the
+  goldens without it). It reaches the Elo launcher through `crates/el-launcher` (the platform's
+  `elo_overlay.rs`, vendored byte for byte: `scripts/elo-drift.sh <scry-forge>` checks it and the
+  copied test vectors).
 - `scripts/build-web.sh [webgl2] [webgpu]`: the browser build into `web/dist/` (needs
   wasm-bindgen-cli 0.2.128); both modules by default, each checked for the backend it binds, and
   `web/dist/build.json` naming them. The page takes WebGPU where the browser has an adapter, and
@@ -100,7 +113,7 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `el_client_core::icons`. `window.__el` has `portrait`, `ally_portraits`, `death_screen` and
   `recap_lines`.
 - The menu (Esc, or the button at the top left: `menu.rs`; `docs/DESIGN.md`, "Controls"): Controls,
-  Graphics, Sound, in the game's own UI (not the page's: a desktop build is coming). Settings are
+  Graphics, Sound, in the game's own UI (not the page's: the desktop build has it too). Settings are
   `config::Prefs` (the layout, the indicators, the tier now and at the next load, the first
   match's strip seen), kept by `config::remember` in the same `localStorage` keys `web/loader.js`
   reads for `?keys=`, `?indicators=`, `?camera=` and `?quality=`; the camera's lock is the rig's,

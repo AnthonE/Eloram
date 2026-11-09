@@ -112,6 +112,17 @@ pub struct Session {
     /// reads the world's events by count (the kill feed here, the figures' casts and falls) starts
     /// again from its first event when this moves on: a new match's count starts at 0 too.
     pub world: u32,
+    /// What the server said of us and itself after the Welcome (`ToClient::About`): who it knows
+    /// us as, and whether it holds practice and ranked matches.
+    pub player: Option<String>,
+    pub practice_here: bool,
+    pub ranked_here: bool,
+    /// The ranked queue, as the server relays the store's: a line to show, while queued.
+    pub ranked_line: Option<String>,
+    /// The last thing the server turned down, in words (`ToClient::Refused`), until shown.
+    pub refused: Option<String>,
+    /// A match left on purpose: the main menu comes back up.
+    pub left: bool,
 }
 
 /// What a ping says, in words.

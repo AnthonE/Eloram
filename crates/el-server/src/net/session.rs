@@ -24,7 +24,7 @@ use el_client_core::lobby::{ToClient, ToServer};
 use el_match::InputMsg;
 use el_proto::auth::{Domain, PlayerId, TOKEN_BYTES};
 use el_proto::control::{
-    ControlMsg, Frame, MAX_FRAME, MAX_LOBBY_FRAME, PlayerKind, RejectReason, encode_lobby, hello_flags,
+    ControlMsg, Frame, MAX_FRAME, MAX_LOBBY_FRAME, PlayerKind, RejectReason, bye, encode_lobby, hello_flags,
     welcome_flags,
 };
 use el_proto::{InputPacket, MAX_DATAGRAM, PROTOCOL_VERSION, TICK_HZ};
@@ -34,12 +34,15 @@ use wtransport::{Connection, RecvStream, SendStream};
 use super::NetStats;
 use super::admit::{Asked, Requests};
 use crate::lobby::{Lobby, LobbyEvent, Seating};
-use crate::signin::{SignIn, host_of, pick_domain, short, unix_now};
+use crate::signin::{SignIn, host_of, pick_domain, short, status, unix_now};
 
 /// How long a client has to say Hello.
 const HELLO_WAIT: Duration = Duration::from_secs(10);
 /// A seated session that sends nothing for this long has gone.
 const QUIET: Duration = Duration::from_secs(20);
+/// A session out of any match (at the menu) that asks for nothing for this long is let go
+/// (`bye::IDLE`): a tab left open earns no hosted hours.
+const IDLE: Duration = Duration::from_secs(30 * 60);
 /// How long one write to the control stream may take before the client is taken to have stopped
 /// reading.
 const WRITE_WAIT: Duration = Duration::from_secs(5);
@@ -112,7 +115,7 @@ pub async fn run(
     let name = name.as_str().to_string();
     // Signed in: a token to come back on without the wallet, and a place on the store's roster
     // while this session lasts.
-    let _here = match address {
+    let here = match address {
         Some(a) => {
             let token = signin.tokens.issue(a, signin.token_ttl);
             if send(&mut tx, ControlMsg::Token { token }).await.is_err() {
@@ -157,6 +160,24 @@ pub async fn run(
             }
         }
     });
+    // Who we know them as, and what this server holds: the menu's identity and its PRACTICE and
+    // RANKED states.
+    let about = ToClient::About {
+        player: address.map(|a| a.to_string()),
+        practice: lobby.practice_allowed(),
+        ranked: false,
+    };
+    if !post_lobby(&out, &about) {
+        reader.abort();
+        writer.abort();
+        present.fetch_sub(1, Ordering::Relaxed);
+        return;
+    }
+    let say = |now: &'static str| {
+        if let Some(h) = here.as_ref() {
+            h.set_status(now);
+        }
+    };
     let (events_tx, mut events) = mpsc::unbounded_channel();
     let mut seated: Option<Box<Seating>> = None;
     let mut last_heard = tokio::time::Instant::now();
@@ -165,6 +186,11 @@ pub async fn run(
     // time round the loop (once an input datagram: a timer registered and dropped each time).
     let quiet = tokio::time::sleep_until(last_heard + QUIET);
     tokio::pin!(quiet);
+    // And one for the menu's idle: put forward by anything asked or told in the lobby.
+    let mut last_asked = tokio::time::Instant::now();
+    let idle = tokio::time::sleep_until(last_asked + IDLE);
+    tokio::pin!(idle);
+    let mut idled = false;
     loop {
         tokio::select! {
             _ = &mut writer => break,
@@ -178,12 +204,35 @@ pub async fn run(
                     Asked::Refuse => NetStats::add(&stats.lobby_refused, 1),
                     Asked::Take => match serde_json::from_slice::<ToServer>(&bytes) {
                         Ok(ToServer::Queue) => {
+                            last_asked = tokio::time::Instant::now();
                             if let Some(s) = seated.take() {
                                 lobby.unseat(*s);
                             }
                             lobby.enqueue(session, &name, agent, max_datagram, events_tx.clone(), address);
+                            say(status::QUEUED);
                         }
-                        Ok(ToServer::Leave) => lobby.leave(session),
+                        Ok(ToServer::QueueRanked) => {
+                            last_asked = tokio::time::Instant::now();
+                            let no = ToClient::Refused {
+                                what: "ranked".into(),
+                                why: "This server doesn't hold ranked matches.".into(),
+                            };
+                            if !post_lobby(&out, &no) {
+                                break;
+                            }
+                        }
+                        // Out of the queue or select; or, seated, out of the match for good.
+                        Ok(ToServer::Leave) => {
+                            last_asked = tokio::time::Instant::now();
+                            match seated.take() {
+                                Some(s) => {
+                                    tracing::info!(session, m = s.m, seat = s.seat, "left its match");
+                                    lobby.leave_seat(*s);
+                                }
+                                None => lobby.leave(session),
+                            }
+                            say(status::MENU);
+                        }
                         Ok(ToServer::Reroll) => lobby.reroll(session),
                         Ok(ToServer::Swap { champ }) => lobby.swap(session, champ),
                         Ok(ToServer::Ready) => lobby.ready(session),
@@ -205,6 +254,7 @@ pub async fn run(
                             }
                         }
                         Ok(ToServer::Practice { champ }) => {
+                            last_asked = tokio::time::Instant::now();
                             if let Some(s) = seated.take() {
                                 lobby.unseat(*s);
                             }
@@ -221,11 +271,14 @@ pub async fn run(
             },
             Some(ev) = events.recv() => match ev {
                 LobbyEvent::Queued { waiting, fill_in } => {
+                    last_asked = tokio::time::Instant::now();
                     if !post_lobby(&out, &ToClient::Queued { waiting, fill_in }) {
                         break;
                     }
                 }
                 LobbyEvent::Select(msg) => {
+                    last_asked = tokio::time::Instant::now();
+                    say(status::SELECT);
                     if !post_lobby(&out, &msg) {
                         break;
                     }
@@ -235,6 +288,8 @@ pub async fn run(
                         lobby.unseat(*old);
                     }
                     lobby.game.attach(s.shard, s.g, conn.clone());
+                    let practice = matches!(s.msg, ToClient::Match { practice: true, .. });
+                    say(if practice { status::PRACTICE } else { status::PLAYING });
                     let ok = post_lobby(&out, &s.msg);
                     tracing::info!(session, shard = s.shard, m = s.m, seat = s.seat, "seated");
                     seated = Some(s);
@@ -248,9 +303,11 @@ pub async fn run(
                     break;
                 }
                 LobbyEvent::Over { winner } => {
+                    last_asked = tokio::time::Instant::now();
                     if let Some(s) = seated.take() {
                         lobby.unseat(*s);
                     }
+                    say(status::MENU);
                     if !post_lobby(&out, &ToClient::Over { winner }) {
                         break;
                     }
@@ -280,9 +337,27 @@ pub async fn run(
                 tracing::info!(session, "quiet for {}s: gone", QUIET.as_secs());
                 break;
             }
+            () = &mut idle, if seated.is_none() => {
+                if last_asked + IDLE > tokio::time::Instant::now() {
+                    idle.as_mut().reset(last_asked + IDLE);
+                    continue;
+                }
+                tracing::info!(session, "idle at the menu for {} min: let go", IDLE.as_secs() / 60);
+                idled = true;
+                break;
+            }
         }
     }
     reader.abort();
+    if idled {
+        // Said, then the writer finishes what it has (it ends once its outbox is closed).
+        let mut buf = [0u8; MAX_FRAME];
+        if let Some(n) = (ControlMsg::Bye { reason: bye::IDLE }).encode(&mut buf) {
+            let _ = out.try_send(buf[..n].to_vec());
+        }
+        drop(out);
+        let _ = tokio::time::timeout(WRITE_WAIT, &mut writer).await;
+    }
     writer.abort();
     if let Some(s) = seated.take() {
         lobby.unseat(*s);

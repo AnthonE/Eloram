@@ -1,6 +1,6 @@
 [package]
 name = "el-client"
-description = "Eloram's browser client: Bevy 0.19 compiled to wasm32"
+description = "Eloram's client: Bevy 0.19, compiled to wasm32 for the browser and natively for the desktop"
 publish = false
 version.workspace = true
 edition.workspace = true
@@ -9,18 +9,45 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+# The browser's module is the `el-client` bin compiled to wasm32 (`scripts/build-web.sh` takes
+# `el-client.wasm`); the desktop's is `eloram`, built only with `--features desktop`. Natively
+# without the feature the library is empty, so `cargo test --workspace` never builds Bevy.
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "el-client"
+path = "src/main.rs"
+
+[[bin]]
+name = "eloram"
+path = "src/bin/eloram.rs"
+required-features = ["desktop"]
+
 [features]
 # Bevy's webgpu feature overrides webgl2, so the WebGPU build is a separate variant.
-webgpu = ["bevy/webgpu"]
+webgpu = ["bevy?/webgpu"]
+# The desktop client: what the browser gives the page (a window, a transport, sound, storage),
+# natively. Never with el-bot or el-server in the same build: they turn on glam's scalar maths,
+# which Bevy's glam won't take.
+desktop = [
+    "dep:bevy", "dep:bevy_asset", "dep:bevy_ecs", "dep:bevy_image", "dep:bevy_reflect", "dep:bevy_render",
+    "dep:encase", "dep:futures", "dep:el-launcher", "dep:wtransport", "dep:tokio", "dep:rustls", "dep:ureq",
+    "dep:cpal", "dep:rtrb", "dep:symphonia", "dep:winit", "dep:image",
+]
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
+[dependencies]
 el-proto.workspace = true
 el-sim.workspace = true
 el-client-core.workspace = true
-# The sign-in text only: the browser's wallet signs it, the server checks it.
+# The sign-in text only: the wallet signs it, the server checks it.
 el-auth = { path = "../el-auth", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
+url = "2"
+glam.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
 # jpeg: the ground's textures and the models' (`web/assets/`, `art/`).
 bevy = { workspace = true, features = ["3d", "ui", "jpeg"] }
 # Bevy's derive macros resolve `bevy` by reading only [dependencies]; since ours is target-specific
@@ -37,7 +64,7 @@ wasm-bindgen-futures.workspace = true
 js-sys.workspace = true
 web-sys = { workspace = true, features = [
     "Window", "Location", "UrlSearchParams", "Document", "Element", "HtmlElement", "Performance", "DomTokenList",
-    "Storage", "History", "console", "EventTarget", "Response",
+    "Storage", "History", "console", "EventTarget", "Response", "RequestInit", "Headers", "RequestCache",
     # The WebTransport is built here, for its datagram queue's high-water mark (`transport.rs`).
     "WebTransport", "WebTransportOptions", "WebTransportHash", "WebTransportCongestionControl",
     "WebTransportDatagramDuplexStream",
@@ -50,8 +77,33 @@ web-sys = { workspace = true, features = [
 web-transport-wasm.workspace = true
 console_error_panic_hook.workspace = true
 futures.workspace = true
-url = "2"
-glam.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# The same Bevy as the browser's: its `3d` and `ui` sets bring the native window (winit, X11 and
+# Wayland), the GPU backends and the threads.
+bevy = { workspace = true, optional = true, features = ["3d", "ui", "jpeg"] }
+bevy_asset = { version = "0.19.1", default-features = false, optional = true }
+bevy_ecs = { version = "0.19.1", default-features = false, optional = true }
+bevy_image = { version = "0.19.1", default-features = false, optional = true }
+bevy_reflect = { version = "0.19.1", default-features = false, optional = true }
+bevy_render = { version = "0.19.1", default-features = false, optional = true }
+encase = { version = "0.12", default-features = false, optional = true }
+futures = { workspace = true, optional = true }
+# The Elo launcher (`el-launcher`): who is playing, the sign-in proof, pages opened.
+el-launcher = { path = "../el-launcher", optional = true }
+# The session (as el-bot's) on a runtime of its own; HTTP with rustls on threads.
+wtransport = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+rustls = { workspace = true, optional = true }
+ureq = { version = "3", default-features = false, features = ["rustls"], optional = true }
+# The sound card (cpal, as Gates'), told what to do through a ring that never allocates, and the
+# MP3s decoded in pure Rust (no C to cross-compile).
+cpal = { version = "0.16", optional = true }
+rtrb = { workspace = true, optional = true }
+symphonia = { version = "0.5", default-features = false, features = ["mp3"], optional = true }
+# The window's icon, set through winit (Bevy's own), read with Bevy's own image decoder.
+winit = { version = "0.30", default-features = false, optional = true }
+image = { version = "0.25", default-features = false, features = ["png"], optional = true }
 
 [lints]
 workspace = true
