@@ -119,6 +119,8 @@ enum Pick {
     Watch(usize),
     Refresh,
     Open(Section),
+    /// The player's profile on Elo Pros (their face, hours, rating and friends).
+    Profile,
 }
 
 #[derive(Component)]
@@ -366,6 +368,20 @@ fn act(
             front.up = false;
         }
         Pick::Refresh => front.rows_at = f64::NEG_INFINITY,
+        Pick::Profile => {
+            let Some(id) = front.who.id.as_deref() else {
+                front.status = "Sign in to see your Elo Pros profile.".into();
+                return;
+            };
+            let url = el_client_core::front::who::profile_url(id);
+            front.status = match crate::platform::open_url(&url) {
+                Opened::Opened => "Opened your Elo Pros profile in your browser.".into(),
+                Opened::Refused => "The browser didn't open it (a pop-up blocked?).".into(),
+                Opened::NoLauncher => {
+                    "The Elo launcher isn't running: start Eloram from it to open this.".into()
+                }
+            };
+        }
         Pick::Open(s) => {
             let Status::Ready(url) = hub_status(front, s) else {
                 front.status = hub_status(front, s).line();
@@ -811,14 +827,16 @@ fn soon_page(c: &mut Commands, front: &Front) -> Vec<Entity> {
         _ => ("PROFILE", "Your name and face on Elo Pros, your hours, your rating and the ladder."),
     };
     title_and_blurb(c, panel, t, b);
-    let l = c
-        .spawn(label(
-            if front.who.id.is_some() { "Asking Elo Pros..." } else { "Sign in to see this." },
-            15.0,
-            DIM,
-        ))
-        .id();
-    c.entity(panel).add_child(l);
+    let signed = front.who.id.is_some();
+    let line = if signed {
+        "They live on your Elo Pros profile, which opens in your browser."
+    } else {
+        "Sign in to see this: a guest has no profile."
+    };
+    let l = c.spawn(label(line, 15.0, if signed { FAINT } else { DIM })).id();
+    let gap = c.spawn(ui::spacer()).id();
+    let open = c.spawn((ui::button("OPEN YOUR PROFILE", 0.0, signed), Pick::Profile)).id();
+    c.entity(panel).add_children(&[l, gap, open]);
     vec![panel]
 }
 

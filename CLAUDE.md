@@ -47,8 +47,10 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   bots in the other nine seats after 3 s (`EL_FILL`), then 20 s of champion select (`--select-secs`;
   it ends sooner once everyone seated is ready, and agents are ready at once). The server alone:
   `cargo run -p el-server --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
-- `scripts/e2e.sh spike|match|watch|login|art|recover|fx|draws [webgl2]`: Playwright against a real server
-  (`match`: queue, champion select (a reroll, the bench, ready), the headliner, augment, shop,
+- `scripts/e2e.sh spike|match|menu|watch|login|art|recover|fx|draws [webgl2]`: Playwright against a real server
+  (a plain load opens the main menu, so the suites that play go in with `&queue=1`; `menu`: the
+  menu's pages, RANKED refused on a server without Elo Pros, PLAY into champion select, LEAVE MATCH
+  back to the menu and a reload staying there; `match`: queue, champion select (a reroll, the bench, ready), the headliner, augment, shop,
   Blink, a walk predicted exactly, the fog; and `?keys=wasd`'s keys walking the champion, the
   first match's strip, and Esc's menu holding the keys, its pages, a layout chosen there; `watch`:
   an agent's match watched live a minute behind from a checkpoint, then replayed; `recover`: the
@@ -112,7 +114,15 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `hud_lobby.rs` (the connecting, lobby and queue card, and a match's end with Play again); the icons are painted by
   `el_client_core::icons`. `window.__el` has `portrait`, `ally_portraits`, `death_screen` and
   `recap_lines`.
-- The menu (Esc, or the button at the top left: `menu.rs`; `docs/DESIGN.md`, "Controls"): Controls,
+- The main menu (`el-client/src/front/`, its words and decisions in `el_client_core::front`;
+  `docs/DESIGN.md`, "The menu"): PLAY (NORMAL, RANKED), PRACTICE, WATCH, FRIENDS, NEWS, STORE,
+  PROFILE, OPTIONS, QUIT (desktop). Up on a plain load; `?queue=1`, `?practice=1` and `?watch=` go
+  past it. One window camera at a time: while it's up its `Camera2d` draws and the match's camera
+  is off. The inbox takes `{t:"front",open,nav}`, `{t:"play",mode}` and `{t:"back_to_menu"}`;
+  `window.__el` has `front`, `front_nav`, `front_mode`, `front_status`, `play_label`, `identity`,
+  `practice_available`, `ranked_available`, `ranked_state` and `watch_rows`. The server tells the
+  page who it is and what it holds after the Welcome (`ToClient::About`).
+- The Esc menu (Esc, or the button at the top left: `menu.rs`; `docs/DESIGN.md`, "Controls"): Controls,
   Graphics, Sound, in the game's own UI (not the page's: the desktop build has it too). Settings are
   `config::Prefs` (the layout, the indicators, the tier now and at the next load, the first
   match's strip seen), kept by `config::remember` in the same `localStorage` keys `web/loader.js`
@@ -179,6 +189,13 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   without a restart; `/cert-hash` follows, and a page fetches it fresh on every dial. SIGTERM
   stops the server, its matches left for the next on the same `--records`. `cargo test -p
   el-server --release --test rotate` dials before and after.
+- Elo Pros from the server (`el-server/src/elopros/`, `ops/README.md` "Elo Pros"): `el-server
+  --keygen <pem>` makes the server key (the row for `elo.json`'s `server_keys`); with
+  `--server-key <pem>` each finished match's stats go to the store against `elo.json`'s
+  definitions, kept in `{records}/elopros/outbox/` until taken, and with `--ranked --public-addr
+  host:port` the RANKED queue is the store's matchmaker's (a ranked result goes to the ratings with
+  its record's hash). `cargo test -p el-server --release --test elopros` runs it against a stand-in
+  meter; `scripts/elo-drift.sh` holds the copied signing vectors to the platform's.
 - Hosting (`ops/README.md`, after oneshot's): `ops/eloram.service` (one slot: a restart takes the
   matches up again), `ops/certbot-deploy-hook.sh` (copies a renewed chain and reloads),
   `ops/game-elopros-eloram.nginx.conf` (the HTTP side behind the box's 443, under `/eloram/`),

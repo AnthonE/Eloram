@@ -51,6 +51,25 @@ address, and on this box it is Gates. Eloram could have it on an address of its 
 a player behind such a network can't play, and the page says only that the server didn't
 answer.
 
+## Elo Pros
+
+The server reports to the store with a key of its own (`el-server/src/elopros/`): each finished
+match's stats, unlocks and board scores (`POST /api/gamestats/eloram/report`, against the
+definitions in the repository's `elo.json`), a ranked match's result to the ratings with its
+record's hash (`POST /api/ratings/eloram/report`), and the RANKED queue through the store's
+matchmaker (`POST /api/lobbies/serve/eloram`). Reports wait in `eloram-data/elopros/outbox/`
+until the store takes them (a minute, then doubling to an hour, while it's down); one it refuses
+goes to `outbox/failed/` with its reason beside it. `/status`'s `game.elopros` says whether the
+store knows the key (`key: ok`), what's waiting, and who's in the ranked queue.
+
+1. `el-server --keygen /home/master/eloram-certs/server-key.pem` (mode 0600; it never overwrites)
+   prints the row for `elo.json`'s `server_keys`. Commit it; the store lands it from the repo
+   (`POST /api/store/repo/pull {game:"eloram"}`), and `GET /api/store/serverkeys/eloram` shows it.
+2. The flags in `eloram.service`'s comment, then `scripts/deploy-server.sh --go`.
+   `--ranked` waits until the listing is on the shelf (the matchmaker serves listed titles).
+3. The title's server list (`scripts/shardlist.py`) names `game.elopros.com:61260`, which is the
+   `--public-addr` the matchmaker puts ranked matches on.
+
 ## Day to day
 
 - **Release the server:** `scripts/deploy-server.sh` (a dry run), then `--go`. The restart takes

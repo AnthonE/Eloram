@@ -165,7 +165,7 @@ pub async fn run(
     let about = ToClient::About {
         player: address.map(|a| a.to_string()),
         practice: lobby.practice_allowed(),
-        ranked: false,
+        ranked: lobby.elopros.get().is_some_and(|e| e.ranked_on),
     };
     if !post_lobby(&out, &about) {
         reader.abort();
@@ -213,17 +213,44 @@ pub async fn run(
                         }
                         Ok(ToServer::QueueRanked) => {
                             last_asked = tokio::time::Instant::now();
-                            let no = ToClient::Refused {
-                                what: "ranked".into(),
-                                why: "This server doesn't hold ranked matches.".into(),
-                            };
-                            if !post_lobby(&out, &no) {
-                                break;
+                            let elo = lobby.elopros.get().filter(|e| e.ranked_on);
+                            let wallet = address.filter(|a| !a.as_str().starts_with("acct_"));
+                            match (elo, wallet) {
+                                (Some(elo), Some(w)) if seated.is_none() => {
+                                    lobby.leave(session);
+                                    let waiting = crate::lobby::Waiting {
+                                        session,
+                                        name: name.clone(),
+                                        agent,
+                                        max_datagram,
+                                        tx: events_tx.clone(),
+                                        token: String::new(),
+                                        wallet: Some(w),
+                                    };
+                                    crate::elopros::ranked::join(elo, w.to_string(), waiting);
+                                    say(status::RANKED);
+                                }
+                                (elo, wallet) => {
+                                    let why = if elo.is_none() {
+                                        "This server doesn't hold ranked matches."
+                                    } else if wallet.is_none() {
+                                        "Ranked is for wallets: sign in with yours to queue."
+                                    } else {
+                                        "Leave the match first."
+                                    };
+                                    let no = ToClient::Refused { what: "ranked".into(), why: why.into() };
+                                    if !post_lobby(&out, &no) {
+                                        break;
+                                    }
+                                }
                             }
                         }
                         // Out of the queue or select; or, seated, out of the match for good.
                         Ok(ToServer::Leave) => {
                             last_asked = tokio::time::Instant::now();
+                            if let Some(elo) = lobby.elopros.get() {
+                                crate::elopros::ranked::leave(elo, session);
+                            }
                             match seated.take() {
                                 Some(s) => {
                                     tracing::info!(session, m = s.m, seat = s.seat, "left its match");
@@ -298,6 +325,12 @@ pub async fn run(
                         break;
                     }
                 }
+                LobbyEvent::Tell(msg) => {
+                    last_asked = tokio::time::Instant::now();
+                    if !post_lobby(&out, &msg) {
+                        break;
+                    }
+                }
                 LobbyEvent::Replaced => {
                     tracing::info!(session, "its seat was taken back on another connection");
                     break;
@@ -363,6 +396,9 @@ pub async fn run(
         lobby.unseat(*s);
     }
     lobby.leave(session);
+    if let Some(elo) = lobby.elopros.get() {
+        crate::elopros::ranked::leave(elo, session);
+    }
     present.fetch_sub(1, Ordering::Relaxed);
     tracing::info!(session, "left");
 }

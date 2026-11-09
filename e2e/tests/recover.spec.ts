@@ -27,7 +27,7 @@ test("a server killed mid-match: the page back in its seat on the next one", asy
   const logs = collectConsole(page);
   const cmd = process.env.EL_SERVER_CMD!.split(/\s+/).filter(Boolean);
   const pidfile = process.env.EL_PIDFILE!;
-  await page.goto(`/?gfx=${info.project.name}&name=Survivor`);
+  await page.goto(`/?gfx=${info.project.name}&name=Survivor&queue=1`);
   let s: Record<string, any>;
   try {
     s = await until(page, "champion select", (s) => s.phase === "selecting", 150_000);

@@ -131,6 +131,7 @@ struct Entry {
 pub mod status {
     pub const MENU: &str = "At the menu";
     pub const QUEUED: &str = "Finding a match";
+    pub const RANKED: &str = "In the ranked queue";
     pub const SELECT: &str = "Champion select";
     pub const PLAYING: &str = "In a match";
     pub const PRACTICE: &str = "Practising";

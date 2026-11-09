@@ -44,7 +44,16 @@ ExecStart=/home/master/eloram-deploy/el-server \
   --records /home/master/eloram-data \
   --siwe-domain elopros.com \
   --cors-origin https://elopros.com \
+  --practice \
   --fill-after 30
+# Elo Pros (ops/README.md, "Elo Pros"): once the box has its key (`el-server --keygen
+# /home/master/eloram-certs/server-key.pem`, its row in elo.json's server_keys, landed on the
+# store), add these to ExecStart above; then each match's stats go to the store, and with
+# --ranked (the title on the store's shelf first) the RANKED queue is the store's matchmaker's.
+# --elo-pubkey takes Elo Pros' account key (`curl -s https://elopros.com/api/account/pubkey`).
+#   --server-key /home/master/eloram-certs/server-key.pem --server-key-id game-1
+#   --public-addr game.elopros.com:61260 --records-url https://game.elopros.com/eloram/records
+#   --elo-pubkey <key> --ranked
 ExecReload=/bin/kill -HUP $MAINPID
 
 Restart=always

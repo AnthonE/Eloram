@@ -211,10 +211,12 @@ fn confine(
 
 /// `--screenshot <png> --screenshot-at <phase|menu>`: once the moment comes and the picture has
 /// settled (two seconds on), the window is saved and the program ends.
+#[allow(clippy::too_many_arguments)]
 fn screenshot(
     mut commands: Commands,
     cfg: Res<crate::net::LaunchConfigRes>,
     session: Res<crate::session::Session>,
+    front: Res<crate::front::Front>,
     time: Res<Time<Real>>,
     mut since: Local<Option<f32>>,
     mut taken: Local<Option<f32>>,
@@ -222,14 +224,20 @@ fn screenshot(
 ) {
     let Some(path) = cfg.0.screenshot.clone() else { return };
     let now = time.elapsed_secs();
+    // Out once the picture is on disk (a software renderer can take a while to read it back).
     if let Some(at) = *taken {
-        if now - at > 3.0 {
+        if (std::path::Path::new(&path).exists() && now - at > 1.0) || now - at > 30.0 {
             exit.write(AppExit::Success);
         }
         return;
     }
     let want = cfg.0.screenshot_at.as_deref().unwrap_or("playing");
-    if session.phase.name() != want {
+    // `menu`: the main menu up with the server's welcome in (its PRACTICE and RANKED known).
+    let here = match want {
+        "menu" => front.up && session.phase == crate::session::Phase::Lobby,
+        phase => session.phase.name() == phase,
+    };
+    if !here {
         *since = None;
         return;
     }

@@ -42,11 +42,22 @@ pub enum Control {
     End { m: u16 },
 }
 
+/// A seat's line at a match's end, for the stats a server reports (`el-server`'s `elopros`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SeatLine {
+    pub champ: u8,
+    pub level: u8,
+    pub kills: u16,
+    pub deaths: u16,
+    pub assists: u16,
+    pub last_hits: u16,
+}
+
 /// Shard → network.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Outcome {
-    /// Match `m` ended: `winner` won, at `tick`; `hash` is its state then.
-    Over { m: u16, winner: u8, tick: u32, hash: u64 },
+    /// Match `m` ended: `winner` won, at `tick`; `hash` is its state then; `line` each seat's.
+    Over { m: u16, winner: u8, tick: u32, hash: u64, line: [SeatLine; el_sim::units::SEATS] },
     /// Match `m` panicked at `tick`: it was stopped where it stood, the rest of the shard going on.
     Failed { m: u16, tick: u32 },
 }

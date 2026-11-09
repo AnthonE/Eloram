@@ -145,6 +145,19 @@ units, of either team, gets 16% of missing health and mana (Mayhem: 22%).
   they don't depend on the order anything else happened in. A seat's offers are sent to that seat
   only.
 
+## The menu
+
+A plain load opens the main menu (`el-client/src/front/`, after Gates' layout in our colours):
+PLAY, in two modes: NORMAL (five a side, the server's bots in the seats no one takes, unrated) and
+RANKED (ten signed-in wallets, no bots, every match rated on Elo Pros' `ranked` ladder by the
+store's matchmaker, `docs/NETCODE.md`); PRACTICE (a champion, the dummies); WATCH (the server's
+matches, live a minute behind, and finished ones as replays); FRIENDS, NEWS, STORE and PROFILE
+(Elo Pros' pages for the title: what a manifest or the launcher has, said honestly when it has
+nothing); OPTIONS (the Esc menu's pages); and QUIT on the desktop. The identity chip says who's
+playing (a guest, a wallet, an Elo Pros account). Champion select takes the menu away; a match's
+end offers PLAY AGAIN in the mode last played, or the menu. LEAVE MATCH in the Esc menu, pressed
+twice, lets the seat go (a ranked match still counts it).
+
 ## Controls
 
 League's defaults, because that is what players' hands know:

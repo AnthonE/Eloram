@@ -32,6 +32,8 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 hex.workspace = true
 futures.workspace = true
+# Elo Pros' API, on the blocking pool (`elopros::api`).
+ureq = { version = "3", default-features = false, features = ["rustls"] }
 # The UDP socket bound here, with its buffers asked for (`net::endpoint::bind_udp`).
 socket2 = "0.6"
 

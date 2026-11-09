@@ -232,6 +232,14 @@ Before Colony's, sized for a match:
   what the client takes a unit to be is what the server's record of it said at the snapshot's
   tick for 99.9% of the units its team sees. The estimate was 18–27 KB/s.
 
+- The lobby is JSON on the control stream (`el_client_core::lobby`), protocol 7: the queue
+  (NORMAL, or `QueueRanked` through the store's matchmaker: `el-server/src/elopros/ranked.rs`),
+  champion select, the seat and its rejoin token, the end; `About` once after the Welcome (who the
+  server knows the player as, whether it holds practice and ranked matches), `Ranked` while the
+  store's queue has the player, `Refused` for what this server won't do. A `Leave` while seated
+  lets the seat go for good: its token is forgotten here and in the page. A desktop client speaks
+  the same wire through wtransport (`el-client/src/transport/native.rs`).
+
 ### The record
 
 - Each match writes one file (`el_sim::record`, `.elr`): its seed, champions, protocol and content

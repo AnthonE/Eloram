@@ -31,6 +31,12 @@ pub fn short(id: &str) -> String {
     format!("{}...{}", &id[..6], &id[id.len() - 4..])
 }
 
+/// A player's profile on Elo Pros (friends are there too).
+pub fn profile_url(id: &str) -> String {
+    let safe: String = id.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+    format!("https://elopros.com/profile.html?who={safe}")
+}
+
 impl Who {
     /// A wallet that may queue ranked and be rated (an account alone may not).
     pub fn wallet(&self) -> bool {
@@ -80,5 +86,6 @@ mod tests {
         assert_eq!(Who::default().shown_name(), "GUEST");
         assert!(!Who { id: Some("acct_0123456789abcdef0123".into()), ..Default::default() }.wallet());
         assert!(Who::default().line().is_ascii());
+        assert_eq!(profile_url("0xAb&x=1"), "https://elopros.com/profile.html?who=0xAbx1");
     }
 }

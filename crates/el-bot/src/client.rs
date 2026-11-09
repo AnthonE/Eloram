@@ -85,6 +85,13 @@ pub struct BotClient {
     pub rejoin: Option<String>,
     /// A rejoin found no seat.
     pub no_seat: bool,
+    /// What the server said of itself after the Welcome (`ToClient::About`).
+    pub about: Option<ToClient>,
+    /// The ranked queue's last state, and the last thing the server turned down.
+    pub ranked: Option<String>,
+    pub refused: Option<String>,
+    /// In a champion select (its roster in `roster`).
+    pub selecting: bool,
     /// In a champion select it hasn't yet said it's ready in (it plays what it's dealt).
     ready_due: bool,
     start: Instant,
@@ -165,6 +172,10 @@ impl BotClient {
             address,
             rejoin: None,
             no_seat: false,
+            about: None,
+            ranked: None,
+            refused: None,
+            selecting: false,
             ready_due: false,
             start: Instant::now(),
         })
@@ -179,6 +190,23 @@ impl BotClient {
         let mut buf = vec![0u8; json.len() + 3];
         let n = encode_lobby(&json, &mut buf).ok_or_else(|| anyhow::anyhow!("lobby frame too big"))?;
         self.tx.write_all(&buf[..n]).await?;
+        Ok(())
+    }
+
+    /// Joins the RANKED queue (signed in with a wallet, on a server that holds ranked matches).
+    pub async fn queue_ranked(&mut self) -> anyhow::Result<()> {
+        self.over = None;
+        self.refused = None;
+        self.send_lobby(&ToServer::QueueRanked).await
+    }
+
+    /// Reads what the server sends for a while, as a waiting player does.
+    pub async fn listen(&mut self, dur: Duration) -> anyhow::Result<()> {
+        let end = tokio::time::Instant::now() + dur;
+        while let Ok(f) = tokio::time::timeout_at(end, self.frames.recv()).await {
+            let Some(f) = f else { anyhow::bail!("the server hung up") };
+            self.take(f)?;
+        }
         Ok(())
     }
 
@@ -229,14 +257,21 @@ impl BotClient {
                         client.set_practice();
                     }
                     self.client = Some(client);
+                    self.selecting = false;
                     self.roster = roster;
                     self.rejoin = (!rejoin.is_empty()).then_some(rejoin);
                 }
                 ToClient::NoSeat => self.no_seat = true,
                 ToClient::Over { winner } => self.over = Some(winner),
-                ToClient::Queued { .. } | ToClient::About { .. } | ToClient::Ranked { .. } => {}
-                ToClient::Refused { .. } => self.no_seat = true,
-                ToClient::Select { .. } => self.ready_due = true,
+                ToClient::Queued { .. } => {}
+                a @ ToClient::About { .. } => self.about = Some(a),
+                ToClient::Ranked { state, .. } => self.ranked = Some(state),
+                ToClient::Refused { why, .. } => self.refused = Some(why),
+                ToClient::Select { roster, .. } => {
+                    self.ready_due = true;
+                    self.selecting = true;
+                    self.roster = roster;
+                }
             },
             Incoming::Msg(ControlMsg::Bye { reason }) => anyhow::bail!("the server said goodbye ({reason})"),
             Incoming::Msg(_) => {}
