@@ -261,3 +261,39 @@ Changed on the way:
   - What stands in the chasm sinks into its haze with depth, as the cliffs do, and the ice's own
     light is halved: the pale spires pulled the eye off the lane.
 
+- **What Gates and oneshot had learned, taken over** (their `render/` and `look/`, both MIT; the
+  numbers ours, judged from the same spots photographed before and after):
+  - *A hemisphere fill* (their `fill.rs`). Bevy's ambient never reads the normal, so the underside
+    of a statue's arm was filled as the floor was and every shape went flat in the moon's shadow.
+    They hand Bevy a baked cube as an environment map; here its two cube textures took the ground's
+    material to 18 sampled textures (WebGL2 refused the pipeline), so the ambient stays the night's
+    and the Causeway's own materials scale it by the normal through their diffuse occlusion
+    (`shaders/fill.wgsl`): the sky's deep blue on what faces up (the floor keeps its light), the
+    moonlit snow's paler, brighter bounce on what faces sideways and down. Champions keep the flat
+    fill: their portraits share the material under a light of their own.
+  - *Rock in blocks* (Gates' `ground_splat.wgsl` rock face, oneshot's `rock.rs`): the cliffs, the
+    plinths and the outcrops are broken into blocks a metre or so across over 3D space, each
+    leaning its own way so it catches the moon at its own angle and each a little lighter or
+    darker; cracks along some of the blocks' boundaries and melt streaks down the steep faces on
+    the cliffs. The hash is Gates' integer one (`shaders/noise.wgsl`), shared by every material that
+    weathers: a `fract(sin)` hash bands at range.
+  - *Each paving stone its own*: the photograph is seven stones a tile, a metre each, square to the
+    world, so a stone is a cell of the world's grid, and each is a little lighter or darker, warmer
+    or colder, and laid a little off level; the runner's slabs the same; Gates' broad mottle over
+    the floor at five and seventeen metres. It read as one tile printed every seven metres.
+  - *Weathering* (their `weathering.wgsl`) on the props and structures, in world space, so no two
+    statues of one model are one value: a mottle, a ragged band of grime where a thing meets the
+    floor, frost settled in patches on the props' flat tops (not the structures': they read clean,
+    in their team's colour; not the rocks': their snow is their own). The parapet's dressed stone
+    gets the mottle and stains down its faces.
+  - *Lines no thinner than a pixel can carry* (Gates' `band`, and `FX.md`'s 1.6 px): the floor's
+    cracks are drawn as a pixel covers them and only as dark as the share they cover once thinner
+    than one, the wind's fine snow streaks fade to their mean where a pixel can't hold them, and
+    every new term does the same.
+  - *Embers* over each brazier (Gates' `embers.rs`): short glowing streaks that rise, drift on the
+    snow's wind and go out, moved in the vertex shader (`shaders/embers.wgsl`), one mesh and
+    material for every fire.
+  - Not taken: the drifting cloud shadows (on a MOBA's floor a dark patch reads as the fog of war),
+    the light shafts (a march through mist toward a low sun: the Causeway's moon is high and its air
+    clear over the lane), the stars and moon (the camera never sees the sky), the clutter of pebbles (the gravel and snow already break the floor
+    at that scale; a later pass, if the pictures ask for it).

@@ -84,6 +84,10 @@ pub struct FoggedParams {
     pub look: Vec4,
     /// The glow's colour (linear); w: the height (m) the crystal ends at.
     pub tint: Vec4,
+    /// Weathering (`fogged.wgsl`, after Gates' and oneshot's): x the mottle's depth, y the grime
+    /// at the foot where it meets the floor, z frost settled on its flat tops, w how far rock's
+    /// blocks lean. 0 is none.
+    pub wear: Vec4,
 }
 
 impl MaterialExtension for Fogged {
@@ -179,6 +183,8 @@ impl Plugin for GroundPlugin {
     fn build(&self, app: &mut App) {
         bevy::shader::load_shader_library!(app, "shaders/fog.wgsl");
         bevy::shader::load_shader_library!(app, "shaders/display.wgsl");
+        bevy::shader::load_shader_library!(app, "shaders/noise.wgsl");
+        bevy::shader::load_shader_library!(app, "shaders/fill.wgsl");
         bevy::asset::embedded_asset!(app, "shaders/ground.wgsl");
         bevy::asset::embedded_asset!(app, "shaders/fogged.wgsl");
         bevy::asset::embedded_asset!(app, "shaders/brush.wgsl");
