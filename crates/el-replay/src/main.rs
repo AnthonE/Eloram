@@ -70,8 +70,8 @@ fn verify(map: &'static Map, path: &Path) -> anyhow::Result<()> {
                     format!("the record skips from tick {expected} to {got}")
                 }
                 Divergence::Version { protocol, content } => format!(
-                    "made by protocol {protocol}, content {content}; this build is protocol {}, content {}",
-                    el_proto::PROTOCOL_VERSION,
+                    "made by record protocol {protocol}, content {content}; this build is record protocol {}, content {}",
+                    el_sim::record::RECORD_PROTOCOL,
                     el_sim::record::CONTENT_VERSION
                 ),
                 Divergence::NoHeader => "no header".into(),

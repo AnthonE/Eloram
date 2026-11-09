@@ -295,7 +295,7 @@ fn talk(
         session.error = Some(e.clone());
     }
     if !link.hello_sent {
-        let name = if cfg.0.name.is_empty() { "Summoner" } else { cfg.0.name.as_str() };
+        let name = if cfg.0.name.is_empty() { "Player" } else { cfg.0.name.as_str() };
         let mut hello = ControlMsg::hello(PlayerKind::Human, name);
         let pass = cfg.0.pass.clone().filter(|_| !link.pass_used);
         if let ControlMsg::Hello { flags, resume, .. } = &mut hello {
@@ -439,12 +439,9 @@ fn talk(
                         if *practice {
                             c.set_practice();
                         }
+                        session.begin_world();
                         session.client = Some(Box::new(c));
                         session.roster = roster.clone();
-                        session.winner = None;
-                        session.kd = Default::default();
-                        session.feed.clear();
-                        session.select = None;
                         session.phase = Phase::Playing;
                     }
                 }

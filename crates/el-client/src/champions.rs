@@ -112,6 +112,8 @@ struct Seats {
     /// The client's events read so far, and its own.
     feed_read: u64,
     own_read: u64,
+    /// The world those counts are of (`Session::world`).
+    world: u32,
     /// Casts begun on the figures, all told.
     casts: u64,
 }
@@ -319,6 +321,11 @@ fn animate(
         return;
     }
     let seats = &mut *seats;
+    if seats.world != session.world {
+        seats.world = session.world;
+        seats.feed_read = 0;
+        seats.own_read = 0;
+    }
     // What was told: casts begun, falls, hits; each when the units are drawn there.
     if let Some(c) = client {
         let view = c.clock.view_tick(now);

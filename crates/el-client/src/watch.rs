@@ -245,6 +245,7 @@ impl Plugin for WatchPlugin {
 
 fn start(cfg: Res<LaunchConfigRes>, map: Res<MapRes>, mut session: ResMut<Session>) {
     if let Some(url) = cfg.0.record_url.clone() {
+        session.begin_world();
         session.watch = Some(Box::new(Watch::new(map.0, url, cfg.0.watch_live)));
         session.phase = Phase::Watching;
     }

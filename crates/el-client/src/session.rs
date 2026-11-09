@@ -108,6 +108,10 @@ pub struct Session {
     pub practice: Option<u8>,
     /// The client's events read so far.
     feed_read: u64,
+    /// Which world is drawn: a match played or a record watched, counted from 0. Anything that
+    /// reads the world's events by count (the kill feed here, the figures' casts and falls) starts
+    /// again from its first event when this moves on: a new match's count starts at 0 too.
+    pub world: u32,
 }
 
 /// What a ping says, in words.
@@ -124,6 +128,18 @@ pub fn ping_words(kind: u8) -> &'static str {
 }
 
 impl Session {
+    /// A new world is about to be drawn (a match seated, a record watched, or none any more): what
+    /// was told of the last one goes.
+    pub fn begin_world(&mut self) {
+        self.world = self.world.wrapping_add(1);
+        self.feed_read = 0;
+        self.kd = Default::default();
+        self.feed.clear();
+        self.pings = 0;
+        self.winner = None;
+        self.select = None;
+    }
+
     /// The name in seat `s`: its player's, or (a record watched names no one) its champion's.
     pub fn name(&self, s: usize) -> &str {
         if let Some(p) = self.roster.get(s) {

@@ -22,6 +22,12 @@ pub const MAGIC: [u8; 4] = *b"ELR1";
 /// Bumped whenever the content (champions, items, augments, the map, the rules) changes what a
 /// match does with the same inputs: a record names the content it was played on.
 pub const CONTENT_VERSION: u32 = 6;
+/// The encoding of what a record carries (the tick frames' inputs and orders), named in its header.
+/// It is the wire protocol's version as it was when that encoding last changed, and stays put while
+/// the wire changes elsewhere (the lobby's JSON, the control stream), so a server that speaks a new
+/// protocol still re-steps the records, checkpoints and replays the last one wrote. Bump it, with a
+/// new value of the golden record test below, when an input or order's bytes change.
+pub const RECORD_PROTOCOL: u16 = 6;
 /// Ticks between the state's hashes.
 pub const HASH_EVERY: u32 = 30;
 /// The longest frame (a tick of ten seats, each with its most orders, fits with room to spare).
@@ -49,7 +55,7 @@ pub struct Header {
 
 impl Header {
     pub fn new(seed: u64, picks: [u8; SEATS]) -> Self {
-        Self { protocol: el_proto::PROTOCOL_VERSION, content: CONTENT_VERSION, seed, picks }
+        Self { protocol: RECORD_PROTOCOL, content: CONTENT_VERSION, seed, picks }
     }
 }
 
@@ -404,9 +410,7 @@ impl Referee {
     pub fn take_with(&mut self, f: &Frame, scratch: &mut PathScratch) -> Result<(), Divergence> {
         if let Some(at) = self.skip_to {
             match *f {
-                Frame::Header(h)
-                    if h.protocol != el_proto::PROTOCOL_VERSION || h.content != CONTENT_VERSION =>
-                {
+                Frame::Header(h) if h.protocol != RECORD_PROTOCOL || h.content != CONTENT_VERSION => {
                     return Err(Divergence::Version { protocol: h.protocol, content: h.content });
                 }
                 Frame::Hash { tick, .. } if tick == at => self.skip_to = None,
@@ -422,7 +426,7 @@ impl Referee {
         }
         match *f {
             Frame::Header(h) => {
-                if h.protocol != el_proto::PROTOCOL_VERSION || h.content != CONTENT_VERSION {
+                if h.protocol != RECORD_PROTOCOL || h.content != CONTENT_VERSION {
                     return Err(Divergence::Version { protocol: h.protocol, content: h.content });
                 }
                 self.m.reset(h.seed, h.picks);
@@ -515,6 +519,34 @@ mod tests {
         assert_eq!(read_frame(&buf[..n]).unwrap(), Some((key, n)));
         // An idle tick: the prefix, the tick and a bit a seat.
         assert_eq!(write_tick(&mut buf, 5, &[SeatInput::default(); SEATS]), 9);
+    }
+
+    /// The bytes a record's frames are written as, pinned: a change to an input's or an order's
+    /// encoding fails here, and is the moment to bump [`RECORD_PROTOCOL`] with the new value (the
+    /// wire's own version moves for other reasons and must not orphan the records).
+    #[test]
+    fn the_records_encoding_is_pinned_to_its_protocol() {
+        let mut bytes = [0u8; 4 * MAX_FRAME];
+        let mut n =
+            write_header(&mut bytes, &Header::new(0x0123_4567_89AB_CDEF, [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]));
+        let mut inputs = [SeatInput::default(); SEATS];
+        for (s, i) in inputs.iter_mut().enumerate() {
+            i.steer = (s % 9) as u8;
+            i.push(Order::Move { to: Vec2::new(700.0 + 13.0 * s as f32, 4_100.5) }.quantized());
+            i.push(Order::Cast {
+                slot: (s % 4) as u8,
+                aim: Aim::Unit(UnitRef { slot: 3 + s as u8, generation: 2 }),
+            });
+            i.push(Order::Buy { item: s as u8 });
+        }
+        n += write_tick(&mut bytes[n..], 4_321, &inputs);
+        n += write_hash(&mut bytes[n..], 4_320, 0x0F0E_0D0C_0B0A_0908);
+        n += write_seat(&mut bytes[n..], 4_322, 6, false);
+        n += write_outcome(&mut bytes[n..], 4_400, 1);
+        let fnv = bytes[..n]
+            .iter()
+            .fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ u64::from(*b)).wrapping_mul(0x0100_0000_01b3));
+        assert_eq!((RECORD_PROTOCOL, n, fnv), (6, 169, 0x7e3d_922b_1180_720e));
     }
 
     #[test]

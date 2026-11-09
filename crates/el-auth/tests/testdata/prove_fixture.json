@@ -1,0 +1,9 @@
+{
+  "address": "0x24445EFddB08d4938E3E3627042B2Cf4063d9092",
+  "domain": "shard-3.gates.example",
+  "game": "gates",
+  "issued_at": "2026-08-07T12:00:00Z",
+  "message": "shard-3.gates.example wants you to sign in with your Ethereum account:\n0x24445EFddB08d4938E3E3627042B2Cf4063d9092\n\nProve your identity to play gates. This signature authorises nothing and moves no funds.\n\nURI: https://shard-3.gates.example\nVersion: 1\nChain ID: 4663\nNonce: 8f14e45fceea167a\nIssued At: 2026-08-07T12:00:00Z",
+  "nonce": "8f14e45fceea167a",
+  "note": "The EXACT SIWE (EIP-4361) message the broker must compose. `launcher-rs/crates/elo-broker` builds it; `tests/cross_language.rs` asserts the composer and `sdk/test_sdk.py` asserts what comes off the live wire. issued_at is pinned so the message is a pure function."
+}

@@ -43,8 +43,6 @@ pub struct Config {
     pub tls: Option<(PathBuf, PathBuf)>,
     pub cors_origins: Vec<String>,
     pub limits: Limits,
-    /// Places for players, for `/status.json`.
-    pub max_players: usize,
     /// Shard threads, and the matches each holds.
     pub shards: usize,
     pub matches_per_shard: usize,
@@ -85,7 +83,6 @@ impl Default for Config {
             tls: None,
             cors_origins: vec![STORE_ORIGIN.to_string()],
             limits: Limits::default(),
-            max_players: 640,
             shards: 1,
             matches_per_shard: 64,
             fill_after: Duration::from_secs(30),
@@ -244,7 +241,9 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
     let mode = cfg.mode;
     let online = signin.online.clone();
     let nonces = signin.clone();
-    let max_players = cfg.max_players;
+    // The places `/status.json` names are the connections the server takes: a launcher or the
+    // store told of more would send players the admission refuses.
+    let max_players = cfg.limits.connections as usize;
     let status_stats = stats.clone();
     let launcher_stats = stats.clone();
     let status_lobby = lobby.clone();

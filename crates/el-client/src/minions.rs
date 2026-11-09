@@ -96,13 +96,14 @@ struct Slot {
 #[derive(Resource)]
 struct Slots {
     slots: Vec<Slot>,
-    /// The client's events read so far.
+    /// The client's events read so far, and the world they are of (`Session::world`).
     feed_read: u64,
+    world: u32,
 }
 
 impl Default for Slots {
     fn default() -> Self {
-        Self { slots: (FIRST_MINION..MAX_UNITS).map(|_| Slot::default()).collect(), feed_read: 0 }
+        Self { slots: (FIRST_MINION..MAX_UNITS).map(|_| Slot::default()).collect(), feed_read: 0, world: 0 }
     }
 }
 
@@ -284,6 +285,10 @@ fn animate(
         return;
     }
     let slots = &mut *slots;
+    if slots.world != session.world {
+        slots.world = session.world;
+        slots.feed_read = 0;
+    }
     let models = &mut *models;
     // Deaths told, each when the units are drawn there.
     if let Some(c) = client {

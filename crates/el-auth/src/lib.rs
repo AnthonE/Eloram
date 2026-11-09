@@ -191,15 +191,9 @@ impl Text<'_> {
     }
 }
 
-/// Whether `domain` is this machine (the dev server), which is served over plain http.
-fn loopback(domain: &str) -> bool {
-    let host = domain.rsplit_once(':').map_or(domain, |(h, _)| h);
-    matches!(host, "127.0.0.1" | "localhost" | "[::1]")
-}
-
-/// The launcher's one human sentence (`elo-broker`'s `statement`), for [`GAME`].
-const STATEMENT: &str =
-    "Prove your identity to play eloram. This signature authorises nothing and moves no funds.";
+/// The launcher's one human sentence (`elo-broker`'s `statement`), around the game it names.
+const STATEMENT_HEAD: &str = "Prove your identity to play ";
+const STATEMENT_TAIL: &str = ". This signature authorises nothing and moves no funds.";
 
 /// The exact text a player's wallet signs to sign in to `domain` with `address`, for the server's
 /// `nonce` at `issued_at` (Unix seconds). Written into `out`; returns its length.
@@ -215,7 +209,7 @@ pub fn siwe_message(
     out: &mut [u8; SIWE_MAX],
 ) -> usize {
     let checksummed = checksum_hex(address);
-    write_message(domain, b"Ethereum", &checksummed, Chain::Id(CHAIN_ID), nonce, issued_at, out)
+    write_message(GAME, domain, b"Ethereum", &checksummed, Chain::Id(CHAIN_ID), nonce, issued_at, out)
 }
 
 /// The text a Solana wallet signs to sign in, its address as written: [`siwe_message`]'s in its
@@ -227,7 +221,7 @@ pub fn siws_message(
     issued_at: u64,
     out: &mut [u8; SIWE_MAX],
 ) -> usize {
-    write_message(domain, b"Solana", address.as_bytes(), Chain::Named("mainnet"), nonce, issued_at, out)
+    write_message(GAME, domain, b"Solana", address.as_bytes(), Chain::Named("mainnet"), nonce, issued_at, out)
 }
 
 /// A message's `Chain ID` line.
@@ -236,13 +230,17 @@ enum Chain {
     Named(&'static str),
 }
 
-/// EIP-4361's shape.
+/// EIP-4361's shape, as the Elo Pros launcher's `prove` writes it (`elo-broker`'s
+/// `prove_message`): its URI is always `https://` and the domain, the dev server's on this machine
+/// too, so one signature text serves the page and the launcher alike.
+#[allow(clippy::too_many_arguments)]
 fn write_message(
+    game: &str,
     domain: &str,
     family: &[u8],
     address: &[u8],
     chain: Chain,
-    nonce: &[u8; NONCE_BYTES],
+    nonce: &[u8],
     issued_at: u64,
     out: &mut [u8; SIWE_MAX],
 ) -> usize {
@@ -253,9 +251,10 @@ fn write_message(
     w.s(" account:\n");
     w.bytes(address);
     w.s("\n\n");
-    w.s(STATEMENT);
-    w.s("\n\nURI: ");
-    w.s(if loopback(domain) { "http://" } else { "https://" });
+    w.s(STATEMENT_HEAD);
+    w.s(game);
+    w.s(STATEMENT_TAIL);
+    w.s("\n\nURI: https://");
     w.s(domain);
     w.s("\nVersion: 1\nChain ID: ");
     match chain {
@@ -541,12 +540,7 @@ mod tests {
     /// The launcher's `prove` text (`elo-broker`'s `prove_message`), for this game.
     #[test]
     fn the_message_is_the_launchers_prove_text() {
-        assert_eq!(
-            STATEMENT
-                .strip_prefix("Prove your identity to play ")
-                .and_then(|r| r.strip_suffix(". This signature authorises nothing and moves no funds.")),
-            Some(GAME)
-        );
+        assert_eq!(GAME, "eloram");
         let a = parse_address(KEY1_ADDRESS).unwrap();
         let nonce = core::array::from_fn(|i| i as u8);
         let mut out = [0u8; SIWE_MAX];
@@ -554,7 +548,7 @@ mod tests {
         let expected = "127.0.0.1:8080 wants you to sign in with your Ethereum account:\n\
 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf\n\n\
 Prove your identity to play eloram. This signature authorises nothing and moves no funds.\n\n\
-URI: http://127.0.0.1:8080\n\
+URI: https://127.0.0.1:8080\n\
 Version: 1\n\
 Chain ID: 4663\n\
 Nonce: 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\n\
@@ -723,6 +717,14 @@ mod pass_tests {
         assert_eq!(p.player().as_str(), "acct_0123456789abcdef0123");
     }
 
+    /// A Solana wallet riding a pass, from Elo Pros' own vector: the player is the key as written.
+    #[test]
+    fn a_solana_wallet_on_elo_pros_pass_vector() {
+        let pass = field(VECTOR, "solana_wallet", "pass");
+        let p = check(pass, "gates", "elopros.com", 1_700_000_000).unwrap();
+        assert_eq!(p.player().as_str(), field(VECTOR, "solana_wallet", "wallet"));
+    }
+
     #[test]
     fn a_base58_wallet_on_a_pass_keeps_its_case() {
         let sol = "GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB";
@@ -831,5 +833,48 @@ mod pass_tests {
             verify_solana("elopros.com", &nonce, 1_793_016_000, &[1; 32], &sig),
             Err(AuthError::WrongSigner)
         );
+    }
+
+    /// Byte for byte the text the Elo Pros launcher composes for `prove` (its own fixture,
+    /// `sdk/testdata/prove_fixture.json`, copied; `scripts/elo-drift.sh` keeps it current), so a
+    /// desktop sign-in the launcher signs checks out here.
+    #[test]
+    fn the_launchers_prove_fixture_is_this_text() {
+        const FIXTURE: &str = include_str!("../tests/testdata/prove_fixture.json");
+        let top = |key: &str| {
+            let mut quoted = [0u8; 64];
+            quoted[0] = b'"';
+            quoted[1..=key.len()].copy_from_slice(key.as_bytes());
+            field(FIXTURE, core::str::from_utf8(&quoted[..=key.len()]).unwrap(), key)
+        };
+        let mut lower = [0u8; 42];
+        lower.copy_from_slice(top("address").as_bytes());
+        lower.make_ascii_lowercase();
+        let a = parse_address(core::str::from_utf8(&lower).unwrap()).unwrap();
+        let hex = top("nonce");
+        let nonce: [u8; 8] =
+            core::array::from_fn(|i| u8::from_str_radix(&hex[2 * i..2 * i + 2], 16).unwrap());
+        // 2026-08-07T12:00:00Z, the fixture's `issued_at`.
+        let mut out = [0u8; SIWE_MAX];
+        let n = write_message(
+            top("game"),
+            top("domain"),
+            b"Ethereum",
+            &checksum_hex(&a),
+            Chain::Id(CHAIN_ID),
+            &nonce,
+            1_786_104_000,
+            &mut out,
+        );
+        // The fixture's JSON writes each line break as `\n`.
+        let text = core::str::from_utf8(&out[..n]).unwrap();
+        let mut want = top("message").split("\\n");
+        let mut got = text.split('\n');
+        loop {
+            match (want.next(), got.next()) {
+                (None, None) => break,
+                (w, g) => assert_eq!(w, g),
+            }
+        }
     }
 }
