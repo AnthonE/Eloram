@@ -190,6 +190,9 @@ async function main() {
     fxside: params.get("side") || "own",
     fxsize: Number(params.get("size") || 0),
     fxcards: params.get("cards") || "",
+    // The anim stage (`?animstage=<champion>-<act>`, `el-client/src/animstage.rs`): one champion
+    // alone on the same stepped clock, no server; `&knobs=` retunes its motion.
+    animstage: params.get("animstage") || "",
   };
   if (config.signIn) {
     try {
@@ -207,7 +210,7 @@ async function main() {
   } else if (params.get("replay")) {
     config.recordUrl = params.get("replay");
   }
-  if (config.recordUrl || config.fxstage) {
+  if (config.recordUrl || config.fxstage || config.animstage) {
     // Nothing to dial.
   } else if (!("WebTransport" in window)) {
     config.noWebTransport = true;

@@ -389,6 +389,23 @@ Measured (headless Chromium, the same match each time):
 - The CPU's parts there are SwiftShader's and mean nothing for a real machine, beyond that they're
   counted; on one, `?bench=1` says them per phase.
 
+Then the motion (`CHAMPIONS.md`, "The motion", "The second clips", "The stage"), the moba's feel,
+which the first pass of the champions had left at "the right clip at the right moment". Client-side
+only: nothing on the wire, in the record or in the sim. A strike's wind-up eased in, held on its
+contact and followed through, still landing as the windup ends; two attacks a champion,
+alternated; a stance each by what it holds; the legs running under a cast (each clip twice in a
+model's graph, Bevy's masks); a flinch over the upper body when hit, a reel when the hit is heavy;
+the figure turned in a few hundredths of a second instead of snapped at 30 Hz, leant into turns
+and as it speeds up, pushed back from a hit and squashed as it lands; and from its sockets a
+swing's arc, a casting hand's light, shots leaving the muzzle, a running foot's dust and the
+player's own steps heard. The champions' own colours richer and warmly lit against the cold
+stone, the team's rim softer, what they hold a quarter bigger, a blob of shadow on the low tier.
+Eighteen clips came from Quaternius's CC0 Universal Animation Library, retargeted from its T-pose
+onto each champion's A-pose (Meshy's credits were spent). And the anim stage, the fx stage's loop
+for motion (`scripts/anim.sh`, 260 acts by name, knobs without a rebuild, a skill and a judge),
+which found Meshy's slash striking a tenth of a second early and the rim drowning the textures.
+Measured: the models 30 KiB bigger each (595 KiB over twenty); the golden hashes held.
+
 Left, in no order:
 - **A name**: a guest's is `?name=` or the server's; the page doesn't ask for one.
 - **A real GPU.** Nobody has seen the game on one: the frame rate on either tier (the target is 60
@@ -413,7 +430,8 @@ Left, in no order:
 - **Listening.** The sounds were judged by their spectrograms and measures, not by ear.
 - **Tuning by hand**: each ability's look (`FX.md`, step 5; the stage and its strips are the
   loop, `scripts/fx.sh`, and a dozen of the 296 have been through it), each champion's clip
-  windows (`CHAMPIONS.md`).
+  windows and its motion (`CHAMPIONS.md`; the anim stage is the loop, `scripts/anim.sh`, and a
+  handful of its 260 acts have been through it).
 - **Art**: an outline drawn as a line, where the rim stands in (`CHAMPIONS.md`); the HUD's last
   draw calls.
 - **The announcer's and the music's files**: wired, optional, dropped in by name (`FX.md`).

@@ -50,6 +50,9 @@ pub struct LaunchConfig {
     pub fxside: String,
     pub fxsize: Option<f32>,
     pub fxcards: Option<[f32; 2]>,
+    /// The anim stage (`?animstage=<champion>-<act>`, `animstage.rs`): one champion alone on the
+    /// fx stage's clock, no server; `&knobs=` (in `fxknobs`) retunes its motion.
+    pub animstage: Option<String>,
     /// The frame-rate bench (`?bench=1`, `bench.rs`): a practice match scripted over the map's
     /// places and a fight, its frame times summed up. `renderer` is what WebGL names the GPU.
     pub bench: bool,
@@ -97,6 +100,7 @@ impl LaunchConfig {
             camera_locked: flag("cameraLocked"),
             low: string("quality") == "low",
             fxstage: get(&cfg, "fxstage").as_string().filter(|s| !s.is_empty()),
+            animstage: get(&cfg, "animstage").as_string().filter(|s| !s.is_empty()),
             fxknobs: string("fxknobs"),
             fxseed: get(&cfg, "fxseed").as_f64().unwrap_or(0.0).clamp(0.0, f64::from(u32::MAX)) as u32,
             fxside: string("fxside"),

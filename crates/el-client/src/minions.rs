@@ -16,18 +16,22 @@
 
 use std::collections::HashMap;
 
+use bevy::animation::AnimationTargetId;
 use bevy::gltf::{Gltf, GltfMaterialName};
 use bevy::prelude::*;
 use bevy::world_serialization::WorldInstanceReady;
 use el_client_core::client::FEED;
-use el_client_core::pose::{Clip, MINIONS, Poser, Seen};
+use el_client_core::motion::Motion;
+use el_client_core::pose::{MINIONS, Poser, Seen};
 use el_proto::event::WireEvent;
 use el_proto::unit::flags;
 use el_sim::content::rules::minion_def;
 use el_sim::units::{FIRST_MINION, Kind, MAX_UNITS};
 
+use crate::champions::FeelRes;
 use crate::coords::S;
 use crate::dev_hooks::DevStatus;
+use crate::figure::{self, FiguresSet, Nodes};
 use crate::look::Look;
 use crate::net::now_s;
 use crate::session::Session;
@@ -53,11 +57,13 @@ const FLASH_GLOW: f32 = 0.45;
 /// A wheel's radius, of the cart's height (`art/tools/champions.mjs`'s `WHEEL`).
 const WHEEL: f32 = 0.22;
 
-/// A model, once it's in: its scene, and its clips in a graph.
+/// A model, once it's in: its scene, and its clips in a graph (its bones put in their mask groups
+/// with its first figure: `figure.rs`).
 pub(crate) struct Art {
     pub(crate) scene: Handle<WorldAsset>,
     graph: Handle<AnimationGraph>,
-    nodes: [Option<AnimationNodeIndex>; Clip::ALL.len()],
+    nodes: Nodes,
+    masked: bool,
 }
 
 #[derive(Resource, Default)]
@@ -76,6 +82,8 @@ struct Slot {
     /// Its model (in `MINIONS`) and the figure's entity.
     figure: Option<(usize, Entity)>,
     poser: Option<Poser>,
+    /// How it turns, leans and recoils (`el_client_core::motion`).
+    motion: Motion,
     /// The life shown (the low byte of the slot's generation), where it was last drawn and which
     /// way it faced, and when.
     life: Option<u8>,
@@ -126,7 +134,7 @@ impl Plugin for MinionsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Models>()
             .init_resource::<Slots>()
-            .add_systems(Update, (load, animate.after(ViewSet)));
+            .add_systems(Update, (load, animate.after(ViewSet).in_set(FiguresSet)));
     }
 }
 
@@ -159,11 +167,8 @@ fn load(
         let Some(scene) = gltf.default_scene.clone().or_else(|| gltf.scenes.first().cloned()) else {
             continue;
         };
-        let mut graph = AnimationGraph::new();
-        let root = graph.root;
-        let nodes = Clip::ALL
-            .map(|c| gltf.named_animations.get(c.name()).map(|clip| graph.add_clip(clip.clone(), 1.0, root)));
-        models.ready[m] = Some(Art { scene, graph: graphs.add(graph), nodes });
+        let (graph, nodes) = figure::graph(gltf);
+        models.ready[m] = Some(Art { scene, graph: graphs.add(graph), nodes, masked: false });
     }
 }
 
@@ -173,16 +178,24 @@ fn load(
 fn ready(
     event: On<WorldInstanceReady>,
     mut commands: Commands,
-    models: Res<Models>,
+    mut models: ResMut<Models>,
+    mut graphs: ResMut<Assets<AnimationGraph>>,
     children: Query<&Children>,
     players: Query<(), With<AnimationPlayer>>,
     meshes: Query<&MeshMaterial3d<StandardMaterial>>,
     nodes: Query<(&Name, &Transform)>,
+    targets: Query<(&Name, &AnimationTargetId)>,
     mut figures: Query<&mut Figure>,
 ) {
     let e = event.event_target();
     let Ok(mut figure) = figures.get_mut(e) else { return };
-    let Some(art) = &models.ready[figure.model] else { return };
+    let Some(art) = models.ready[figure.model].as_mut() else { return };
+    if !art.masked
+        && let Some(mut g) = graphs.get_mut(&art.graph)
+    {
+        figure::mask(&mut g, children.iter_descendants(e).filter_map(|c| targets.get(c).ok()));
+        art.masked = true;
+    }
     for c in children.iter_descendants(e) {
         if players.contains(c) {
             commands.entity(c).insert(AnimationGraphHandle(art.graph.clone()));
@@ -266,6 +279,7 @@ fn animate(
     session: Res<Session>,
     mut models: ResMut<Models>,
     drawn: Res<Drawn>,
+    feel: Res<FeelRes>,
     mut slots: ResMut<Slots>,
     mut views: Query<(Entity, &UnitView, &mut Transform, &mut Visibility), Without<Figure>>,
     mut parts: Query<&mut Visibility, (Without<UnitView>, Without<Figure>)>,
@@ -305,11 +319,8 @@ fn animate(
             {
                 s.fell = Some(now);
             }
-            if let WireEvent::Damage { target, .. } = e
-                && let Some(s) =
-                    usize::from(target).checked_sub(FIRST_MINION).and_then(|k| slots.slots.get_mut(k))
-            {
-                s.hit_at = now;
+            if let WireEvent::Damage { target, source, amount, .. } = e {
+                hit(slots, &drawn, &feel.0, target, source, amount, now);
             }
             n += 1;
         }
@@ -319,11 +330,8 @@ fn animate(
     if let Some(w) = watch {
         let (feed, feed_n) = (&w.told.feed, w.told.feed_n);
         for n in slots.feed_read.max(feed_n.saturating_sub(FEED as u64))..feed_n {
-            if let WireEvent::Damage { target, .. } = feed[(n % FEED as u64) as usize].1
-                && let Some(s) =
-                    usize::from(target).checked_sub(FIRST_MINION).and_then(|k| slots.slots.get_mut(k))
-            {
-                s.hit_at = now;
+            if let WireEvent::Damage { target, source, amount, .. } = feed[(n % FEED as u64) as usize].1 {
+                hit(slots, &drawn, &feel.0, target, source, amount, now);
             }
         }
         slots.feed_read = feed_n;
@@ -355,6 +363,7 @@ fn animate(
             if slot.life != Some(life) || slot.fell.is_some_and(|t| now - t > 1.0) {
                 slot.fell = None;
                 slot.poser = None;
+                slot.motion.reset();
             }
             slot.life = Some(life);
             slot.last = Some((d.pos, d.facing));
@@ -373,6 +382,7 @@ fn animate(
             slot.life = None;
             slot.fell = None;
             slot.poser = None;
+            slot.motion.reset();
             if let Some((_, f)) = slot.figure
                 && let Ok((_, _, mut fvis)) = figures.get_mut(f)
             {
@@ -406,6 +416,7 @@ fn animate(
             commands.entity(root).add_child(figure);
             slot.figure = Some((m, figure));
             slot.poser = None;
+            slot.motion.reset();
         }
         let Some((_, entity)) = slot.figure else { continue };
         let Ok((mut figure, mut ftf, mut fvis)) = figures.get_mut(entity) else { continue };
@@ -463,23 +474,30 @@ fn animate(
         fvis.set_if_neq(Visibility::Inherited);
         let height = minion_def(kind).radius * HEIGHT[m];
         let s = seen.map_or(Seen::default(), |s| s.3);
-        let mut place = Transform {
-            rotation: Quat::from_rotation_y(facing + std::f32::consts::FRAC_PI_2),
-            scale: Vec3::splat(height),
-            ..default()
-        };
+        let stride = 6.0 * minion_def(kind).radius;
+        let pose = rigged.then(|| {
+            let poser = slot.poser.get_or_insert_with(|| {
+                let mut p = Poser::minion(kind);
+                p.set_feel(feel.0);
+                p
+            });
+            poser.step(now, &Seen { alive: !lying, ..s })
+        });
+        let beats = pose.map(|p| p.beats).unwrap_or_default();
+        // Turned, leant and pushed about as the champions are (`figure.rs`).
+        let moved =
+            slot.motion.step(now, facing + std::f32::consts::FRAC_PI_2, s.speed, stride, beats, &feel.0);
+        let mut place = figure::place(&moved, height);
         if lying {
             // Under the floor once it has lain a while.
             let t = ((now - slot.fell.unwrap_or(now) - LIE) / SINK).clamp(0.0, 1.0) as f32;
             place.translation.y = -t * t * height * 0.8;
         }
-        if rigged {
-            let poser = slot.poser.get_or_insert_with(|| Poser::minion(kind));
-            let pose = poser.step(now, &Seen { alive: !lying, ..s });
+        if let Some(pose) = pose {
             if let Some(p) = figure.player
                 && let Ok(mut player) = players.get_mut(p)
             {
-                crate::champions::play(&mut player, &art.nodes, pose.main, pose.fading);
+                figure::play(&mut player, &art.nodes, &pose);
             }
             *clips.entry(pose.main.clip.name()).or_default() += 1;
         } else {
@@ -530,4 +548,29 @@ fn animate(
     let mut by: Vec<_> = clips.into_iter().collect();
     by.sort();
     dev.set("minion_clips", by.iter().map(|(c, n)| format!("{c}:{n}")).collect::<Vec<_>>().join(","));
+}
+
+/// A hit on a minion: its flash, its flinch, and its push away from whoever hit it.
+fn hit(
+    slots: &mut Slots,
+    drawn: &Drawn,
+    feel: &el_client_core::motion::Feel,
+    target: u8,
+    source: u8,
+    amount: u16,
+    now: f64,
+) {
+    let Some(s) = usize::from(target).checked_sub(FIRST_MINION).and_then(|k| slots.slots.get_mut(k)) else {
+        return;
+    };
+    s.hit_at = now;
+    let Some(t) = drawn.units[usize::from(target)] else { return };
+    let share = f32::from(amount) / t.max_hp.max(1.0);
+    if let Some(p) = s.poser.as_mut() {
+        p.hit(now, share > feel.heavy);
+    }
+    if let Some(from) = drawn.units.get(usize::from(source)).copied().flatten() {
+        let d = t.pos - from.pos;
+        s.motion.hit([d.x, -d.y], share, feel);
+    }
 }

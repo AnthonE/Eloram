@@ -509,6 +509,8 @@ pub fn spawn(
     time: Res<Time>,
     cues: Res<Cues>,
     drawn: Res<Drawn>,
+    muzzles: Res<crate::champions::Muzzles>,
+    mut kicks: ResMut<crate::figure::Kicks>,
     knobs: Res<KnobsRes>,
     mut catch: ResMut<Catch>,
     mut clock: ResMut<Time<Virtual>>,
@@ -547,12 +549,27 @@ pub fn spawn(
         glow.clear();
         smoke.clear();
         let mut m = Make { b: &mut bursts, now: born, glow, smoke, keep, knobs: &knobs.0 };
-        recipe(&mut m, q, &drawn);
+        recipe(&mut m, q, &drawn, &muzzles);
         let (glow, smoke) = (std::mem::take(&mut m.glow), std::mem::take(&mut m.smoke));
         bursts.put(&glow, false, born, &mut meshes);
         bursts.put(&smoke, true, born, &mut meshes);
         bursts.scratch = (glow, smoke);
     }
+    // What the figures kicked up (`figure::Kick`): one burst for all of a frame's.
+    if !kicks.list.is_empty() && !catch.held {
+        let (mut glow, mut smoke) = std::mem::take(&mut bursts.scratch);
+        glow.clear();
+        smoke.clear();
+        let mut m = Make { b: &mut bursts, now, glow, smoke, keep, knobs: &knobs.0 };
+        for k in kicks.list.drain(..) {
+            kick(&mut m, k);
+        }
+        let (glow, smoke) = (std::mem::take(&mut m.glow), std::mem::take(&mut m.smoke));
+        bursts.put(&glow, false, now, &mut meshes);
+        bursts.put(&smoke, true, now, &mut meshes);
+        bursts.scratch = (glow, smoke);
+    }
+    kicks.list.clear();
     status.set("fx_bursts", bursts.written as f64);
     status.set("fx_bursts_stolen", bursts.stolen as f64);
     for slot in bursts.glow.iter().chain(&bursts.smoke) {
@@ -604,7 +621,28 @@ fn chest(kind: Kind) -> f32 {
     }
 }
 
-fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
+/// The snow and grit a figure kicks up: pale, soft, low, and quick to settle.
+const DUST: [f32; 4] = [0.62, 0.68, 0.78, 0.55];
+
+/// What a figure kicked up (`figure::Kick`).
+fn kick(m: &mut Make<'_>, k: crate::figure::Kick) {
+    use crate::figure::Kick;
+    match k {
+        Kick::Step { at } => {
+            m.spray(at, 2.0, shape::PUFF, 0.45, 0.35, 0.4, 0.09, -0.15, 3.0, DUST, true);
+        }
+        Kick::Land { at, size } => {
+            let k = (size / 1.8).clamp(0.6, 1.6);
+            m.spray(at, 9.0 * k, shape::PUFF, 2.2 * k, 0.12, 0.65, 0.2 * k, -0.1, 3.5, DUST, true);
+            m.one(at + Vec3::Y * 0.02, shape::RING, 1.1 * k, 0.3, [0.5, 0.55, 0.62, 0.45], true);
+        }
+        Kick::Dash { at, back } => {
+            m.spray(at + back * 0.25, 5.0, shape::PUFF, 1.1, 0.3, 0.5, 0.18, -0.1, 3.0, DUST, true);
+        }
+    }
+}
+
+fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn, muzzles: &crate::champions::Muzzles) {
     // Bigger and brighter as it matters more to this viewer: 0.7 for a 1 to 1.4 for a 10.
     let k = 0.62 + 0.08 * f32::from(q.rating.clamp(1, 10));
     let pal = q.look.palette;
@@ -626,8 +664,14 @@ fn recipe(m: &mut Make<'_>, q: &Cue, drawn: &Drawn) {
             m.spray(ground(0.3), 16.0 * k, shape::GLOW, 2.0, 0.9, 0.9, 0.08, -1.5, 1.5, core, false);
         }
         What::Part(Part::Launch) => {
-            // The muzzle on the caster's near side, as a hit is (a turret's is its own height).
-            let at = if matches!(q.look.reach, Reach::Turret) { ground(1.1) } else { on_body(q, drawn) };
+            // The muzzle: the tip of what the caster holds, or its hand (`champions.rs`); else its
+            // near side, as a hit is (a turret's is its own height).
+            let muzzle = q.unit.and_then(|u| muzzles.0.get(usize::from(u)).copied().flatten());
+            let at = if matches!(q.look.reach, Reach::Turret) {
+                ground(1.1)
+            } else {
+                muzzle.unwrap_or_else(|| on_body(q, drawn))
+            };
             m.one(at, shape::GLOW, 0.25 * k, 0.16, core, false);
             if matches!(q.look.reach, Reach::Line { .. } | Reach::Homing | Reach::Turret) {
                 // A muzzle's flash, and what it throws forward.

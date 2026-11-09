@@ -42,6 +42,8 @@ loads). Nothing of Riot's is traced, sampled or named (`CLAUDE.md`).
   (a slash, a thrust, an overhead smash, a punch, a shot from the hip, a two-handed bolt, a flick
   of the hand); its four casts from how each ability reaches (aimed, gathered and released, raised
   high, slammed down, a great stroke for a bladed ultimate), as `fx::look` derives an ability's look.
+  Eighteen more came later from a CC0 library ("The second clips"): a second attack each, stances,
+  flinches, a throw.
 - **Timed to the game.** An attack's clip plays so its strike lands as the server's windup ends:
   the own champion's windup is known to the tick (the prediction has it), anyone else's is its
   champion's at its level, then the last one seen (attack speed bought shows in it). A cast's
@@ -100,6 +102,105 @@ made, so a run that stops is taken up and nothing is paid for twice); `art/tools
   animation graph; each frame the pose is played on it, paused at the pose's time (the clock is
   the pose's), two clips blended while one fades. The primitive figure stands in until it's there.
 
+## The motion
+
+The first pass gave every champion a model, clips timed to the game, and nothing between "the
+right clip at the right moment" and a champion that feels alive. Seen in a match: all twenty moved
+alike (the same nineteen clips, their windows shared), each clip played at one even pace (a 1.3 s
+captured slash squeezed into a 0.3 s windup winds up and follows through at the same speed), a
+champion snapped to its facing at the sim's 30 Hz (a path round a minion turns it every tick), a
+hit was a white flash and nothing in the body, and nothing came from what it held. Riot's word is
+that the hand-keyed look is "smooth and instant", the silhouette carried by poses that read; this
+is what we built for it, client-side, with the sim, the wire and the record untouched.
+
+- **The timing's shape** (`el_client_core::pose`): a strike's wind-up is eased in, slow then
+  fast into the hit (`Feel::snap`: the clip's time to its strike is `u` blended with `u³`), the
+  strike holds on its contact for a few frames (`hold_melee`, `hold_ranged`, `hold_cast`), and the
+  follow-through plays on at its own pace (`follow`). The strike still lands exactly as the
+  server's windup ends; a test holds it for any knobs.
+- **Two attacks, alternated**, as League's champions swing (`Kit::attacks`, by what each holds):
+  a slash and a sweep, a cut and a slash, a thrust and the left knife's jab, a punch and a hook, a
+  smash and a lunge, a two-handed shot and a one-handed one, a gesture and a spell.
+- **A stance each** (`Kit::idle`): a blade's guard (Vire, Talmar, Sefa), a shield raised (Pell), a
+  crouch (Kesh), a weapon held up to aim (Vessa, Marret), a light held up (Liora and Sable
+  left-handed, Mira right), arms folded (Gorum); Meshy's idle for the rest.
+- **The legs run while the arms cast** (`Pose::legs`): every clip is in a model's graph twice, the
+  upper body and the hips and legs apart (Bevy's masks, `el-client/src/figure.rs`), so a cast
+  walked through plays on the arms over the run, and its follow-through ends into the run without
+  a hitch in the legs. Before, moving cut a cast's follow-through to the run outright.
+- **A flinch** over the upper body when hit (`Pose::flinch`), a reel past `heavy` of its health,
+  on top of the flash; not over a fall, a stun or a knock.
+- **The motion** (`el_client_core::motion`): the figure turns to its facing in a few hundredths of
+  a second, the short way, never past it (`turn`); leans into turns by how fast it turns and moves
+  (`bank`), forward as it speeds up and a little as it runs (`lean_accel`, `lean_run`), back as it
+  stops; is pushed away from whoever hit it by the hit's share of its health and springs back
+  (`recoil`, `recoil_share`); and squashes and stretches about its feet, keeping its volume, as it
+  lands, strikes, dashes or falls. The minions turn, lean and recoil the same way, and flinch.
+- **The beats** (`pose::Beats`): a strike, an attack or a cast begun, a dash of its own, a landing,
+  a fall, a hit; what the motion and the effects key off.
+- **Its sockets** (`figure::Sockets`): its hands, its toes, and the tip of what it holds (an empty
+  `<prop>.tip` node the pipeline puts at each prop's far end). From them: a swing's **arc**, a
+  ribbon over the outer part of the blade over its last tenth of a second, in its family's colour
+  (`el-client/src/trails.rs`); a **light gathering** at the hand or the staff's tip as a cast winds
+  up; the **launch's flash** at the muzzle, and a missile drawn leaving it and on its own path a
+  moment later (where it is and what it hits stay the server's); the **dust** the player's own
+  champion's running foot kicks up as it comes down, and its **step**, heard (`step`, made by
+  `sounds.py` from nothing recorded; everyone's steps took the burst pool's smoke slots from the
+  effects in a watched match); a **landing's** ring and a **dash's** puff.
+- **The look**: each champion's own colours a little richer than made (`shaders/rim.wgsl`,
+  `look.x`: League's champions are the most saturated thing on screen), lit by its own colour
+  warmly against the night's cold light (the subject warm, the world cool), its team's rim
+  softened so it no longer drowns the texture (an ally read blue on the blue stone), what it holds
+  in hand drawn a quarter bigger (the "defining primary characteristic", at some 60 px tall), and
+  on the low tier, which has no shadows, a soft blob of shadow under it. What these add to a
+  match's drawing (the arcs', the hands' lights' and the blob's materials) is in the page from its
+  start, hidden, so the warm-up (`el-client/src/warm.rs`) builds their pipelines before the match
+  and `scripts/e2e.sh hitches` holds none built in it.
+
+The numbers are a `motion::Feel`, `Feel::GAME` in a match; the anim stage's knobs retune them
+without a rebuild.
+
+## The second clips
+
+Meshy charges a clip a rig, and its last credit was spent. Quaternius's Universal Animation
+Library, volumes 1 and 2 (the Standard sets: CC0, some ninety clips between them on one humanoid
+rig under two sets of bone names), has the rest: sword strokes with their recoveries, a jab, a
+cross and a hook, a simple spell cast, a pistol shot, an overhand throw, flinches to the chest and
+the head, and stances (a guard, a shield, a torch, a lantern, folded arms, a crouch, a weapon
+raised). `python3 -I art/tools/ual.py` fetches both and checks them against their hashes and
+their licences; `art/champions.json`'s `ual` names each clip we take, its parts in order (a
+stroke then its recovery: one clip); `node art/tools/champions.mjs --ual` puts them on the models
+already made (and the full build with the rest).
+
+- **Retargeted across rigs** (`art/tools/retarget.mjs`): both rigs face +Z with their left on +X,
+  but the library's rest is a T-pose and Meshy's an A-pose, so each bone's turn is taken from the
+  library's rest after turning that rest onto the champion's, the shortest turn that lays each bone
+  of one along the same bone of the other (a hand and a toe take their parent's). A bone of the
+  champion then points where the library's does. The hips rise and fall by the library's share of
+  hip height and never travel.
+- **Their strikes measured**: where the weapon's tip (or the hand) moves fastest
+  (`retarget.mjs`, `strike`), checked by hand where that's the wrong hand (the jab is the left)
+  or the arm coming down (the spell's release is its shot's start).
+- **Looked at without the browser**: `node art/tools/champions.mjs --sheet <glb> <png> [clip...]`
+  draws each clip as a row of stick figures from the front and the side, the prop in gold and the
+  strike boxed (a library's own clips too).
+- The models keep exactly their kit's clips: a champion whose stance is a guard no longer carries
+  Meshy's idle. The minions take the chest's flinch.
+
+## The stage
+
+How a champion moves can't be judged in a match in headless Chromium (SwiftShader draws a frame
+every second or so; a swing falls between frames), nor from one still. The anim stage is the fx
+stage's loop for it (`el-client/src/animstage.rs`, `el_client_core::anim`, `scripts/anim.sh`,
+`.claude/skills/anim/SKILL.md`, `.claude/agents/anim-judge.md`): one champion doing one thing,
+twice (in profile over a dark card, three-quarters toward the camera over a light one), on the fx
+stage's clock (a step a sixtieth of a second, held where the shooter asks), shot by the same
+`e2e/fxstrip.mjs` into a strip with a diff against the last run. Each act is a script of what a
+match's client would tell the figure (`anim::Act`: stand, run, attack, each cast, a cast on the
+run, a light and a heavy hit, turns, a landing, a fall, a win); 260 by name (`vire-attack`,
+`seren-r`). `&knobs=` retunes the `Feel` without a rebuild. The figures are drawn as a match draws
+them, with what they kick up and draw.
+
 ## The minions
 
 The minions were the last primitives on the lane: a cube, a ball, a crate and a bigger cube. Riot's
@@ -151,6 +252,16 @@ than any champion, told apart at a glance by shape and by what they hold, and th
   tick and anyone else's from its champion and then from what was seen; a cast's release with its
   ability; moving cuts a follow-through short; states outrank actions and fade in.
 - **Pictures**: the `match` suite's screenshots with the champions in them.
+- **The motion** (`pose`, `motion`, `anim`, natively): the strike still lands as the windup ends
+  whatever the knobs; a strike eases in, holds and follows through; attacks alternate; a cast
+  walked through keeps the legs running and ends into the run with the legs' cycle unbroken; a
+  hit flinches the upper body and a heavy one reels it, never over a fall or a stun; the beats
+  come once each; the turn takes the short way, fast, and never overshoots; the lean goes into a
+  turn and forward as it speeds up; a hit pushes away from its source and comes back; squash keeps
+  the volume; a long frame doesn't blow a spring up; every act on the stage does what it says.
+- **The models hold exactly their kit's clips** (no more, none missing), each prop's tip beside
+  it, and the library's clips at their lengths.
+- **The stage's strips**: an act shot and read (`scripts/anim.sh`).
 - **Nothing else moves**: the sim, the wire and the record untouched (no `CONTENT_VERSION` bump),
   the golden hashes, no allocation in a tick, `ci.sh` green.
 
@@ -194,7 +305,43 @@ Changed on the way:
   of champion.
 - The mode has no recall (`DESIGN.md`), so no champion needs one.
 
+- **The motion** (above): the timing's shape, two attacks alternated, a stance each, the legs
+  running under a cast, flinches, turning, leaning, recoil, squash and stretch, a swing's arc, a
+  casting hand's light, shots from the muzzle, a running foot's dust and the player's own steps,
+  a landing's ring and a dash's puff; the champions' own colours richer, warmly self-lit, a
+  softer rim, what they hold a quarter bigger, a blob of shadow on the low tier. Eighteen clips
+  from Quaternius's CC0 library on the models (two to six a champion; a flinch on each minion),
+  595 KiB over the twenty models (30 KiB each; 10.95 MiB to 11.53 raw), the minions' as they were.
+  Nothing on the wire, in the record or in the sim.
+- **The anim stage** (above), with which it was tuned. What it showed:
+  - Meshy's slash struck a tenth of a second early: at its strike the blade was still crossing
+    the body, the swing after it. Measured where the tip moves fastest on every model that swings
+    it, the slash is at 0.69 s (not 0.55) and the slam at 1.12 (not 1.05); the thrust, the smash,
+    the punch and the stroke agree with the table to a hundredth.
+  - The team's rim drowned the textures: Vire read blue-white over the dark card. At 0.55 (from
+    0.9) and a little tighter, with the colours richer before the light (not after, where it
+    saturated the rim too), his red cloth and grey steel read.
+  - A swing's arc over two thirds of the blade, bright, was a white sheet, its fan reaching the
+    next card on a fast follow-through; over the outer 40%, dimmer and quicker, it's a crescent.
+  - A casting hand's light at 12 to 45 cm was six pixels: it's 30 cm to a metre now, brightening
+    as it gathers.
+  - An about-face is done in a few frames and never past; a weaving run banks into each turn.
+- In the browser (`scripts/e2e.sh match`): the own champion standing in its stance (the suite
+  waits for `window.__el.champion_stance`, the idle no longer being everyone's), then running, the
+  walk still predicted exactly, all three tests in 6.5 minutes. In a practice match at the game's
+  zoom the allies read in their own colours where they read blue on the blue stone. The golden
+  hashes held, native and on wasm. `scripts/e2e.sh watch` passes (3.7 minutes), its bursts taken
+  from one still burning 17 as before (16): with every champion's steps kicking up dust they were
+  100, so only the player's own do. Twice its replay ran out before anyone died: the suite needs
+  a champion's death in the record's first 100 s, and the headless sim's first kill falls in the
+  second minute (six seeds: none by 1:00, one to nine by 2:00), so it fails now and then on the
+  match it's given, before this pass as after.
+
 Not yet:
 - Nobody has seen them on a real GPU, and the frame rate there isn't measured.
 - An outline drawn as a line (the rim stands in); the clips' windows shared by every champion, not
   tuned one by one.
+- Hand-keyed signature moments (an ultimate's own clip, the way Riot keys them), a crit's swing,
+  dynamic cloth and hair: the library has none, and Meshy's credits are spent.
+- The library's lantern and torch stances are a hand's, not the champions' own props' (Liora's
+  lantern swings from where Meshy's grip left it); the champions' own walk under a cast is a run.

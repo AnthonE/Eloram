@@ -26,6 +26,8 @@ pub struct DrawnUnit {
     pub radius: f32,
     pub team: u8,
     pub generation: u8,
+    /// Its health at most: a hit's share of it is how hard it was hit (`champions.rs`).
+    pub max_hp: f32,
 }
 
 #[derive(Resource)]
@@ -611,7 +613,7 @@ fn draw_units(
         };
         vis.set_if_neq(Visibility::Visible);
         tf.set_if_neq(Transform { translation: world(pos, 0.0), ..*tf });
-        drawn.units[i] = Some(DrawnUnit { pos, facing, radius: radius_of(kind), team, generation });
+        drawn.units[i] = Some(DrawnUnit { pos, facing, radius: radius_of(kind), team, generation, max_hp });
         let champs = watch.map_or_else(|| client.map(|c| &c.world.champs), |w| Some(&w.referee.m.champs));
         let def = if i < SEATS { champs.map_or(0, |ch| ch[i].def) } else { 0 };
         let (w, h) = bar_of(kind);

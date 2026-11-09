@@ -1993,6 +1993,19 @@ def _(v):
     return 0.8 * sn + 0.6 * sm
 
 
+@sound("step")
+def _(v):
+    """A footstep on snow over stone, the player's own as it runs: the heel's soft thump, then the
+    snow's crunch, a burst of tiny cracks falling away. Made from nothing recorded."""
+    r, n = v.rng, T(0.15)
+    t = tt(n)
+    heel = sine(85 * v.j(0.1), n) * np.exp(-t / 0.018) + 0.3 * white(n, r) * np.exp(-t / 0.006)
+    heel = ffilt(heel, lambda f: lp(f, 420, 2))
+    crunch = crackle(n, r, 2600 * v.j(0.2), lo=1200, hi=7500, amp=np.exp(-t / 0.035))
+    crunch = ffilt(crunch, lambda f: bp(f, 3200 * v.j(0.15), 0.7) + 0.4 * hp(f, 5000, 2))
+    return unit(0.9 * unit(heel) + 0.7 * unit(crunch))
+
+
 @sound("tag.dash")
 def _(v):
     r, n = v.rng, T(0.4)
@@ -2723,8 +2736,11 @@ def main():
     man = json.load(open(os.path.join(AUDIO, "manifest.json"), encoding="utf-8"))
     sounds = [d for d in man["sounds"] if not d["optional"]]
     SRC = Sources(a.cache)
-    for p in PACKS:
-        SRC.pack(p)
+    # Every pack, once, before the work is shared out; making only some sounds, a pack is fetched
+    # when one of them asks for it (a sound made from nothing needs none).
+    if a.only is None:
+        for p in PACKS:
+            SRC.pack(p)
     ROOM = make_room(np.random.default_rng(7))
     todo = [(d, k) for d in sounds for k in range(d["takes"])
             if a.only is None or d["name"].startswith(a.only)]

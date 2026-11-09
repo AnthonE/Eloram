@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::animstage::AnimStagePlugin;
 use crate::audio::AudioPlugin;
 use crate::bench::BenchPlugin;
 use crate::camera::CameraPlugin;
@@ -25,6 +26,7 @@ use crate::net::{LaunchConfigRes, MapRes, NetPlugin};
 use crate::portrait::PortraitPlugin;
 use crate::scenery::SceneryPlugin;
 use crate::stage::StagePlugin;
+use crate::trails::TrailsPlugin;
 use crate::view::ViewPlugin;
 use crate::warm::WarmPlugin;
 use crate::watch::WatchPlugin;
@@ -84,5 +86,6 @@ pub fn run() {
             FramePlugin,
             WarmPlugin,
         ))
+        .add_plugins((TrailsPlugin, AnimStagePlugin))
         .run();
 }
