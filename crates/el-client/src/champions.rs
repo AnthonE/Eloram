@@ -81,16 +81,16 @@ fn rim(team: u8) -> Rim {
 }
 
 /// A champion's model, once it's in: its scene, and its clips in a graph.
-struct Art {
-    scene: Handle<WorldAsset>,
+pub(crate) struct Art {
+    pub(crate) scene: Handle<WorldAsset>,
     graph: Handle<AnimationGraph>,
     nodes: [Option<AnimationNodeIndex>; Clip::ALL.len()],
 }
 
 #[derive(Resource, Default)]
-struct Models {
+pub(crate) struct Models {
     asked: [Option<Handle<Gltf>>; CHAMPIONS.len()],
-    ready: [Option<Art>; CHAMPIONS.len()],
+    pub(crate) ready: [Option<Art>; CHAMPIONS.len()],
 }
 
 /// A seat's figure.
@@ -276,23 +276,30 @@ fn ready(
             figure.player = Some(c);
         }
         if let Ok(m) = meshes.get(c)
-            && let Some(mut own) = materials.get(&m.0).cloned()
+            && let Some(own) = materials.get(&m.0)
         {
-            // Lit as the rest of the Causeway is, and a little by its own colour so it reads
-            // against the night's stone (Riot's skinned meshes are lit by their own emissive as
-            // well as the scene); a hit flashes this one alone.
-            own.double_sided = true;
-            own.cull_mode = None;
-            if own.base_color_texture.is_some() && own.emissive_texture.is_none() {
-                own.emissive_texture = own.base_color_texture.clone();
-                own.emissive = LinearRgba::rgb(LIFT, LIFT, LIFT);
-            }
-            let glow = own.emissive;
-            let h = rims.add(ExtendedMaterial { base: own, extension: rim(team_of_seat(seat)) });
+            let mat = rim_material(own, team_of_seat(seat));
+            let glow = mat.base.emissive;
+            let h = rims.add(mat);
             commands.entity(c).remove::<MeshMaterial3d<StandardMaterial>>().insert(MeshMaterial3d(h.clone()));
             figure.mats.push((h, glow));
         }
     }
+}
+
+/// A champion's mesh's own material as it's drawn: lit as the rest of the Causeway is, and a little
+/// by its own colour so it reads against the night's stone (Riot's skinned meshes are lit by their
+/// own emissive as well as the scene), with its team's rim; a hit flashes this one alone. The
+/// warm-up (`warm.rs`) makes the same, so the pipeline it builds is the match's.
+pub(crate) fn rim_material(own: &StandardMaterial, team: u8) -> RimMat {
+    let mut own = own.clone();
+    own.double_sided = true;
+    own.cull_mode = None;
+    if own.base_color_texture.is_some() && own.emissive_texture.is_none() {
+        own.emissive_texture = own.base_color_texture.clone();
+        own.emissive = LinearRgba::rgb(LIFT, LIFT, LIFT);
+    }
+    ExtendedMaterial { base: own, extension: rim(team) }
 }
 
 /// What each seat's champion is doing, and its figure drawn doing it.

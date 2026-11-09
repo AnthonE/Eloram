@@ -166,6 +166,9 @@ async function main() {
     practiceChamp: Number(params.get("champ") || 0) | 0,
     bench: params.get("bench") === "1",
     renderer: rendererName(),
+    // What a match draws, drawn before it (`el-client/src/warm.rs`); `?warm=0` leaves it to the
+    // match, to compare (`scripts/e2e.sh hitches` counts what's built late).
+    warm: params.get("warm") !== "0",
     // Sign in with the browser's wallet (`?signin=1`): back on the resume token from the last
     // sign-in while it's good, so the wallet isn't asked every time.
     signIn: params.get("signin") === "1",
