@@ -64,7 +64,8 @@ pub fn ratings(done: &MatchDone, replay_sha256: Option<&str>, replay_url: Option
     let teams: Vec<Value> = (0..2)
         .map(|t| json!({"players": side(t), "place": if usize::from(done.winner) == t { 1 } else { 2 }}))
         .collect();
-    if teams.iter().any(|t| t["players"].as_array().is_none_or(Vec::is_empty)) {
+    // A rated match is five wallets a side (a drop mid-match keeps its wallet: still rated).
+    if teams.iter().any(|t| t["players"].as_array().is_none_or(|p| p.len() != el_sim::units::TEAM_SIZE)) {
         return None;
     }
     let agents: Vec<&str> =
@@ -183,6 +184,9 @@ mod tests {
         let mut nc = done(true);
         nc.winner = 2;
         assert!(ratings(&nc, None, None).is_none(), "no contest");
+        let mut short = done(true);
+        short.seats[7].player = None;
+        assert!(ratings(&short, None, None).is_none(), "a side of four isn't rated");
     }
 
     #[test]

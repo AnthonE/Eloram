@@ -158,6 +158,11 @@ impl Online {
         Here { online: self.clone(), address, session }
     }
 
+    /// The session `address` is on now, if any.
+    pub fn session_of(&self, address: &PlayerId) -> Option<u32> {
+        self.0.lock().ok()?.get(address).map(|e| e.session)
+    }
+
     /// `{"at": unix, "online": [{"wallet", "name", "agent", "since", "status"}]}`.
     pub fn json(&self) -> serde_json::Value {
         let online: Vec<serde_json::Value> = self.0.lock().map_or_else(

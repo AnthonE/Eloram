@@ -6,6 +6,7 @@ pub mod game;
 pub mod http;
 pub mod lobby;
 pub mod net;
+pub mod party;
 pub mod records;
 pub mod recover;
 pub mod referee;

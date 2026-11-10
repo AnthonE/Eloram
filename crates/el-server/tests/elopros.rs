@@ -98,6 +98,15 @@ async fn meter(
                         (v["ladder"].as_str(), v["teams"].as_u64(), v["size"].as_u64()),
                         (Some("ranked"), Some(2), Some(5))
                     );
+                    // Queued again: out of the match they were in (a select called off).
+                    let mut matched = m.matched.lock().unwrap();
+                    if matched
+                        .as_ref()
+                        .is_some_and(|mm| players.iter().any(|p| mm.to_string().contains(p.as_str())))
+                    {
+                        *matched = None;
+                    }
+                    drop(matched);
                     let mut q = m.queued.lock().unwrap();
                     q.extend(players.iter().cloned());
                     if q.len() == 10 {
@@ -320,4 +329,152 @@ async fn reports_wait_on_disk_until_taken() {
     assert_eq!(failed.len(), 2, "the job and its reason");
     assert_eq!(*m.bad_signatures.lock().unwrap(), 0);
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A ranked party of two queues as one call and sits on one side; then someone leaving champion
+/// select calls the match off, and the other nine are back in the queue (nothing was started).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_ranked_party_and_a_leaver_in_select() {
+    let dir = scratch("party");
+    let public_addr = "game.example:61260";
+    let (m, base, key_file) = start_meter(&dir, public_addr).await;
+    let cfg = el_server::Config {
+        wt_port: 0,
+        http_addr: "127.0.0.1:0".parse().unwrap(),
+        web_dir: None,
+        matches_per_shard: 2,
+        fill_after: Duration::from_secs(600),
+        select_for: Duration::from_secs(60),
+        elopros: Some(EloConfig {
+            api: base,
+            key_file,
+            key_id: "game-1".into(),
+            public_addr: Some(public_addr.into()),
+            records_url: None,
+            ranked: true,
+        }),
+        ..el_server::Config::default()
+    };
+    let h = el_server::start(cfg).await.expect("the server starts");
+    let server = format!("http://{}", h.http_addr);
+    let mut bots = Vec::new();
+    for k in 1..=10u8 {
+        let cfg = BotConfig { server: server.clone(), name: format!("Wallet-{k}"), key: Some(secret(k)) };
+        bots.push(BotClient::connect(&cfg).await.unwrap());
+    }
+    // The first asks the second into a party; the second takes it.
+    let second = bots[1].address.unwrap().to_string();
+    bots[0].party_invite(&second).await.unwrap();
+    bots[1].listen(Duration::from_millis(500)).await.unwrap();
+    assert_eq!(bots[1].party.2, vec![bots[0].session], "asked");
+    let leader = bots[0].session;
+    bots[1].party_accept(leader).await.unwrap();
+    bots[0].listen(Duration::from_millis(500)).await.unwrap();
+    assert_eq!(bots[0].party.0, leader);
+    assert_eq!(bots[0].party.1.len(), 2);
+    // Only the leader queues for the party.
+    bots[1].queue_ranked().await.unwrap();
+    bots[1].listen(Duration::from_millis(500)).await.unwrap();
+    assert!(bots[1].refused.as_deref().is_some_and(|w| w.contains("leader")), "{:?}", bots[1].refused);
+    for b in &mut bots {
+        if b.session != bots_session_of(&second, b) {
+            b.queue_ranked().await.unwrap();
+        }
+    }
+    for _ in 0..40 {
+        for b in &mut bots {
+            b.listen(Duration::from_millis(50)).await.unwrap();
+        }
+        if bots.iter().all(|b| b.selecting) {
+            break;
+        }
+    }
+    assert!(bots.iter().all(|b| b.selecting && b.ranked_match), "everyone in a ranked select");
+    let calls = m.calls.lock().unwrap().clone();
+    let party_call = calls
+        .iter()
+        .find(|(p, v)| {
+            p == "/lobbies/serve/eloram" && v["op"] == "queue" && v["players"].as_array().unwrap().len() == 2
+        })
+        .expect("the party queued in one call");
+    assert_eq!(party_call.1["players"][1], second.as_str());
+    let seat_of = |b: &BotClient, name: &str| b.roster.iter().position(|p| p.name == name).unwrap();
+    assert_eq!(seat_of(&bots[0], "Wallet-1") / 5, seat_of(&bots[0], "Wallet-2") / 5, "the party on one side");
+
+    // The last one goes: the select is called off, the other nine queue again.
+    for b in &mut bots {
+        b.ranked = None;
+    }
+    let gone = bots.pop().unwrap();
+    gone.close().await;
+    for _ in 0..40 {
+        for b in &mut bots {
+            b.listen(Duration::from_millis(50)).await.unwrap();
+        }
+        if bots.iter().all(|b| b.ranked.as_deref() == Some("waiting")) {
+            break;
+        }
+    }
+    assert!(
+        bots.iter().all(|b| b.ranked.as_deref() == Some("waiting")),
+        "the nine are told they're queued again"
+    );
+    assert_eq!(m.queued.lock().unwrap().len(), 9, "and the store has them");
+    let status = el_bot::get_json(&server, "/status").await.unwrap();
+    assert_eq!(status["game"]["matches"], 0, "nothing was started: {status}");
+    for b in bots {
+        b.close().await;
+    }
+    h.shutdown();
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The session whose wallet is `addr`, or 0.
+fn bots_session_of(addr: &str, b: &BotClient) -> u32 {
+    if b.address.map(|a| a.to_string()).as_deref() == Some(addr) { b.session } else { 0 }
+}
+
+/// A NORMAL party of two sits on one side, the server's bots in the other seats.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_party_plays_on_one_side() {
+    let cfg = el_server::Config {
+        wt_port: 0,
+        http_addr: "127.0.0.1:0".parse().unwrap(),
+        web_dir: None,
+        matches_per_shard: 2,
+        fill_after: Duration::from_millis(800),
+        select_for: Duration::ZERO,
+        ..el_server::Config::default()
+    };
+    let h = el_server::start(cfg).await.expect("the server starts");
+    let server = format!("http://{}", h.http_addr);
+    let mut a =
+        BotClient::connect(&BotConfig { server: server.clone(), name: "A".into(), key: Some(secret(21)) })
+            .await
+            .unwrap();
+    let mut b =
+        BotClient::connect(&BotConfig { server: server.clone(), name: "B".into(), key: Some(secret(22)) })
+            .await
+            .unwrap();
+    // A guest can't be asked: nobody can find one.
+    let guest =
+        BotClient::connect(&BotConfig { server: server.clone(), name: "G".into(), key: None }).await.unwrap();
+    a.party_invite("0x0000000000000000000000000000000000000001").await.unwrap();
+    a.listen(Duration::from_millis(300)).await.unwrap();
+    assert!(a.refused.is_some(), "nobody there");
+    a.party_invite(&b.address.unwrap().to_string()).await.unwrap();
+    b.listen(Duration::from_millis(400)).await.unwrap();
+    b.party_accept(a.session).await.unwrap();
+    a.listen(Duration::from_millis(400)).await.unwrap();
+    assert_eq!(a.party.1.len(), 2);
+    a.queue().await.unwrap();
+    a.wait_match(Duration::from_secs(10)).await.unwrap();
+    b.wait_match(Duration::from_secs(10)).await.unwrap();
+    let (sa, sb) = (a.client.as_ref().unwrap().seat, b.client.as_ref().unwrap().seat);
+    assert_eq!(sa / 5, sb / 5, "seats {sa} and {sb}: one side");
+    assert_eq!(a.roster.iter().filter(|p| p.bot).count(), 8);
+    a.close().await;
+    b.close().await;
+    guest.close().await;
+    h.shutdown();
 }

@@ -123,6 +123,23 @@ pub struct Session {
     pub refused: Option<String>,
     /// A match left on purpose: the main menu comes back up.
     pub left: bool,
+    /// The party, as the server last told it (`ToClient::Party`).
+    pub party: PartyView,
+}
+
+/// The party: its leader's session (0: none), its members, and the asks into others'.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PartyView {
+    pub leader: u32,
+    pub members: Vec<el_client_core::lobby::PartyMember>,
+    pub invites_in: Vec<el_client_core::lobby::PartyAsk>,
+}
+
+impl PartyView {
+    /// In a party of two or more.
+    pub fn on(&self) -> bool {
+        self.members.len() > 1
+    }
 }
 
 /// What a ping says, in words.

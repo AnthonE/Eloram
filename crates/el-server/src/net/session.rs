@@ -179,6 +179,18 @@ pub async fn run(
         }
     };
     let (events_tx, mut events) = mpsc::unbounded_channel();
+    // Who this session is, as the lobby seats it: kept by the parties, so a leader can queue it.
+    let me = crate::lobby::Waiting {
+        session,
+        name: name.clone(),
+        agent,
+        max_datagram,
+        tx: events_tx.clone(),
+        token: String::new(),
+        wallet: address,
+        party: 0,
+    };
+    lobby.parties.register(me.clone());
     let mut seated: Option<Box<Seating>> = None;
     let mut last_heard = tokio::time::Instant::now();
     let mut asks = Requests::new(std::time::Instant::now());
@@ -205,41 +217,70 @@ pub async fn run(
                     Asked::Take => match serde_json::from_slice::<ToServer>(&bytes) {
                         Ok(ToServer::Queue) => {
                             last_asked = tokio::time::Instant::now();
+                            let party = lobby.parties.party_of(session);
+                            let no = match &party {
+                                Some(p) if p[0] != session => Some("The party's leader queues for the party.".to_string()),
+                                Some(p) => p
+                                    .iter()
+                                    .skip(1)
+                                    .find(|&&m| lobby.busy(m))
+                                    .map(|&m| format!("{} is still in a match.", lobby.parties.name(m))),
+                                None => None,
+                            };
+                            if let Some(why) = no {
+                                if !post_lobby(&out, &refused("queue", why)) {
+                                    break;
+                                }
+                                continue;
+                            }
                             if let Some(s) = seated.take() {
                                 lobby.unseat(*s);
                             }
-                            lobby.enqueue(session, &name, agent, max_datagram, events_tx.clone(), address);
+                            match party {
+                                Some(p) => lobby.enqueue_party(lobby.parties.waiting(&p)),
+                                None => lobby.enqueue(session, &name, agent, max_datagram, events_tx.clone(), address),
+                            }
                             say(status::QUEUED);
                         }
                         Ok(ToServer::QueueRanked) => {
                             last_asked = tokio::time::Instant::now();
                             let elo = lobby.elopros.get().filter(|e| e.ranked_on);
-                            let wallet = address.filter(|a| !a.as_str().starts_with("acct_"));
-                            match (elo, wallet) {
-                                (Some(elo), Some(w)) if seated.is_none() => {
-                                    lobby.leave(session);
-                                    let waiting = crate::lobby::Waiting {
-                                        session,
-                                        name: name.clone(),
-                                        agent,
-                                        max_datagram,
-                                        tx: events_tx.clone(),
-                                        token: String::new(),
-                                        wallet: Some(w),
-                                    };
-                                    crate::elopros::ranked::join(elo, w.to_string(), waiting);
+                            let members = match lobby.parties.party_of(session) {
+                                Some(p) => lobby.parties.waiting(&p),
+                                None => vec![me.clone()],
+                            };
+                            let leader = members.first().map_or(session, |w| w.session);
+                            let wallet = |w: &crate::lobby::Waiting| w.wallet.filter(|a| !a.as_str().starts_with("acct_"));
+                            let no = if elo.is_none() {
+                                Some("This server doesn't hold ranked matches.".to_string())
+                            } else if leader != session {
+                                Some("The party's leader queues for the party.".to_string())
+                            } else if let Some(w) = members.iter().find(|w| wallet(w).is_none()) {
+                                Some(if w.session == session {
+                                    "Ranked is for wallets: sign in with yours to queue.".to_string()
+                                } else {
+                                    format!("Ranked is for wallets: {} isn't signed in with one.", w.name)
+                                })
+                            } else if seated.is_some() || members.iter().any(|w| lobby.busy(w.session)) {
+                                Some("Leave the match first.".to_string())
+                            } else {
+                                None
+                            };
+                            match (elo, no) {
+                                (Some(elo), None) => {
+                                    let party = if members.len() > 1 { leader } else { 0 };
+                                    let mut queued = Vec::with_capacity(members.len());
+                                    for w in members {
+                                        let _ = lobby.leave(w.session);
+                                        let id = wallet(&w).map(|a| a.to_string()).unwrap_or_default();
+                                        queued.push((id, crate::lobby::Waiting { party, ..w }));
+                                    }
+                                    crate::elopros::ranked::join_party(elo, queued, None);
                                     say(status::RANKED);
                                 }
-                                (elo, wallet) => {
-                                    let why = if elo.is_none() {
-                                        "This server doesn't hold ranked matches."
-                                    } else if wallet.is_none() {
-                                        "Ranked is for wallets: sign in with yours to queue."
-                                    } else {
-                                        "Leave the match first."
-                                    };
-                                    let no = ToClient::Refused { what: "ranked".into(), why: why.into() };
-                                    if !post_lobby(&out, &no) {
+                                (_, why) => {
+                                    let why = why.unwrap_or_default();
+                                    if !post_lobby(&out, &refused("ranked", why)) {
                                         break;
                                     }
                                 }
@@ -248,17 +289,45 @@ pub async fn run(
                         // Out of the queue or select; or, seated, out of the match for good.
                         Ok(ToServer::Leave) => {
                             last_asked = tokio::time::Instant::now();
+                            let mut gone = Vec::new();
                             if let Some(elo) = lobby.elopros.get() {
-                                crate::elopros::ranked::leave(elo, session);
+                                gone.extend(crate::elopros::ranked::leave(elo, session));
                             }
                             match seated.take() {
                                 Some(s) => {
                                     tracing::info!(session, m = s.m, seat = s.seat, "left its match");
                                     lobby.leave_seat(*s);
                                 }
-                                None => lobby.leave(session),
+                                None => gone.extend(lobby.leave(session)),
                             }
+                            lobby.parties.tell_left(&gone, &name);
                             say(status::MENU);
+                        }
+                        Ok(ToServer::PartyInvite { player }) => {
+                            last_asked = tokio::time::Instant::now();
+                            let to = el_proto::auth::PlayerId::parse(&player).and_then(|id| signin.online.session_of(&id));
+                            let got = match to {
+                                Some(to) => lobby.parties.invite(session, to),
+                                None => Err("They aren't signed in on this server.".to_string()),
+                            };
+                            if let Err(why) = got
+                                && !post_lobby(&out, &refused("party", why))
+                            {
+                                break;
+                            }
+                        }
+                        Ok(ToServer::PartyAccept { leader }) => {
+                            last_asked = tokio::time::Instant::now();
+                            if let Err(why) = lobby.parties.accept(session, leader)
+                                && !post_lobby(&out, &refused("party", why))
+                            {
+                                break;
+                            }
+                        }
+                        Ok(ToServer::PartyDecline { leader }) => lobby.parties.decline(session, leader),
+                        Ok(ToServer::PartyLeave) => {
+                            last_asked = tokio::time::Instant::now();
+                            lobby.parties.leave(session);
                         }
                         Ok(ToServer::Reroll) => lobby.reroll(session),
                         Ok(ToServer::Swap { champ }) => lobby.swap(session, champ),
@@ -299,6 +368,7 @@ pub async fn run(
             Some(ev) = events.recv() => match ev {
                 LobbyEvent::Queued { waiting, fill_in } => {
                     last_asked = tokio::time::Instant::now();
+                    say(status::QUEUED);
                     if !post_lobby(&out, &ToClient::Queued { waiting, fill_in }) {
                         break;
                     }
@@ -395,10 +465,12 @@ pub async fn run(
     if let Some(s) = seated.take() {
         lobby.unseat(*s);
     }
-    lobby.leave(session);
+    let mut gone = lobby.leave(session);
     if let Some(elo) = lobby.elopros.get() {
-        crate::elopros::ranked::leave(elo, session);
+        gone.extend(crate::elopros::ranked::leave(elo, session));
     }
+    lobby.parties.tell_left(&gone, &name);
+    lobby.parties.unregister(session);
     present.fetch_sub(1, Ordering::Relaxed);
     tracing::info!(session, "left");
 }
@@ -488,6 +560,11 @@ async fn send(tx: &mut SendStream, msg: ControlMsg) -> anyhow::Result<()> {
     let n = msg.encode(&mut buf).ok_or_else(|| anyhow::anyhow!("control frame too big"))?;
     tokio::time::timeout(WRITE_WAIT, tx.write_all(&buf[..n])).await??;
     Ok(())
+}
+
+/// Something this session asked for that the server won't do, in words.
+fn refused(what: &str, why: impl Into<String>) -> ToClient {
+    ToClient::Refused { what: what.into(), why: why.into() }
 }
 
 /// Hands one lobby message to the session's writer. False if the client isn't keeping up (its

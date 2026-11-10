@@ -286,6 +286,12 @@ enum Cmd {
     },
     /// Back to the menu (a match over, a watch left).
     BackToMenu,
+    /// The party: `invite` a player (by id), `accept`/`decline` a leader's ask, `leave`.
+    Party {
+        op: String,
+        player: Option<String>,
+        leader: Option<u32>,
+    },
     /// An ability's indicator shown, as if its key were held (`slot: null` lets go without casting).
     Aim {
         slot: Option<u8>,
@@ -556,6 +562,19 @@ fn inbox(
             }
             Cmd::BackToMenu => {
                 front.back(&mut session);
+                continue;
+            }
+            Cmd::Party { op, player, leader } => {
+                let leader = leader.unwrap_or(0);
+                match op.as_str() {
+                    "invite" => {
+                        controls.lobby.push(ToServer::PartyInvite { player: player.unwrap_or_default() })
+                    }
+                    "accept" => controls.lobby.push(ToServer::PartyAccept { leader }),
+                    "decline" => controls.lobby.push(ToServer::PartyDecline { leader }),
+                    "leave" => controls.lobby.push(ToServer::PartyLeave),
+                    _ => {}
+                }
                 continue;
             }
             Cmd::Aim { slot } => {

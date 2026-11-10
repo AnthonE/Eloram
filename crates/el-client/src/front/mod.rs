@@ -121,6 +121,10 @@ enum Pick {
     Open(Section),
     /// The player's profile on Elo Pros (their face, hours, rating and friends).
     Profile,
+    /// Into the party this leader asked us into; not; out of ours.
+    PartyJoin(u32),
+    PartyDecline(u32),
+    PartyLeave,
 }
 
 #[derive(Component)]
@@ -308,6 +312,7 @@ fn play_inputs(front: &Front, session: &Session) -> PlayInputs {
         connecting: matches!(session.phase, Phase::Connecting | Phase::SigningIn),
         failed: session.phase == Phase::Failed,
         wallet: front.who.wallet() || (session.signed_in && front.who.id.is_none()),
+        party_member: session.party.on() && Some(session.party.leader) != session.session,
         ranked_here: front.ranked_here,
         queued: (session.phase == Phase::Queued).then_some(front.mode),
         mode: front.mode,
@@ -368,6 +373,9 @@ fn act(
             front.up = false;
         }
         Pick::Refresh => front.rows_at = f64::NEG_INFINITY,
+        Pick::PartyJoin(leader) => controls.lobby.push(ToServer::PartyAccept { leader }),
+        Pick::PartyDecline(leader) => controls.lobby.push(ToServer::PartyDecline { leader }),
+        Pick::PartyLeave => controls.lobby.push(ToServer::PartyLeave),
         Pick::Profile => {
             let Some(id) = front.who.id.as_deref() else {
                 front.status = "Sign in to see your Elo Pros profile.".into();
@@ -458,7 +466,7 @@ fn key(front: &Front, session: &Session) -> String {
         front.ranked_here,
         session.signed_in,
         session.error.as_deref().unwrap_or(""),
-    )
+    ) + &format!("|{:?}", session.party)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -638,6 +646,7 @@ fn play_page(c: &mut Commands, front: &Front, session: &Session) -> Vec<Entity> 
             .id();
         c.entity(panel).add_child(b);
     }
+    party_card(c, panel, session);
     let gap = c.spawn(ui::spacer()).id();
     let view = play_view(play_inputs(front, session));
     let go = c.spawn((ui::go(view.label, &view.line, view.ready), Pick::Go)).id();
@@ -693,6 +702,52 @@ fn play_page(c: &mut Commands, front: &Front, session: &Session) -> Vec<Entity> 
     let l = c.spawn((label(line, 18.0, TEXT), TEXT_SHADOW)).id();
     c.entity(stage).add_children(&[k, h, l]);
     vec![panel, stage]
+}
+
+/// The party on PLAY: who's in it, the asks into others', and the way out.
+fn party_card(c: &mut Commands, panel: Entity, session: &Session) {
+    let p = &session.party;
+    if !p.on() && p.invites_in.is_empty() {
+        return;
+    }
+    let rule = c.spawn(ui::group_rule("PARTY")).id();
+    c.entity(panel).add_child(rule);
+    if p.on() {
+        for m in &p.members {
+            let lead = if m.session == p.leader { "  LEADER" } else { "" };
+            let me = if Some(m.session) == session.session { "  (you)" } else { "" };
+            let l = c.spawn(label(format!("{}{lead}{me}", m.name), 16.0, TEXT)).id();
+            c.entity(panel).add_child(l);
+        }
+        let line = if Some(p.leader) == session.session {
+            "You lead: PLAY queues the party, on one side."
+        } else {
+            "The leader queues for the party."
+        };
+        let l = c.spawn(label(line, 14.0, DIM)).id();
+        let out = c.spawn((ui::button("LEAVE PARTY", 0.0, true), Pick::PartyLeave)).id();
+        c.entity(panel).add_children(&[l, out]);
+    }
+    for ask in &p.invites_in {
+        let row = c
+            .spawn(Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: px(8),
+                ..default()
+            })
+            .id();
+        let l = c
+            .spawn((
+                label(format!("{} asks you in", ask.name), 15.0, TEXT),
+                Node { flex_grow: 1.0, ..default() },
+            ))
+            .id();
+        let yes = c.spawn((ui::button("JOIN", 90.0, true), Pick::PartyJoin(ask.leader))).id();
+        let no = c.spawn((ui::button("DECLINE", 110.0, true), Pick::PartyDecline(ask.leader))).id();
+        c.entity(row).add_children(&[l, yes, no]);
+        c.entity(panel).add_child(row);
+    }
 }
 
 fn practice_page(c: &mut Commands, front: &Front, session: &Session) -> Vec<Entity> {
@@ -926,6 +981,9 @@ fn publish(front: Res<Front>, session: Res<Session>, mut dev: ResMut<DevStatus>)
     dev.set("ranked_available", front.ranked_here);
     dev.set("ranked_state", front.ranked_state.clone().unwrap_or_default());
     dev.set("watch_rows", front.rows.len() as u32);
+    dev.set("party_size", session.party.members.len() as u32);
+    dev.set("party_leader", session.party.leader);
+    dev.set("party_asks", session.party.invites_in.len() as u32);
     dev.set("watch_error", front.rows_error.clone().unwrap_or_default());
     dev.set("hub_news", hub_status(&front, Section::News).key());
     dev.set("hub_store", hub_status(&front, Section::Store).key());

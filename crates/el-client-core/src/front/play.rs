@@ -15,6 +15,8 @@ pub struct PlayInputs {
     pub wallet: bool,
     /// The server holds ranked matches (it said so when it welcomed us).
     pub ranked_here: bool,
+    /// In a party someone else leads (who queues for it).
+    pub party_member: bool,
     /// Already in a queue, and which.
     pub queued: Option<PlayMode>,
     pub mode: PlayMode,
@@ -42,6 +44,9 @@ pub fn play_view(i: PlayInputs) -> PlayView {
     }
     if i.connecting || !i.linked {
         return v("PLAY", false, "Reaching the game server...");
+    }
+    if i.party_member {
+        return v("PLAY", false, "The party's leader queues for the party.");
     }
     match i.mode {
         PlayMode::Normal => v("PLAY", true, "Five a side, bots in the empty seats"),
@@ -71,5 +76,6 @@ mod tests {
             play_view(PlayInputs { queued: Some(PlayMode::Ranked), ..base }).line,
             "In the ranked queue"
         );
+        assert!(!play_view(PlayInputs { party_member: true, ..base }).ready, "the leader queues");
     }
 }

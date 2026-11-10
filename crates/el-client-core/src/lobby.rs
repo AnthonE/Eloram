@@ -18,16 +18,36 @@ pub enum ToServer {
     /// In champion select: this champion back to the team's bench, a new one dealt.
     Reroll,
     /// In champion select: `champ` off the team's bench, mine onto it.
-    Swap { champ: u8 },
+    Swap {
+        champ: u8,
+    },
     /// In champion select: done choosing (the match starts once everyone seated is).
     Ready,
     /// Back into the seat a `Match` gave this `token` for, after the connection dropped (or the
     /// page reloaded). Answered with that `Match` again, or [`ToClient::NoSeat`].
-    Rejoin { token: String },
+    Rejoin {
+        token: String,
+    },
+    /// Asks `player` (a signed-in player's id, on this server) into my party (a new one, led by
+    /// me, if I'm in none).
+    PartyInvite {
+        player: String,
+    },
+    /// Into the party `leader` (a session) asked me into.
+    PartyAccept {
+        leader: u32,
+    },
+    PartyDecline {
+        leader: u32,
+    },
+    /// Out of my party (its lead passes to the next member).
+    PartyLeave,
     /// A practice match as champion `champ` (`el_sim::practice`), on a server that holds them
     /// (`el-server --practice`): at once, no champion select; asked again, a new one as another.
     /// Answered with its `Match`, or [`ToClient::NoSeat`].
-    Practice { champ: u8 },
+    Practice {
+        champ: u8,
+    },
 }
 
 /// A seat in champion select with no champion shown: the other team's, unseen until the match.
@@ -43,6 +63,26 @@ pub struct Player {
     pub bot: bool,
 }
 
+/// A party's member, as the party card shows them.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PartyMember {
+    pub session: u32,
+    pub name: String,
+    /// Their id, signed in (a guest's: none, and a guest can't queue ranked).
+    #[serde(default)]
+    pub player: Option<String>,
+}
+
+/// An ask into a party.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PartyAsk {
+    pub leader: u32,
+    pub name: String,
+}
+
+/// The most a party holds: a side.
+pub const PARTY_MAX: usize = 5;
+
 /// Server → client.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "t", rename_all = "snake_case")]
@@ -53,7 +93,17 @@ pub enum ToClient {
     /// Champion select (ARAM's): your seat; every seat's champion as your team may see it (the
     /// other team's [`UNSEEN`]); your team's bench; your rerolls left; the seconds left; and who
     /// sits where. Sent again whenever any of it changes.
-    Select { seat: u8, picks: Vec<u8>, bench: Vec<u8>, rerolls: u8, ends_in: u32, roster: Vec<Player> },
+    Select {
+        seat: u8,
+        picks: Vec<u8>,
+        bench: Vec<u8>,
+        rerolls: u8,
+        ends_in: u32,
+        roster: Vec<Player>,
+        /// A ranked match's select (someone leaving it sends everyone else back to the queue).
+        #[serde(default)]
+        ranked: bool,
+    },
     /// Seated: every seat's champion, the augment screens' tiers and the headliner (all a client
     /// needs of the match's seed, which stays on the server: every seat's augment offers follow
     /// from it), and who plays where. Snapshots follow as datagrams. `rejoin` takes the seat back
@@ -73,6 +123,9 @@ pub enum ToClient {
         /// no other, so nothing of a match it was in before is taken for this one. 0: not told.
         #[serde(default)]
         stream: u8,
+        /// Rated on Elo Pros.
+        #[serde(default)]
+        ranked: bool,
     },
     /// A rejoin found no seat: the match is over, or the token isn't one.
     NoSeat,
@@ -100,6 +153,9 @@ pub enum ToClient {
     /// Something asked for that this server won't do (`what`: `ranked`, `practice`...), and why,
     /// in words to show.
     Refused { what: String, why: String },
+    /// My party (`leader` 0 and no members: none) and the asks into others', whenever either
+    /// changes. Only the leader queues; everyone in it goes into the same match, on one side.
+    Party { leader: u32, members: Vec<PartyMember>, invites_in: Vec<PartyAsk> },
 }
 
 /// The ranked queue's state in words, for the menu.
@@ -149,6 +205,7 @@ mod tests {
             rejoin: "00ff".into(),
             practice: false,
             stream: 12,
+            ranked: false,
         };
         let text = serde_json::to_string(&m).unwrap();
         assert!(text.starts_with(r#"{"t":"match","seat":3,"picks":[0,1,2"#), "{text}");
@@ -163,6 +220,9 @@ mod tests {
             (r#"{"t":"rejoin","token":"ab"}"#, ToServer::Rejoin { token: "ab".into() }),
             (r#"{"t":"practice","champ":12}"#, ToServer::Practice { champ: 12 }),
             (r#"{"t":"queue_ranked"}"#, ToServer::QueueRanked),
+            (r#"{"t":"party_invite","player":"0xab"}"#, ToServer::PartyInvite { player: "0xab".into() }),
+            (r#"{"t":"party_accept","leader":4}"#, ToServer::PartyAccept { leader: 4 }),
+            (r#"{"t":"party_leave"}"#, ToServer::PartyLeave),
         ] {
             assert_eq!(serde_json::from_str::<ToServer>(json).unwrap(), msg);
         }
@@ -179,6 +239,17 @@ mod tests {
             (
                 r#"{"t":"refused","what":"ranked","why":"no"}"#,
                 ToClient::Refused { what: "ranked".into(), why: "no".into() },
+            ),
+            (
+                r#"{"t":"party","leader":3,"members":[{"session":3,"name":"A","player":"0xab"},{"session":5,"name":"B"}],"invites_in":[]}"#,
+                ToClient::Party {
+                    leader: 3,
+                    members: vec![
+                        PartyMember { session: 3, name: "A".into(), player: Some("0xab".into()) },
+                        PartyMember { session: 5, name: "B".into(), player: None },
+                    ],
+                    invites_in: vec![],
+                },
             ),
         ] {
             assert_eq!(serde_json::from_str::<ToClient>(json).unwrap(), msg);

@@ -303,11 +303,17 @@ fn talk(
             Frame::Pass(_) => {}
             Frame::Lobby(bytes) => match serde_json::from_slice::<ToClient>(bytes) {
                 Ok(ToClient::Queued { waiting, fill_in }) => {
+                    // Queued by the party's leader, from the menu.
+                    if matches!(session.phase, Phase::Lobby | Phase::Over) {
+                        session.client = None;
+                        session.winner = None;
+                        session.phase = Phase::Queued;
+                    }
                     session.waiting = waiting;
                     session.fill_in = fill_in;
                     session.fill_at = now_s() + f64::from(fill_in);
                 }
-                Ok(ToClient::Select { seat, picks, bench, rerolls, ends_in, roster }) => {
+                Ok(ToClient::Select { seat, picks, bench, rerolls, ends_in, roster, .. }) => {
                     let ready = session.select.as_ref().is_some_and(|s| s.ready);
                     session.select = Some(SelectView {
                         seat: usize::from(seat).min(el_sim::units::SEATS - 1),
@@ -385,8 +391,19 @@ fn talk(
                         session.refused = Some(line.clone());
                         session.ranked_line = None;
                     } else {
+                        // Queued again (a select called off), or by the party's leader.
+                        if state == "waiting"
+                            && matches!(session.phase, Phase::Lobby | Phase::Over | Phase::Selecting)
+                        {
+                            session.select = None;
+                            session.client = None;
+                            session.phase = Phase::Queued;
+                        }
                         session.ranked_line = Some(line);
                     }
+                }
+                Ok(ToClient::Party { leader, members, invites_in }) => {
+                    session.party = crate::session::PartyView { leader, members, invites_in };
                 }
                 Ok(ToClient::Refused { why, .. }) => {
                     if session.phase == Phase::Queued {

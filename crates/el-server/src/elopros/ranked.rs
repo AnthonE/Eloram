@@ -67,43 +67,70 @@ impl Ranked {
     }
 }
 
-/// `w` (signed in as `player`) into the store's ranked queue.
-pub(crate) fn join(elo: &Arc<EloPros>, player: String, w: Waiting) {
+/// A party (each member signed in as a wallet, its leader first) into the store's ranked queue
+/// together: the store keeps it whole and on one side. `why` goes with the first word of it.
+pub(crate) fn join_party(elo: &Arc<EloPros>, party: Vec<(String, Waiting)>, why: Option<String>) {
     let elo = elo.clone();
     tokio::spawn(async move {
-        let body = json!({"op": "queue", "players": [player], "ladder": super::report::LADDER, "teams": 2, "size": 5});
+        let players: Vec<&str> = party.iter().map(|(p, _)| p.as_str()).collect();
+        let body = json!({"op": "queue", "players": players, "ladder": super::report::LADDER, "teams": 2, "size": 5});
         let bytes = serde_json::to_vec(&body).unwrap_or_default();
         let api = elo.clone();
         let got = tokio::task::spawn_blocking(move || api.api.post(QUEUE_ROUTE, &bytes)).await;
-        match got {
-            Ok(Ok(a)) if a.ok() => {
-                tell(&w, state("waiting", 0, None));
-                elo.ranked.put(Waiter { player, since: Instant::now(), w });
+        let refused = match got {
+            Ok(Ok(a)) if a.ok() => None,
+            Ok(Ok(a)) => Some(format!("The ranked queue: {}", a.why())),
+            _ => Some("Elo Pros' ranked queue can't be reached just now.".to_string()),
+        };
+        for (player, w) in party {
+            match &refused {
+                None => {
+                    tell(&w, state("waiting", 0, why.clone()));
+                    elo.ranked.put(Waiter { player, since: Instant::now(), w });
+                }
+                Some(no) => tell(&w, ToClient::Refused { what: "ranked".into(), why: no.clone() }),
             }
-            Ok(Ok(a)) => tell(
-                &w,
-                ToClient::Refused { what: "ranked".into(), why: format!("The ranked queue: {}", a.why()) },
-            ),
-            _ => tell(
-                &w,
-                ToClient::Refused {
-                    what: "ranked".into(),
-                    why: "Elo Pros' ranked queue can't be reached just now.".into(),
-                },
-            ),
         }
     });
 }
 
-/// `session` out of the ranked queue (it left, or went).
-pub fn leave(elo: &Arc<EloPros>, session: u32) {
-    let Some(waiter) = elo.ranked.take(session) else { return };
+/// Players back into the ranked queue, each party together (a select called off, a match whose
+/// players didn't all come), told `why`.
+pub(crate) fn requeue(elo: &Arc<EloPros>, back: Vec<Waiting>, why: &str) {
+    let mut groups: Vec<Vec<(String, Waiting)>> = Vec::new();
+    for w in back {
+        let Some(player) = w.wallet.map(|p| p.to_string()) else { continue };
+        match groups.iter_mut().find(|g| w.party != 0 && g[0].1.party == w.party) {
+            Some(g) => g.push((player, w)),
+            None => groups.push(vec![(player, w)]),
+        }
+    }
+    for g in groups {
+        join_party(elo, g, Some(why.to_string()));
+    }
+}
+
+/// `session` out of the ranked queue (it left, or went), and its party with it. The other
+/// sessions taken out are given back, to be told.
+pub fn leave(elo: &Arc<EloPros>, session: u32) -> Vec<u32> {
+    let Some(waiter) = elo.ranked.take(session) else { return Vec::new() };
+    let party = waiter.w.party;
+    let mut gone = vec![waiter];
+    if party != 0
+        && let Ok(mut w) = elo.ranked.waiting.lock()
+    {
+        let (out, rest): (Vec<Waiter>, Vec<Waiter>) = w.drain(..).partition(|x| x.w.party == party);
+        *w = rest;
+        gone.extend(out);
+    }
+    let players: Vec<String> = gone.iter().map(|x| x.player.clone()).collect();
+    let others: Vec<u32> = gone.iter().skip(1).map(|x| x.w.session).collect();
     let elo = elo.clone();
     tokio::spawn(async move {
-        let bytes =
-            serde_json::to_vec(&json!({"op": "unqueue", "players": [waiter.player]})).unwrap_or_default();
+        let bytes = serde_json::to_vec(&json!({"op": "unqueue", "players": players})).unwrap_or_default();
         let _ = tokio::task::spawn_blocking(move || elo.api.post(QUEUE_ROUTE, &bytes)).await;
     });
+    others
 }
 
 /// Polls the waiters and seats the matches made here, for as long as the server runs.
@@ -219,10 +246,7 @@ async fn seat(elo: &Arc<EloPros>, lobby: &Arc<Lobby>, id: &str) {
         if let Ok(mut g) = elo.ranked.gathering.lock() {
             g.remove(id);
         }
-        for x in came {
-            tell(&x.w, state("waiting", 0, Some("not everyone matched came: queued again".into())));
-            join(elo, x.player, x.w);
-        }
+        requeue(elo, came.into_iter().map(|x| x.w).collect(), "not everyone matched came: queued again");
         return;
     }
     let taken: Vec<Waiter> = elo

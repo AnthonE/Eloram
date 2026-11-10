@@ -92,6 +92,11 @@ pub struct BotClient {
     pub refused: Option<String>,
     /// In a champion select (its roster in `roster`).
     pub selecting: bool,
+    /// The last select's or match's word on being ranked.
+    pub ranked_match: bool,
+    /// The party, as last told: its leader (0: none), its members' sessions, and the leaders
+    /// who've asked this one in.
+    pub party: (u32, Vec<u32>, Vec<u32>),
     /// In a champion select it hasn't yet said it's ready in (it plays what it's dealt).
     ready_due: bool,
     start: Instant,
@@ -176,6 +181,8 @@ impl BotClient {
             ranked: None,
             refused: None,
             selecting: false,
+            ranked_match: false,
+            party: (0, Vec::new(), Vec::new()),
             ready_due: false,
             start: Instant::now(),
         })
@@ -198,6 +205,20 @@ impl BotClient {
         self.over = None;
         self.refused = None;
         self.send_lobby(&ToServer::QueueRanked).await
+    }
+
+    /// Asks a signed-in player (by id) into this one's party.
+    pub async fn party_invite(&mut self, player: &str) -> anyhow::Result<()> {
+        self.send_lobby(&ToServer::PartyInvite { player: player.into() }).await
+    }
+
+    /// Takes `leader`'s ask into its party.
+    pub async fn party_accept(&mut self, leader: u32) -> anyhow::Result<()> {
+        self.send_lobby(&ToServer::PartyAccept { leader }).await
+    }
+
+    pub async fn party_leave(&mut self) -> anyhow::Result<()> {
+        self.send_lobby(&ToServer::PartyLeave).await
     }
 
     /// Reads what the server sends for a while, as a waiting player does.
@@ -267,10 +288,18 @@ impl BotClient {
                 a @ ToClient::About { .. } => self.about = Some(a),
                 ToClient::Ranked { state, .. } => self.ranked = Some(state),
                 ToClient::Refused { why, .. } => self.refused = Some(why),
-                ToClient::Select { roster, .. } => {
+                ToClient::Select { roster, ranked, .. } => {
                     self.ready_due = true;
                     self.selecting = true;
+                    self.ranked_match = ranked;
                     self.roster = roster;
+                }
+                ToClient::Party { leader, members, invites_in } => {
+                    self.party = (
+                        leader,
+                        members.iter().map(|m| m.session).collect(),
+                        invites_in.iter().map(|a| a.leader).collect(),
+                    );
                 }
             },
             Incoming::Msg(ControlMsg::Bye { reason }) => anyhow::bail!("the server said goodbye ({reason})"),
