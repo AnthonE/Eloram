@@ -11,10 +11,11 @@ use el_sim::content::champions::{CHAMPIONS, ability};
 use el_sim::units::{SEATS, TEAM_SIZE, team_of_seat};
 
 use crate::hud::{
-    Act, BUTTON, BUTTON_GOLD, DIM, FRAME, FRAME_SOFT, GOLD, Icons, PANEL, TEXT, TRIM, Tint, Tip, WELL,
-    framed, icon_image, initials, outline, shade, text,
+    Act, BUTTON, BUTTON_GOLD, DIM, FRAME, FRAME_SOFT, GOLD, Icons, PANEL, TEXT, Tint, Tip, WELL, framed,
+    icon_image, initials, outline, prose, shade, text, title,
 };
 use crate::session::{Phase, Session};
+use crate::skin::{self, plates};
 use crate::view::{CHAMPION, TEAM};
 
 /// Places on a team's bench (it holds at most what was never dealt).
@@ -86,6 +87,8 @@ struct ReadyButton;
 
 /// A button's colours, to change together.
 type ButtonLook = (&'static mut Tint, &'static mut BackgroundColor, &'static mut BorderColor);
+/// The ready button's colours and the finish over them.
+type ReadyLook = (ButtonLook, &'static mut MaterialNode<skin::Plate>);
 /// The bench's tiles, not the line for an empty one or the tiles' badges.
 type TileOnly = (Without<BenchEmpty>, Without<BenchBadge>);
 
@@ -111,11 +114,12 @@ fn badge(commands: &mut Commands, side: f32, size: f32, words: Words, marker: im
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(6)),
+                border_radius: BorderRadius::all(px(3)),
                 ..default()
             },
             BorderColor::all(Color::srgba(0.0, 0.0, 0.0, 0.6)),
             BackgroundColor(WELL),
+            MaterialNode(plates::FINISH_WIDE),
             marker,
             children![(text("", size, TEXT), outline(), words)],
         ))
@@ -136,19 +140,21 @@ fn big_button(
             Button,
             Node {
                 width: px(width),
-                height: px(44),
+                height: px(52),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(6)),
+                border: UiRect::all(px(2)),
+                border_radius: BorderRadius::all(px(3)),
                 ..default()
             },
             BorderColor::all(FRAME),
             BackgroundColor(base),
             Tint(base),
+            MaterialNode(plates::FINISH_WIDE),
+            skin::drop_shadow(),
             act,
             marker,
-            children![(text("", 15.0, TEXT), outline(), words)],
+            children![(title("", 17.0, TEXT), outline(), words)],
         ))
         .id()
 }
@@ -164,20 +170,26 @@ fn setup(mut commands: Commands) {
             ..default()
         })
         .with_children(|h| {
-            h.spawn(text("CHOOSE YOUR CHAMPION", 13.0, GOLD));
-            h.spawn((text("", 40.0, TEXT), outline(), Words::Seconds));
+            h.spawn((title("CHOOSE YOUR CHAMPION", 22.0, GOLD), outline()));
+            h.spawn((
+                title("", 46.0, Color::srgb(1.0, 0.96, 0.88)),
+                TextShadow { offset: Vec2::new(0.0, 3.0), color: Color::srgba(0.0, 0.0, 0.0, 0.9) },
+                Words::Seconds,
+            ));
             h.spawn((
                 Node {
-                    width: px(420),
-                    height: px(4),
-                    border_radius: BorderRadius::all(px(2)),
+                    width: px(460),
+                    height: px(6),
+                    border: UiRect::all(px(1)),
                     overflow: Overflow::clip(),
                     ..default()
                 },
-                BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.08)),
+                BorderColor::all(Color::srgba(0.0, 0.0, 0.0, 0.8)),
+                BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.07)),
                 children![(
                     Node { width: percent(100), height: percent(100), ..default() },
-                    BackgroundColor(GOLD),
+                    BackgroundColor(skin::EMBER_HI),
+                    skin::halo(skin::EMBER, 0.8, 10.0),
                     TimeBar,
                 )],
             ));
@@ -185,9 +197,9 @@ fn setup(mut commands: Commands) {
         .id();
 
     // The team down the left.
-    let mut team = vec![commands.spawn((text("", 13.0, TEXT), Words::TeamHead)).id()];
+    let mut team = vec![commands.spawn((title("", 15.0, TEXT), outline(), Words::TeamHead)).id()];
     for i in 0..TEAM_SIZE {
-        let b = badge(&mut commands, 44.0, 16.0, Words::RowInitials(i), RowBadge(i));
+        let b = badge(&mut commands, 48.0, 17.0, Words::RowInitials(i), RowBadge(i));
         let who = commands
             .spawn(Node {
                 flex_direction: FlexDirection::Column,
@@ -196,24 +208,25 @@ fn setup(mut commands: Commands) {
                 ..default()
             })
             .with_children(|w| {
-                w.spawn((text("", 15.0, TEXT), Words::RowChamp(i)));
-                w.spawn((text("", 11.0, DIM), Words::RowWho(i)));
+                w.spawn((text("", 17.0, TEXT), Words::RowChamp(i)));
+                w.spawn((text("", 13.0, DIM), Words::RowWho(i)));
             })
             .id();
-        let tag = commands.spawn((text("", 11.0, GOLD), Words::RowTag(i))).id();
+        let tag = commands.spawn((text("", 13.0, GOLD), Words::RowTag(i))).id();
         let row = commands
             .spawn((
                 Node {
                     align_items: AlignItems::Center,
                     column_gap: px(10),
-                    height: px(58),
+                    height: px(64),
                     padding: UiRect::axes(px(8), px(6)),
                     border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(6)),
+                    border_radius: BorderRadius::all(px(3)),
                     ..default()
                 },
                 BorderColor::all(FRAME_SOFT),
                 BackgroundColor(PANEL),
+                skin::finish(),
                 RowFrame(i),
             ))
             .add_children(&[b, who, tag])
@@ -221,7 +234,7 @@ fn setup(mut commands: Commands) {
         team.push(row);
     }
     let team = commands
-        .spawn(Node { flex_direction: FlexDirection::Column, row_gap: px(6), width: px(300), ..default() })
+        .spawn(Node { flex_direction: FlexDirection::Column, row_gap: px(7), width: px(310), ..default() })
         .add_children(&team)
         .id();
 
@@ -239,21 +252,20 @@ fn setup(mut commands: Commands) {
                         ..default()
                     },
                     BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.8)),
-                    children![text(KEYS[k], 11.0, GOLD)],
+                    children![text(KEYS[k], 13.0, GOLD)],
                 ))
                 .id();
             let icon = commands
                 .spawn((
                     Node {
-                        width: px(72),
-                        height: px(72),
-                        border: UiRect::all(px(2)),
-                        border_radius: BorderRadius::all(px(6)),
+                        width: px(76),
+                        height: px(76),
+                        border: UiRect::all(px(3)),
+                        border_radius: BorderRadius::all(px(4)),
                         overflow: Overflow::clip(),
                         ..default()
                     },
-                    BorderColor::all(if k == 3 { TRIM } else { FRAME }),
-                    BackgroundColor(WELL),
+                    skin::plate(if k == 3 { plates::SLOT_READY } else { plates::SLOT_BRONZE }),
                     Interaction::None,
                     Tip::Pick(k),
                     children![(
@@ -266,7 +278,7 @@ fn setup(mut commands: Commands) {
                 .id();
             let name = commands
                 .spawn((
-                    text("", 12.0, TEXT),
+                    text("", 14.0, TEXT),
                     TextLayout::justify(Justify::Center),
                     Node { max_width: px(104), ..default() },
                     Words::AbilityName(k),
@@ -289,27 +301,30 @@ fn setup(mut commands: Commands) {
         .add_children(&abilities)
         .id();
     let band = commands
+        .spawn((Node { width: percent(100), height: px(4), ..default() }, BackgroundColor(GOLD), PickBand))
+        .id();
+    let role = commands
+        .spawn((text("", 14.0, GOLD), Node { margin: UiRect::top(px(8)), ..default() }, Words::Role))
+        .id();
+    let name = commands
         .spawn((
-            Node { width: percent(100), height: px(4), border_radius: BorderRadius::all(px(2)), ..default() },
-            BackgroundColor(GOLD),
-            PickBand,
+            title("", 50.0, Color::srgb(1.0, 0.96, 0.88)),
+            TextShadow { offset: Vec2::new(0.0, 3.0), color: Color::srgba(0.0, 0.0, 0.0, 0.9) },
+            Words::Name,
         ))
         .id();
-    let role = commands.spawn((text("", 12.0, GOLD), Words::Role)).id();
-    let name = commands.spawn((text("", 44.0, TEXT), outline(), Words::Name)).id();
-    let title = commands.spawn((text("", 15.0, DIM), Words::Title)).id();
+    let title = commands.spawn((prose("", 17.0, DIM), Words::Title)).id();
     let hint =
-        commands.spawn(text("Hover an ability to read it.", 11.0, Color::srgba(0.56, 0.59, 0.66, 0.7))).id();
+        commands.spawn(prose("Hover an ability to read it.", 13.0, Color::srgba(0.56, 0.59, 0.66, 0.7))).id();
     let card = commands
         .spawn((
             Node {
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 row_gap: px(4),
-                width: px(520),
-                padding: UiRect::new(px(24), px(24), px(18), px(20)),
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(10)),
+                width: px(560),
+                padding: UiRect::new(px(26), px(26), px(20), px(20)),
+                border: UiRect::all(px(3)),
                 ..default()
             },
             framed(),
@@ -327,7 +342,7 @@ fn setup(mut commands: Commands) {
         .add_children(&[team, card])
         .id();
     // A spacer as wide as the team, so the card sits in the screen's middle.
-    let spacer = commands.spawn(Node { width: px(300), ..default() }).id();
+    let spacer = commands.spawn(Node { width: px(310), ..default() }).id();
     commands.entity(middle).add_child(spacer);
 
     // The bench, under the card.
@@ -337,8 +352,8 @@ fn setup(mut commands: Commands) {
             let words = commands
                 .spawn(Node { flex_direction: FlexDirection::Column, ..default() })
                 .with_children(|w| {
-                    w.spawn((text("", 13.0, TEXT), Words::BenchName(k)));
-                    w.spawn((text("", 10.0, DIM), Words::BenchRole(k)));
+                    w.spawn((text("", 15.0, TEXT), Words::BenchName(k)));
+                    w.spawn((text("", 12.0, DIM), Words::BenchRole(k)));
                 })
                 .id();
             commands
@@ -351,13 +366,14 @@ fn setup(mut commands: Commands) {
                         column_gap: px(8),
                         padding: UiRect::horizontal(px(6)),
                         border: UiRect::all(px(1)),
-                        border_radius: BorderRadius::all(px(6)),
+                        border_radius: BorderRadius::all(px(3)),
                         display: Display::None,
                         ..default()
                     },
                     BorderColor::all(FRAME_SOFT),
                     BackgroundColor(BUTTON),
                     Tint(BUTTON),
+                    skin::finish(),
                     Act::Swap(k),
                     BenchTile(k),
                 ))
@@ -365,10 +381,10 @@ fn setup(mut commands: Commands) {
                 .id()
         })
         .collect();
-    let bench_head = commands.spawn((text("", 11.0, DIM), Words::BenchHead)).id();
+    let bench_head = commands.spawn((text("", 13.0, DIM), Words::BenchHead)).id();
     let empty = commands
         .spawn((
-            text("Empty. A reroll sends your champion here, for anyone on your team to take.", 12.0, DIM),
+            prose("Empty. A reroll sends your champion here, for anyone on your team to take.", 14.0, DIM),
             Node { height: px(44), align_items: AlignItems::Center, ..default() },
             BenchEmpty,
         ))
@@ -396,8 +412,8 @@ fn setup(mut commands: Commands) {
         .add_children(&[bench_head, tiles])
         .id();
 
-    let reroll = big_button(&mut commands, Act::RerollChampion, Words::Reroll, 210.0, BUTTON, RerollButton);
-    let ready = big_button(&mut commands, Act::Ready, Words::Ready, 260.0, BUTTON_GOLD, ReadyButton);
+    let reroll = big_button(&mut commands, Act::RerollChampion, Words::Reroll, 230.0, BUTTON, RerollButton);
+    let ready = big_button(&mut commands, Act::Ready, Words::Ready, 300.0, BUTTON_GOLD, ReadyButton);
     let actions = commands
         .spawn(Node { column_gap: px(14), margin: UiRect::top(px(16)), ..default() })
         .add_children(&[reroll, ready])
@@ -613,7 +629,7 @@ fn bench(
 fn buttons(
     session: Res<Session>,
     mut reroll: Query<ButtonLook, (With<RerollButton>, Without<ReadyButton>)>,
-    mut ready: Query<ButtonLook, (With<ReadyButton>, Without<RerollButton>)>,
+    mut ready: Query<ReadyLook, (With<ReadyButton>, Without<RerollButton>)>,
 ) {
     let Some(s) = session.select.as_ref().filter(|_| session.phase == Phase::Selecting) else { return };
     let (base, border) = if s.rerolls > 0 {
@@ -631,13 +647,18 @@ fn buttons(
     let (base, border) = if s.ready {
         (Color::srgb(0.10, 0.24, 0.14), Color::srgb(0.36, 0.78, 0.44))
     } else {
-        (BUTTON_GOLD, TRIM)
+        (BUTTON_GOLD, skin::EMBER_HI)
     };
-    for (mut tint, mut bg, mut b) in &mut ready {
+    // Ready to be pressed: lit from inside, a sheen crossing it; said: steady.
+    let finish = if s.ready { plates::FINISH_WIDE } else { plates::FINISH_HOT };
+    for ((mut tint, mut bg, mut b), mut plate) in &mut ready {
         if tint.0 != base {
             tint.0 = base;
             bg.0 = base;
             *b = BorderColor::all(border);
+        }
+        if plate.0 != finish {
+            plate.0 = finish.clone();
         }
     }
 }

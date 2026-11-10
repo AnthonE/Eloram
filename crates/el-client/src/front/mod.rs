@@ -530,6 +530,9 @@ fn rebuild(
     }
     let s = commands.spawn(ui::scrim()).id();
     commands.entity(root).add_child(s);
+    // The braziers' sparks, over the scrim and under the menu.
+    let e = commands.spawn(crate::skin::sparks()).id();
+    commands.entity(root).add_child(e);
     let header = header(&mut commands, &front);
     let body = body(&mut commands, &front, &session);
     let footer = footer(&mut commands, &front);
@@ -652,7 +655,7 @@ fn body(c: &mut Commands, front: &Front, session: &Session) -> Entity {
 }
 
 fn title_and_blurb(c: &mut Commands, panel: Entity, title: &str, blurb: &str) {
-    let t = c.spawn(strong(title.to_string(), 32.0, TITLE)).id();
+    let t = c.spawn((ui::title(title.to_string(), 32.0, Color::srgb(1.0, 0.95, 0.84)), TEXT_SHADOW)).id();
     let b = c.spawn(label(blurb.to_string(), 17.0, DIM)).id();
     c.entity(panel).add_children(&[t, b]);
 }
@@ -675,9 +678,10 @@ fn play_page(c: &mut Commands, front: &Front, session: &Session) -> Vec<Entity> 
                     flex_shrink: 0.0,
                     ..default()
                 },
-                BackgroundColor(if on { PICKED } else { Color::NONE }),
-                BorderColor::all(if on { crate::hud::TRIM } else { RULE }),
-                Hover { idle: if on { PICKED } else { Color::NONE }, over: ROW_HOVER },
+                BackgroundColor(if on { PICKED } else { ui::ROW_IDLE }),
+                BorderColor::all(if on { crate::skin::EMBER_HI } else { RULE }),
+                crate::skin::finish(),
+                Hover { idle: if on { PICKED } else { ui::ROW_IDLE }, over: ROW_HOVER },
                 Pick::Mode(m),
                 children![strong(m.label(), 20.0, if on { GOLD } else { TEXT }), label(m.blurb(), 15.0, DIM)],
             ))
@@ -731,12 +735,21 @@ fn play_page(c: &mut Commands, front: &Front, session: &Session) -> Vec<Entity> 
                 ..default()
             },
             children![
-                (Node { width: px(32), height: px(4), ..default() }, BackgroundColor(GOLD)),
+                (
+                    Node { width: px(32), height: px(3), ..default() },
+                    BackgroundColor(crate::skin::EMBER_HI),
+                    crate::skin::halo(crate::skin::EMBER, 0.7, 10.0),
+                ),
                 strong(kicker, 15.0, TITLE)
             ],
         ))
         .id();
-    let h = c.spawn((strong(head, 44.0, TITLE), TEXT_SHADOW)).id();
+    let h = c
+        .spawn((
+            ui::title(head, 46.0, Color::srgb(1.0, 0.95, 0.84)),
+            TextShadow { offset: Vec2::new(0.0, 3.0), color: Color::srgba(0.0, 0.0, 0.0, 0.9) },
+        ))
+        .id();
     let l = c.spawn((label(line, 18.0, TEXT), TEXT_SHADOW)).id();
     c.entity(stage).add_children(&[k, h, l]);
     vec![panel, stage]

@@ -66,7 +66,7 @@ fn setup(mut commands: Commands) {
         Root,
         children![
             (
-                text("", 30.0, TEXT),
+                crate::hud::title("", 34.0, Color::srgb(1.0, 0.96, 0.88)),
                 TextLayout::justify(Justify::Center),
                 TextShadow { offset: Vec2::splat(2.0), color: Color::srgba(0.0, 0.0, 0.0, 0.9) },
                 Part::Line

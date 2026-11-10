@@ -41,6 +41,7 @@ pub mod platform;
 mod portrait;
 mod scenery;
 mod session;
+mod skin;
 mod stage;
 mod trails;
 mod transport;

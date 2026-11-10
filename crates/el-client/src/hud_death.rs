@@ -106,8 +106,8 @@ fn setup(mut commands: Commands) {
                     ..default()
                 })
                 .with_children(|h| {
-                    h.spawn((text("", 12.0, TEXT), Words::Name(i)));
-                    h.spawn((text("", 12.0, GOLD), Words::Amount(i)));
+                    h.spawn((text("", 14.0, TEXT), Words::Name(i)));
+                    h.spawn((text("", 14.0, GOLD), Words::Amount(i)));
                 })
                 .id();
             commands
@@ -124,8 +124,10 @@ fn setup(mut commands: Commands) {
                 .id()
         })
         .collect();
-    let title = commands.spawn((text("", 16.0, Color::srgb(0.95, 0.42, 0.38)), outline(), Words::Title)).id();
-    let total = commands.spawn((text("", 11.0, DIM), Words::Total)).id();
+    let title = commands
+        .spawn((crate::hud::title("", 18.0, Color::srgb(0.98, 0.45, 0.40)), outline(), Words::Title))
+        .id();
+    let total = commands.spawn((text("", 13.0, DIM), Words::Total)).id();
     let body = commands
         .spawn((
             Node {

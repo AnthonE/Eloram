@@ -48,7 +48,7 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   bots in the other nine seats after 3 s (`EL_FILL`), then 20 s of champion select (`--select-secs`;
   it ends sooner once everyone seated is ready, and agents are ready at once). The server alone:
   `cargo run -p el-server --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
-- `scripts/e2e.sh spike|match|menu|backdrop|watch|login|art|recover|fx|draws|hitches [webgl2]`: Playwright against a real server
+- `scripts/e2e.sh spike|match|menu|backdrop|watch|login|art|recover|fx|draws|hitches|ui [webgl2]`: Playwright against a real server
   (a plain load opens the main menu, so the suites that play go in with `&queue=1`; `menu`: the
   menu's pages, RANKED refused on a server without Elo Pros, PLAY into champion select, LEAVE MATCH
   back to the menu and a reload staying there; `match`: queue, champion select (a reroll, the bench, ready), the headliner, augment, shop,
@@ -151,6 +151,18 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `hud_lobby.rs` (the connecting, lobby and queue card, and a match's end with Play again); the icons are painted by
   `el_client_core::icons`. `window.__el` has `portrait`, `ally_portraits`, `death_screen` and
   `recap_lines`.
+- The UI's look (`docs/DESIGN.md`, "The look of the UI"): `el-client/src/skin.rs` is the palette
+  (slate, bronze, ember), the two faces (Cinzel for titles, Roboto Condensed for the rest:
+  `crates/el-client/fonts/`, each with its licence, `NOTICE`) and the three UI shaders: `Plate`
+  (`shaders/plate.wgsl`: a panel, a frame, a finish over a control's own colours; the styles are
+  fixed handles in `skin::plates`, so a bundle names one with no resource in hand), `Gauge`
+  (`shaders/gauge.wgsl`: health and mana, told again only when a value moves) and `Sparks`
+  (`shaders/sparks.wgsl`: the menu's embers). A UI material doesn't batch: a plate goes where it
+  replaces a panel's shadow, border and gradient, a finish where the control's colours are
+  written by a system, and what can be painted into a picture is (`hud::icon_image`'s set-in).
+  Their pipelines are built from the first frame (`skin::warm`'s specks), so `hitches` stays at 0.
+  `scripts/e2e.sh ui` shoots every screen into `e2e/artifacts/ui-<project>-<name>.png`
+  (`EL_UI_SIZE=1280x720`, `EL_UI_ONLY=menu|hud`, `EL_UI_QUALITY=high`).
 - The main menu (`el-client/src/front/`, its words and decisions in `el_client_core::front`;
   `docs/DESIGN.md`, "The menu"): PLAY (NORMAL, RANKED), PRACTICE, WATCH, FRIENDS, NEWS, STORE,
   PROFILE, OPTIONS, QUIT (desktop). Up on a plain load; `?queue=1`, `?practice=1` and `?watch=` go

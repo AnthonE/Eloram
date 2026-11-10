@@ -13,7 +13,7 @@
 use bevy::prelude::*;
 use bevy::ui::{
     AngularColorStop, BackgroundGradient, BoxShadow, ConicGradient, LinearGradient, RelativeCursorPosition,
-    UiGlobalTransform, UiPosition, UiTransform,
+    ShadowStyle, UiGlobalTransform, UiPosition, UiTransform,
 };
 use el_client_core::lobby::ToServer;
 use el_client_core::tips;
@@ -29,10 +29,10 @@ use crate::camera::MainCamera;
 use crate::coords::map_point;
 use crate::input::Controls;
 use crate::session::{Phase, Session};
+use crate::skin::{self, Gauge, GaugeParams, Plate, plates};
 use crate::view::{CHAMPION, Drawn, FloorImage, TEAM};
 
 pub(crate) const PANEL: Color = Color::srgba(0.035, 0.045, 0.07, 0.90);
-pub(crate) const PANEL_TOP: Color = Color::srgba(0.07, 0.085, 0.12, 0.94);
 /// The frames' bronze, and a slot's well.
 pub(crate) const FRAME: Color = Color::srgb(0.47, 0.39, 0.24);
 pub(crate) const WELL: Color = Color::srgb(0.07, 0.08, 0.11);
@@ -44,7 +44,6 @@ pub(crate) const FRAME_SOFT: Color = Color::srgba(0.47, 0.39, 0.24, 0.55);
 pub(crate) const TEXT: Color = Color::srgb(0.92, 0.93, 0.96);
 pub(crate) const DIM: Color = Color::srgb(0.56, 0.59, 0.66);
 pub(crate) const GOLD: Color = Color::srgb(0.98, 0.82, 0.36);
-const MANA: Color = Color::srgb(0.30, 0.55, 0.98);
 const SHORT: Color = Color::srgb(0.90, 0.40, 0.36);
 const HP: [Color; 2] = [Color::srgb(0.20, 0.62, 0.24), Color::srgb(0.38, 0.86, 0.36)];
 /// Seconds the headliner stays in the middle of the screen as a match starts.
@@ -245,9 +244,13 @@ struct Pip(usize, u8);
 #[derive(Component)]
 struct LevelUp(usize);
 
-/// An augment card's frame, in its tier's colour.
+/// An augment card's frame, in its tier's colour; the band at its head and its gem, too.
 #[derive(Component)]
 struct CardFrame(usize);
+#[derive(Component)]
+struct CardBand(usize);
+#[derive(Component)]
+struct CardGem(usize);
 
 /// The player's portrait (`None`) or an ally's, in the champion's colour.
 #[derive(Component)]
@@ -284,8 +287,20 @@ impl Plugin for HudPlugin {
                 Update,
                 (
                     (press, minimap).after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send),
-                    (texts, fills, panels, dots, view_box, tooltip).after(crate::net::NetSet::Send),
-                    (scale, tints, slots, pips, level_ups, card_frames, portraits, ally_rows, colors)
+                    (texts, fills, meters, danger, panels, dots, view_box, tooltip)
+                        .after(crate::net::NetSet::Send),
+                    (
+                        scale,
+                        tints,
+                        finishes,
+                        slots,
+                        pips,
+                        level_ups,
+                        card_frames,
+                        portraits,
+                        ally_rows,
+                        colors,
+                    )
                         .after(crate::net::NetSet::Send),
                     (ability_icons, item_icons, portrait_picture, rec_tiles, ally_ults, sweeps, score_badges)
                         .after(crate::net::NetSet::Send),
@@ -294,8 +309,19 @@ impl Plugin for HudPlugin {
     }
 }
 
+/// The HUD's words: the condensed face, bold, as numbers read at a glance are set.
 pub(crate) fn text(s: &str, size: f32, color: Color) -> impl Bundle {
-    (Text::new(s), TextFont { font_size: FontSize::Px(size), ..default() }, TextColor(color))
+    skin::bold(s, size, color)
+}
+
+/// Prose (a tooltip's body, a card's text): the same face, regular.
+pub(crate) fn prose(s: &str, size: f32, color: Color) -> impl Bundle {
+    skin::sans(s, size, color)
+}
+
+/// A title (a card's name, a screen's heading): the carved face.
+pub(crate) fn title(s: &str, size: f32, color: Color) -> impl Bundle {
+    skin::display(s, size, color)
 }
 
 /// A tight shadow under words, to read them over the bright ground.
@@ -318,30 +344,21 @@ pub(crate) fn outline() -> TextShadow {
     TextShadow { offset: Vec2::splat(1.0), color: Color::srgba(0.0, 0.0, 0.0, 0.85) }
 }
 
-/// A soft shadow under a panel.
-pub(crate) fn shadow() -> BoxShadow {
-    BoxShadow::new(Color::srgba(0.0, 0.0, 0.0, 0.55), px(0), px(4), px(0), px(14))
-}
-
 /// A vertical gradient, `top` to `bottom`.
 pub(crate) fn down(top: Color, bottom: Color) -> BackgroundGradient {
     BackgroundGradient(vec![LinearGradient::to_bottom(vec![top.into(), bottom.into()]).into()])
 }
 
-/// A framed panel's look. It takes the cursor: a click on it is the HUD's, not the map's.
-pub(crate) fn framed() -> (BorderColor, BackgroundGradient, BoxShadow, Interaction) {
-    (BorderColor::all(FRAME), down(PANEL_TOP, PANEL), shadow(), Interaction::None)
+/// A framed panel's look: a slate plate in a bronze rim, every corner cut (`skin.rs`). It takes
+/// the cursor: a click on it is the HUD's, not the map's.
+pub(crate) fn framed() -> (MaterialNode<Plate>, BoxShadow, Interaction) {
+    (skin::plate(plates::PANEL), skin::drop_shadow(), Interaction::None)
 }
 
-/// A framed panel docked at the screen's bottom: its top edge brighter, so the bottom's panels
+/// A framed panel docked at the screen's bottom: its top corners cut, so the bottom's panels
 /// read as one set.
-pub(crate) fn docked() -> (BorderColor, BackgroundGradient, BoxShadow, Interaction) {
-    (
-        BorderColor { top: TRIM, ..BorderColor::all(FRAME) },
-        down(PANEL_TOP, PANEL),
-        shadow(),
-        Interaction::None,
-    )
+pub(crate) fn docked() -> (MaterialNode<Plate>, BoxShadow, Interaction) {
+    (skin::plate(plates::DOCK_BOTTOM), skin::drop_shadow(), Interaction::None)
 }
 
 /// A colour a little lighter (`by` > 0) or darker.
@@ -365,7 +382,27 @@ pub(crate) fn initials(def: u8) -> String {
 /// A bar this tall (px) or less is filled in two bands, not a gradient (`bar`).
 const THIN: f32 = 8.0;
 
-/// A bar: its well, its fill and, if any, the words on it.
+/// A tall bar drawn as a gauge (`skin.rs`): which fill it shows, in its colours, and what was just
+/// lost in another.
+#[derive(Component)]
+struct Meter {
+    fill: Fill,
+    colors: [Color; 2],
+    lost: Color,
+}
+
+/// What a gauge last showed: its fill, where what was lost ends and how long that's still held,
+/// and the rest of what its shader is told, to tell it again only when it moves.
+#[derive(Component, Default)]
+struct MeterState {
+    fill: f32,
+    lost: f32,
+    hold: f32,
+    told: [i32; 5],
+}
+
+/// A bar: its well, its fill and, if any, the words on it. A tall one is a gauge, drawn whole by
+/// its shader; a thin one two bands.
 fn bar(
     commands: &mut Commands,
     w: Val,
@@ -374,6 +411,31 @@ fn bar(
     fill: Fill,
     label: Option<(Label, f32)>,
 ) -> Entity {
+    if h > THIN {
+        let lost = match fill {
+            Fill::Hp => Color::srgba(1.0, 0.46, 0.22, 0.95),
+            _ => Color::srgba(0.62, 0.78, 1.0, 0.55),
+        };
+        let e = commands
+            .spawn((
+                Node {
+                    width: w,
+                    height: px(h),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border_radius: BorderRadius::all(px(3)),
+                    ..default()
+                },
+                Meter { fill, colors: fill_color, lost },
+                MeterState::default(),
+            ))
+            .id();
+        if let Some((l, size)) = label {
+            let t = commands.spawn((text("", size, TEXT), outline(), l)).id();
+            commands.entity(e).add_child(t);
+        }
+        return e;
+    }
     let e = commands
         .spawn((
             Node {
@@ -390,25 +452,20 @@ fn bar(
             BackgroundColor(Color::srgb(0.05, 0.06, 0.08)),
         ))
         .id();
-    let node = Node {
+    // A thin bar's gradient is a few rows: two bands of it, its top quarter's and its bottom
+    // quarter's, look the same and are drawn with the plain nodes round them (a gradient is a
+    // pipeline of its own, so a draw call, and the next node another).
+    let (top, bottom) = (fill_color[1].mix(&fill_color[0], 0.25), fill_color[1].mix(&fill_color[0], 0.75));
+    let band = Node {
         position_type: PositionType::Absolute,
         left: px(0),
         top: px(0),
         height: percent(100),
         width: percent(100),
+        border: UiRect::top(px((h * 0.5).round())),
         ..default()
     };
-    let f = if h <= THIN {
-        // A thin bar's gradient is a few rows: two bands of it, its top quarter's and its bottom
-        // quarter's, look the same and are drawn with the plain nodes round them (a gradient is
-        // a pipeline of its own, so a draw call, and the next node another).
-        let (top, bottom) =
-            (fill_color[1].mix(&fill_color[0], 0.25), fill_color[1].mix(&fill_color[0], 0.75));
-        let band = Node { border: UiRect::top(px((h * 0.5).round())), ..node };
-        commands.spawn((band, BorderColor::all(top), BackgroundColor(bottom), fill)).id()
-    } else {
-        commands.spawn((node, down(fill_color[1], fill_color[0]), fill)).id()
-    };
+    let f = commands.spawn((band, BorderColor::all(top), BackgroundColor(bottom), fill)).id();
     commands.entity(e).add_child(f);
     if let Some((l, size)) = label {
         let t = commands.spawn((text("", size, TEXT), outline(), l)).id();
@@ -436,13 +493,13 @@ fn button(commands: &mut Commands, act: Act, label: Label, width: f32, base: Col
             BackgroundColor(base),
             Tint(base),
             act,
-            children![(text("", 13.0, TEXT), label)],
+            children![(text("", 14.0, TEXT), outline(), label)],
         ))
         .id()
 }
 
 pub(crate) const BUTTON: Color = Color::srgb(0.11, 0.12, 0.16);
-pub(crate) const BUTTON_GOLD: Color = Color::srgb(0.30, 0.24, 0.10);
+pub(crate) const BUTTON_GOLD: Color = Color::srgb(0.40, 0.26, 0.08);
 
 #[allow(clippy::too_many_lines)]
 fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::portrait::PortraitImage>) {
@@ -460,33 +517,52 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
         children![(
             Node {
                 align_items: AlignItems::Center,
-                column_gap: px(14),
-                padding: UiRect::axes(px(18), px(5)),
-                border: UiRect::new(px(1), px(1), px(0), px(2)),
-                border_radius: BorderRadius::px(0.0, 0.0, 10.0, 10.0),
+                column_gap: px(12),
+                // Hung from the screen's top: its upper rim is off it.
+                margin: UiRect::top(px(-3)),
+                padding: UiRect::new(px(24), px(24), px(8), px(8)),
+                border: UiRect::all(px(3)),
                 ..default()
             },
-            // Docked at the top: its bright edge is its bottom.
-            BorderColor { bottom: TRIM, ..BorderColor::all(FRAME) },
-            down(PANEL_TOP, PANEL),
-            shadow(),
+            skin::plate(plates::DOCK_TOP),
+            skin::drop_shadow(),
             Interaction::None,
             children![
-                (text("DAWN", 11.0, TEAM[0]), Node { margin: UiRect::top(px(4)), ..default() }),
-                (text("0", 22.0, TEAM[0]), outline(), Label::KillsDawn),
+                (title("DAWN", 13.0, TEAM[0]), outline()),
                 (
+                    // Each side's kills over a line of its colour.
                     Node {
-                        min_width: px(64),
+                        min_width: px(40),
                         justify_content: JustifyContent::Center,
-                        padding: UiRect::axes(px(8), px(2)),
-                        border_radius: BorderRadius::all(px(4)),
+                        border: UiRect::bottom(px(2)),
                         ..default()
                     },
-                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
-                    children![(text("0:00", 16.0, TEXT), Label::Clock)],
+                    BorderColor::all(TEAM[0]),
+                    children![(text("0", 26.0, TEXT), outline(), Label::KillsDawn)],
                 ),
-                (text("0", 22.0, TEAM[1]), outline(), Label::KillsDusk),
-                (text("DUSK", 11.0, TEAM[1]), Node { margin: UiRect::top(px(4)), ..default() }),
+                (
+                    Node {
+                        min_width: px(78),
+                        justify_content: JustifyContent::Center,
+                        padding: UiRect::axes(px(10), px(3)),
+                        border: UiRect::all(px(1)),
+                        border_radius: BorderRadius::all(px(2)),
+                        ..default()
+                    },
+                    skin::plate(plates::WELL),
+                    children![(text("0:00", 17.0, GOLD), Label::Clock)],
+                ),
+                (
+                    Node {
+                        min_width: px(40),
+                        justify_content: JustifyContent::Center,
+                        border: UiRect::bottom(px(2)),
+                        ..default()
+                    },
+                    BorderColor::all(TEAM[1]),
+                    children![(text("0", 26.0, TEXT), outline(), Label::KillsDusk)],
+                ),
+                (title("DUSK", 13.0, TEAM[1]), outline()),
             ],
         )],
     ));
@@ -512,8 +588,7 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
                     display: Display::None,
                     ..default()
                 },
-                BorderColor::all(FRAME_SOFT),
-                BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.62)),
+                skin::plate(plates::SOFT),
                 Panel::Feed,
                 children![(
                     text("", 13.0, TEXT),
@@ -534,11 +609,24 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
             ..default()
         },
         children![(
-            text("", 30.0, TEXT),
+            title("", 30.0, Color::srgb(1.0, 0.95, 0.84)),
             TextLayout::justify(Justify::Center),
-            TextShadow { offset: Vec2::splat(2.0), color: Color::srgba(0.0, 0.0, 0.0, 0.85) },
+            TextShadow { offset: Vec2::new(0.0, 3.0), color: Color::srgba(0.0, 0.0, 0.0, 0.9) },
             Label::Center
         )],
+    ));
+    // The screen's edge, red and beating while the champion's health is low: under the HUD.
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            width: percent(100),
+            height: percent(100),
+            ..default()
+        },
+        skin::plate(plates::DANGER),
+        Visibility::Hidden,
+        GlobalZIndex(-2),
+        Danger,
     ));
     bottom(&mut commands, &portrait);
     allies(&mut commands, &portrait);
@@ -600,7 +688,14 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
     // The square the turned map sits in, its corners the abyss's dark; the view box is cut at it.
     let square = commands
         .spawn((
-            Node { width: px(MINI), height: px(MINI), overflow: Overflow::clip(), ..default() },
+            Node {
+                width: px(MINI),
+                height: px(MINI),
+                border: UiRect::all(px(1)),
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BorderColor::all(Color::srgba(0.0, 0.0, 0.0, 0.9)),
             BackgroundColor(Color::srgb(0.02, 0.03, 0.05)),
         ))
         .add_child(mini)
@@ -611,13 +706,16 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
                 position_type: PositionType::Absolute,
                 bottom: px(0),
                 right: px(0),
-                padding: UiRect::all(px(4)),
-                border: UiRect::new(px(2), px(0), px(2), px(0)),
-                border_radius: BorderRadius::px(10.0, 0.0, 0.0, 0.0),
+                // In the corner: its right and lower rims are off the screen.
+                margin: UiRect::new(px(0), px(-3), px(0), px(-3)),
+                padding: UiRect::all(px(5)),
+                border: UiRect::all(px(3)),
                 display: Display::None,
                 ..default()
             },
-            docked(),
+            skin::plate(plates::DOCK_CORNER),
+            skin::drop_shadow(),
+            Interaction::None,
             Panel::Minimap,
         ))
         .add_child(square);
@@ -731,18 +829,19 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
             flex_direction: FlexDirection::Column,
             row_gap: px(4),
             width: px(TIP_W),
-            padding: UiRect::axes(px(10), px(8)),
-            border: UiRect::all(px(1)),
-            border_radius: BorderRadius::all(px(6)),
+            padding: UiRect::axes(px(13), px(10)),
+            border: UiRect::all(px(2)),
             display: Display::None,
             ..default()
         },
-        BorderColor::all(FRAME),
-        down(Color::srgb(0.10, 0.11, 0.15), Color::srgb(0.05, 0.06, 0.09)),
-        shadow(),
+        skin::plate(plates::TIP),
+        skin::drop_shadow(),
         GlobalZIndex(20),
         Panel::Tip,
-        children![(text("", 14.0, GOLD), Label::TipTitle), (text("", 12.0, TEXT), Label::TipBody)],
+        children![
+            (skin::display("", 15.0, GOLD), Label::TipTitle),
+            (prose("", 14.0, Color::srgb(0.84, 0.86, 0.90)), Label::TipBody)
+        ],
     ));
 }
 
@@ -753,19 +852,19 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                right: px(-7),
-                bottom: px(-7),
-                width: px(24),
-                height: px(24),
+                right: px(-8),
+                bottom: px(-8),
+                width: px(26),
+                height: px(26),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                border: UiRect::all(px(1)),
+                border: UiRect::all(px(2)),
                 border_radius: BorderRadius::all(percent(50)),
                 ..default()
             },
-            BorderColor::all(GOLD),
-            BackgroundColor(Color::srgb(0.06, 0.07, 0.10)),
-            children![(text("1", 12.0, TEXT), Label::Level)],
+            BorderColor::all(skin::BRONZE_HI),
+            BackgroundColor(Color::srgb(0.045, 0.055, 0.08)),
+            children![(text("1", 14.0, GOLD), Label::Level)],
         ))
         .id();
     // The champion's initials, and over them its model drawn live (`portrait.rs`), cut to the
@@ -778,12 +877,13 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(8)),
+                border_radius: BorderRadius::all(px(4)),
                 overflow: Overflow::clip(),
                 ..default()
             },
-            BorderColor::all(GOLD),
+            BorderColor::all(skin::BRONZE_HI),
             BackgroundColor(WELL),
+            MaterialNode(plates::FINISH_PICTURE),
             Portrait(None),
             children![
                 (text("", 26.0, TEXT), outline(), Label::Initials),
@@ -818,10 +918,10 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
         ))
         .id();
     let portrait =
-        commands.spawn(Node { width: px(66), height: px(66), ..default() }).add_children(&[face, badge]).id();
+        commands.spawn(Node { width: px(74), height: px(74), ..default() }).add_children(&[face, badge]).id();
     let xp = bar(
         commands,
-        px(66),
+        px(74),
         5.0,
         [Color::srgb(0.50, 0.32, 0.80), Color::srgb(0.74, 0.55, 0.98)],
         Fill::Xp,
@@ -847,10 +947,10 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
     let names = STATS
         .iter()
         .enumerate()
-        .map(|(i, name)| commands.spawn((text(name, 9.0, DIM), place(i, false))).id());
+        .map(|(i, name)| commands.spawn((text(name, 10.0, skin::BRONZE), place(i, false))).id());
     let mut cells: Vec<Entity> = names.collect();
     cells.extend(
-        (0..STATS.len()).map(|i| commands.spawn((text("", 11.0, TEXT), Label::Stat(i), place(i, true))).id()),
+        (0..STATS.len()).map(|i| commands.spawn((text("", 13.0, TEXT), Label::Stat(i), place(i, true))).id()),
     );
     let stats = commands
         .spawn((
@@ -858,21 +958,20 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                 display: Display::Grid,
                 // A name's 16 px and its value's 34, twice: the cells of 54 they were.
                 grid_template_columns: vec![
-                    GridTrack::px(16.0),
-                    GridTrack::px(34.0),
-                    GridTrack::px(16.0),
-                    GridTrack::px(34.0),
+                    GridTrack::px(17.0),
+                    GridTrack::px(33.0),
+                    GridTrack::px(17.0),
+                    GridTrack::px(33.0),
                 ],
                 align_items: AlignItems::Baseline,
                 column_gap: px(4),
                 row_gap: px(5),
-                padding: UiRect::axes(px(8), px(7)),
+                padding: UiRect::axes(px(9), px(8)),
                 border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(6)),
+                border_radius: BorderRadius::all(px(3)),
                 ..default()
             },
-            BorderColor::all(FRAME_SOFT),
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.3)),
+            skin::plate(plates::WELL),
         ))
         .add_children(&cells)
         .id();
@@ -885,23 +984,23 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
         .add_child(gap)
         .add_children(&slots[4..])
         .id();
-    let name = commands.spawn((text("", 13.0, TEXT), Label::Name)).id();
+    let name = commands.spawn((title("", 13.0, GOLD), outline(), Label::Name)).id();
     let kda = commands.spawn((text("", 13.0, DIM), Label::Kda)).id();
     let head = commands
         .spawn(Node { justify_content: JustifyContent::SpaceBetween, width: percent(100), ..default() })
         .add_children(&[name, kda])
         .id();
-    let hp = bar(commands, percent(100), 18.0, HP, Fill::Hp, Some((Label::Hp, 12.0)));
+    let hp = bar(commands, percent(100), 20.0, HP, Fill::Hp, Some((Label::Hp, 14.0)));
     let mana = bar(
         commands,
         percent(100),
-        12.0,
-        [Color::srgb(0.16, 0.34, 0.80), MANA],
+        14.0,
+        [Color::srgb(0.10, 0.26, 0.74), Color::srgb(0.36, 0.62, 1.0)],
         Fill::Mana,
-        Some((Label::Mana, 10.0)),
+        Some((Label::Mana, 12.0)),
     );
     let middle = commands
-        .spawn(Node { flex_direction: FlexDirection::Column, row_gap: px(5), width: px(372), ..default() })
+        .spawn(Node { flex_direction: FlexDirection::Column, row_gap: px(5), width: px(388), ..default() })
         .add_children(&[head, row, hp, mana])
         .id();
     // The items, three by two, and the gold under them.
@@ -911,19 +1010,18 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                 .spawn((
                     Button,
                     Node {
-                        width: px(42),
-                        height: px(42),
-                        padding: UiRect::all(px(2)),
+                        width: px(44),
+                        height: px(44),
+                        padding: UiRect::all(px(1)),
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
                         border: UiRect::all(px(1)),
-                        border_radius: BorderRadius::all(px(5)),
+                        border_radius: BorderRadius::all(px(3)),
                         overflow: Overflow::clip(),
                         ..default()
                     },
-                    BorderColor::all(Color::srgb(0.24, 0.22, 0.18)),
-                    BackgroundColor(WELL),
-                    Tint(WELL),
+                    skin::plate(plates::WELL),
+                    skin::Press { idle: plates::WELL, over: plates::WELL_OVER, down: plates::WELL },
                     Act::Sell(k as u8),
                     Tip::Item(k),
                     children![
@@ -957,7 +1055,7 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
     let grid = commands
         .spawn(Node {
             flex_wrap: FlexWrap::Wrap,
-            width: px(138),
+            width: px(146),
             column_gap: px(4),
             row_gap: px(4),
             ..default()
@@ -970,11 +1068,12 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                 justify_content: JustifyContent::Center,
                 flex_grow: 1.0,
                 padding: UiRect::axes(px(6), px(3)),
-                border_radius: BorderRadius::all(px(4)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(3)),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
-            children![(text("", 15.0, GOLD), outline(), Label::Gold)],
+            skin::plate(plates::WELL),
+            children![(text("", 16.0, GOLD), outline(), Label::Gold)],
         ))
         .id();
     // The trinket's slot beside the gold: its treats, and the key that eats one.
@@ -982,18 +1081,19 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
         .spawn((
             Button,
             Node {
-                width: px(38),
-                height: px(26),
+                width: px(40),
+                height: px(28),
                 padding: UiRect::left(px(8)),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(5)),
+                border_radius: BorderRadius::all(px(3)),
                 overflow: Overflow::clip(),
                 ..default()
             },
             BorderColor::all(Color::srgb(0.42, 0.32, 0.18)),
             BackgroundColor(TREAT_WELL),
+            skin::finish(),
             Tip::Trinket,
             children![
                 (text("", 11.0, TEXT), outline(), Label::Treats),
@@ -1018,9 +1118,10 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
             Node {
                 align_items: AlignItems::Center,
                 column_gap: px(14),
-                padding: UiRect::new(px(14), px(14), px(10), px(10)),
-                border: UiRect::new(px(1), px(1), px(2), px(0)),
-                border_radius: BorderRadius::px(12.0, 12.0, 0.0, 0.0),
+                // Stood on the screen's foot: its lower rim is off it.
+                margin: UiRect::bottom(px(-3)),
+                padding: UiRect::new(px(16), px(16), px(10), px(11)),
+                border: UiRect::all(px(3)),
                 ..default()
             },
             docked(),
@@ -1047,7 +1148,7 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
 /// An ability's slot: the "+" over it, the slot (its name, the cooldown's shade and count, its key)
 /// and its ranks under it.
 fn ability_slot(commands: &mut Commands, k: usize) -> Entity {
-    let size = if k < 4 { 54.0 } else { 42.0 };
+    let size = if k < 4 { 58.0 } else { 44.0 };
     let plus = commands
         .spawn((
             Button,
@@ -1074,17 +1175,16 @@ fn ability_slot(commands: &mut Commands, k: usize) -> Entity {
             Node {
                 width: px(size),
                 height: px(size),
-                border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(6)),
+                border: UiRect::all(px(3)),
+                border_radius: BorderRadius::all(px(4)),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 overflow: Overflow::clip(),
                 ..default()
             },
-            BorderColor::all(FRAME),
-            // Flat: the icon is opaque and covers it all, and a gradient is a draw call of its
-            // own.
-            BackgroundColor(Color::srgb(0.11, 0.12, 0.17)),
+            // The frame is a plate, clear inside its rim (the icon is opaque and covers it all):
+            // which one says the ability's state (`slots`).
+            skin::plate(plates::SLOT_DARK),
             Interaction::None,
             AbilitySlot(k),
             Tip::Ability(k),
@@ -1133,8 +1233,8 @@ fn ability_slot(commands: &mut Commands, k: usize) -> Entity {
                         ..default()
                     },
                     children![(
-                        text("", if k < 4 { 20.0 } else { 16.0 }, TEXT),
-                        outline(),
+                        text("", if k < 4 { 24.0 } else { 18.0 }, TEXT),
+                        TextShadow { offset: Vec2::new(0.0, 2.0), color: Color::srgba(0.0, 0.0, 0.0, 0.95) },
                         Label::Cooldown(k)
                     )],
                 ),
@@ -1143,12 +1243,12 @@ fn ability_slot(commands: &mut Commands, k: usize) -> Entity {
                         position_type: PositionType::Absolute,
                         left: px(0),
                         bottom: px(0),
-                        padding: UiRect::axes(px(3), px(0)),
-                        border_radius: BorderRadius::px(0.0, 4.0, 0.0, 0.0),
+                        padding: UiRect::axes(px(4), px(0)),
+                        border_radius: BorderRadius::px(0.0, 3.0, 0.0, 0.0),
                         ..default()
                     },
-                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
-                    children![(text("", 10.0, GOLD), Label::Key(k))],
+                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.78)),
+                    children![(text("", 12.0, GOLD), Label::Key(k))],
                 ),
             ],
         ))
@@ -1162,20 +1262,15 @@ fn ability_slot(commands: &mut Commands, k: usize) -> Entity {
         .map(|r| {
             commands
                 .spawn((
-                    Node {
-                        width: px(7),
-                        height: px(3),
-                        border_radius: BorderRadius::all(px(1)),
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgb(0.20, 0.21, 0.25)),
+                    Node { width: px(if ranks == 3 { 14 } else { 8 }), height: px(4), ..default() },
+                    BackgroundColor(Color::srgb(0.13, 0.14, 0.18)),
                     Pip(k, r),
                 ))
                 .id()
         })
         .collect();
     let pip_row =
-        commands.spawn(Node { column_gap: px(2), height: px(3), ..default() }).add_children(&pips).id();
+        commands.spawn(Node { column_gap: px(2), height: px(4), ..default() }).add_children(&pips).id();
     commands
         .spawn(Node {
             flex_direction: FlexDirection::Column,
@@ -1201,12 +1296,13 @@ fn allies(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
                         border: UiRect::all(px(2)),
-                        border_radius: BorderRadius::all(px(6)),
+                        border_radius: BorderRadius::all(px(3)),
                         overflow: Overflow::clip(),
                         ..default()
                     },
                     BorderColor::all(FRAME),
                     BackgroundColor(WELL),
+                    MaterialNode(plates::FINISH_PICTURE),
                     Portrait(Some(i)),
                     children![
                         (text("", 14.0, TEXT), outline(), Label::AllyInitials(i)),
@@ -1229,8 +1325,8 @@ fn allies(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                         position_type: PositionType::Absolute,
                         right: px(-5),
                         bottom: px(-5),
-                        min_width: px(16),
-                        height: px(16),
+                        min_width: px(18),
+                        height: px(18),
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
                         border: UiRect::all(px(1)),
@@ -1239,7 +1335,7 @@ fn allies(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                     },
                     BorderColor::all(FRAME),
                     BackgroundColor(Color::srgb(0.06, 0.07, 0.10)),
-                    children![(text("", 9.0, TEXT), Label::AllyLevel(i))],
+                    children![(text("", 11.0, TEXT), Label::AllyLevel(i))],
                 ))
                 .id();
             // The ultimate: an orb at the top right, lit while it's ready, as League's team frames.
@@ -1263,11 +1359,11 @@ fn allies(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                 ))
                 .id();
             let portrait = commands
-                .spawn(Node { width: px(38), height: px(38), ..default() })
+                .spawn(Node { width: px(42), height: px(42), ..default() })
                 .add_children(&[face, level, ult])
                 .id();
-            let name = commands.spawn((text("", 11.0, TEXT), outline(), Label::AllyName(i))).id();
-            let hp = bar(commands, px(86), 6.0, HP, Fill::AllyHp(i), None);
+            let name = commands.spawn((text("", 13.0, TEXT), outline(), Label::AllyName(i))).id();
+            let hp = bar(commands, px(92), 7.0, HP, Fill::AllyHp(i), None);
             let side = commands
                 .spawn(Node { flex_direction: FlexDirection::Column, row_gap: px(4), ..default() })
                 .add_children(&[name, hp])
@@ -1277,19 +1373,13 @@ fn allies(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                     Node {
                         align_items: AlignItems::Center,
                         column_gap: px(10),
-                        padding: UiRect::new(px(6), px(10), px(6), px(6)),
-                        border: UiRect::new(px(0), px(1), px(1), px(1)),
-                        border_radius: BorderRadius::px(0.0, 8.0, 8.0, 0.0),
+                        // Against the screen's left: its rim there is off it.
+                        margin: UiRect::left(px(-1)),
+                        padding: UiRect::new(px(8), px(12), px(6), px(6)),
+                        border: UiRect::all(px(1)),
                         ..default()
                     },
-                    BorderColor::all(FRAME_SOFT),
-                    BackgroundGradient(vec![
-                        LinearGradient::to_right(vec![
-                            Color::srgba(0.05, 0.06, 0.09, 0.85).into(),
-                            Color::srgba(0.02, 0.03, 0.05, 0.6).into(),
-                        ])
-                        .into(),
-                    ]),
+                    skin::plate(plates::ALLY),
                     Interaction::None,
                     AllyRow(i),
                 ))
@@ -1313,36 +1403,112 @@ fn allies(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
         .add_children(&rows);
 }
 
-/// The augment cards, a frame each in its tier's colour.
+/// A card's size.
+const CARD_W: f32 = 250.0;
+const CARD_H: f32 = 300.0;
+
+/// The augment cards: a tall plate each, its rim, its head's band and its light in its tier's
+/// colour, the name carved under a gem, what it does under a rule, its key at its foot.
 fn cards(commands: &mut Commands) {
     let cards: Vec<Entity> = (0..3)
         .map(|k| {
-            let reroll = button(commands, Act::Reroll(k as u8), Label::CardReroll, 100.0, BUTTON);
+            let reroll = button(commands, Act::Reroll(k as u8), Label::CardReroll, 120.0, BUTTON);
+            let base = Color::srgb(0.055, 0.066, 0.095);
             let card = commands
                 .spawn((
                     Button,
                     Node {
-                        width: px(210),
-                        height: px(150),
+                        width: px(CARD_W),
+                        height: px(CARD_H),
                         border: UiRect::all(px(2)),
-                        border_radius: BorderRadius::all(px(10)),
+                        border_radius: BorderRadius::all(px(4)),
                         flex_direction: FlexDirection::Column,
-                        justify_content: JustifyContent::SpaceBetween,
                         align_items: AlignItems::Center,
-                        padding: UiRect::all(px(10)),
+                        overflow: Overflow::clip(),
                         ..default()
                     },
                     BorderColor::all(GOLD),
-                    BackgroundColor(Color::srgb(0.08, 0.09, 0.13)),
-                    Tint(Color::srgb(0.08, 0.09, 0.13)),
-                    BoxShadow::new(Color::srgba(0.0, 0.0, 0.0, 0.6), px(0), px(6), px(0), px(18)),
+                    BackgroundColor(base),
+                    Tint(base),
+                    BoxShadow::new(Color::srgba(0.0, 0.0, 0.0, 0.7), px(0), px(8), px(0), px(26)),
+                    MaterialNode(plates::FINISH_CARD),
                     CardFrame(k),
                     Act::Pick(k as u8),
                     children![
-                        (text("", 11.0, GOLD), Label::CardTier(k)),
-                        (text("", 17.0, TEXT), TextLayout::justify(Justify::Center), Label::CardName(k)),
-                        (text("", 11.0, DIM), TextLayout::justify(Justify::Center), Label::CardText(k)),
-                        (text("", 11.0, DIM), Label::CardKey(k)),
+                        (
+                            // The head: the tier's name on a band of its colour.
+                            Node {
+                                width: percent(100),
+                                height: px(34),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                border: UiRect::bottom(px(1)),
+                                ..default()
+                            },
+                            BorderColor::all(GOLD),
+                            BackgroundColor(Color::NONE),
+                            CardBand(k),
+                            children![(text("", 13.0, GOLD), outline(), Label::CardTier(k))],
+                        ),
+                        (
+                            // The gem: a square on its corner, lit in the tier's colour.
+                            Node {
+                                width: px(26),
+                                height: px(26),
+                                margin: UiRect::new(px(0), px(0), px(26), px(18)),
+                                border: UiRect::all(px(2)),
+                                ..default()
+                            },
+                            UiTransform { rotation: Rot2::degrees(45.0), ..UiTransform::IDENTITY },
+                            BorderColor::all(GOLD),
+                            BackgroundColor(Color::NONE),
+                            BoxShadow::new(Color::NONE, px(0), px(0), px(2), px(16)),
+                            CardGem(k),
+                        ),
+                        (
+                            Node {
+                                width: percent(100),
+                                justify_content: JustifyContent::Center,
+                                padding: UiRect::horizontal(px(14)),
+                                ..default()
+                            },
+                            children![(
+                                title("", 19.0, Color::srgb(1.0, 0.96, 0.88)),
+                                TextLayout::justify(Justify::Center),
+                                Node { max_width: px(CARD_W - 32.0), ..default() },
+                                outline(),
+                                Label::CardName(k)
+                            )],
+                        ),
+                        (
+                            Node {
+                                width: px(120),
+                                height: px(1),
+                                margin: UiRect::vertical(px(12)),
+                                ..default()
+                            },
+                            BackgroundColor(FRAME_SOFT),
+                        ),
+                        (
+                            Node {
+                                width: percent(100),
+                                flex_grow: 1.0,
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Start,
+                                padding: UiRect::horizontal(px(18)),
+                                ..default()
+                            },
+                            children![(
+                                prose("", 15.0, Color::srgb(0.80, 0.83, 0.88)),
+                                TextLayout::justify(Justify::Center),
+                                Node { max_width: px(CARD_W - 40.0), ..default() },
+                                Label::CardText(k)
+                            )],
+                        ),
+                        (
+                            Node { margin: UiRect::bottom(px(12)), ..default() },
+                            children![(text("", 12.0, DIM), Label::CardKey(k))],
+                        ),
                     ],
                 ))
                 .id();
@@ -1350,29 +1516,34 @@ fn cards(commands: &mut Commands) {
                 .spawn(Node {
                     flex_direction: FlexDirection::Column,
                     align_items: AlignItems::Center,
-                    row_gap: px(6),
+                    row_gap: px(10),
                     ..default()
                 })
                 .add_children(&[card, reroll])
                 .id()
         })
         .collect();
-    let title = commands.spawn((text("CHOOSE AN AUGMENT", 18.0, GOLD), outline())).id();
-    let row = commands.spawn(Node { column_gap: px(16), ..default() }).add_children(&cards).id();
+    let heading = commands
+        .spawn((
+            title("CHOOSE AN AUGMENT", 26.0, GOLD),
+            TextShadow { offset: Vec2::new(0.0, 3.0), color: Color::srgba(0.0, 0.0, 0.0, 0.9) },
+        ))
+        .id();
+    let row = commands.spawn(Node { column_gap: px(22), ..default() }).add_children(&cards).id();
     let body = commands
         .spawn(Node {
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
-            row_gap: px(12),
+            row_gap: px(16),
             ..default()
         })
-        .add_children(&[title, row])
+        .add_children(&[heading, row])
         .id();
     commands
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                top: percent(30),
+                top: percent(21),
                 width: percent(100),
                 justify_content: JustifyContent::Center,
                 display: Display::None,
@@ -1972,26 +2143,122 @@ fn fills(session: Res<Session>, mut q: Query<(&Fill, &mut Node)>) {
     }
 }
 
-/// An ability's border: gold when it's ready, grey cooling down, blue short of mana, dark not
+/// The screen's edge in red while the champion is alive and under [`LOW_HP`] of its health.
+#[derive(Component)]
+struct Danger;
+
+fn danger(session: Res<Session>, mut q: Query<&mut Visibility, With<Danger>>) {
+    let low = session.client.as_deref().is_some_and(|c| {
+        let u = &c.pred.units[c.seat];
+        c.started()
+            && session.phase == Phase::Playing
+            && session.watch.is_none()
+            && u.alive
+            && u.hp < u.stats.max_hp * LOW_HP
+    });
+    for mut v in &mut q {
+        v.set_if_neq(if low { Visibility::Inherited } else { Visibility::Hidden });
+    }
+}
+
+/// How long what a gauge just lost stays behind the fill (s), and how fast it's then let go (of
+/// the whole bar a second).
+const LOST_HELD: f32 = 0.35;
+const LOST_GOES: f32 = 0.9;
+/// The health a tick marks, and the share of it under which the gauge beats.
+const TICK_HP: f32 = 100.0;
+const LOW_HP: f32 = 0.3;
+
+/// The gauges (health, mana): the fill, what was just lost held behind it a moment and let go,
+/// the ticks (one each hundred health), the shield past the fill, the beat while it's low. A
+/// gauge's material is made as it first comes by, and told again only when something moved.
+fn meters(
+    session: Res<Session>,
+    time: Res<Time<Real>>,
+    mut commands: Commands,
+    mut gauges: ResMut<Assets<Gauge>>,
+    mut q: Query<(Entity, &Meter, &mut MeterState, Option<&MaterialNode<Gauge>>)>,
+) {
+    let c = session.client.as_deref();
+    let dt = time.delta_secs().min(0.1);
+    for (e, meter, mut st, node) in &mut q {
+        // The fill, a tick's share, the shield's end, the beat.
+        let (fill, tick, shield, low) = match (c, meter.fill) {
+            (Some(c), Fill::Hp) => {
+                let u = &c.pred.units[c.seat];
+                let whole = u.stats.max_hp.max(1.0).max(u.hp + u.shield);
+                let fill = (u.hp / whole).clamp(0.0, 1.0);
+                let shield = if u.shield > 0.0 { ((u.hp + u.shield) / whole).clamp(0.0, 1.0) } else { 0.0 };
+                let low = if u.alive && u.hp < u.stats.max_hp * LOW_HP { 1.0 } else { 0.0 };
+                (fill, TICK_HP / whole, shield, low)
+            }
+            (Some(c), Fill::Mana) => {
+                let u = &c.pred.units[c.seat];
+                ((u.mana / u.stats.max_mana.max(1.0)).clamp(0.0, 1.0), 0.0, 0.0, 0.0)
+            }
+            _ => (0.0, 0.0, 0.0, 0.0),
+        };
+        if fill < st.fill - 0.002 {
+            st.hold = LOST_HELD;
+        }
+        if st.lost <= fill {
+            st.lost = fill;
+        } else if st.hold > 0.0 {
+            st.hold -= dt;
+        } else {
+            st.lost = (st.lost - LOST_GOES * dt).max(fill);
+        }
+        st.fill = fill;
+        let lost = st.lost;
+        let step = |v: f32| (v * 2000.0).round() as i32;
+        let told = [step(fill), step(lost), (tick * 1e6) as i32, step(shield), step(low)];
+        let params = || GaugeParams {
+            lo: skin::lin(meter.colors[0]),
+            hi: skin::lin(meter.colors[1]),
+            lost: skin::lin(meter.lost),
+            back: skin::lin(Color::srgb(0.035, 0.042, 0.06)),
+            amount: Vec4::new(fill, lost, tick, shield),
+            live: Vec4::new(low, 1.6, 10.0, 0.0),
+        };
+        match node {
+            None => {
+                let h = gauges.add(Gauge { g: params() });
+                commands.entity(e).insert(MaterialNode(h));
+                st.told = told;
+            }
+            Some(n) if st.told != told => {
+                if let Some(mut g) = gauges.get_mut(&n.0) {
+                    g.g = params();
+                }
+                st.told = told;
+            }
+            Some(_) => {}
+        }
+    }
+}
+
+/// An ability's frame: ember when it's ready, iron cooling down, blue short of mana, dark not
 /// learned.
-fn slots(session: Res<Session>, mut q: Query<(&AbilitySlot, &mut BorderColor)>) {
+fn slots(session: Res<Session>, mut q: Query<(&AbilitySlot, &mut MaterialNode<Plate>)>) {
     let Some(c) = session.client.as_deref() else { return };
     let u = &c.pred.units[c.seat];
     let ch = &c.pred.champs[c.seat];
-    for (slot, mut border) in &mut q {
+    for (slot, mut frame) in &mut q {
         let k = slot.0;
         let rank = if k < 4 { ch.ranks[k] } else { 1 };
         let cost = ability(ch.def, k as u8).cost[usize::from(rank.max(1) - 1).min(4)];
         let want = if rank == 0 {
-            Color::srgb(0.16, 0.17, 0.20)
+            plates::SLOT_DARK
         } else if ch.ready[k] > c.pred.tick {
-            Color::srgb(0.30, 0.31, 0.34)
+            plates::SLOT_COOLING
         } else if cost > u.mana {
-            MANA
+            plates::SLOT_SHORT
         } else {
-            GOLD
+            plates::SLOT_READY
         };
-        border.set_if_neq(BorderColor::all(want));
+        if frame.0 != want {
+            frame.0 = want;
+        }
     }
 }
 
@@ -1999,7 +2266,7 @@ fn pips(session: Res<Session>, mut q: Query<(&Pip, &mut BackgroundColor)>) {
     let Some(c) = session.client.as_deref() else { return };
     let ch = &c.pred.champs[c.seat];
     for (p, mut bg) in &mut q {
-        let want = if p.1 < ch.ranks[p.0] { GOLD } else { Color::srgb(0.20, 0.21, 0.25) };
+        let want = if p.1 < ch.ranks[p.0] { skin::EMBER_HI } else { Color::srgb(0.13, 0.14, 0.18) };
         bg.set_if_neq(BackgroundColor(want));
     }
 }
@@ -2012,12 +2279,63 @@ fn level_ups(session: Res<Session>, mut q: Query<(&LevelUp, &mut Visibility)>) {
     }
 }
 
-fn card_frames(session: Res<Session>, mut q: Query<(&CardFrame, &mut BorderColor)>) {
+/// A card's frame: its rim and the light under it.
+type FrameLook = (&'static CardFrame, &'static mut BorderColor, &'static mut BoxShadow);
+/// A card's gem: its rim, its fill and its light.
+type GemLook =
+    (&'static CardGem, &'static mut BorderColor, &'static mut BackgroundColor, &'static mut BoxShadow);
+
+/// Each card in its tier's colour: its rim, its head's band and the rule under it, its gem and
+/// the gem's light, and the light under the card itself.
+fn card_frames(
+    session: Res<Session>,
+    mut q: Query<FrameLook, (Without<CardBand>, Without<CardGem>)>,
+    mut bands: Query<(&CardBand, &mut BorderColor, &mut BackgroundColor), Without<CardGem>>,
+    mut gems: Query<GemLook>,
+) {
     let Some(c) = session.client.as_deref() else { return };
     let screen = &c.pred.champs[c.seat].screen;
-    for (f, mut border) in &mut q {
-        let tier = AUGMENTS[usize::from(screen.offers[f.0]) % AUGMENTS.len()].tier;
-        border.set_if_neq(BorderColor::all(tier_color(tier)));
+    if !screen.open {
+        return;
+    }
+    let tier = |k: usize| tier_color(AUGMENTS[usize::from(screen.offers[k]) % AUGMENTS.len()].tier);
+    for (f, mut border, mut shadow) in &mut q {
+        let t = tier(f.0);
+        border.set_if_neq(BorderColor::all(t));
+        // A dark fall under the card, and its tier's light round it.
+        let want = BoxShadow(vec![
+            ShadowStyle {
+                color: Color::srgba(0.0, 0.0, 0.0, 0.7),
+                x_offset: px(0),
+                y_offset: px(8),
+                spread_radius: px(0),
+                blur_radius: px(26),
+            },
+            ShadowStyle {
+                color: t.with_alpha(0.30),
+                x_offset: px(0),
+                y_offset: px(0),
+                spread_radius: px(1),
+                blur_radius: px(22),
+            },
+        ]);
+        if *shadow != want {
+            *shadow = want;
+        }
+    }
+    for (b, mut border, mut bg) in &mut bands {
+        let t = tier(b.0);
+        border.set_if_neq(BorderColor::all(t.with_alpha(0.7)));
+        bg.set_if_neq(BackgroundColor(t.with_alpha(0.16)));
+    }
+    for (g, mut border, mut bg, mut shadow) in &mut gems {
+        let t = tier(g.0);
+        border.set_if_neq(BorderColor::all(shade(t, 0.12)));
+        bg.set_if_neq(BackgroundColor(t.with_alpha(0.55)));
+        let want = BoxShadow::new(t.with_alpha(0.65), px(0), px(0), px(2), px(16));
+        if *shadow != want {
+            *shadow = want;
+        }
     }
 }
 
@@ -2077,11 +2395,38 @@ fn ability_icons(
     }
 }
 
+/// An icon set in its frame: a shade round its edge (the frame stands over it), a dark line
+/// against the frame and a little light across its upper half, as a thing behind glass has. In
+/// the picture itself, so it costs no draw.
+fn set_in(pixels: &mut [u8], side: usize) {
+    for y in 0..side {
+        for x in 0..side {
+            let edge = x.min(y).min(side - 1 - x).min(side - 1 - y) as f32;
+            // The shade: deepest at the edge, gone nine pixels in; a hard line at the very edge.
+            let t = (1.0 - edge / 9.0).clamp(0.0, 1.0);
+            let mut k = 1.0 - 0.55 * t * t;
+            if edge < 1.0 {
+                k *= 0.45;
+            }
+            // The light: the upper two fifths, falling off downward.
+            let v = y as f32 / side as f32;
+            let gloss = if v < 0.42 { 22.0 * (1.0 - v / 0.42) * (1.0 - t) } else { 0.0 };
+            let i = (y * side + x) * 4;
+            for c in &mut pixels[i..i + 3] {
+                *c = (f32::from(*c) * k + gloss).min(255.0) as u8;
+            }
+        }
+    }
+}
+
 /// An icon's picture, `ICON` square, from its painted pixels.
-pub(crate) fn icon_image(pixels: Vec<u8>) -> Image {
+pub(crate) fn icon_image(mut pixels: Vec<u8>) -> Image {
     use bevy::asset::RenderAssetUsages;
     use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
     let side = el_client_core::icons::ICON as u32;
+    if pixels.len() == (side * side * 4) as usize {
+        set_in(&mut pixels, side as usize);
+    }
     Image::new(
         Extent3d { width: side, height: side, depth_or_array_layers: 1 },
         TextureDimension::D2,
@@ -2334,6 +2679,16 @@ fn scale(window: Single<&Window>, mut ui: ResMut<UiScale>) {
     let want = want.clamp(0.7, 1.5);
     if ui.0 != want {
         ui.0 = want;
+    }
+}
+
+/// Every tinted control (a button, a tile) wears the skin's finish over its own colours, unless
+/// it was given a plate of its own.
+type Unfinished = (Added<Tint>, Without<MaterialNode<Plate>>);
+
+fn finishes(mut commands: Commands, q: Query<Entity, Unfinished>) {
+    for e in &q {
+        commands.entity(e).insert(skin::finish());
     }
 }
 
