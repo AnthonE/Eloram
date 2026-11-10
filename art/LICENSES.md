@@ -124,6 +124,17 @@ water, wind, bells, glass, starlight, the warnings, the tones, the room, the amb
 synthesised by the tool; ours. Each file below is a mix of those: the recordings layered,
 pitched, filtered and enveloped under the synthesis.
 
+The packs are in the repository (`art/vendor/kenney/`), as Kenney published them, each pinned by
+its hash in `sounds.py`: kenney.nl's downloads now go through a signed link, and the links the
+tool had pinned lead to the packs' pages. Rebuilt from them, every sound they make comes out the
+same bytes as the files shipped.
+
+| Pack | Where it came from |
+|---|---|
+| `kenney_sci-fi-sounds.zip`, `kenney_interface-sounds.zip`, `kenney_casino-audio.zip` | Kenney's own uploads to OpenGameArt ([sci-fi](https://opengameart.org/content/sci-fi-sounds), [interface](https://opengameart.org/content/interface-sounds), [casino](https://opengameart.org/content/54-casino-sound-effects-cards-dice-chips)): the same bytes as kenney.nl's 2023 zips |
+| `kenney_rpg-audio.zip` | Kenney's own OpenGameArt upload ([50 RPG sound effects](https://opengameart.org/content/50-rpg-sound-effects), `RPGsounds_Kenney.zip`), older than kenney.nl's 2023 zip and laid out differently; the same recordings for every sound checked (11 of the 14 used; the other 3 are in sounds that need the impact pack too) |
+| `kenney_impact-sounds.zip` | not in the repository yet ([kenney.nl](https://kenney.nl/assets/impact-sounds) only): the sounds made from it can't be remade until it is |
+
 | Files | Kenney recordings in them (CC0) | Pure synthesis (ours) |
 |---|---|---|
 | `ember.*` | impact (punches), sci-fi (thruster, low explosion, crunch) | `cast`, `windup`, `dash`, `buff`, `ult` |
@@ -141,8 +152,26 @@ pitched, filtered and enveloped under the synthesis.
 | `ui.*`, `ping.*` | Interface (click, tick), Casino (chips, cards, the shuffle) in `ui.click`, `ui.tick`, `ui.buy`, `ui.sell`, `ui.card`, `ui.reroll` | the rest |
 | `amb.wind`, `amb.fire` | none | all |
 
-The announcer's lines (`voice.*`) and the music (`music.*`) are optional lines the tool doesn't
-make; they come with their own licences when they come.
+| `gold.coin`, `takedown.*` | none | all |
+
+The music (`music.*`) is optional: it comes with its own licence when it comes.
+
+## The voices (`web/assets/audio/voice.*`, `vo.*`)
+
+Placeholders, made by `art/tools/voices.py` from the words in `manifest.json` (ours: the
+announcer's in `el_client_core::fx::voice::says`, the champions' scripts in
+`el_client_core::fx::vo`), spoken by [Piper](https://github.com/OHF-Voice/piper1-gpl) (the
+program is GPL-3.0; what it speaks is not the program, and carries the voices' terms below) and
+processed by the tool (pitch, pace, rooms, the families' layers: ours).
+
+| Files | Piper voice | Its data, and licence |
+|---|---|---|
+| `voice.*` (the announcer) | [`en_GB-cori-high`](https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_GB/cori/high) | [LibriVox](https://librivox.org) recordings, public domain |
+| `vo.*` (the champions) | [`en_GB-vctk-medium`](https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_GB/vctk/medium), a speaker each (`voices.py`, `CAST`) | the CSTR VCTK Corpus (Yamagishi, Veaux, MacDonald; the Centre for Speech Technology Research, University of Edinburgh), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): its speakers' voices, attributed here |
+
+`art/voices.lock.json` holds the hash of each placeholder the tool wrote. A recording that
+replaces one (the same `<stem>.ogg` and `<stem>.mp3`) is never written over, and gets its own line
+here, with its actor and its terms, when it comes.
 
 ## The effects' flipbooks (`web/assets/fx/`)
 

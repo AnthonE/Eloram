@@ -24,6 +24,7 @@ mod front;
 mod fx;
 mod ground;
 mod hud;
+mod hud_banner;
 mod hud_death;
 mod hud_first;
 mod hud_lobby;

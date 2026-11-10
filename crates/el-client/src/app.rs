@@ -14,6 +14,7 @@ use crate::front::FrontPlugin;
 use crate::fx::FxPlugin;
 use crate::ground::GroundPlugin;
 use crate::hud::HudPlugin;
+use crate::hud_banner::BannerPlugin;
 use crate::hud_death::DeathPlugin;
 use crate::hud_first::FirstPlugin;
 use crate::hud_lobby::LobbyPlugin;
@@ -162,7 +163,7 @@ pub fn run(cfg: LaunchConfig) {
         FramePlugin,
         WarmPlugin,
     ))
-    .add_plugins(TrailsPlugin);
+    .add_plugins((TrailsPlugin, BannerPlugin));
     #[cfg(target_arch = "wasm32")]
     app.add_plugins(AnimStagePlugin);
     #[cfg(not(target_arch = "wasm32"))]

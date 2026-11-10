@@ -9,7 +9,7 @@
 //! screen is dulled; RBJ's, as Web Audio's `BiquadFilterNode`, its Q 1 dB) → its gain, eased as
 //! `setTargetAtTime` eases → an equal-power stereo panner (Web Audio's `StereoPannerNode`'s
 //! formula) → the front of the effects bus, its back (which ducks under a big moment), or a bus of
-//! its own; then the five buses → the master → a limiter (−6 dB, a knee of 4, 14:1, 2 ms in,
+//! its own; then the six buses → the master → a limiter (−6 dB, a knee of 4, 14:1, 2 ms in,
 //! 120 ms out) → the speakers.
 
 use std::f32::consts::FRAC_PI_2;
@@ -17,8 +17,8 @@ use std::sync::Arc;
 
 /// Frames rendered at a time.
 pub const BLOCK: usize = 128;
-/// Buses: effects, voice, interface, ambience, music (`sound::Bus::ALL`'s order).
-pub const BUSES: usize = 5;
+/// Buses, in `sound::Bus::ALL`'s order (the effects first: its front and back mix into it).
+pub const BUSES: usize = super::sound::Bus::ALL.len();
 
 /// A sound's samples, decoded: interleaved, one or two channels.
 #[derive(Debug)]

@@ -149,6 +149,10 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   expect(s.fx_cues).toBeGreaterThan(20);
   expect(s.audio_played).toBeGreaterThan(5);
   expect(s.audio_failed).toBe(0);
+  // The voices: the announcer's lines shown as they're said (the welcome, the minions' march),
+  // and the champion heard (its pick line as champion select deals it, a line as it walks).
+  expect(s.banner_shown).toBeGreaterThan(0);
+  expect(s.vo_lines).toBeGreaterThan(0);
   expect(s.errors).toBe(0);
   expect(s.datagrams).toBeGreaterThan(600);
   expect(s.orders_unacked).toBeLessThanOrEqual(2);

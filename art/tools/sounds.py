@@ -6,7 +6,7 @@ elemental and magical layers (fire, water, wind, bells, glass partials, starligh
 are synthesised here. Each sound is layered, pitched, filtered and enveloped, put in one shared
 small room (effects; the interface stays dry), trimmed to its onset and levelled by bus.
 
-    python3 -I art/tools/sounds.py [--cache dir] [--sheets dir] [--only prefix]
+    python3 -I art/tools/sounds.py [--cache dir] [--sheets dir] [--only prefix,...]
 
 Writes web/assets/audio/<stem>.ogg (Opus in Ogg, 48 kHz, 64 kb/s mono or 96 kb/s stereo) and
 <stem>.mp3 (LAME VBR -q:a 5), then decodes every file back and prints a report (duration, true
@@ -15,9 +15,11 @@ the wrong channels or rate, a peak over -1 dBFS, more than half again its stated
 past 5 ms, a level off its bus's target, or either format's whole set past 3 MiB. With --sheets,
 a spectrogram contact sheet per family and one for the rest go in that directory (not shipped).
 
-The packs are downloaded once into the cache (default art/cache/sounds/, not in git), checked
-against their hashes and their licence files (CC0), and each extracted into its own directory;
-nothing in them is run. Every random choice comes from a generator seeded by the take's name, so
+The packs are in the repository (art/vendor/kenney/, CC0: kenney.nl's links now go through a
+signed download, so the tool no longer fetches them), checked against their hashes and their
+licence files (CC0), and each extracted into its own directory in the cache (default
+art/cache/sounds/, not in git); nothing in them is run. A pack that isn't there fails only the
+sounds made from it. Every random choice comes from a generator seeded by the take's name, so
 a run makes the same files every time. Needs numpy, Pillow (for --sheets) and an ffmpeg with
 libopus and libmp3lame.
 """
@@ -30,7 +32,6 @@ import re
 import shutil
 import subprocess
 import sys
-import urllib.request
 import zipfile
 import zlib
 from concurrent.futures import ThreadPoolExecutor
@@ -42,20 +43,21 @@ AUDIO = os.path.join(ROOT, "web", "assets", "audio")
 SR = 48000
 
 # ---------------------------------------------------------------------------------------------
-# Sources: Kenney's packs, pinned by URL and hash.
+# Sources: Kenney's packs, in the repository (art/vendor/kenney/kenney_<slug>.zip) as Kenney
+# published them, pinned by hash, with the folder their recordings are in (art/LICENSES.md says
+# where each came from).
 
-KENNEY = "https://kenney.nl/media/pages/assets"
+VENDOR = os.path.join(ROOT, "art", "vendor", "kenney")
 PACKS = {
-    "impact": ("impact-sounds", "87b4ddecda-1677589768",
-               "029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8"),
-    "rpg": ("rpg-audio", "8e99002d76-1677590336",
-            "6dbeaf8544da958d8f2adcb4a4a4b76c1ade34a05f8ab9edccd327da7375f38b"),
-    "scifi": ("sci-fi-sounds", "6b296f9ecf-1677589334",
-              "119340f351a5098ad814f78719438c0da355a9ce8a4c8a3af6a8d48aa3d49e04"),
-    "casino": ("casino-audio", "2472606a04-1721639069",
-               "f36250766ac5bc378c13708ddf12a23a8e54a3251f8d482c7536e51b5dbafa18"),
-    "interface": ("interface-sounds", "fa43c1dd4d-1677589452",
-                  "f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232"),
+    "impact": ("impact-sounds", "029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8", "Audio"),
+    # Kenney's own OpenGameArt upload of the pack: older than kenney.nl's 2023 zip and laid out
+    # differently, the same recordings (rebuilt from it, every sound made from it came out the
+    # same bytes as from the 2023 zip).
+    "rpg": ("rpg-audio", "3ae398ad63e293f9c450bda22d5d81c3af69c74df66fc1400f33c012c0bbc231", "OGG"),
+    "scifi": ("sci-fi-sounds", "119340f351a5098ad814f78719438c0da355a9ce8a4c8a3af6a8d48aa3d49e04", "Audio"),
+    "casino": ("casino-audio", "f36250766ac5bc378c13708ddf12a23a8e54a3251f8d482c7536e51b5dbafa18", "Audio"),
+    "interface": ("interface-sounds", "f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232",
+                  "Audio"),
 }
 
 
@@ -114,7 +116,7 @@ BANK = {
 
 
 class Sources:
-    """The packs, fetched and checked once, and their recordings decoded on demand."""
+    """The packs, checked and extracted once, and their recordings decoded on demand."""
 
     def __init__(self, cache):
         self.cache = cache
@@ -124,22 +126,15 @@ class Sources:
     def pack(self, key):
         if key in self.dirs:
             return self.dirs[key]
-        slug, ver, sha = PACKS[key]
+        slug, sha, _ = PACKS[key]
         os.makedirs(self.cache, exist_ok=True)
-        z = os.path.join(self.cache, f"kenney_{slug}.zip")
+        z = os.path.join(VENDOR, f"kenney_{slug}.zip")
         if not os.path.isfile(z):
-            url = f"{KENNEY}/{slug}/{ver}/kenney_{slug}.zip"
-            print("fetching", url, flush=True)
-            data = urllib.request.urlopen(url, timeout=180).read()
-            if hashlib.sha256(data).hexdigest() != sha:
-                sys.exit(f"{url}: not the pack we pinned (sha256 differs)")
-            with open(z + ".part", "wb") as f:
-                f.write(data)
-            os.replace(z + ".part", z)
-        else:
-            with open(z, "rb") as f:
-                if hashlib.sha256(f.read()).hexdigest() != sha:
-                    sys.exit(f"{z}: not the pack we pinned; delete it to fetch again")
+            # Only what's made from it fails.
+            raise OSError(f"{os.path.relpath(z, ROOT)} isn't there (Kenney's {slug}, CC0)")
+        with open(z, "rb") as f:
+            if hashlib.sha256(f.read()).hexdigest() != sha:
+                sys.exit(f"{z}: not the pack we pinned (sha256 differs)")
         d = os.path.join(self.cache, slug)
         if not os.path.isdir(d):
             # A fresh directory of its own, renamed into place once whole.
@@ -148,7 +143,8 @@ class Sources:
             os.makedirs(tmp)
             with zipfile.ZipFile(z) as zf:
                 zf.extractall(tmp)
-            lic = open(os.path.join(tmp, "License.txt"), encoding="utf-8", errors="replace").read()
+            name = next((f for f in os.listdir(tmp) if f.lower() == "license.txt"), "License.txt")
+            lic = open(os.path.join(tmp, name), encoding="utf-8", errors="replace").read()
             if "CC0" not in lic or "publicdomain/zero" not in lic:
                 sys.exit(f"{slug}: its licence file doesn't say CC0")
             os.replace(tmp, d)
@@ -162,7 +158,7 @@ class Sources:
         key = (pack, stem)
         if key not in self.decoded:
             d = self.pack(pack)
-            path = os.path.realpath(os.path.join(d, "Audio", stem + ".ogg"))
+            path = os.path.realpath(os.path.join(d, PACKS[pack][2], stem + ".ogg"))
             if not path.startswith(os.path.realpath(d) + os.sep) or not os.path.isfile(path):
                 sys.exit(f"{pack}: no {stem}.ogg")
             x = decode(path, 1)[:, 0]
@@ -2123,6 +2119,61 @@ def notes_seq(n, seq, kind="bell", tau=0.3, gains=None):
     return out
 
 
+def gold_coin(n, rng, f0, tau=0.1):
+    """One coin's plink: its partials, a hair of a tick on its strike."""
+    c = coin(n, rng, f0, tau)
+    tick = ffilt(white(T(0.003), rng), lambda q: hp(q, 5000, 2)) * np.exp(-tt(T(0.003)) / 0.0006)
+    return unit(c) + 0.15 * at(n, unit(tick), 0)
+
+
+@sound("gold.coin")
+def _(v):
+    # A last hit's gold: one bright coin, and a second, smaller one a moment after. The take
+    # moves its pitch a little (the mixer draws another each time).
+    r, n = v.rng, T(0.3)
+    f = 3150 * v.j(0.03)
+    return gold_coin(n, r, f, 0.11) + 0.4 * at(n, gold_coin(T(0.2), r, f * 1.335, 0.06), 0.04)
+
+
+def takedown(v, k):
+    """A kill, the k-th close together: a punchy low hit, k bell notes climbing an arpeggio, more
+    coins each time; the fifth rings out in a chord (Riot's kill and takedown sounds, patch 25.11:
+    for the player alone, climbing with the multikill)."""
+    r = v.rng
+    n = T([0.8, 0.9, 1.0, 1.1, 1.4][k - 1])
+    out = np.zeros(n)
+    hit = thump(T(0.4), 150 + 12 * k, 48, 0.006, 0.09 + 0.02 * k, click=0.35, rng=r)
+    body = ffilt(pink(T(0.12), r), lambda q: lp(q, 1800, 2)) * np.exp(-tt(T(0.12)) / 0.03)
+    place(out, unit(hit), 0, 0.85 + 0.04 * k)
+    place(out, unit(body), 0, 0.25)
+    arp = [0, 4, 7, 12, 16]
+    seq = [(mf(74 + arp[i]), 0.05 + 0.075 * i) for i in range(k)]
+    bells = notes_seq(n, seq, "bell", 0.28 + 0.05 * k, [0.55 + 0.1 * i for i in range(k)])
+    out += 0.75 * unit(bells)
+    if k == 5:
+        ring = notes_seq(n, [(mf(86), 0.42), (mf(90), 0.42), (mf(93), 0.42)], "bell", 0.6, [0.5, 0.4, 0.35])
+        out += 0.45 * unit(ring)
+    for i in range(2 + 3 * k):
+        when = 0.07 + r.uniform(0, 0.2 + 0.08 * k)
+        place(out, gold_coin(T(0.22), r, r.uniform(2700, 3900), r.uniform(0.05, 0.09)), when,
+              r.uniform(0.12, 0.28))
+    return out
+
+
+for _k in range(1, 6):
+    sound(f"takedown.x{_k}")(lambda v, k=_k: takedown(v, k))
+
+
+@sound("takedown.assist")
+def _(v):
+    r, n = v.rng, T(0.6)
+    bells = notes_seq(n, [(mf(79), 0.0), (mf(86), 0.07)], "bell", 0.3, [0.6, 0.8])
+    out = 0.7 * unit(bells)
+    for when in (0.08, 0.17):
+        place(out, gold_coin(T(0.2), r, r.uniform(2800, 3500), 0.07), when, 0.25)
+    return out
+
+
 @sound("ui.click")
 def _(v):
     n = T(0.07)
@@ -2720,7 +2771,11 @@ def render(d, k):
 
 def job(args):
     d, k = args
-    y = render(d, k)
+    try:
+        y = render(d, k)
+    except OSError as e:
+        # A pack it's made from isn't there: its files are left as they are.
+        return d["name"], k, None, str(e)
     rows, decoded = write_take(y, d["files"][k], d)
     return d["name"], k, rows, spectrogram(decoded)
 
@@ -2730,24 +2785,29 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cache", default=os.path.join(ROOT, "art", "cache", "sounds"))
     ap.add_argument("--sheets", default=None)
-    ap.add_argument("--only", default=None, help="make only the sounds whose names start so")
+    ap.add_argument("--only", default=None,
+                    help="make only the sounds whose names start so (several, comma-separated)")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 1)
     a = ap.parse_args()
     man = json.load(open(os.path.join(AUDIO, "manifest.json"), encoding="utf-8"))
     sounds = [d for d in man["sounds"] if not d["optional"]]
     SRC = Sources(a.cache)
-    # Every pack, once, before the work is shared out; making only some sounds, a pack is fetched
-    # when one of them asks for it (a sound made from nothing needs none).
-    if a.only is None:
-        for p in PACKS:
+    for p in PACKS:
+        # Checked and extracted once here, before the workers fork; one that isn't there is only
+        # a problem for the sounds made from it (they fail when they ask for it).
+        try:
             SRC.pack(p)
+        except OSError as e:
+            print(f"the {p} pack: {e}; the sounds made from it will fail", flush=True)
     ROOM = make_room(np.random.default_rng(7))
+    only = None if a.only is None else tuple(a.only.split(","))
     todo = [(d, k) for d in sounds for k in range(d["takes"])
-            if a.only is None or d["name"].startswith(a.only)]
+            if only is None or d["name"].startswith(only)]
     import multiprocessing as mp
     with mp.get_context("fork").Pool(a.jobs) as pool:
         done = pool.map(job, todo, chunksize=1)
-    by = {(name, k): (rows, img) for name, k, rows, img in done}
+    by = {(name, k): (rows, img) for name, k, rows, img in done if rows is not None}
+    unmade = sorted({f"{name}: not made ({why})" for name, k, rows, why in done if rows is None})
 
     # The report.
     bad = []
@@ -2788,6 +2848,7 @@ def main():
         print(f"{fmt}: {b / 2 ** 20:.2f} MiB")
         if b > 3 * 2 ** 20:
             bad.append(f"the {fmt} set is {b / 2 ** 20:.2f} MiB, over 3")
+    bad += unmade
     if a.sheets:
         os.makedirs(a.sheets, exist_ok=True)
         groups = {}
