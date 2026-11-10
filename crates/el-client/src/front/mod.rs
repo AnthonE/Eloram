@@ -12,6 +12,7 @@
 //! camera at a time (the menu's own 2D one), as Gates draws it.
 
 mod elo;
+pub mod report;
 pub mod ui;
 
 use bevy::prelude::*;
@@ -130,6 +131,7 @@ enum Pick {
     PartyDecline(u32),
     PartyLeave,
     Friend(elo::FriendPick),
+    Report,
 }
 
 #[derive(Component)]
@@ -388,6 +390,7 @@ fn act(
         Pick::PartyDecline(leader) => controls.lobby.push(ToServer::PartyDecline { leader }),
         Pick::PartyLeave => controls.lobby.push(ToServer::PartyLeave),
         Pick::Friend(p) => elo::pick(front, p, controls),
+        Pick::Report => report::ask(),
         Pick::Profile => {
             let Some(id) = front.who.id.as_deref() else {
                 front.status = "Sign in to see your Elo Pros profile.".into();
@@ -922,6 +925,7 @@ fn footer(c: &mut Commands, front: &Front) -> Entity {
         children![
             strong(format!("Eloram {}", crate::build_name()), 14.0, FAINT),
             strong("Elo Pros", 14.0, DIM),
+            (ui::button("REPORT A BUG (F8)", 0.0, false), Pick::Report),
             ui::spacer(),
             label(front.status.clone(), 14.0, DIM),
             strong(

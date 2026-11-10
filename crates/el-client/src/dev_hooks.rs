@@ -320,6 +320,16 @@ enum Cmd {
     Fog {
         on: bool,
     },
+    /// The HUD (every screen-space node) drawn or not: the world alone, for the menu's backdrop.
+    Hud {
+        on: bool,
+    },
+    /// A bug report filed as if typed into the panel (F8), to the intake (`EL_BUGS_URL` on the
+    /// desktop: tests never file a real one).
+    Report {
+        title: String,
+        text: Option<String>,
+    },
     /// A volume, as the menu's Sound page sets it (`menu.rs`): `"master"` or a bus's name (`effects`, `voice`, `ui`,
     /// `ambience`, `music`), 0 to 1.
     Volume {
@@ -365,13 +375,31 @@ pub struct InboxPlugin;
 
 impl Plugin for InboxPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.init_resource::<HudHidden>().add_systems(
             Update,
             (
                 inbox.after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send),
                 match_status.after(crate::net::NetSet::Send),
+                hide_hud.after(crate::net::NetSet::Send),
             ),
         );
+    }
+}
+
+/// The HUD hidden by `{t:"hud",on:false}`.
+#[derive(Resource, Default)]
+struct HudHidden(bool);
+
+/// While the HUD is hidden, every UI root is (spawned later or not).
+fn hide_hud(hidden: Res<HudHidden>, mut roots: Query<&mut Visibility, (With<Node>, Without<ChildOf>)>) {
+    if !hidden.0 && !hidden.is_changed() {
+        return;
+    }
+    let want = if hidden.0 { Visibility::Hidden } else { Visibility::Inherited };
+    for mut v in &mut roots {
+        if *v != want {
+            *v = want;
+        }
     }
 }
 
@@ -390,6 +418,7 @@ fn inbox(
     mut read: Local<u64>,
     mut front: ResMut<crate::front::Front>,
     mut session: ResMut<crate::session::Session>,
+    mut hud: ResMut<HudHidden>,
 ) {
     use el_client_core::lobby::ToServer;
     use el_proto::{Aim, Order, UnitRef};
@@ -453,6 +482,14 @@ fn inbox(
             }
             Cmd::Fog { on } => {
                 look.fog = on;
+                continue;
+            }
+            Cmd::Hud { on } => {
+                hud.0 = !on;
+                continue;
+            }
+            Cmd::Report { title, text } => {
+                crate::front::report::fill_and_send(title, text.unwrap_or_default());
                 continue;
             }
             Cmd::Volume { bus, v } => {

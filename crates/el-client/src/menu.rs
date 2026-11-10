@@ -99,6 +99,8 @@ enum Do {
     Mute,
     /// Out of the match (or practice) for good, back to the main menu: two presses.
     Leave,
+    /// REPORT A BUG (F8).
+    Report,
 }
 
 /// The menu: the world dimmed, the panel in the middle.
@@ -294,6 +296,7 @@ fn setup(mut commands: Commands) {
             r.spawn((button_node(Do::Leave, percent(100), OFF), LeaveButton)).with_children(|b| {
                 b.spawn((text("LEAVE MATCH", 14.0, TEXT), Words::Leave));
             });
+            r.spawn(button(Do::Report, "REPORT A BUG (F8)", percent(100), OFF));
             r.spawn(button(Do::Resume, "RESUME", percent(100), ON));
             r.spawn((
                 text("Esc closes it", 11.0, DIM),
@@ -534,6 +537,10 @@ fn press(
                 audio.muted = !audio.muted;
                 audio.save();
             }
+            Do::Report => {
+                menu.show(false);
+                crate::front::report::ask();
+            }
             Do::Leave if !menu.leave_armed => menu.leave_armed = true,
             Do::Leave => {
                 if in_match(session.phase) {
@@ -634,7 +641,7 @@ fn show(
             Do::Low(low) => prefs.low_next == low,
             Do::Mute => audio.muted,
             Do::Leave => menu.leave_armed,
-            Do::Resume | Do::Reload => continue,
+            Do::Resume | Do::Reload | Do::Report => continue,
         };
         let base = if lit { ON } else { OFF };
         if tint.0 != base {

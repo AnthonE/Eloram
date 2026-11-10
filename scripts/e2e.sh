@@ -3,6 +3,7 @@
 #   scripts/e2e.sh spike [project]   # transport smoke test: echo, then the game's Hello and Welcome
 #   scripts/e2e.sh match [project]   # a match from the queue against the server's bots
 #   scripts/e2e.sh menu [project]    # the main menu: its pages, PLAY, LEAVE MATCH back to it
+#   scripts/e2e.sh backdrop [project] # the menu's backdrop shot from a match (art/tools/menu_backdrop.py)
 #   scripts/e2e.sh watch [project]   # an agent's match watched live from its record, then replayed
 #   scripts/e2e.sh login [project]   # wallet sign-in with a stub wallet, /online.json, the resume token
 #   scripts/e2e.sh art [project]     # the map's look: the camera over each place, pictures in artifacts/
@@ -47,7 +48,7 @@ case "$suite" in
     pids+=($!)
     export EL_GAME_URL="http://127.0.0.1:$((port + 1))"
     ;;
-  match|art|draws|menu)
+  match|art|draws|menu|backdrop)
     # Bots take the empty seats a second after the first player queues. Champion select runs 45 s,
     # not 20 (it ends once everyone is ready): software rendering stalls on its first frames.
     server --mode game --fill-after 1 --select-secs 45 --http "127.0.0.1:${port}" --wt-port "$wt" &

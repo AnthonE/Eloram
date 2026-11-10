@@ -153,6 +153,7 @@ pub fn run(cfg: LaunchConfig) {
         StagePlugin,
         BenchPlugin,
         FrontPlugin,
+        crate::front::report::ReportPlugin,
     ));
     #[cfg(not(target_arch = "wasm32"))]
     app.add_plugins(crate::desktop::DesktopPlugin);

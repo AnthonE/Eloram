@@ -287,7 +287,10 @@ pub fn fetch(req: Req) -> Slot {
 /// The same, waited for (on a thread that may wait).
 pub fn fetch_blocking(req: &Req) -> super::Answer {
     let resp = match &req.post {
-        Some(body) => agent().post(&req.url).header("content-type", "application/json").send(&body[..]),
+        Some(body) => agent()
+            .post(&req.url)
+            .header("content-type", if req.plain { "text/plain" } else { "application/json" })
+            .send(&body[..]),
         None => agent().get(&req.url).call(),
     };
     let mut resp = resp.map_err(|e| format!("{}: {e}", req.url))?;
@@ -312,6 +315,41 @@ pub(crate) fn answer_error(status: u16, body: &[u8]) -> String {
     match said {
         Some(w) => format!("{status}: {w}"),
         None => format!("HTTP {status}"),
+    }
+}
+
+/// Where a crash's note goes (`desktop.rs`'s panic hook): `$ELO_CRASH_DIR`, else `crashes/` in
+/// the settings' folder.
+pub fn crash_dir() -> Option<PathBuf> {
+    env_dir("ELO_CRASH_DIR").or_else(|| config_dir().map(|d| d.join("crashes")))
+}
+
+/// The newest crash note the last run left and nobody has sent or put away, with its words.
+pub fn last_crash() -> Option<(PathBuf, String)> {
+    let dir = crash_dir()?;
+    let mut notes: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("eloram-") && n.ends_with(".txt"))
+                && !p.file_name().is_some_and(|n| n == "eloram-missing-library.txt")
+        })
+        .collect();
+    notes.sort();
+    let newest = notes.pop()?;
+    let words = std::fs::read_to_string(&newest).ok()?;
+    Some((newest, words))
+}
+
+/// A crash note sent or put away: into `crashes/sent/`, never offered again.
+pub fn put_away_crash(path: &std::path::Path) {
+    let Some(dir) = path.parent().map(|d| d.join("sent")) else { return };
+    let _ = std::fs::create_dir_all(&dir);
+    if let Some(name) = path.file_name() {
+        let _ = std::fs::rename(path, dir.join(name));
     }
 }
 

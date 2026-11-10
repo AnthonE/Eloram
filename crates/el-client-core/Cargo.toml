@@ -14,6 +14,7 @@ el-sim.workspace = true
 glam.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+base64 = "0.22"
 
 # The prediction steps the server's own code, so it must take the same bits. The server builds
 # with glam's scalar maths (`el-sim/deterministic`); the clients can't (Bevy's glam won't take

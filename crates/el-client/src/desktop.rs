@@ -10,12 +10,7 @@ use crate::config::native::{Parsed, USAGE, parse};
 
 /// Where a crash's note goes: the launcher's folder for it (`ELO_CRASH_DIR`, which it offers to
 /// send after an abnormal exit), else the config directory's `crashes/`.
-fn crash_dir() -> Option<PathBuf> {
-    std::env::var_os("ELO_CRASH_DIR")
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| crate::platform::config_dir().map(|d| d.join("crashes")))
-}
+use crate::platform::crash_dir;
 
 /// The build's name: the version and the commit it was built from (`build.rs`).
 pub const BUILD: &str = env!("EL_BUILD");

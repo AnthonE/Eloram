@@ -5,6 +5,7 @@
 //! checks the copies). After Gates' (`AnthonE/Gates`, MIT, `crates/client/src/friends.rs`,
 //! `profile.rs`, `report.rs`), for wallets of either chain.
 
+pub mod bugs;
 pub mod face;
 pub mod friends;
 pub mod profile;

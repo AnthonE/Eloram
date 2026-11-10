@@ -76,6 +76,8 @@ web-sys = { workspace = true, features = [
 ] }
 web-transport-wasm.workspace = true
 console_error_panic_hook.workspace = true
+# The bug report's picture, as a PNG (`front/report.rs`); the version Bevy already builds.
+image = { version = "0.25", default-features = false, features = ["png"] }
 futures.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

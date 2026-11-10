@@ -148,7 +148,7 @@ async fn fetch_now(req: &Req) -> super::Answer {
     if let Some(body) = &req.post {
         init.set_method("POST");
         let headers = web_sys::Headers::new().map_err(|_| "headers")?;
-        let _ = headers.set("content-type", "application/json");
+        let _ = headers.set("content-type", if req.plain { "text/plain" } else { "application/json" });
         init.set_headers(&headers);
         init.set_body(&js_sys::Uint8Array::from(body.as_slice()));
     }
@@ -186,3 +186,10 @@ pub(crate) fn answer_error(status: u16, body: &[u8]) -> String {
 pub fn spawn(f: impl std::future::Future<Output = ()> + 'static) {
     wasm_bindgen_futures::spawn_local(f);
 }
+
+/// A page leaves no crash notes (the browser's console has the panic).
+pub fn last_crash() -> Option<(std::path::PathBuf, String)> {
+    None
+}
+
+pub fn put_away_crash(_path: &std::path::Path) {}

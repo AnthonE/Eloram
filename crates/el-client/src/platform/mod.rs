@@ -50,19 +50,27 @@ pub struct Req {
     pub url: String,
     pub post: Option<Vec<u8>>,
     pub cap: usize,
+    /// The body is sent as `text/plain` (a page on another origin then posts it without a
+    /// preflight; the bug intake reads any).
+    pub plain: bool,
 }
 
 impl Req {
     pub fn get(url: impl Into<String>) -> Self {
-        Self { url: url.into(), post: None, cap: 256 * 1024 }
+        Self { url: url.into(), post: None, cap: 256 * 1024, plain: false }
     }
 
     pub fn post(url: impl Into<String>, json: Vec<u8>) -> Self {
-        Self { url: url.into(), post: Some(json), cap: 256 * 1024 }
+        Self { url: url.into(), post: Some(json), cap: 256 * 1024, plain: false }
     }
 
     pub fn cap(mut self, cap: usize) -> Self {
         self.cap = cap;
+        self
+    }
+
+    pub fn text(mut self) -> Self {
+        self.plain = true;
         self
     }
 }
