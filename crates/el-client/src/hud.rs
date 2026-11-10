@@ -36,6 +36,8 @@ pub(crate) const PANEL: Color = Color::srgba(0.035, 0.045, 0.07, 0.90);
 /// The frames' bronze, and a slot's well.
 pub(crate) const FRAME: Color = Color::srgb(0.47, 0.39, 0.24);
 pub(crate) const WELL: Color = Color::srgb(0.07, 0.08, 0.11);
+/// A sunk well's floor.
+const WELL_DEEP: Color = Color::srgb(0.030, 0.036, 0.054);
 /// The trinket's well: a little warmer than an item's.
 const TREAT_WELL: Color = Color::srgb(0.16, 0.11, 0.07);
 pub(crate) const TRIM: Color = Color::srgb(0.78, 0.64, 0.36);
@@ -287,7 +289,7 @@ impl Plugin for HudPlugin {
                 Update,
                 (
                     (press, minimap).after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send),
-                    (texts, fills, meters, danger, panels, dots, view_box, tooltip)
+                    (texts, fills, meters, danger, center_line, panels, dots, view_box, tooltip)
                         .after(crate::net::NetSet::Send),
                     (
                         scale,
@@ -549,7 +551,7 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
                         border_radius: BorderRadius::all(px(2)),
                         ..default()
                     },
-                    skin::plate(plates::WELL),
+                    sunk(),
                     children![(text("0:00", 17.0, GOLD), Label::Clock)],
                 ),
                 (
@@ -599,15 +601,16 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
             ),
         ],
     ));
-    // The middle line.
+    // The middle line: over the map's middle, or under the augment cards while they're up.
     commands.spawn((
         Node {
             position_type: PositionType::Absolute,
-            top: percent(28),
+            top: percent(CENTER_AT[0]),
             width: percent(100),
             justify_content: JustifyContent::Center,
             ..default()
         },
+        CenterLine,
         children![(
             title("", 30.0, Color::srgb(1.0, 0.95, 0.84)),
             TextLayout::justify(Justify::Center),
@@ -886,7 +889,6 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
             },
             BorderColor::all(skin::BRONZE_HI),
             BackgroundColor(WELL),
-            MaterialNode(plates::FINISH_PICTURE),
             Portrait(None),
             children![
                 (text("", 26.0, TEXT), outline(), Label::Initials),
@@ -974,7 +976,7 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                 border_radius: BorderRadius::all(px(3)),
                 ..default()
             },
-            skin::plate(plates::WELL),
+            sunk(),
         ))
         .add_children(&cells)
         .id();
@@ -1023,8 +1025,9 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                         overflow: Overflow::clip(),
                         ..default()
                     },
-                    skin::plate(plates::WELL),
-                    skin::Press { idle: plates::WELL, over: plates::WELL_OVER, down: plates::WELL },
+                    sunk(),
+                    Tint(WELL_DEEP),
+                    Bare,
                     Act::Sell(k as u8),
                     Tip::Item(k),
                     children![
@@ -1075,7 +1078,7 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                 border_radius: BorderRadius::all(px(3)),
                 ..default()
             },
-            skin::plate(plates::WELL),
+            sunk(),
             children![(text("", 16.0, GOLD), outline(), Label::Gold)],
         ))
         .id();
@@ -1096,7 +1099,6 @@ fn bottom(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
             },
             BorderColor::all(Color::srgb(0.42, 0.32, 0.18)),
             BackgroundColor(TREAT_WELL),
-            skin::finish(),
             Tip::Trinket,
             children![
                 (text("", 11.0, TEXT), outline(), Label::Treats),
@@ -1167,6 +1169,7 @@ fn ability_slot(commands: &mut Commands, k: usize) -> Entity {
             BorderColor::all(GOLD),
             BackgroundColor(BUTTON_GOLD),
             Tint(BUTTON_GOLD),
+            Bare,
             Visibility::Hidden,
             LevelUp(k),
             Act::Level(k as u8),
@@ -1305,7 +1308,6 @@ fn allies(commands: &mut Commands, portrait: &crate::portrait::PortraitImage) {
                     },
                     BorderColor::all(FRAME),
                     BackgroundColor(WELL),
-                    MaterialNode(plates::FINISH_PICTURE),
                     Portrait(Some(i)),
                     children![
                         (text("", 14.0, TEXT), outline(), Label::AllyInitials(i)),
@@ -2146,6 +2148,27 @@ fn fills(session: Res<Session>, mut q: Query<(&Fill, &mut Node)>) {
     }
 }
 
+/// Where the middle line sits (percent down the screen): at rest, and while the augment cards
+/// are up (the headliner is said as the first cards come: under them, not behind them).
+const CENTER_AT: [f32; 2] = [28.0, 70.0];
+
+/// The middle line's place.
+#[derive(Component)]
+struct CenterLine;
+
+fn center_line(session: Res<Session>, mut q: Query<&mut Node, With<CenterLine>>) {
+    let cards = session
+        .client
+        .as_deref()
+        .is_some_and(|c| c.started() && session.phase == Phase::Playing && c.pred.champs[c.seat].screen.open);
+    let want = percent(CENTER_AT[usize::from(cards)]);
+    for mut node in &mut q {
+        if node.top != want {
+            node.top = want;
+        }
+    }
+}
+
 /// The screen's edge in red while the champion is alive and under [`LOW_HP`] of its health.
 #[derive(Component)]
 struct Danger;
@@ -2685,14 +2708,26 @@ fn scale(window: Single<&Window>, mut ui: ResMut<UiScale>) {
     }
 }
 
+/// A tinted control that wears no finish: its own colours are all it is (a slot among six, a
+/// mark over an ability: a finish is a draw each, and these are on the screen all match).
+#[derive(Component)]
+struct Bare;
+
 /// Every tinted control (a button, a tile) wears the skin's finish over its own colours, unless
-/// it was given a plate of its own.
-type Unfinished = (Added<Tint>, Without<MaterialNode<Plate>>);
+/// it was given a plate of its own or is [`Bare`].
+type Unfinished = (Added<Tint>, Without<MaterialNode<Plate>>, Without<Bare>);
 
 fn finishes(mut commands: Commands, q: Query<Entity, Unfinished>) {
     for e in &q {
         commands.entity(e).insert(skin::finish());
     }
+}
+
+/// A well sunk into its panel, in plain nodes (they batch, where a plate is a draw of its own):
+/// the dark along its top and left, the light on its lower lip.
+pub(crate) fn sunk() -> (BorderColor, BackgroundColor) {
+    let (dark, light) = (Color::srgb(0.012, 0.015, 0.024), Color::srgb(0.26, 0.23, 0.17));
+    (BorderColor { top: dark, left: dark, bottom: light, right: light }, BackgroundColor(WELL_DEEP))
 }
 
 /// A button lighter under the cursor, darker pressed.

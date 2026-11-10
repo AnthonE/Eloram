@@ -206,8 +206,6 @@ pub mod plates {
     pub const SOFT: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a05");
     /// A tooltip: dense, a thin bright rim.
     pub const TIP: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a06");
-    /// A well: a slot sunk into its panel, the light on its lower lip.
-    pub const WELL: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a07");
     /// An ability's frame: ready (ember, breathing), cooling down (iron), short of mana (blue),
     /// not learned (dark).
     pub const SLOT_READY: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a08");
@@ -226,14 +224,11 @@ pub mod plates {
     /// A thin rim, a wide one, and one for a picture (no gloss over it, a shade round its edge).
     pub const FINISH: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a10");
     pub const FINISH_WIDE: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a11");
-    pub const FINISH_PICTURE: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a12");
     /// The menu's panel and its wider pane: slate that lets the backdrop through.
     pub const MENU_PANEL: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a13");
     pub const MENU_PANE: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a14");
     /// The pane with no panel beside it: every corner cut.
     pub const MENU_ALONE: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a16");
-    /// A well under the pointer.
-    pub const WELL_OVER: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a17");
     /// An ally's row, against the screen's left: its right corners cut.
     pub const ALLY: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a18");
     /// An augment's card: a tall control's light, a sheen crossing it now and then.
@@ -326,35 +321,6 @@ fn styles() -> Vec<(Handle<Plate>, Make)> {
             .cut(7.0, 0.0, 7.0, 0.0),
         ),
         (
-            WELL,
-            Make {
-                top: Color::srgb(0.022, 0.027, 0.042),
-                bottom: Color::srgb(0.055, 0.066, 0.095),
-                // Sunk: the dark on top, the light on the lower lip.
-                rim_hi: Color::srgb(0.09, 0.10, 0.13),
-                rim_lo: Color::srgb(0.30, 0.27, 0.20),
-                rim: 1.0,
-                grain: 0.06,
-                shade: 0.45,
-                lip: 0.0,
-                ..slate
-            },
-        ),
-        (
-            WELL_OVER,
-            Make {
-                top: Color::srgb(0.06, 0.07, 0.10),
-                bottom: Color::srgb(0.11, 0.125, 0.17),
-                rim_hi: Color::srgb(0.20, 0.19, 0.17),
-                rim_lo: BRONZE_HI,
-                rim: 1.0,
-                grain: 0.06,
-                shade: 0.3,
-                lip: 0.0,
-                ..slate
-            },
-        ),
-        (
             ALLY,
             Make {
                 top: Color::srgba(0.05, 0.062, 0.09, 0.86),
@@ -436,7 +402,6 @@ fn styles() -> Vec<(Handle<Plate>, Make)> {
                 ..finish(2.0, 0.02, 0.0)
             },
         ),
-        (FINISH_PICTURE, finish(2.0, 0.0, 0.0)),
         (
             MENU_PANEL,
             Make {

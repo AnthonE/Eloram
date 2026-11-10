@@ -242,7 +242,8 @@ League's defaults, because that is what players' hands know:
   mana and dark unlearned; its icon is set into it (a shade round its edge and a light across its
   top, painted into the picture). An augment's card is a tall plate in its tier's colour: a band at
   its head, a gem lit in it, the name carved, a sheen crossing. The menu has the braziers' sparks
-  rising over its backdrop (`shaders/sparks.wgsl`). The type is two faces, compiled in: **Cinzel**
+  rising over its backdrop (`shaders/sparks.wgsl`). The line in the middle (the headliner, as a
+  match starts) drops under the augment cards while they're up. The type is two faces, compiled in: **Cinzel**
   for what's carved (the wordmark, the nav, a title, a champion's name, a result) and **Roboto
   Condensed**, bold, for everything read at a glance.
 - **Around a match**: a card in the middle while the page connects, signs in, waits in the lobby
