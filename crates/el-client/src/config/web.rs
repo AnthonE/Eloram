@@ -36,12 +36,15 @@ impl LaunchConfig {
             camera_locked: flag("cameraLocked"),
             low: string("quality") == "low",
             fxstage: get(&cfg, "fxstage").as_string().filter(|s| !s.is_empty()),
+            animstage: get(&cfg, "animstage").as_string().filter(|s| !s.is_empty()),
             fxknobs: string("fxknobs"),
             fxseed: get(&cfg, "fxseed").as_f64().unwrap_or(0.0).clamp(0.0, f64::from(u32::MAX)) as u32,
             fxside: string("fxside"),
             fxsize: get(&cfg, "fxsize").as_f64().map(|v| v as f32).filter(|v| *v > 0.0),
             bench: flag("bench"),
             renderer: string("renderer"),
+            // Off only when asked: a page whose loader predates it warms.
+            warm: get(&cfg, "warm").as_bool() != Some(false),
             fxcards: {
                 let c = string("fxcards");
                 let mut it = c.split(',').map(|v| v.trim().parse::<f32>().ok());

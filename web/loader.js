@@ -167,6 +167,9 @@ async function main() {
     practiceChamp: Number(params.get("champ") || 0) | 0,
     bench: params.get("bench") === "1",
     renderer: rendererName(),
+    // What a match draws, drawn before it (`el-client/src/warm.rs`); `?warm=0` leaves it to the
+    // match, to compare (`scripts/e2e.sh hitches` counts what's built late).
+    warm: params.get("warm") !== "0",
     // Sign in with the browser's wallet (`?signin=1`): back on the resume token from the last
     // sign-in while it's good, so the wallet isn't asked every time.
     signIn: params.get("signin") === "1",
@@ -188,6 +191,9 @@ async function main() {
     fxside: params.get("side") || "own",
     fxsize: Number(params.get("size") || 0),
     fxcards: params.get("cards") || "",
+    // The anim stage (`?animstage=<champion>-<act>`, `el-client/src/animstage.rs`): one champion
+    // alone on the same stepped clock, no server; `&knobs=` retunes its motion.
+    animstage: params.get("animstage") || "",
   };
   // Back on the token the last sign-in left, on any load: a player who signed in stays signed in.
   try {
@@ -212,7 +218,7 @@ async function main() {
     config.recordUrl = params.get("replay");
   }
   // Found even when watching (nothing is dialled then): the menu dials it later, from WATCH's way back.
-  if (config.fxstage) {
+  if (config.fxstage || config.animstage) {
     // Nothing to dial.
   } else if (!("WebTransport" in window)) {
     config.noWebTransport = true;

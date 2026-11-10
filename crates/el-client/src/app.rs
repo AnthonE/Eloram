@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+#[cfg(target_arch = "wasm32")]
+use crate::animstage::AnimStagePlugin;
 use crate::audio::AudioPlugin;
 use crate::bench::BenchPlugin;
 use crate::camera::CameraPlugin;
@@ -7,6 +9,7 @@ use crate::champions::ChampionsPlugin;
 use crate::config::{LaunchConfig, Prefs};
 use crate::dev_hooks::{DevHooksPlugin, InboxPlugin};
 use crate::edges::EdgesPlugin;
+use crate::frame::FramePlugin;
 use crate::front::FrontPlugin;
 use crate::fx::FxPlugin;
 use crate::ground::GroundPlugin;
@@ -25,7 +28,9 @@ use crate::net::{LaunchConfigRes, MapRes, NetPlugin};
 use crate::portrait::PortraitPlugin;
 use crate::scenery::SceneryPlugin;
 use crate::stage::StagePlugin;
+use crate::trails::TrailsPlugin;
 use crate::view::ViewPlugin;
+use crate::warm::WarmPlugin;
 use crate::watch::WatchPlugin;
 
 /// The browser's start: the page's config (`window.EL_CONFIG`).
@@ -154,7 +159,12 @@ pub fn run(cfg: LaunchConfig) {
         BenchPlugin,
         FrontPlugin,
         crate::front::report::ReportPlugin,
-    ));
+        FramePlugin,
+        WarmPlugin,
+    ))
+    .add_plugins(TrailsPlugin);
+    #[cfg(target_arch = "wasm32")]
+    app.add_plugins(AnimStagePlugin);
     #[cfg(not(target_arch = "wasm32"))]
     app.add_plugins(crate::desktop::DesktopPlugin);
     app.run();

@@ -10,6 +10,7 @@
 #   scripts/e2e.sh recover [project] # the server killed mid-match and started again: the page back in its seat
 #   scripts/e2e.sh fx [project]      # practice: every ability of every champion cast, drawn and heard, a contact sheet
 #   scripts/e2e.sh draws [project]   # WebGL2's draw calls a frame on each tier, by shader and mesh
+#   scripts/e2e.sh hitches [project] # a match: nothing built once it's in view (casts, the lane, a wave)
 # Anything after the project goes to Playwright.
 # The server listens on EL_HTTP_PORT (8080) and EL_WT_PORT (UDP, 4433).
 set -euo pipefail
@@ -48,7 +49,7 @@ case "$suite" in
     pids+=($!)
     export EL_GAME_URL="http://127.0.0.1:$((port + 1))"
     ;;
-  match|art|draws|menu|backdrop)
+  match|art|draws|menu|backdrop|hitches)
     # Bots take the empty seats a second after the first player queues. Champion select runs 45 s,
     # not 20 (it ends once everyone is ready): software rendering stalls on its first frames.
     server --mode game --fill-after 1 --select-secs 45 --http "127.0.0.1:${port}" --wt-port "$wt" &

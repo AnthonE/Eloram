@@ -24,6 +24,7 @@ if [ "${EL_E2E:-0}" = "1" ]; then
   step "e2e: transport";      ./scripts/e2e.sh spike webgl2
   step "e2e: a match";        ./scripts/e2e.sh match webgl2
   step "e2e: the main menu";  ./scripts/e2e.sh menu webgl2
+  step "e2e: hitches";        ./scripts/e2e.sh hitches webgl2
   step "e2e: watching";       ./scripts/e2e.sh watch webgl2
   step "e2e: sign-in";        ./scripts/e2e.sh login webgl2
 fi

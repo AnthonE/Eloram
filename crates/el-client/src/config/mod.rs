@@ -53,10 +53,15 @@ pub struct LaunchConfig {
     pub fxside: String,
     pub fxsize: Option<f32>,
     pub fxcards: Option<[f32; 2]>,
+    /// The anim stage (`?animstage=<champion>-<act>`, `animstage.rs`): one champion alone on the
+    /// fx stage's clock, no server; `&knobs=` (in `fxknobs`) retunes its motion.
+    pub animstage: Option<String>,
     /// The frame-rate bench (`?bench=1`, `bench.rs`): a practice match scripted over the map's
     /// places and a fight, its frame times summed up. `renderer` is what WebGL names the GPU.
     pub bench: bool,
     pub renderer: String,
+    /// What a match draws, drawn before it (`warm.rs`); `?warm=0` leaves it to the match.
+    pub warm: bool,
     /// The game server's HTTP side (`records.json`, `records/<id>`, `nonce`): the page's address,
     /// or the desktop's `--http`, or what the server list says.
     pub http_base: String,
@@ -124,6 +129,7 @@ impl LaunchConfig {
             || self.watch_newest
             || self.echo
             || self.fxstage.is_some()
+            || self.animstage.is_some()
             || self.bench)
     }
 }

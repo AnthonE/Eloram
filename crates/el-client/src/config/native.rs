@@ -29,6 +29,7 @@ eloram [address | elo://join/eloram/host:port] [options]
   --replay url         replay a record
   --guest              don't sign in through the launcher
   --no-launcher        don't look for the Elo launcher at all
+  --no-warm            don't draw a match's models and effects out of sight before it
   --keys league|wasd   the keys' layout
   --indicators 0|1     cast with an indicator
   --camera locked|free the camera
@@ -71,6 +72,8 @@ pub fn check_addr(addr: &str) -> Result<(), String> {
 /// Parses the arguments (the program's name left off), over the settings already kept.
 pub fn parse(args: impl IntoIterator<Item = String>) -> Parsed {
     let mut cfg = LaunchConfig {
+        // What a match draws, drawn before it (`warm.rs`; `--no-warm` leaves it to the match).
+        warm: true,
         // The settings this machine kept, as the page's loader reads them from localStorage.
         wasd: kv_get("el.keys").is_some_and(|v| v == "wasd"),
         indicators: kv_get("el.indicators").is_some_and(|v| v == "1"),
@@ -133,6 +136,7 @@ pub fn parse(args: impl IntoIterator<Item = String>) -> Parsed {
                 "--guest" => cfg.sign_in = false,
                 "--signin" => cfg.sign_in = true,
                 "--no-launcher" => cfg.no_launcher = true,
+                "--no-warm" => cfg.warm = false,
                 "--keys" => cfg.wasd = value(&mut args, &a)?.is_some_and(|v| v == "wasd"),
                 "--indicators" => cfg.indicators = value(&mut args, &a)?.is_some_and(|v| v == "1"),
                 "--camera" => cfg.camera_locked = value(&mut args, &a)?.is_some_and(|v| v == "locked"),

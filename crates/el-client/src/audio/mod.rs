@@ -125,6 +125,8 @@ struct Stats {
     last: &'static str,
     /// The own champion's casts heard: their sounds started.
     own_casts: u32,
+    /// The own champion's steps heard.
+    steps: u32,
 }
 
 impl Engine {
@@ -244,9 +246,13 @@ fn play(
     settings: Res<AudioSettings>,
     rig: Res<crate::camera::Rig>,
     cam: Single<(&Camera, &GlobalTransform), With<MainCamera>>,
+    mut figures: ResMut<crate::champions::FigureSounds>,
     mut status: ResMut<DevStatus>,
 ) {
-    let Some(mut e) = engine else { return };
+    let Some(mut e) = engine else {
+        figures.list.clear();
+        return;
+    };
     let e = &mut *e;
     let now = now_s();
     e.out.poll();
@@ -324,6 +330,30 @@ fn play(
             None => e.stats.missing += 1,
         }
     }
+    // What the figures make (the player's own steps): the lowest rung, where it happens, behind
+    // everything else.
+    for (sfx, at) in figures.list.drain(..) {
+        let p = mix::place(ndc(at));
+        if p.gain <= 0.0 {
+            continue;
+        }
+        let secs = e.out.duration(&sfx.file(0)).unwrap_or(0.2);
+        let Admit::Play { id, cut, take, cents } = e.mixer.admit(sfx, mix::RUNGS - 1, now, secs) else {
+            e.stats.dropped += 1;
+            continue;
+        };
+        if let Some(c) = cut {
+            e.cut(c);
+        }
+        let level = mix::db(sfx.def().gain_db) * p.gain;
+        if let Some((voice, secs)) =
+            e.out.start(&sfx.file(take), Route::Back, level, Some(p.pan), p.lowpass, cents, false)
+        {
+            e.playing.push(Playing { id, voice, ends: t + secs });
+            e.stats.played += 1;
+            e.stats.steps += 1;
+        }
+    }
     e.stats.peak = e.stats.peak.max(e.playing.len());
     // The announcer: one line at a time, the music dipping under it.
     let busy = now < e.voice_until;
@@ -348,6 +378,7 @@ fn play(
     status.set("audio_peak", e.stats.peak as u32);
     status.set("audio_lines", e.stats.lines);
     status.set("audio_own_casts", e.stats.own_casts);
+    status.set("audio_steps", e.stats.steps);
     status.set("audio_last", e.stats.last);
     status.set("audio_unlocked", e.out.unlocked());
 }

@@ -17,7 +17,8 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
 
 ## Commands
 
-- `scripts/ci.sh`: everything CI runs (`EL_E2E=1` adds the browser tests).
+- `scripts/ci.sh`: everything CI runs (`EL_E2E=1` adds the browser tests: `match`, `menu` and
+  `hitches` among them).
 - `cargo test --workspace --release`: all native tests (el-client is empty natively without its
   `desktop` feature; release because the simulation-heavy tests are slow unoptimised).
 - `cargo clippy --workspace --all-targets -- -D warnings`, and for the client
@@ -47,7 +48,7 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   bots in the other nine seats after 3 s (`EL_FILL`), then 20 s of champion select (`--select-secs`;
   it ends sooner once everyone seated is ready, and agents are ready at once). The server alone:
   `cargo run -p el-server --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
-- `scripts/e2e.sh spike|match|menu|backdrop|watch|login|art|recover|fx|draws [webgl2]`: Playwright against a real server
+- `scripts/e2e.sh spike|match|menu|backdrop|watch|login|art|recover|fx|draws|hitches [webgl2]`: Playwright against a real server
   (a plain load opens the main menu, so the suites that play go in with `&queue=1`; `menu`: the
   menu's pages, RANKED refused on a server without Elo Pros, PLAY into champion select, LEAVE MATCH
   back to the menu and a reload staying there; `match`: queue, champion select (a reroll, the bench, ready), the headliner, augment, shop,
@@ -56,7 +57,9 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   an agent's match watched live a minute behind from a checkpoint, then replayed; `recover`: the
   server SIGKILLed mid-match and started again, the page back in its seat; `login`: a stub wallet
   signing through `el-auth`'s `sign` example, `/online.json`, the resume token; `art`: the camera over each place on the map, the fog's darkness off (`{t:"camera"}`,
-  `{t:"fog"}`); `draws`: WebGL2's draw calls a frame on each tier, by shader program and mesh
+  `{t:"fog"}`); `hitches`: a match played through select, casts, the lane and the first wave,
+  and nothing built once it's in view (`pipelines_late` 0, each one named with its frame);
+  `draws`: WebGL2's draw calls a frame on each tier, by shader program and mesh
   (`e2e/artifacts/draws-<tier>.json`); `fx`: practice, every ability of every champion cast at a dummy, drawn and heard
   as the player's own, held on its missile in flight and on what lands (`EL_FX_CATCH=0` skips
   those), and a contact sheet a champion (`EL_FX_FROM=10 EL_FX_CHAMPIONS=20` for
@@ -85,6 +88,27 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   --ignored write_clips` rewrites `art/clips.json` (a test fails while it's stale, and another
   checks every model carries its kit's clips, and each minion's). `window.__el` has `champion_models` and `champion_poses`
   (`seat:clip,...`), `minion_models`, `minions_drawn` and `minion_clips` (`clip:count,...`).
+- The motion (`docs/CHAMPIONS.md`, "The motion"): `el_client_core::pose` shapes a strike's timing
+  (eased in, held, followed through), alternates two attacks, runs the legs under a cast and lays a
+  flinch over the upper body; `el_client_core::motion` turns, leans, recoils and squashes the
+  figure (`Feel::GAME`, its knobs); `el-client/src/figure.rs` plays both (each clip twice in a
+  model's graph, the upper body and the legs apart: Bevy's masks) and finds the sockets (hands,
+  toes, `<prop>.tip`), `trails.rs` draws a swing's arc and a casting hand's light. The second clips
+  are Quaternius's CC0 library: `python3 -I art/tools/ual.py` fetches it into `art/cache/ual/`,
+  `node art/tools/champions.mjs --ual [name]` retargets `art/champions.json`'s `ual` clips onto the
+  models already made (`art/tools/retarget.mjs`) and prints their strikes, `--sheet <glb> <png>`
+  draws a model's clips as stick figures. `window.__el` has `champion_stance` (the own champion's
+  standing clip), `champion_hits`, `champion_steps`, `champion_strikes`, `swing_arcs`,
+  `hands_glowing` and `audio_steps`.
+- The anim stage (`docs/CHAMPIONS.md`, "The stage"): `scripts/anim.sh <champion>-<act>…` (`list
+  [filter]`: `vire-attack`, `seren-r`, `nimra-walkcast`, `gorum-turn`...; `knobs`) shoots one
+  champion doing one thing in profile over a dark card and three-quarters over a light one, on the
+  fx stage's clock, into `e2e/artifacts/anim/<name>/{strip.png,numbers.json,diff.png}` with the fx
+  stage's shooter (`--knobs 'snap=0.4;hold_melee=0.1'` retunes the motion without a rebuild;
+  `--steps`, `--frames`, `--span`, `--no-build`, `EL_ANIM_DIST=dir`). The page is
+  `?animstage=<name>` (`el-client/src/animstage.rs`; `el_client_core::anim` is the catalogue and
+  the scripts). The loop as a skill: `.claude/skills/anim/SKILL.md` and
+  `.claude/agents/anim-judge.md`.
 - The effects and sounds (`docs/FX.md`): `el_client_core::fx` decides (the sound table, a look a
   source, the director's cues, the mixer, the announcer), `el-client/src/fx.rs` draws and
   `audio.rs` plays (Web Audio); a match watched is told to them by `el_client_core::spectator`.
@@ -147,7 +171,21 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   loop, close and wide) and sums up each one's frame times: `window.__el.bench` as it runs, the
   menu's Graphics page (Esc), and `window.__elBench` (JSON, also in the console) at the end;
   `&quality=low` and `&gfx=webgl2` for the other tier and API. Headless Chromium's numbers mean
-  nothing: this is for a real GPU.
+  nothing: this is for a real GPU. Each phase has its CPU's too (`cpu_p50_ms`, `cpu_p99_ms`,
+  `cpu_parts_ms`).
+- The frame's parts (`el-client/src/frame.rs`): a mark at each boundary of Bevy's frame, main
+  world and render world (`pre`, `update`, `post`, `last`, `extract`, `prepare`, `pipelines`,
+  `draw`, `cleanup`), the wasm's own work a frame, which headless Chromium measures as well as a
+  real browser (only its rasterising is in software); spikes (over 16.7 ms) and hitches (over 50)
+  counted in a match, by the part that took most. And what's built once a match is in view:
+  pipelines (named, with the match's frame), textures, meshes. `window.__el` has `cpu_p50`,
+  `cpu_p99`, `cpu_parts`, `cpu_spikes`, `cpu_spike_parts`, `cpu_hitches`, `pipelines`,
+  `pipelines_late`, `pipelines_late_what`, `pipelines_late_ms`, `images_late`, `meshes_late`.
+  `warm.rs` draws what a match will before it (the effects' pools, each model with the match's
+  materials, in the main view and the portrait's, and whatever isn't in view yet), out of sight
+  (`?warm=0` doesn't, to compare: `EL_HITCH_WARM=0 scripts/e2e.sh hitches`); a new material,
+  mesh layout or view a match draws needs its piece there, or `hitches` names it
+  (`EL_HITCH_QUALITY=high` for the high tier's).
 - Practice (`el_sim::practice`, `docs/FX.md` step 4): `el-server --practice` holds practice
   matches, which the page asks for on `?practice=1` (`&champ=<number>`; `{t:"practice_champ",
   champ}` again as another): seat 0 the player's at the top level with every rank, nothing on

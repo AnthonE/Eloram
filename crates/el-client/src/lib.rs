@@ -6,6 +6,9 @@
 #[cfg(all(target_arch = "wasm32", feature = "desktop"))]
 compile_error!("the desktop feature is for a native build");
 
+/// The anim stage is a page of its own (`?animstage=`): the browser's alone.
+#[cfg(target_arch = "wasm32")]
+mod animstage;
 pub mod app;
 mod audio;
 mod bench;
@@ -15,6 +18,8 @@ mod config;
 mod coords;
 mod dev_hooks;
 mod edges;
+mod figure;
+mod frame;
 mod front;
 mod fx;
 mod ground;
@@ -36,8 +41,10 @@ mod portrait;
 mod scenery;
 mod session;
 mod stage;
+mod trails;
 mod transport;
 mod view;
+mod warm;
 mod watch;
 
 #[cfg(not(target_arch = "wasm32"))]

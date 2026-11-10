@@ -1417,6 +1417,22 @@
     {
       "bus": "effects",
       "files": [
+        "step.1",
+        "step.2",
+        "step.3",
+        "step.4"
+      ],
+      "gain_db": -15.0,
+      "loop": false,
+      "name": "step",
+      "optional": false,
+      "stereo": false,
+      "takes": 4,
+      "what": "a footstep, the player's own as it runs: a soft crunch of snow on stone, 0.15 s"
+    },
+    {
+      "bus": "effects",
+      "files": [
         "death.champion.1",
         "death.champion.2"
       ],

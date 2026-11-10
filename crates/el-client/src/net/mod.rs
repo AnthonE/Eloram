@@ -130,8 +130,12 @@ fn goodbye_on_exit() {}
 pub static DIAL_NOW: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 fn connect(net: NonSend<NetState>, cfg: Res<LaunchConfigRes>) {
-    if cfg.0.record_url.is_some() || cfg.0.watch_newest || cfg.0.fxstage.is_some() {
-        // Watching: the record comes over HTTP (`watch`), nothing is dialled. The fx stage has no
+    if cfg.0.record_url.is_some()
+        || cfg.0.watch_newest
+        || cfg.0.fxstage.is_some()
+        || cfg.0.animstage.is_some()
+    {
+        // Watching: the record comes over HTTP (`watch`), nothing is dialled. The stages have no
         // match at all.
         return;
     }

@@ -61,6 +61,13 @@ holds by text-to-3D (untextured), coloured in bands (`art/champions.json`). Put 
 `art/tools/champions.mjs` (glTF Transform). Ours: generated for this project on its Meshy account,
 under [Meshy's terms](https://www.meshy.ai/terms-of-use).
 
+Their second clips (the flinches, a second attack each, the stances some stand in, the throw:
+`art/champions.json`, `ual`) are Quaternius's
+[Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html) and
+[Universal Animation Library 2](https://quaternius.com/packs/universalanimationlibrary2.html), the
+Standard sets, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (fetched and checked by
+`art/tools/ual.py`, retargeted onto each rig by `art/tools/retarget.mjs`).
+
 | File | The champion, and the props it holds |
 |---|---|
 | `brakka.glb` | Brakka: hook chain |
@@ -92,7 +99,8 @@ rigged by Meshy, each its own run; the champions' shared clips retargeted onto t
 the champions' (`art/champions.json`, `minions`), a band of each in its team's colour. The siege
 cart by text-to-3D and textured, not rigged. Each `<name>.dusk.jpg` is its texture with the blues
 turned red, by `art/tools/champions.mjs`, which puts them together. Ours: generated for this project
-on its Meshy account, under [Meshy's terms](https://www.meshy.ai/terms-of-use).
+on its Meshy account, under [Meshy's terms](https://www.meshy.ai/terms-of-use). Their flinch is
+Quaternius's (CC0), as the champions' is.
 
 | File | The minion, and what it holds |
 |---|---|

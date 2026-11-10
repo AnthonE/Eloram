@@ -229,6 +229,7 @@ sounds! {
     TagThrow = "tag.throw", Effects, 1, 3, -6.0, "", "a snowball thrown: a soft whoosh, 0.3 s";
     TagHit = "tag.hit", Effects, 1, 3, -4.0, "", "a snowball's hit: a soft packed-snow thump, 0.3 s";
     TagDash = "tag.dash", Effects, 1, 3, -4.0, "", "the dash to a tag: a rushing swish, 0.4 s";
+    Step = "step", Effects, 4, 2, -15.0, "", "a footstep, the player's own as it runs: a soft crunch of snow on stone, 0.15 s";
     DeathChampion = "death.champion", Effects, 2, 3, 0.0, "", "a champion falls: a heavy body-fall and a low swell, 1.0 s";
     DeathOwn = "death.own", Effects, 1, 1, 2.0, "", "you fall: a muffled heavy hit into a low drone, 1.6 s";
     Respawn = "respawn", Effects, 1, 2, -4.0, "", "back on the platform: a soft rising whoosh and chime, 0.8 s";
