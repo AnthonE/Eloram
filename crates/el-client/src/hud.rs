@@ -737,7 +737,10 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
                     },
                     BorderColor::all(TEAM[usize::from(t)]),
                     BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.3)),
-                    children![text(if t == 0 { "DAWN" } else { "DUSK" }, 14.0, TEAM[usize::from(t)])],
+                    children![(
+                        skin::display(if t == 0 { "DAWN" } else { "DUSK" }, 16.0, TEAM[usize::from(t)]),
+                        outline()
+                    )],
                 ))
                 .with_children(|team| {
                     for j in 0..el_sim::units::TEAM_SIZE {
@@ -748,7 +751,7 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
         })
         .collect();
     let team_row = commands.spawn(Node { column_gap: px(12), ..default() }).add_children(&teams).id();
-    let head = commands.spawn((text("", 14.0, GOLD), Label::ScoreHead)).id();
+    let head = commands.spawn((text("", 15.0, GOLD), Label::ScoreHead)).id();
     let body = commands
         .spawn((
             Node {
@@ -1643,7 +1646,7 @@ fn shop(commands: &mut Commands) {
     let rec = shop_section(commands, rec_title, &rec);
     let parts = shop_section(commands, parts_title, &parts);
     let done = shop_section(commands, done_title, &done);
-    let title = commands.spawn(text("SHOP", 16.0, GOLD)).id();
+    let title = commands.spawn((skin::display("SHOP", 20.0, GOLD), outline())).id();
     let gold = commands.spawn((text("", 15.0, GOLD), outline(), Label::ShopGold)).id();
     let head = commands
         .spawn(Node {
