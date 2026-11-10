@@ -18,7 +18,9 @@ use el_client_core::fx::director::Watched;
 use el_client_core::spectator::Spectator;
 use el_sim::record::{Divergence, Frames, Referee};
 use el_sim::units::MAX_UNITS;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsCast;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::JsFuture;
 
 use crate::net::{LaunchConfigRes, MapRes, now_s};
@@ -127,7 +129,19 @@ impl Watch {
     }
 }
 
+/// Fetches `url` into `slot`: its bytes, or why not (the desktop's, on a thread of its own).
+#[cfg(not(target_arch = "wasm32"))]
+fn fetch_into(slot: Fetched, url: String) {
+    std::thread::spawn(move || {
+        let got = crate::platform::fetch_blocking(&crate::platform::Req::get(url).cap(256 << 20));
+        if let Ok(mut s) = slot.lock() {
+            *s = Some(got);
+        }
+    });
+}
+
 /// Fetches `url` into `slot`: its bytes, or why not.
+#[cfg(target_arch = "wasm32")]
 fn fetch_into(slot: Fetched, url: String) {
     wasm_bindgen_futures::spawn_local(async move {
         let got = async {
@@ -245,9 +259,17 @@ impl Plugin for WatchPlugin {
 
 fn start(cfg: Res<LaunchConfigRes>, map: Res<MapRes>, mut session: ResMut<Session>) {
     if let Some(url) = cfg.0.record_url.clone() {
-        session.watch = Some(Box::new(Watch::new(map.0, url, cfg.0.watch_live)));
-        session.phase = Phase::Watching;
+        start_url(&mut session, map.0, url, cfg.0.watch_live);
     }
+}
+
+/// Watches the record at `url` (live: a minute behind its match) from now: the world drawn is the
+/// record's until it's left (`front::Front::back`).
+pub fn start_url(session: &mut Session, map: &'static el_sim::map::Map, url: String, live: bool) {
+    session.begin_world();
+    session.client = None;
+    session.watch = Some(Box::new(Watch::new(map, url, live)));
+    session.phase = Phase::Watching;
 }
 
 fn step(mut session: ResMut<Session>) {

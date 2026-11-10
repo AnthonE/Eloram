@@ -27,7 +27,7 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   const logs = collectConsole(page);
   const shots = `artifacts/match-${info.project.name}`;
   // The camera locked on the champion (free is the default), so the pictures follow it down the lane.
-  await page.goto(`/?gfx=${info.project.name}&name=Tester&camera=locked`);
+  await page.goto(`/?gfx=${info.project.name}&name=Tester&camera=locked&queue=1`);
   let s: Record<string, any>;
   let chosen = "";
   try {
@@ -167,7 +167,7 @@ test("WASD and the menu: the keys walk the champion, Esc holds them", async ({ p
   test.setTimeout(300_000);
   const logs = collectConsole(page);
   const shots = `artifacts/match-${info.project.name}`;
-  await page.goto(`/?gfx=${info.project.name}&name=Walker&keys=wasd`);
+  await page.goto(`/?gfx=${info.project.name}&name=Walker&keys=wasd&queue=1`);
   let s: Record<string, any>;
   try {
     s = await until(page, "champion select", (s) => s.phase === "selecting", 150_000);
@@ -240,7 +240,7 @@ test("WASD and the menu: the keys walk the champion, Esc holds them", async ({ p
 // page sees close is dialled again on its own.
 test("a reload or a dropped link takes the seat back", async ({ page }, info) => {
   const logs = collectConsole(page);
-  await page.goto(`/?gfx=${info.project.name}&name=Rejoiner`);
+  await page.goto(`/?gfx=${info.project.name}&name=Rejoiner&queue=1`);
   let s: Record<string, any>;
   try {
     s = await until(page, "champion select", (s) => s.phase === "selecting", 150_000);

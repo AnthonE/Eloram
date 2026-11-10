@@ -164,6 +164,29 @@ fn setup(mut commands: Commands) {
             children![(text("PLAY AGAIN", 16.0, TEXT), outline())],
         ))
         .id();
+    let menu = commands
+        .spawn((
+            Button,
+            Node {
+                width: px(200),
+                height: px(46),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(6)),
+                ..default()
+            },
+            BorderColor::all(FRAME),
+            BackgroundColor(BUTTON),
+            Tint(BUTTON),
+            Act::Menu,
+            children![(text("MENU", 16.0, TEXT), outline())],
+        ))
+        .id();
+    let again = commands
+        .spawn(Node { flex_direction: FlexDirection::Row, column_gap: px(12), ..default() })
+        .add_children(&[again, menu])
+        .id();
     let result = commands
         .spawn(Node {
             flex_direction: FlexDirection::Column,
@@ -219,6 +242,7 @@ fn setup(mut commands: Commands) {
 /// The card while there's no match to show; the result once one is over.
 fn show(
     session: Res<Session>,
+    front: Res<crate::front::Front>,
     mut since: ResMut<Since>,
     mut card: Query<&mut Node, (With<Card>, Without<Over>)>,
     mut over: Query<&mut Node, (With<Over>, Without<Card>)>,
@@ -227,7 +251,9 @@ fn show(
         since.phase = session.phase;
         since.at = crate::net::now_s();
     }
+    // The main menu says all of this itself (`front`): the card is for a launch that skipped it.
     let card_up = session.watch.is_none()
+        && !front.up
         && matches!(
             session.phase,
             Phase::Connecting

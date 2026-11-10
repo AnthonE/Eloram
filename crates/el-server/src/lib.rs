@@ -1,10 +1,12 @@
 //! Eloram's game server: WebTransport sessions on tokio, shard threads stepping the matches, and a
 //! small HTTP side for the page, the certificate hash and the store's status polls.
 
+pub mod elopros;
 pub mod game;
 pub mod http;
 pub mod lobby;
 pub mod net;
+pub mod party;
 pub mod records;
 pub mod recover;
 pub mod referee;
@@ -43,8 +45,6 @@ pub struct Config {
     pub tls: Option<(PathBuf, PathBuf)>,
     pub cors_origins: Vec<String>,
     pub limits: Limits,
-    /// Places for players, for `/status.json`.
-    pub max_players: usize,
     /// Shard threads, and the matches each holds.
     pub shards: usize,
     pub matches_per_shard: usize,
@@ -69,6 +69,8 @@ pub struct Config {
     pub require_sign_in: bool,
     /// Practice matches may be asked for (`el_sim::practice`, `ToServer::Practice`).
     pub practice: bool,
+    /// Elo Pros: the server key and what it's used for (`elopros`). None: no reports, no ranked.
+    pub elopros: Option<elopros::EloConfig>,
     /// How long a self-signed certificate is used before a running server remakes it, and how
     /// often it looks (`net::endpoint::rotate`; a CA-issued one is read again as often).
     pub cert_keep: Duration,
@@ -85,7 +87,6 @@ impl Default for Config {
             tls: None,
             cors_origins: vec![STORE_ORIGIN.to_string()],
             limits: Limits::default(),
-            max_players: 640,
             shards: 1,
             matches_per_shard: 64,
             fill_after: Duration::from_secs(30),
@@ -97,6 +98,7 @@ impl Default for Config {
             elo_pubkey: None,
             require_sign_in: false,
             practice: false,
+            elopros: None,
             cert_keep: net::endpoint::KEEP_CERT,
             cert_check: net::endpoint::CHECK_CERT,
         }
@@ -208,6 +210,12 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
             if cfg.practice {
                 lobby.allow_practice();
             }
+            if let Some(e) = &cfg.elopros {
+                let elo = elopros::EloPros::new(e, cfg.records_dir.clone())
+                    .map_err(|e| anyhow::anyhow!("Elo Pros: {e}"))?;
+                elo.start(lobby.clone());
+                let _ = lobby.elopros.set(elo);
+            }
             tokio::spawn(lobby.clone().run());
             Some(lobby)
         }
@@ -244,7 +252,9 @@ pub async fn start(cfg: Config) -> anyhow::Result<Handle> {
     let mode = cfg.mode;
     let online = signin.online.clone();
     let nonces = signin.clone();
-    let max_players = cfg.max_players;
+    // The places `/status.json` names are the connections the server takes: a launcher or the
+    // store told of more would send players the admission refuses.
+    let max_players = cfg.limits.connections as usize;
     let status_stats = stats.clone();
     let launcher_stats = stats.clone();
     let status_lobby = lobby.clone();
@@ -381,5 +391,6 @@ fn game_json(lobby: &lobby::Lobby) -> serde_json::Value {
         "shards": shards,
         "referee": lobby.game.referee.json(),
         "records": { "written": written, "astray": astray },
+        "elopros": lobby.elopros.get().map(|e| e.status()),
     })
 }

@@ -24,8 +24,9 @@ use bevy::render::view::{ColorGrading, ColorGradingGlobal, Msaa};
 use crate::camera::{MainCamera, VIEW};
 use crate::net::LaunchConfigRes;
 
-/// The WebGPU build (Bevy picks its GPU API when it's compiled).
-pub const WEBGPU: bool = cfg!(feature = "webgpu");
+/// The full tier's GPU: the browser's WebGPU build (Bevy picks its GPU API when it's compiled), or
+/// the desktop's (Vulkan, DirectX 12 or Metal). The browser's WebGL2 build takes the rest.
+pub const WEBGPU: bool = cfg!(any(feature = "webgpu", not(target_arch = "wasm32")));
 
 /// How the picture is made.
 #[derive(Resource)]
@@ -138,12 +139,18 @@ fn on_render_error(
     _: &mut World,
 ) -> bevy::render::error_handler::RenderErrorPolicy {
     use bevy::render::error_handler::RenderErrorPolicy;
-    use wasm_bindgen::{JsCast, JsValue};
-    let fell_back = web_sys::window()
-        .and_then(|w| js_sys::Reflect::get(&w, &JsValue::from_str("elGpuFallBack")).ok())
-        .and_then(|f| f.dyn_into::<js_sys::Function>().ok())
-        .and_then(|f| f.call1(&JsValue::NULL, &JsValue::from_str(&error.description)).ok())
-        .is_some_and(|r| r.is_truthy());
+    #[cfg(target_arch = "wasm32")]
+    let fell_back = {
+        use wasm_bindgen::{JsCast, JsValue};
+        web_sys::window()
+            .and_then(|w| js_sys::Reflect::get(&w, &JsValue::from_str("elGpuFallBack")).ok())
+            .and_then(|f| f.dyn_into::<js_sys::Function>().ok())
+            .and_then(|f| f.call1(&JsValue::NULL, &JsValue::from_str(&error.description)).ok())
+            .is_some_and(|r| r.is_truthy())
+    };
+    // The desktop has no other module to fall back to: the error is said, and the program stops.
+    #[cfg(not(target_arch = "wasm32"))]
+    let fell_back = false;
     if !fell_back {
         bevy::log::error!("Quitting the application due to {:?} RenderError", error.ty);
         main_world.write_message(AppExit::error());

@@ -283,6 +283,7 @@ impl Bursts {
     }
 
     /// How many slots hold a live burst: of light, and of smoke.
+    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
     pub fn live(&self) -> (u32, u32) {
         let n = |v: &[Slot]| v.iter().filter(|s| s.ends > self.now_seen).count() as u32;
         (n(&self.glow), n(&self.smoke))

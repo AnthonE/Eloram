@@ -67,12 +67,13 @@ pub fn status_json(stats: &NetStats, mode: crate::Mode) -> serde_json::Value {
 }
 
 /// The `/status.json` document, in the shape the Elo Pros launcher and store poll (Gates' shard
-/// and Before Colony's server serve the same): `players` are the people connected (agents
-/// apart), `max_players` the places.
+/// serves the same, `crates/server/src/status.rs`): `players` is everyone connected, people and
+/// agents, and `agents` the share of them that are agents (the store reads people as
+/// `players - agents`, `meter/launcher.py`), `max_players` the connections taken.
 pub fn launcher_status_json(stats: &NetStats, max_players: usize) -> serde_json::Value {
     let r = |c: &AtomicU64| c.load(Ordering::Relaxed);
     serde_json::json!({
-        "players": r(&stats.humans_active),
+        "players": r(&stats.humans_active) + r(&stats.agents_active),
         "agents": r(&stats.agents_active),
         "max_players": max_players,
         // What a page must speak to be let in (`scripts/publish-web.sh` checks it before publishing).

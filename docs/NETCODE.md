@@ -232,6 +232,19 @@ Before Colony's, sized for a match:
   what the client takes a unit to be is what the server's record of it said at the snapshot's
   tick for 99.9% of the units its team sees. The estimate was 18–27 KB/s.
 
+- The lobby is JSON on the control stream (`el_client_core::lobby`), protocol 7: the queue
+  (NORMAL, or `QueueRanked` through the store's matchmaker: `el-server/src/elopros/ranked.rs`),
+  champion select, the seat and its rejoin token, the end; `About` once after the Welcome (who the
+  server knows the player as, whether it holds practice and ranked matches), `Ranked` while the
+  store's queue has the player, `Refused` for what this server won't do. A `Leave` while seated
+  lets the seat go for good: its token is forgotten here and in the page. Protocol 8 adds parties
+  (`PartyInvite`/`Accept`/`Decline`/`Leave`, and `Party` whenever one changes: `el-server/src/
+  party.rs`): only the leader queues, NORMAL seats the party whole on one side (`lobby::take_match`),
+  RANKED queues it in one call to the store, which keeps it together. `Select` and `Match` say
+  whether they're ranked; someone leaving a ranked select calls it off (nothing was started on the
+  shard) and the rest go back to the store's queue, so a rated match is always five wallets a side. A desktop client speaks
+  the same wire through wtransport (`el-client/src/transport/native.rs`).
+
 ### The record
 
 - Each match writes one file (`el_sim::record`, `.elr`): its seed, champions, protocol and content

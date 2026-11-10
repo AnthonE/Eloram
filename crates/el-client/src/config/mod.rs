@@ -1,7 +1,10 @@
-//! Launch configuration injected by `web/loader.js` as `window.EL_CONFIG`.
+//! The launch's configuration: in the browser what `web/loader.js` injects as
+//! `window.EL_CONFIG` (`web.rs`), on the desktop the command line over the settings file
+//! (`native.rs`); and the settings and tokens kept for the next time, through `crate::platform`.
 
 use el_client_core::controls::Layout;
-use wasm_bindgen::JsValue;
+
+use crate::platform::{forget_param, kv_get, kv_remove, kv_set, tab_get, tab_set};
 
 #[derive(Clone, Debug, Default)]
 pub struct LaunchConfig {
@@ -59,10 +62,29 @@ pub struct LaunchConfig {
     pub renderer: String,
     /// What a match draws, drawn before it (`warm.rs`); `?warm=0` leaves it to the match.
     pub warm: bool,
-}
-
-fn get(obj: &JsValue, key: &str) -> JsValue {
-    js_sys::Reflect::get(obj, &JsValue::from_str(key)).unwrap_or(JsValue::UNDEFINED)
+    /// The game server's HTTP side (`records.json`, `records/<id>`, `nonce`): the page's address,
+    /// or the desktop's `--http`, or what the server list says.
+    pub http_base: String,
+    /// The desktop's: the server to play on (`--server`, a join link), the list to find one in
+    /// (`--servers`), the wallet the launcher plays as (`--identity`), and no launcher at all.
+    pub server: Option<String>,
+    pub servers_url: Option<String>,
+    pub identity: Option<String>,
+    pub no_launcher: bool,
+    /// A record named by its id (`--watch <id>`), or the newest live match (`?watch=live`).
+    pub record_id: Option<String>,
+    pub watch_newest: bool,
+    /// The desktop's window: fullscreen, windowed, or as last time.
+    pub fullscreen: Option<bool>,
+    /// The desktop's test hooks: the status written to a file, commands read from one, and a
+    /// screenshot saved at a moment, then quit.
+    pub status_file: Option<String>,
+    pub inbox_file: Option<String>,
+    pub screenshot: Option<String>,
+    pub screenshot_at: Option<String>,
+    /// What the Elo launcher said at the start (the desktop's).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub launcher: Option<crate::launcher::Found>,
 }
 
 pub(crate) fn decode_hex(s: &str) -> Option<Vec<u8>> {
@@ -72,62 +94,52 @@ pub(crate) fn decode_hex(s: &str) -> Option<Vec<u8>> {
     (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).ok()).collect()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+pub mod native;
+#[cfg(target_arch = "wasm32")]
+mod web;
+
+/// The game server's HTTP side, once found (the records, the nonce, the status), with its slash.
+static HTTP_BASE: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+pub fn set_http_base(base: &str) {
+    if let Ok(mut b) = HTTP_BASE.lock() {
+        *b = base.to_string();
+    }
+}
+
+/// `path` on the game server's HTTP side (`records.json`, `records/<id>`), or `None` before the
+/// server is found. A page with no base was served by the game server itself: the path is its own.
+pub fn server_url(path: &str) -> Option<String> {
+    let b = HTTP_BASE.lock().ok()?.clone();
+    if b.is_empty() {
+        return cfg!(target_arch = "wasm32").then(|| path.to_string());
+    }
+    Some(format!("{}{path}", if b.ends_with('/') { b } else { format!("{b}/") }))
+}
+
 impl LaunchConfig {
-    pub fn from_window() -> Self {
-        let Some(window) = web_sys::window() else { return Self::default() };
-        let cfg = get(&window, "EL_CONFIG");
-        let string = |k: &str| get(&cfg, k).as_string().unwrap_or_default();
-        let flag = |k: &str| get(&cfg, k).as_bool().unwrap_or(false);
-        Self {
-            wt_url: string("wtUrl"),
-            cert_hash: get(&cfg, "certHash").as_string().and_then(|h| decode_hex(&h)),
-            name: string("name"),
-            echo: flag("echo"),
-            queue: flag("queue"),
-            practice: flag("practice")
-                .then(|| get(&cfg, "practiceChamp").as_f64().unwrap_or(0.0).clamp(0.0, 255.0) as u8),
-            record_url: get(&cfg, "recordUrl").as_string().filter(|s| !s.is_empty()),
-            watch_live: flag("watchLive"),
-            no_web_transport: flag("noWebTransport"),
-            sign_in: flag("signIn"),
-            pass: Some(string("pass")).filter(|p| !p.is_empty()),
-            resume: get(&cfg, "resume")
-                .as_string()
-                .and_then(|h| decode_hex(&h))
-                .and_then(|b| b.try_into().ok()),
-            indicators: flag("indicators"),
-            wasd: flag("wasd"),
-            camera_locked: flag("cameraLocked"),
-            low: string("quality") == "low",
-            fxstage: get(&cfg, "fxstage").as_string().filter(|s| !s.is_empty()),
-            animstage: get(&cfg, "animstage").as_string().filter(|s| !s.is_empty()),
-            fxknobs: string("fxknobs"),
-            fxseed: get(&cfg, "fxseed").as_f64().unwrap_or(0.0).clamp(0.0, f64::from(u32::MAX)) as u32,
-            fxside: string("fxside"),
-            fxsize: get(&cfg, "fxsize").as_f64().map(|v| v as f32).filter(|v| *v > 0.0),
-            bench: flag("bench"),
-            renderer: string("renderer"),
-            // Off only when asked: a page whose loader predates it warms.
-            warm: get(&cfg, "warm").as_bool() != Some(false),
-            fxcards: {
-                let c = string("fxcards");
-                let mut it = c.split(',').map(|v| v.trim().parse::<f32>().ok());
-                match (it.next().flatten(), it.next().flatten()) {
-                    (Some(d), Some(l)) => Some([d.clamp(0.0, 1.0), l.clamp(0.0, 1.0)]),
-                    _ => None,
-                }
-            },
-        }
+    /// Whether the launch opens on the main menu: not when a link says where to go (the queue, a
+    /// practice match, a record, the fx stage, the bench, the transport's smoke test).
+    pub fn menu(&self) -> bool {
+        !(self.queue
+            || self.practice.is_some()
+            || self.record_url.is_some()
+            || self.record_id.is_some()
+            || self.watch_newest
+            || self.echo
+            || self.fxstage.is_some()
+            || self.animstage.is_some()
+            || self.bench)
     }
 }
 
 /// Keeps (or with `None`, forgets) the resume token for the next visit.
 pub fn store_resume(token: Option<&[u8]>) {
-    let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) else { return };
-    let _ = match token {
-        Some(t) => storage.set_item("el.resume", &t.iter().map(|b| format!("{b:02x}")).collect::<String>()),
-        None => storage.remove_item("el.resume"),
-    };
+    match token {
+        Some(t) => kv_set("el.resume", &t.iter().map(|b| format!("{b:02x}")).collect::<String>()),
+        None => kv_remove("el.resume"),
+    }
 }
 
 /// The settings the menu changes while the page runs (`menu.rs`), started from the launch
@@ -180,38 +192,15 @@ impl Prefs {
 
 /// Keeps a setting for the next visit (`localStorage[key]`, which `web/loader.js` reads), and takes
 /// `?param=` off the address (where it was the setting asked for, it would win again at a reload).
-/// The one place the browser's storage is written for a setting: a desktop build keeps them here
-/// in a file.
+/// The one place a setting is written: the browser's `localStorage`, the desktop's settings file.
 pub fn remember(key: &str, value: &str, param: &str) {
-    let Some(window) = web_sys::window() else { return };
-    if let Some(storage) = window.local_storage().ok().flatten() {
-        let _ = storage.set_item(key, value);
-    }
-    let Ok(href) = window.location().href() else { return };
-    let Ok(mut url) = url::Url::parse(&href) else { return };
-    if !url.query_pairs().any(|(k, _)| k == param) {
-        return;
-    }
-    let kept: Vec<(String, String)> = url
-        .query_pairs()
-        .filter(|(k, _)| k != param)
-        .map(|(k, v)| (k.into_owned(), v.into_owned()))
-        .collect();
-    if kept.is_empty() {
-        url.set_query(None);
-    } else {
-        url.query_pairs_mut().clear().extend_pairs(kept);
-    }
-    if let Ok(history) = window.history() {
-        let _ = history.replace_state_with_url(&wasm_bindgen::JsValue::NULL, "", Some(url.as_str()));
-    }
+    kv_set(key, value);
+    forget_param(param);
 }
 
 /// A setting kept by an earlier visit.
 pub fn recall(key: &str) -> Option<String> {
-    web_sys::window()
-        .and_then(|w| w.local_storage().ok().flatten())
-        .and_then(|s| s.get_item(key).ok().flatten())
+    kv_get(key)
 }
 
 /// Remembers the camera locked or free for the next visit (`localStorage["el.camera"]`, which
@@ -223,17 +212,10 @@ pub fn store_camera(locked: bool) {
 /// Keeps (or with `None`, forgets) this tab's rejoin token (`sessionStorage["el.rejoin"]`, never
 /// logged): a reload, or a dropped link, takes the seat back with it while the match lasts.
 pub fn store_rejoin(token: Option<&str>) {
-    let Some(storage) = web_sys::window().and_then(|w| w.session_storage().ok().flatten()) else { return };
-    let _ = match token {
-        Some(t) => storage.set_item("el.rejoin", t),
-        None => storage.remove_item("el.rejoin"),
-    };
+    tab_set("el.rejoin", token);
 }
 
 /// This tab's rejoin token, if its last match left one.
 pub fn rejoin_token() -> Option<String> {
-    web_sys::window()
-        .and_then(|w| w.session_storage().ok().flatten())
-        .and_then(|s| s.get_item("el.rejoin").ok().flatten())
-        .filter(|t| !t.is_empty())
+    tab_get("el.rejoin").filter(|t| !t.is_empty())
 }

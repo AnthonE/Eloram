@@ -1,0 +1,17 @@
+[package]
+name = "el-launcher"
+description = "The Elo Pros launcher, as the desktop client reaches it: the platform's SDK file, vendored, and a wrapper"
+publish = false
+version.workspace = true
+# The vendored `elo_overlay.rs` is the platform's own file, byte for byte (`scry-forge/sdk/rust/`,
+# pinned by its sha256 in a test): it is written for edition 2021, and declares the Windows pipe's
+# calls in plain `extern` blocks, which the workspace's edition and its `unsafe_code = "deny"`
+# refuse. So this crate keeps its own edition and lints, and the file stays as it is.
+edition = "2021"
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dev-dependencies]
+ring = { version = "0.17", default-features = false }

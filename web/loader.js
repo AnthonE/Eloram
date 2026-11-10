@@ -157,8 +157,9 @@ async function main() {
   const config = {
     echo: params.get("mode") === "echo",
     name: params.get("name") || "",
-    // Into the queue as soon as the server says hello (`?queue=0`: stay in the lobby).
-    queue: params.get("queue") !== "0",
+    // Straight into the queue as soon as the server says hello (`?queue=1`), past the main menu,
+    // which a plain load opens on.
+    queue: params.get("queue") === "1",
     // A practice match instead (`?practice=1`, on a server started with `--practice`): one seat,
     // any champion (`&champ=<number>`), every rank, no cooldowns, target dummies. The frame-rate
     // bench (`?bench=1`, `el-client/src/bench.rs`) runs over one.
@@ -194,23 +195,30 @@ async function main() {
     // alone on the same stepped clock, no server; `&knobs=` retunes its motion.
     animstage: params.get("animstage") || "",
   };
-  if (config.signIn) {
-    try {
-      config.resume = localStorage.getItem("el.resume") || "";
-    } catch (_) {
-      config.resume = "";
-    }
+  // Back on the token the last sign-in left, on any load: a player who signed in stays signed in.
+  try {
+    config.resume = localStorage.getItem("el.resume") || "";
+  } catch (_) {
+    config.resume = "";
   }
+  if (config.resume) config.signIn = true;
   // Watching: a live match's record a minute behind (`?watch=<id>`, from /records.json), or any
   // record (`?replay=<url>`). No connection is made: the record is fetched over HTTP.
   const srv = window.elServer || { url: (p) => p };
-  if (params.get("watch")) {
+  // The game server's HTTP side, for the menu's WATCH (`records.json`) and the records.
+  config.httpBase = srv.url("");
+  if (params.get("watch") === "live") {
+    // The newest live match, found in records.json once the client is up (chat's and the
+    // stream kit's link: `?watch=live`).
+    config.watchNewest = true;
+  } else if (params.get("watch")) {
     config.recordUrl = srv.url(`records/${encodeURIComponent(params.get("watch"))}`);
     config.watchLive = true;
   } else if (params.get("replay")) {
     config.recordUrl = params.get("replay");
   }
-  if (config.recordUrl || config.fxstage || config.animstage) {
+  // Found even when watching (nothing is dialled then): the menu dials it later, from WATCH's way back.
+  if (config.fxstage || config.animstage) {
     // Nothing to dial.
   } else if (!("WebTransport" in window)) {
     config.noWebTransport = true;
@@ -224,10 +232,8 @@ async function main() {
     step("loader", "signing in…");
     Object.assign(config, await window.elSignIn.choose(window.elServer.url("")));
   }
-  // A guest on the published page gets the way back to signing in.
-  if (!config.signIn && !config.noWebTransport && window.elServer.http && !params.has("watch") && !params.has("replay")) {
-    window.elSignIn.offerLink();
-  }
+  // A guest signs in from the game's own menu (its identity, or RANKED), which loads the page
+  // again with ?signin=1.
   window.EL_CONFIG = config;
   step("graphics", "choosing WebGPU or WebGL 2…");
   const built = await builtModules();

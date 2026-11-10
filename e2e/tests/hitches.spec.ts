@@ -39,7 +39,7 @@ test("nothing built once a match is in view", async ({ page }, info) => {
   test.setTimeout(1_200_000);
   const logs = collectConsole(page);
   await page.addInitScript(() => localStorage.setItem("el.taught", "1"));
-  await page.goto(`/?gfx=${info.project.name}&quality=${QUALITY}${WARM}&name=Hitches&camera=locked`);
+  await page.goto(`/?gfx=${info.project.name}&quality=${QUALITY}${WARM}&name=Hitches&camera=locked&queue=1`);
   let s: Record<string, any>;
   try {
     s = await until(page, "champion select", (s) => s.phase === "selecting" && s.select_champion_id >= 0, 150_000);

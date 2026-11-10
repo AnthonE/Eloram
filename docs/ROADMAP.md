@@ -446,3 +446,42 @@ Left, in no order:
   restart; a running server remakes the one and reads the other again (`net::endpoint::rotate`,
   on SIGHUP and every hour, a test dialling with the new hash and the old). Still theirs: the
   port and the host in the unit and the nginx file are placeholders until the box says.
+
+## 9. The desktop, the main menu, and Elo Pros
+
+A desktop build (`eloram`, Linux and Windows) from the same crate as the browser's: the
+browser-only halves (`platform/`, `transport/`, `net/`, `config/`, `audio/`) sit beside native
+ones (wtransport over a tokio runtime, `settings.toml`, cpal with a no-alloc mixer in
+`el_client_core::fx::out`, the Elo launcher through `crates/el-launcher`). The desktop client never
+turns on glam's scalar maths (Bevy's glam won't build with it): its prediction is `glam::Vec2` only,
+and the golden hashes hold with and without it, and on wasm. Run under Xvfb and lavapipe it plays
+a match against a local server. Windows is cross-built (`x86_64-pc-windows-gnu`), not run here.
+
+The main menu, after Gates' (`render/menu.rs`, `render/ui.rs`) in Eloram's colours, in the game's
+own UI on both builds: PLAY (NORMAL, bots in the empty seats; RANKED, ten wallets rated on Elo
+Pros), PRACTICE, WATCH (the server's records, live a minute behind), FRIENDS, NEWS, STORE,
+PROFILE, OPTIONS (the Esc menu's pages) and, on the desktop, QUIT. A plain load opens it; a deep
+link (`?queue=1`, `?practice=1`, `?watch=`) goes past it. LEAVE MATCH in the Esc menu lets the
+seat go for good.
+
+Protocol 7: `QueueRanked`; `About` after the Welcome (who the server knows the player as, and
+whether it holds practice and ranked); `Ranked` (the store's queue's state) and `Refused`; a
+seated `Leave` forgets the seat's token. `/online.json` says what each player is doing; a session
+idle at the menu for 30 minutes is let go. The record's own protocol (`RECORD_PROTOCOL`) stays at 6,
+so a deploy takes up live records and every past replay plays.
+
+Elo Pros from the server (`el-server/src/elopros/`): a server key (`--keygen`, the SDK's signed
+text, checked against the platform's vectors), each finished match's stats, unlocks and board
+scores against `elo.json`'s definitions, a ranked match's result with its record's hash, both kept
+in an outbox on disk until the store takes them, and the RANKED queue through the store's
+matchmaker, seating its two sides here with no bots (`tests/elopros.rs` against a stand-in meter).
+The store's side: the listing row (hidden until the page is published), the launcher manifest, the
+hosted servers' row, the play block, and the per-title tables (scry-forge).
+
+Then protocol 8 and the rest of the menu: parties (up to five on a server, the leader queues them
+onto one side, NORMAL or RANKED); a ranked select someone leaves is called off and the others
+queued again; FRIENDS and PROFILE read from Elo Pros (the friends texts and the platform's answers
+checked against its own vectors, changes signed by the page's wallet or the launcher); REPORT A BUG
+(F8) to the store's intake with a picture, and a desktop crash's note offered on the next start;
+and the menu's backdrop, the Causeway shot from a match with the HUD off (`scripts/e2e.sh
+backdrop`, `art/tools/menu_backdrop.py`).
