@@ -7,9 +7,6 @@
 //! and the seat taken back with the match's rejoin token (`ToServer::Rejoin`); a page reloaded
 //! mid-match does the same with the token this tab kept.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use bevy::prelude::*;
 use el_client_core::Client;
 use el_client_core::lobby::{ToClient, ToServer};
@@ -21,13 +18,14 @@ use el_proto::quant::pos_code;
 use crate::config::LaunchConfig;
 use crate::dev_hooks::DevStatus;
 use crate::input::Controls;
+use crate::platform::Shared;
 use crate::session::{Phase, SelectView, Session};
 use crate::transport::Transport;
 
 #[derive(Default)]
 pub struct NetState {
-    pub transport: Rc<RefCell<Option<Transport>>>,
-    pub error: Rc<RefCell<Option<String>>>,
+    pub transport: Shared<Option<Transport>>,
+    pub error: Shared<Option<String>>,
 }
 
 impl NetState {
@@ -62,6 +60,8 @@ struct Link {
     pass_used: bool,
     ctrl: Vec<u8>,
     rejected: Option<String>,
+    /// Playing as a guest whatever the launch said (its sign-in ran out).
+    guest: bool,
     /// The resume token this page was given (newer than the launch config's).
     resume: Option<[u8; el_proto::auth::TOKEN_BYTES]>,
     /// Reconnecting: when the next dial goes, and how many have.
@@ -97,6 +97,8 @@ impl Plugin for NetPlugin {
             .init_resource::<Session>()
             .configure_sets(Update, NetSet::Receive.before(NetSet::Send))
             .add_systems(Startup, connect)
+            // The desktop's goodbye, as the browser's page says it on `pagehide` (`web.rs`).
+            .add_systems(Last, goodbye_on_exit)
             // `report` after `talk`: a frame that seats us and feeds the first snapshot shows
             // both, never `started` beside the phase it left.
             .add_systems(
@@ -106,18 +108,34 @@ impl Plugin for NetPlugin {
     }
 }
 
-pub fn now_ms() -> f64 {
-    web_sys::window().and_then(|w| w.performance()).map_or(0.0, |p| p.now())
-}
+pub use crate::platform::{now_ms, now_s};
 
-/// The page's clock, s: what the client core and the datagram pump both run on.
-pub fn now_s() -> f64 {
-    now_ms() / 1_000.0
-}
+#[cfg(not(target_arch = "wasm32"))]
+mod native;
+#[cfg(target_arch = "wasm32")]
+mod web;
+#[cfg(not(target_arch = "wasm32"))]
+pub use native::sign_text;
+#[cfg(not(target_arch = "wasm32"))]
+use native::{dial, goodbye_on_exit, sign_with_wallet};
+#[cfg(target_arch = "wasm32")]
+pub use web::sign_text;
+#[cfg(target_arch = "wasm32")]
+use web::{dial, sign_with_wallet};
+/// The page says its goodbye on `pagehide` (`web.rs`).
+#[cfg(target_arch = "wasm32")]
+fn goodbye_on_exit() {}
+
+/// Set to dial now (the menu's way back from watching a record, which dialled nothing).
+pub static DIAL_NOW: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 fn connect(net: NonSend<NetState>, cfg: Res<LaunchConfigRes>) {
-    if cfg.0.record_url.is_some() || cfg.0.fxstage.is_some() {
-        // Watching: the record comes over HTTP (`watch`), nothing is dialled. The fx stage has no
+    if cfg.0.record_url.is_some()
+        || cfg.0.watch_newest
+        || cfg.0.fxstage.is_some()
+        || cfg.0.animstage.is_some()
+    {
+        // Watching: the record comes over HTTP (`watch`), nothing is dialled. The stages have no
         // match at all.
         return;
     }
@@ -128,136 +146,10 @@ fn connect(net: NonSend<NetState>, cfg: Res<LaunchConfigRes>) {
     dial(&net, &cfg.0, false);
 }
 
-/// Where to dial now, as the page's `elDiscover()` finds it: a server restarted since the page
-/// loaded may have a new certificate (and its hash) to pin. `None` if the page can't say.
-async fn discover() -> Option<(String, Option<Vec<u8>>)> {
-    use wasm_bindgen::JsCast;
-    let window = web_sys::window()?;
-    let f: js_sys::Function = js_sys::Reflect::get(&window, &"elDiscover".into()).ok()?.dyn_into().ok()?;
-    let promise: js_sys::Promise = f.call0(&window).ok()?.dyn_into().ok()?;
-    let found = wasm_bindgen_futures::JsFuture::from(promise).await.ok()?;
-    let url = js_sys::Reflect::get(&found, &"wtUrl".into()).ok()?.as_string()?;
-    let hash = js_sys::Reflect::get(&found, &"certHash".into())
-        .ok()?
-        .as_string()
-        .and_then(|h| crate::config::decode_hex(&h));
-    Some((url, hash))
-}
-
-/// Dials the server; the transport lands in `net`'s slot, or the reason it didn't in its error. A
-/// redial (`fresh`) asks the page where the server is first.
-fn dial(net: &NetState, cfg: &LaunchConfig, fresh: bool) {
-    let slot = net.transport.clone();
-    let err = net.error.clone();
-    let (mut url, mut hash) = (cfg.wt_url.clone(), cfg.cert_hash.clone());
-    wasm_bindgen_futures::spawn_local(async move {
-        if fresh && let Some(found) = discover().await {
-            (url, hash) = found;
-        }
-        match Transport::connect(&url, hash).await {
-            Ok(t) => {
-                t.start_pump(now_s);
-                say_goodbye_on_leaving(&t);
-                *slot.borrow_mut() = Some(t);
-            }
-            Err(e) => {
-                web_sys::console::error_1(&e.clone().into());
-                *err.borrow_mut() = Some(e);
-            }
-        }
-    });
-}
-
-/// A page closed or navigated away says goodbye first, so the server frees its place at once
-/// instead of waiting out the silence.
-fn say_goodbye_on_leaving(t: &Transport) {
-    use wasm_bindgen::JsCast;
-    use wasm_bindgen::closure::Closure;
-    let t = t.clone();
-    let bye = Closure::<dyn FnMut()>::new(move || {
-        let mut buf = [0u8; el_proto::control::MAX_FRAME];
-        match (ControlMsg::Bye { reason: el_proto::control::bye::LEAVE }).encode(&mut buf) {
-            Some(n) => t.close_with(buf[..n].to_vec()),
-            None => t.close(),
-        }
-    });
-    if let Some(w) = web_sys::window() {
-        let _ = w.add_event_listener_with_callback("pagehide", bye.as_ref().unchecked_ref());
-    }
-    // The listener lives as long as the page.
-    bye.forget();
-}
-
-/// What a JavaScript call threw, in words.
-fn js_said(e: wasm_bindgen::JsValue) -> String {
-    js_sys::Reflect::get(&e, &"message".into())
-        .ok()
-        .and_then(|m| m.as_string())
-        .or_else(|| e.as_string())
-        .unwrap_or_else(|| "it said no".into())
-}
-
-/// Calls `window.elWallet[method](args…)` and waits for its promise.
-async fn wallet_call(method: &str, args: &[wasm_bindgen::JsValue]) -> Result<wasm_bindgen::JsValue, String> {
-    use wasm_bindgen::JsCast;
-    let window = web_sys::window().ok_or("no window")?;
-    let wallet = js_sys::Reflect::get(&window, &"elWallet".into()).map_err(js_said)?;
-    let f: js_sys::Function = js_sys::Reflect::get(&wallet, &method.into())
-        .map_err(js_said)?
-        .dyn_into()
-        .map_err(|_| "no wallet script on the page")?;
-    let list = js_sys::Array::new();
-    for a in args {
-        list.push(a);
-    }
-    let promise: js_sys::Promise =
-        f.apply(&wallet, &list).map_err(js_said)?.dyn_into().map_err(|_| "the wallet didn't answer")?;
-    wasm_bindgen_futures::JsFuture::from(promise).await.map_err(js_said)
-}
-
-/// Answers the server's challenge: the wallet's account (an `0x` one or a Solana one, whichever the
-/// page's sign-in chose), the sign-in text for it (`el_auth`, the same text the server rebuilds to
-/// check), the wallet's signature over it.
-fn sign_with_wallet(
-    t: Transport,
-    nonce: [u8; el_proto::auth::NONCE_BYTES],
-    issued_at: u64,
-    domain: el_proto::auth::Domain,
-    err: Rc<RefCell<Option<String>>>,
-) {
-    wasm_bindgen_futures::spawn_local(async move {
-        let signed: Result<(), String> = async {
-            let account =
-                wallet_call("connect", &[]).await?.as_string().ok_or("the wallet gave no account")?;
-            let mut text = [0u8; el_auth::SIWE_MAX];
-            let msg = if let Some(key) = el_proto::auth::base58_key(&account) {
-                let n = el_auth::siws_message(domain.as_str(), &account, &nonce, issued_at, &mut text);
-                let text = std::str::from_utf8(&text[..n]).map_err(|_| "the sign-in text")?;
-                let sig = wallet_call("signSolana", &[text.into(), account.as_str().into()]).await?;
-                let signature = el_auth::parse_solana_signature(&sig.as_string().unwrap_or_default())
-                    .ok_or("the wallet's answer isn't a signature")?;
-                ControlMsg::AuthSolana { key, signature }
-            } else {
-                let address = el_auth::parse_address(&account)
-                    .ok_or("the wallet's account doesn't read as an address")?;
-                let n = el_auth::siwe_message(domain.as_str(), &address, &nonce, issued_at, &mut text);
-                let text = std::str::from_utf8(&text[..n]).map_err(|_| "the sign-in text")?;
-                let sig = wallet_call("sign", &[text.into(), account.as_str().into()]).await?;
-                let signature = el_auth::parse_signature(&sig.as_string().unwrap_or_default())
-                    .ok_or("the wallet's answer isn't a signature")?;
-                ControlMsg::Auth { address, signature }
-            };
-            let mut buf = [0u8; el_proto::control::MAX_FRAME];
-            let n = msg.encode(&mut buf).ok_or("the answer didn't fit")?;
-            t.send_control(buf[..n].to_vec());
-            Ok(())
-        }
-        .await;
-        if let Err(e) = signed {
-            *err.borrow_mut() = Some(format!("The wallet didn't sign in: {e}"));
-            t.close();
-        }
-    });
+/// Signs in from the menu: the browser's page loads again with `?signin=1` (its sign-in card, then
+/// a Hello that asks); the desktop starts again, signing in through the launcher.
+pub fn ask_sign_in() {
+    crate::platform::reload_with("signin", "1");
 }
 
 /// Sends a lobby message.
@@ -279,6 +171,14 @@ fn talk(
     if session.phase == Phase::Reconnecting && !redial(&net, &mut link, &cfg.0, &mut session) {
         return;
     }
+    if DIAL_NOW.swap(false, std::sync::atomic::Ordering::Relaxed) && net.get().is_none() {
+        *link = Link { guest: link.guest, ..Link::default() };
+        *net.error.borrow_mut() = None;
+        session.error = None;
+        session.phase = Phase::Connecting;
+        dial(&net, &cfg.0, true);
+        return;
+    }
     let Some(t) = net.get() else {
         if let Some(e) = net.error.borrow().as_ref() {
             session.phase = Phase::Failed;
@@ -295,12 +195,15 @@ fn talk(
         session.error = Some(e.clone());
     }
     if !link.hello_sent {
-        let name = if cfg.0.name.is_empty() { "Summoner" } else { cfg.0.name.as_str() };
+        let name = if cfg.0.name.is_empty() { "Player" } else { cfg.0.name.as_str() };
         let mut hello = ControlMsg::hello(PlayerKind::Human, name);
         let pass = cfg.0.pass.clone().filter(|_| !link.pass_used);
         if let ControlMsg::Hello { flags, resume, .. } = &mut hello {
-            match (cfg.0.sign_in, link.resume.or(cfg.0.resume), &pass) {
-                (true, Some(token), _) => {
+            // A sign-in kept from an earlier visit is used whether or not this load asks to
+            // sign in (a plain load after signing in stays signed in).
+            let kept = if link.guest { None } else { link.resume.or(cfg.0.resume) };
+            match (cfg.0.sign_in && !link.guest, kept, &pass) {
+                (_, Some(token), _) => {
                     *flags |= hello_flags::RESUME;
                     *resume = token;
                 }
@@ -350,18 +253,14 @@ fn talk(
                     // asked for.
                     session.practice = Some(champ);
                     send_lobby(&t, &ToServer::Practice { champ });
+                } else if let Some(token) = crate::config::rejoin_token() {
+                    // Back to the seat this tab had, if its match may still be on (menu or not: a
+                    // reload or a redial mid-match takes the seat back).
+                    send_lobby(&t, &ToServer::Rejoin { token });
+                    session.phase = Phase::Reconnecting;
                 } else if cfg.0.queue {
-                    // Back to the seat this tab had, if its match may still be on.
-                    match crate::config::rejoin_token() {
-                        Some(token) => {
-                            send_lobby(&t, &ToServer::Rejoin { token });
-                            session.phase = Phase::Reconnecting;
-                        }
-                        None => {
-                            send_lobby(&t, &ToServer::Queue);
-                            session.phase = Phase::Queued;
-                        }
-                    }
+                    send_lobby(&t, &ToServer::Queue);
+                    session.phase = Phase::Queued;
                 }
             }
             Frame::Msg(ControlMsg::Challenge { nonce, issued_at, domain }) => {
@@ -372,6 +271,18 @@ fn talk(
             Frame::Msg(ControlMsg::Token { token }) => {
                 crate::config::store_resume(Some(&token));
                 link.resume = Some(token);
+            }
+            // A sign-in kept from an earlier visit that's run out: forgotten, and in again as a
+            // guest (the menu's identity signs in again).
+            Frame::Msg(ControlMsg::Reject { reason: RejectReason::ResumeExpired }) if !link.guest => {
+                crate::config::store_resume(None);
+                link.resume = None;
+                t.close();
+                *net.transport.borrow_mut() = None;
+                *link = Link { guest: true, ..Link::default() };
+                session.phase = Phase::Connecting;
+                DIAL_NOW.store(true, std::sync::atomic::Ordering::Relaxed);
+                return;
             }
             Frame::Msg(ControlMsg::Reject { reason }) => {
                 link.rejected = Some(format!("{reason:?}"));
@@ -400,11 +311,17 @@ fn talk(
             Frame::Pass(_) => {}
             Frame::Lobby(bytes) => match serde_json::from_slice::<ToClient>(bytes) {
                 Ok(ToClient::Queued { waiting, fill_in }) => {
+                    // Queued by the party's leader, from the menu.
+                    if matches!(session.phase, Phase::Lobby | Phase::Over) {
+                        session.client = None;
+                        session.winner = None;
+                        session.phase = Phase::Queued;
+                    }
                     session.waiting = waiting;
                     session.fill_in = fill_in;
                     session.fill_at = now_s() + f64::from(fill_in);
                 }
-                Ok(ToClient::Select { seat, picks, bench, rerolls, ends_in, roster }) => {
+                Ok(ToClient::Select { seat, picks, bench, rerolls, ends_in, roster, .. }) => {
                     let ready = session.select.as_ref().is_some_and(|s| s.ready);
                     session.select = Some(SelectView {
                         seat: usize::from(seat).min(el_sim::units::SEATS - 1),
@@ -439,12 +356,9 @@ fn talk(
                         if *practice {
                             c.set_practice();
                         }
+                        session.begin_world();
                         session.client = Some(Box::new(c));
                         session.roster = roster.clone();
-                        session.winner = None;
-                        session.kd = Default::default();
-                        session.feed.clear();
-                        session.select = None;
                         session.phase = Phase::Playing;
                     }
                 }
@@ -465,10 +379,48 @@ fn talk(
                         send_lobby(&t, &ToServer::Queue);
                         session.phase = Phase::Queued;
                     } else {
+                        // PRACTICE from the menu on a server without it: said, and back to the menu.
+                        if session.practice.take().is_some() {
+                            session.refused = Some("This server holds no practice matches.".into());
+                        }
                         session.phase = Phase::Lobby;
                     }
                 }
-                Err(e) => web_sys::console::warn_1(&format!("lobby message: {e}").into()),
+                Ok(ToClient::About { player, practice, ranked }) => {
+                    session.player = player;
+                    session.practice_here = practice;
+                    session.ranked_here = ranked;
+                }
+                Ok(ToClient::Ranked { state, waited_s, why }) => {
+                    let line = el_client_core::lobby::ranked_line(&state, waited_s, why.as_deref());
+                    // The store let the wait go (or never took it): back to the menu, saying why.
+                    if el_client_core::lobby::ranked_ended(&state) && session.phase == Phase::Queued {
+                        session.phase = Phase::Lobby;
+                        session.refused = Some(line.clone());
+                        session.ranked_line = None;
+                    } else {
+                        // Queued again (a select called off), or by the party's leader.
+                        if state == "waiting"
+                            && matches!(session.phase, Phase::Lobby | Phase::Over | Phase::Selecting)
+                        {
+                            session.select = None;
+                            session.client = None;
+                            session.phase = Phase::Queued;
+                        }
+                        session.ranked_line = Some(line);
+                    }
+                }
+                Ok(ToClient::Party { leader, members, invites_in }) => {
+                    session.party = crate::session::PartyView { leader, members, invites_in };
+                }
+                Ok(ToClient::Refused { why, .. }) => {
+                    if session.phase == Phase::Queued {
+                        session.phase = Phase::Lobby;
+                    }
+                    session.ranked_line = None;
+                    session.refused = Some(why);
+                }
+                Err(e) => warn!("lobby message: {e}"),
             },
             _ => {}
         }
@@ -540,17 +492,31 @@ fn send(net: NonSend<NetState>, mut session: ResMut<Session>, mut controls: ResM
         // Into the queue from the lobby, or again once a match is over (the server lets the old
         // seat go); out of it while waiting.
         match (&msg, session.phase) {
-            (ToServer::Queue, Phase::Lobby | Phase::Over) => {
+            (ToServer::Queue | ToServer::QueueRanked, Phase::Lobby | Phase::Over) => {
                 send_lobby(&t, &msg);
                 session.client = None;
                 session.winner = None;
                 session.waiting = 0;
+                session.ranked_line = None;
                 session.phase = Phase::Queued;
                 continue;
             }
             (ToServer::Leave, Phase::Queued) => {
                 send_lobby(&t, &msg);
+                session.ranked_line = None;
                 session.phase = Phase::Lobby;
+                continue;
+            }
+            // Out of a match on purpose: the seat is let go for good (the server forgets its
+            // token, and so does this page), so a reload doesn't pull the player back in.
+            (ToServer::Leave, Phase::Playing | Phase::Reconnecting | Phase::Selecting) => {
+                send_lobby(&t, &msg);
+                crate::config::store_rejoin(None);
+                session.practice = None;
+                session.client = None;
+                session.begin_world();
+                session.phase = Phase::Lobby;
+                session.left = true;
                 continue;
             }
             _ => {}

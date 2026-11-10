@@ -157,8 +157,9 @@ async function main() {
   const config = {
     echo: params.get("mode") === "echo",
     name: params.get("name") || "",
-    // Into the queue as soon as the server says hello (`?queue=0`: stay in the lobby).
-    queue: params.get("queue") !== "0",
+    // Straight into the queue as soon as the server says hello (`?queue=1`), past the main menu,
+    // which a plain load opens on.
+    queue: params.get("queue") === "1",
     // A practice match instead (`?practice=1`, on a server started with `--practice`): one seat,
     // any champion (`&champ=<number>`), every rank, no cooldowns, target dummies. The frame-rate
     // bench (`?bench=1`, `el-client/src/bench.rs`) runs over one.
@@ -166,6 +167,9 @@ async function main() {
     practiceChamp: Number(params.get("champ") || 0) | 0,
     bench: params.get("bench") === "1",
     renderer: rendererName(),
+    // What a match draws, drawn before it (`el-client/src/warm.rs`); `?warm=0` leaves it to the
+    // match, to compare (`scripts/e2e.sh hitches` counts what's built late).
+    warm: params.get("warm") !== "0",
     // Sign in with the browser's wallet (`?signin=1`): back on the resume token from the last
     // sign-in while it's good, so the wallet isn't asked every time.
     signIn: params.get("signin") === "1",
@@ -187,24 +191,34 @@ async function main() {
     fxside: params.get("side") || "own",
     fxsize: Number(params.get("size") || 0),
     fxcards: params.get("cards") || "",
+    // The anim stage (`?animstage=<champion>-<act>`, `el-client/src/animstage.rs`): one champion
+    // alone on the same stepped clock, no server; `&knobs=` retunes its motion.
+    animstage: params.get("animstage") || "",
   };
-  if (config.signIn) {
-    try {
-      config.resume = localStorage.getItem("el.resume") || "";
-    } catch (_) {
-      config.resume = "";
-    }
+  // Back on the token the last sign-in left, on any load: a player who signed in stays signed in.
+  try {
+    config.resume = localStorage.getItem("el.resume") || "";
+  } catch (_) {
+    config.resume = "";
   }
+  if (config.resume) config.signIn = true;
   // Watching: a live match's record a minute behind (`?watch=<id>`, from /records.json), or any
   // record (`?replay=<url>`). No connection is made: the record is fetched over HTTP.
   const srv = window.elServer || { url: (p) => p };
-  if (params.get("watch")) {
+  // The game server's HTTP side, for the menu's WATCH (`records.json`) and the records.
+  config.httpBase = srv.url("");
+  if (params.get("watch") === "live") {
+    // The newest live match, found in records.json once the client is up (chat's and the
+    // stream kit's link: `?watch=live`).
+    config.watchNewest = true;
+  } else if (params.get("watch")) {
     config.recordUrl = srv.url(`records/${encodeURIComponent(params.get("watch"))}`);
     config.watchLive = true;
   } else if (params.get("replay")) {
     config.recordUrl = params.get("replay");
   }
-  if (config.recordUrl || config.fxstage) {
+  // Found even when watching (nothing is dialled then): the menu dials it later, from WATCH's way back.
+  if (config.fxstage || config.animstage) {
     // Nothing to dial.
   } else if (!("WebTransport" in window)) {
     config.noWebTransport = true;
@@ -218,10 +232,8 @@ async function main() {
     step("loader", "signing in…");
     Object.assign(config, await window.elSignIn.choose(window.elServer.url("")));
   }
-  // A guest on the published page gets the way back to signing in.
-  if (!config.signIn && !config.noWebTransport && window.elServer.http && !params.has("watch") && !params.has("replay")) {
-    window.elSignIn.offerLink();
-  }
+  // A guest signs in from the game's own menu (its identity, or RANKED), which loads the page
+  // again with ?signin=1.
   window.EL_CONFIG = config;
   step("graphics", "choosing WebGPU or WebGL 2…");
   const built = await builtModules();

@@ -8,6 +8,7 @@
 pub mod director;
 pub mod look;
 pub mod mix;
+pub mod out;
 pub mod sound;
 pub mod stage;
 pub mod vo;

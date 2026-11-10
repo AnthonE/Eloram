@@ -1,0 +1,24 @@
+Eloram
+Copyright (c) Anthony Eckert. MIT licence (LICENSE).
+
+What ships with it that isn't its own code, and under what terms:
+
+**The art** (`web/assets/`): every file's source and licence is in `art/LICENSES.md` (shipped
+beside the desktop build as `ART-LICENSES.md`): CC0 sets (ambientCG, Kenney), and models,
+textures and sounds made for this project.
+
+**Roboto Condensed**: Apache-2.0, © 2011 Google Inc.
+`crates/el-client/fonts/RobotoCondensed-{Regular,Bold}.ttf`, compiled into the client with
+`include_bytes!` (the main menu's type). The licence that must travel with them is
+`crates/el-client/fonts/LICENSE-ROBOTO.txt`, shipped beside the desktop build and the page.
+
+**The mingw-w64 runtime** (the Windows desktop build only): `libgcc_s_seh-1.dll`,
+`libwinpthread-1.dll` and whatever else the build imports from the toolchain, shipped beside
+`eloram.exe` with their notice, `LICENSE-MINGW-RUNTIME.txt` (`ops/licenses/MINGW-RUNTIME.txt`).
+
+**Code after Gates** (`AnthonE/Gates`, MIT, © MoreRight DAO): the main menu's kit, the launcher's
+wrapper, the settings file's shape, the depot packager and publisher, the server list's writer,
+each marked where it is.
+
+**The Elo Pros SDK file** (`crates/el-launcher/src/elo_overlay.rs`): the platform's own
+(`AnthonE/elo-pros-launcher`, MIT), vendored byte for byte.

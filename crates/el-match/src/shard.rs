@@ -330,7 +330,18 @@ impl Shard {
         {
             self.reported[mi] = true;
             let (tick, hash) = (m.tick, m.hash());
-            let _ = self.shared.outcomes.push(Outcome::Over { m: mi as u16, winner, tick, hash });
+            let mut line = [crate::queues::SeatLine::default(); el_sim::units::SEATS];
+            for (l, c) in line.iter_mut().zip(m.champs.iter()) {
+                *l = crate::queues::SeatLine {
+                    champ: c.def,
+                    level: c.level,
+                    kills: c.kills,
+                    deaths: c.deaths,
+                    assists: c.assists,
+                    last_hits: c.last_hits,
+                };
+            }
+            let _ = self.shared.outcomes.push(Outcome::Over { m: mi as u16, winner, tick, hash, line });
             self.shared.states[mi].store(MatchState::Over as u32, Ordering::Release);
             let n = record::write_outcome(&mut self.frame, tick, winner);
             self.record(mi, n);

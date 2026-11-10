@@ -31,10 +31,15 @@ impl Plugin for SceneryPlugin {
     fn build(&self, app: &mut App) {
         bevy::asset::embedded_asset!(app, "shaders/snow.wgsl");
         bevy::asset::embedded_asset!(app, "shaders/flame.wgsl");
-        app.add_plugins((MaterialPlugin::<SnowMat>::default(), MaterialPlugin::<FlameMat>::default()))
-            .add_systems(PreStartup, load)
-            .add_systems(Startup, (place, brush, snow))
-            .add_systems(Update, (ready, report));
+        bevy::asset::embedded_asset!(app, "shaders/embers.wgsl");
+        app.add_plugins((
+            MaterialPlugin::<SnowMat>::default(),
+            MaterialPlugin::<FlameMat>::default(),
+            MaterialPlugin::<EmberMat>::default(),
+        ))
+        .add_systems(PreStartup, load)
+        .add_systems(Startup, (place, brush, snow))
+        .add_systems(Update, (ready, report));
     }
 }
 
@@ -76,6 +81,10 @@ pub enum Kind {
     Plain,
     /// Its crystal (between these percentages of its height) glowing in a team's colour.
     Glow(u8, u8, u8),
+    /// As it is, standing far down in the chasm (no floor at its foot).
+    Deep,
+    /// Rock on the lane, broken into blocks that each catch the moon.
+    Rock,
     /// Ice, lit faintly from within.
     Ice,
     /// Darkened, cold: a structure fallen.
@@ -106,10 +115,19 @@ impl Models {
                 let mut base = standard(gltf_mats.get(&m.mat)?);
                 base.double_sided = true;
                 base.cull_mode = None;
-                let mut params = FoggedParams { look: Vec4::new(0.0, 0.0, 0.0, 0.0), tint: Vec4::ZERO };
+                // Everything stone is weathered; what stands in the chasm meets no floor.
+                let mut params = FoggedParams { wear: WEAR, ..default() };
                 match kind {
                     Kind::Plain => {}
+                    Kind::Deep => params.wear.y = 0.0,
+                    // Its top is its own snow: no frost over it.
+                    Kind::Rock => {
+                        params.wear.z = 0.0;
+                        params.wear.w = 0.6;
+                    }
                     Kind::Glow(team, from, to) => {
+                        // A structure reads clean, in its team's colour: no frost over it.
+                        params.wear.z = 0.0;
                         let h = extent.y * scale / 100.0;
                         params.look.x = 4.0;
                         params.look.w = h * f32::from(from);
@@ -117,6 +135,7 @@ impl Models {
                         params.tint.w = h * f32::from(to) + 0.31;
                     }
                     Kind::Ice => {
+                        params.wear = Vec4::ZERO;
                         params.look.x = 0.45;
                         params.look.w = -100.0;
                         params.tint.w = 100.0;
@@ -125,6 +144,7 @@ impl Models {
                     Kind::Ruin => {
                         base.base_color = Color::srgb(0.38, 0.40, 0.46);
                         params.look.y = 0.8;
+                        params.wear.z = 0.0;
                     }
                 }
                 let h = mats.add(fog.fogged(base, params));
@@ -135,6 +155,10 @@ impl Models {
         Some((mesh, scale, mat))
     }
 }
+
+/// How the stone models are weathered (`FoggedParams::wear`): a mottle so no two statues are one
+/// value, grime where they meet the floor, a little frost on their flat tops.
+const WEAR: Vec4 = Vec4::new(0.16, 0.45, 0.55, 0.0);
 
 /// A glTF's material as Bevy's standard one: what Meshy's models carry (colour, normal and
 /// metal-roughness maps).
@@ -202,7 +226,11 @@ fn place(mut commands: Commands, look: Res<Look>) {
             Prop::Brazier => Size::Radius(p.radius * S * 1.05),
             _ => Size::Height(p.height * S),
         };
-        let kind = if matches!(p.prop, Prop::Spire | Prop::IceSpikes) { Kind::Ice } else { Kind::Plain };
+        let kind = match p.prop {
+            Prop::Spire | Prop::IceSpikes => Kind::Ice,
+            _ if p.depth > 0.0 => Kind::Deep,
+            _ => Kind::Plain,
+        };
         commands.spawn((
             Transform::from_translation(world(p.at, -p.depth * S))
                 .with_rotation(Quat::from_rotation_y(p.yaw)),
@@ -221,7 +249,7 @@ fn place(mut commands: Commands, look: Res<Look>) {
         commands.spawn((
             Transform::from_translation(world(d.0, -0.05)).with_rotation(Quat::from_rotation_y(yaw)),
             Visibility::default(),
-            Wants { name, size, kind: Kind::Plain, fire: false },
+            Wants { name, size, kind: Kind::Rock, fire: false },
         ));
     }
 }
@@ -235,6 +263,7 @@ fn ready(
     gltf_mats: Res<Assets<bevy::gltf::GltfMaterial>>,
     mut mats: ResMut<Assets<FoggedMat>>,
     mut flames: ResMut<Assets<FlameMat>>,
+    mut ember_mats: ResMut<Assets<EmberMat>>,
     mut quad: Local<Option<Handle<Mesh>>>,
     fog: Res<FogTex>,
     look: Res<Look>,
@@ -257,6 +286,8 @@ fn ready(
             m.bounds = Some((Vec3::new(-size.x * 0.5, 0.0, -size.z * 0.5), size));
         }
     }
+    // The fires that came in this frame, for their embers.
+    let mut fires = Vec::new();
     for (e, w, mut tf) in &mut wanting {
         let Some((mesh, scale, mat)) = models.get(w.name, w.size, w.kind, &fog, &gltf_mats, &mut mats) else {
             continue;
@@ -300,7 +331,17 @@ fn ready(
                     Transform::from_xyz(0.0, top * s + 0.6 * s, 0.0),
                 ));
             });
+            fires.push(tf.translation + Vec3::Y * (top + 0.25));
         }
+    }
+    // Their sparks: one mesh and material for every fire, drawn together.
+    if !fires.is_empty() {
+        commands.spawn((
+            Mesh3d(meshes.add(ember_mesh(&fires, if look.high { 28 } else { 12 }))),
+            MeshMaterial3d(ember_mats.add(EmberMat {})),
+            Transform::default(),
+            bevy::light::NotShadowCaster,
+        ));
     }
 }
 
@@ -351,7 +392,7 @@ fn brush(
             perceptual_roughness: 0.8,
             ..default()
         },
-        FoggedParams { look: Vec4::new(0.0, 0.0, 1.0, 0.0), tint: Vec4::ZERO },
+        FoggedParams { look: Vec4::new(0.0, 0.0, 1.0, 0.0), ..default() },
     ));
     for (b, r) in map::brushes().iter().enumerate() {
         let (lo, hi) = (r.0, r.1);
@@ -429,6 +470,53 @@ impl Material for FlameMat {
     fn alpha_mode(&self) -> AlphaMode {
         AlphaMode::Add
     }
+}
+
+/// The braziers' embers (`shaders/embers.wgsl`).
+#[derive(Asset, AsBindGroup, TypePath, Debug, Clone, Default)]
+pub struct EmberMat {}
+
+impl Material for EmberMat {
+    fn vertex_shader() -> ShaderRef {
+        "embedded://el_client/shaders/embers.wgsl".into()
+    }
+    fn fragment_shader() -> ShaderRef {
+        "embedded://el_client/shaders/embers.wgsl".into()
+    }
+    fn alpha_mode(&self) -> AlphaMode {
+        AlphaMode::Add
+    }
+}
+
+/// `n` embers over each fire: a quad each, its four corners at one seed over the fire (x and z
+/// across it, -1 to 1 m; y up the column it rises through, so the mesh's bounds hold it as the
+/// shader moves it), the fire's place in the normal.
+fn ember_mesh(fires: &[Vec3], n: u32) -> Mesh {
+    let count = fires.len() * n as usize * 4;
+    let mut pos = Vec::with_capacity(count);
+    let mut fire = Vec::with_capacity(count);
+    let mut uv = Vec::with_capacity(count);
+    let mut idx = Vec::with_capacity(fires.len() * n as usize * 6);
+    for (f, at) in fires.iter().enumerate() {
+        for e in 0..n {
+            let s = f as u32 * n + e;
+            let a = hash01(s, 21) * std::f32::consts::TAU;
+            let r = hash01(s, 22).sqrt();
+            let p = *at + Vec3::new(a.cos() * r, hash01(s, 23) * 2.6, a.sin() * r);
+            let k = pos.len() as u32;
+            for c in [[0.0f32, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]] {
+                pos.push(p.to_array());
+                fire.push(at.to_array());
+                uv.push(c);
+            }
+            idx.extend([k, k + 1, k + 2, k, k + 2, k + 3]);
+        }
+    }
+    Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, pos)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, fire)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uv)
+        .with_inserted_indices(Indices::U32(idx))
 }
 
 fn snow(

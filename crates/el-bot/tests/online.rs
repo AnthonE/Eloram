@@ -42,7 +42,7 @@ async fn agents_play_a_match_over_webtransport() {
     }
     tokio::time::sleep(Duration::from_secs(6)).await;
     let launcher = el_bot::get_json(&server, "/status.json").await.unwrap();
-    assert_eq!((launcher["players"].as_u64(), launcher["agents"].as_u64()), (Some(0), Some(2)), "{launcher}");
+    assert_eq!((launcher["players"].as_u64(), launcher["agents"].as_u64()), (Some(2), Some(2)), "{launcher}");
     let status = el_bot::get_json(&server, "/status").await.unwrap();
     assert_eq!(status["game"]["matches"], 1, "{status}");
     // The store's roster: the signed-in agent's wallet (test key 1's), and not the guest.

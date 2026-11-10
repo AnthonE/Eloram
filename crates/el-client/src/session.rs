@@ -108,6 +108,38 @@ pub struct Session {
     pub practice: Option<u8>,
     /// The client's events read so far.
     feed_read: u64,
+    /// Which world is drawn: a match played or a record watched, counted from 0. Anything that
+    /// reads the world's events by count (the kill feed here, the figures' casts and falls) starts
+    /// again from its first event when this moves on: a new match's count starts at 0 too.
+    pub world: u32,
+    /// What the server said of us and itself after the Welcome (`ToClient::About`): who it knows
+    /// us as, and whether it holds practice and ranked matches.
+    pub player: Option<String>,
+    pub practice_here: bool,
+    pub ranked_here: bool,
+    /// The ranked queue, as the server relays the store's: a line to show, while queued.
+    pub ranked_line: Option<String>,
+    /// The last thing the server turned down, in words (`ToClient::Refused`), until shown.
+    pub refused: Option<String>,
+    /// A match left on purpose: the main menu comes back up.
+    pub left: bool,
+    /// The party, as the server last told it (`ToClient::Party`).
+    pub party: PartyView,
+}
+
+/// The party: its leader's session (0: none), its members, and the asks into others'.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PartyView {
+    pub leader: u32,
+    pub members: Vec<el_client_core::lobby::PartyMember>,
+    pub invites_in: Vec<el_client_core::lobby::PartyAsk>,
+}
+
+impl PartyView {
+    /// In a party of two or more.
+    pub fn on(&self) -> bool {
+        self.members.len() > 1
+    }
 }
 
 /// What a ping says, in words.
@@ -124,6 +156,18 @@ pub fn ping_words(kind: u8) -> &'static str {
 }
 
 impl Session {
+    /// A new world is about to be drawn (a match seated, a record watched, or none any more): what
+    /// was told of the last one goes.
+    pub fn begin_world(&mut self) {
+        self.world = self.world.wrapping_add(1);
+        self.feed_read = 0;
+        self.kd = Default::default();
+        self.feed.clear();
+        self.pings = 0;
+        self.winner = None;
+        self.select = None;
+    }
+
     /// The name in seat `s`: its player's, or (a record watched names no one) its champion's.
     pub fn name(&self, s: usize) -> &str {
         if let Some(p) = self.roster.get(s) {

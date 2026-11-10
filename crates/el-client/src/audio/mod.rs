@@ -1,50 +1,46 @@
-//! The sound engine (`docs/FX.md`, "Sound"): the browser's Web Audio, straight, so the browser
-//! decodes the files (no decoder in the wasm) and schedules each sound to the sample.
+//! The sound (`docs/FX.md`, "Sound"): which sounds start, where they sit and how loud, decided
+//! the same way in the browser and on the desktop; played by Web Audio in the browser
+//! (`web.rs`) and by the desktop's own mixing desk on its sound card (`native.rs`).
 //!
-//! The graph: every effect is its own source → a low pass (what's off the screen is dulled) → its
-//! gain → an equal-power stereo panner (where it is across the screen) → the front of the effects
-//! bus (the ladder's top three rungs) or its back (allies' and the world's, which duck under a big
-//! moment); then the six buses (effects, the champions' voices, the announcer, interface,
-//! ambience, music) → the master → a
-//! limiter → the speakers. Which sounds may start, and which give way, is the mixer's
-//! (`el_client_core::fx::mix`); which line the announcer says, `fx::voice`'s; which line a
-//! champion says, `fx::vo`'s. A champion's lines go to their own bus, placed where it stands as
-//! the effects are (the player's own in the middle), one at a time a champion and three
-//! champions at most at once, the player's own always heard; the announcer's line is shown on
-//! the banner as it's said (`hud_banner.rs`), heard if its file is there.
-//!
-//! The files are found from `assets/audio/files.json` (written by `scripts/build-web.sh` from what
-//! is there): Opus where the browser plays it, MP3 where it doesn't. The shared sounds load with
-//! the page, a family's and a champion's lines once a match (or champion select) deals that
-//! champion, and the announcer's lines and the music whenever their files are there. A browser
-//! starts its audio only after a click or a key: the first one resumes it.
-
-use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+//! Every effect is its own sound → a low pass (what's off the screen is dulled) → its gain → an
+//! equal-power stereo panner (where it is across the screen) → the front of the effects bus (the
+//! ladder's top three rungs) or its back (allies' and the world's, which duck under a big moment);
+//! then the six buses (effects, the champions' voices, the announcer, interface, ambience, music)
+//! → the master → a limiter → the speakers. Which sounds may start, and which give way, is the
+//! mixer's (`el_client_core::fx::mix`); which line the announcer says, `fx::voice`'s; which line a
+//! champion says, `fx::vo`'s. A champion's lines go to their own bus, placed where it stands as the
+//! effects are (the player's own in the middle), one at a time a champion and three champions at
+//! most at once, the player's own always heard; the announcer's line is shown on the banner as
+//! it's said (`hud_banner.rs`), heard if its file is there. The shared sounds load at the start, a
+//! family's and a champion's lines once a match (or champion select) deals that champion, and the
+//! announcer's lines and the music whenever their files are there.
 
 use bevy::prelude::*;
 use el_client_core::fx::look::Family;
 use el_client_core::fx::mix::{self, Admit, Mixer};
+use el_client_core::fx::out::Route;
 use el_client_core::fx::sound::{Bus, Part, Sfx};
 use el_client_core::fx::vo::{self, Line};
 use el_client_core::fx::voice::Music;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::{JsCast, JsValue};
-use wasm_bindgen_futures::JsFuture;
-use web_sys::{
-    AudioBuffer, AudioBufferSourceNode, AudioContext, AudioContextState, BiquadFilterType, GainNode,
-};
+
+#[cfg(not(target_arch = "wasm32"))]
+mod native;
+#[cfg(target_arch = "wasm32")]
+mod web;
+#[cfg(not(target_arch = "wasm32"))]
+use native::{Out, Voice};
+#[cfg(target_arch = "wasm32")]
+use web::{Out, Voice};
 
 use crate::camera::MainCamera;
 use crate::coords::world;
 use crate::dev_hooks::DevStatus;
 use crate::fx::{Cues, FxSet};
 use crate::hud_banner::Banner;
-use crate::net::now_s;
+use crate::platform::now_s;
 use crate::session::{Phase, Session};
 
-/// The volumes on the page: the master's, then each bus's (in `Bus::ALL`'s order), 0 to 1.
+/// The volumes: the master's, then each bus's (in `Bus::ALL`'s order), 0 to 1.
 #[derive(Resource, Clone, Debug, PartialEq)]
 pub struct AudioSettings {
     pub master: f32,
@@ -64,15 +60,18 @@ impl Default for AudioSettings {
     }
 }
 
-/// Where the page keeps them.
+/// The route to bus `b`, straight.
+fn bus(b: Bus) -> Route {
+    Route::Bus(b.index() as u8)
+}
+
+/// Where they're kept (`localStorage` in the browser, the settings file on the desktop).
 const SETTINGS_KEY: &str = "el.audio";
 
 impl AudioSettings {
     fn load() -> Self {
-        let text = web_sys::window()
-            .and_then(|w| w.local_storage().ok().flatten())
-            .and_then(|s| s.get_item(SETTINGS_KEY).ok().flatten());
         let mut s = AudioSettings::default();
+        let text = crate::platform::kv_get(SETTINGS_KEY);
         let Some(v) = text.and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok()) else { return s };
         let get = |k: &str| v.get(k).and_then(|x| x.as_f64()).map(|x| (x as f32).clamp(0.0, 1.0));
         s.master = get("master").unwrap_or(s.master);
@@ -88,9 +87,7 @@ impl AudioSettings {
         for (k, b) in Bus::ALL.iter().enumerate() {
             v[b.name()] = serde_json::json!(self.buses[k]);
         }
-        if let Some(s) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
-            let _ = s.set_item(SETTINGS_KEY, &v.to_string());
-        }
+        crate::platform::kv_set(SETTINGS_KEY, &v.to_string());
     }
 
     /// A bus's volume set by its name (or the master's, by `"master"`).
@@ -104,65 +101,48 @@ impl AudioSettings {
     }
 }
 
-/// The decoded files, by their stem, and what's on the server.
-#[derive(Default)]
-struct Store {
-    /// The files `files.json` lists (their stems, for the format played), once it's in.
-    listed: Option<HashSet<String>>,
-    asked: HashSet<String>,
-    buffers: HashMap<String, AudioBuffer>,
-    failed: u32,
-}
-
-/// A sound playing: its id (the mixer's), its source, its gain, and when it's over.
+/// A sound playing: its id (the mixer's), its voice, and when it's over.
 struct Playing {
     id: u32,
-    src: AudioBufferSourceNode,
-    gain: GainNode,
+    voice: Voice,
     ends: f64,
 }
 
-/// A champion's line playing: whose, its source and gain, when it's over.
+/// A champion's line playing: whose, its voice, whether it's the player's own, when it's over.
 struct Talking {
     seat: u8,
     own: bool,
-    src: AudioBufferSourceNode,
-    gain: GainNode,
+    voice: Voice,
     ends: f64,
 }
 
 /// Champions' lines sounding at once, at most (the player's own always gets through).
 const VO_VOICES: usize = 3;
 
-/// A bed that loops (the wind, a brazier's fire, the music): its source and gain.
+/// A bed that loops (the wind, a brazier's fire, the music): its voice, and whether it's placed.
 struct Bed {
     sfx: Sfx,
-    src: AudioBufferSourceNode,
-    gain: GainNode,
-    pan: Option<web_sys::StereoPannerNode>,
+    voice: Voice,
+    placed: bool,
 }
 
 pub struct Engine {
-    ctx: AudioContext,
-    master: GainNode,
-    buses: Vec<GainNode>,
-    front: GainNode,
-    back: GainNode,
-    store: Rc<RefCell<Store>>,
-    ext: &'static str,
+    out: Out,
     mixer: Mixer,
     playing: Vec<Playing>,
     wind: Option<Bed>,
     fire: Option<Bed>,
     music: Option<(Music, Bed)>,
     voice_until: f64,
+    /// The announcer's line sounding, and when it's over.
+    line: Option<(Voice, f64)>,
     talking: Vec<Talking>,
+    shared: bool,
     families: [bool; Family::COUNT],
     champions: [bool; el_sim::content::champions::CHAMPIONS.len()],
     /// The champion select's own champion, and its pick line still to say (while it loads).
     picked: Option<u8>,
     pick_due: Option<(u8, f64)>,
-    unlocked: Rc<Cell<bool>>,
     applied: Option<AudioSettings>,
     // What the page did last frame, for the interface's sounds.
     phase: Phase,
@@ -180,6 +160,8 @@ struct Stats {
     last: &'static str,
     /// The own champion's casts heard: their sounds started.
     own_casts: u32,
+    /// The own champion's steps heard.
+    steps: u32,
     /// Champions' lines heard, not loaded (or not there), and cut for room; the last heard.
     vo_lines: u32,
     vo_missing: u32,
@@ -187,97 +169,58 @@ struct Stats {
     vo_last: String,
 }
 
-fn js<T>(r: Result<T, JsValue>) -> Option<T> {
-    r.ok()
-}
-
 impl Engine {
-    fn new() -> Option<Engine> {
-        let ctx = js(AudioContext::new())?;
-        let gain = |ctx: &AudioContext| js(ctx.create_gain());
-        let limiter = js(ctx.create_dynamics_compressor())?;
-        // A limiter on everything: fast, hard, just under the top.
-        limiter.threshold().set_value(-6.0);
-        limiter.knee().set_value(4.0);
-        limiter.ratio().set_value(14.0);
-        limiter.attack().set_value(0.002);
-        limiter.release().set_value(0.12);
-        let master = gain(&ctx)?;
-        js(master.connect_with_audio_node(&limiter))?;
-        js(limiter.connect_with_audio_node(&ctx.destination()))?;
-        let mut buses = Vec::new();
-        for _ in Bus::ALL {
-            let b = gain(&ctx)?;
-            js(b.connect_with_audio_node(&master))?;
-            buses.push(b);
-        }
-        let front = gain(&ctx)?;
-        let back = gain(&ctx)?;
-        js(front.connect_with_audio_node(&buses[Bus::Effects.index()]))?;
-        js(back.connect_with_audio_node(&buses[Bus::Effects.index()]))?;
-        let ext = if can_play_opus() { "ogg" } else { "mp3" };
-        let unlocked = Rc::new(Cell::new(false));
-        unlock_on_gesture(&ctx, unlocked.clone());
-        let e = Engine {
-            ctx,
-            master,
-            buses,
-            front,
-            back,
-            store: Rc::new(RefCell::new(Store::default())),
-            ext,
+    fn new(asset_root: &std::path::Path) -> Option<Engine> {
+        #[cfg(target_arch = "wasm32")]
+        let out = Out::new(asset_root)?;
+        #[cfg(not(target_arch = "wasm32"))]
+        let out = Out::new(asset_root);
+        Some(Engine {
+            out,
             mixer: Mixer::default(),
             playing: Vec::new(),
             wind: None,
             fire: None,
             music: None,
             voice_until: 0.0,
+            line: None,
             talking: Vec::new(),
+            shared: false,
             families: [false; Family::COUNT],
             champions: [false; el_sim::content::champions::CHAMPIONS.len()],
             picked: None,
             pick_due: None,
-            unlocked,
             applied: None,
             phase: Phase::Connecting,
             select: None,
             stats: Stats::default(),
-        };
-        e.list();
-        Some(e)
+        })
     }
 
-    /// Asks the server what files there are; then loads the shared sounds.
-    fn list(&self) {
-        let store = self.store.clone();
-        let ctx = self.ctx.clone();
-        let ext = self.ext;
-        wasm_bindgen_futures::spawn_local(async move {
-            let Some(text) = fetch_text("assets/audio/files.json").await else { return };
-            let names: Vec<String> = serde_json::from_str(&text).unwrap_or_default();
-            let suffix = format!(".{ext}");
-            let listed: HashSet<String> =
-                names.iter().filter_map(|n| n.strip_suffix(&suffix)).map(str::to_string).collect();
-            store.borrow_mut().listed = Some(listed);
-            // The shared sounds (all but the families'), the announcer's and the music.
-            for &s in Sfx::ALL.iter().skip(Family::COUNT * Part::COUNT) {
-                for k in 0..s.def().takes {
-                    load(&store, &ctx, s.file(k), ext);
-                }
+    /// The shared sounds (all but the families'), the announcer's and the music: once the list of
+    /// files is in.
+    fn load_shared(&mut self) {
+        if self.shared || !self.out.listed() {
+            return;
+        }
+        self.shared = true;
+        for &s in Sfx::ALL.iter().skip(Family::COUNT * Part::COUNT) {
+            for k in 0..s.def().takes {
+                self.out.want(&s.file(k));
             }
-        });
+        }
     }
 
     /// Loads family `f`'s sounds (once).
     fn family(&mut self, f: usize) {
-        if self.families[f] || self.store.borrow().listed.is_none() {
+        if self.families[f] || !self.out.listed() {
             return;
         }
         self.families[f] = true;
         for p in 0..Part::COUNT {
             let s = Sfx::ALL[f * Part::COUNT + p];
             for k in 0..s.def().takes {
-                load(&self.store, &self.ctx, s.file(k), self.ext);
+                self.out.want(&s.file(k));
             }
         }
     }
@@ -285,196 +228,57 @@ impl Engine {
     /// Loads champion `c`'s lines (once).
     fn champion(&mut self, c: u8) {
         let k = usize::from(c);
-        if k >= self.champions.len() || self.champions[k] || self.store.borrow().listed.is_none() {
+        if k >= self.champions.len() || self.champions[k] || !self.out.listed() {
             return;
         }
         self.champions[k] = true;
         for line in Line::ALL {
             for t in 0..vo::script(c).takes(line).len() as u8 {
-                load(&self.store, &self.ctx, vo::file(c, line, t), self.ext);
+                self.out.want(&vo::file(c, line, t));
             }
         }
     }
 
-    fn buffer(&self, stem: &str) -> Option<AudioBuffer> {
-        self.store.borrow().buffers.get(stem).cloned()
-    }
-
-    /// Applies the page's volumes (the master's and each bus's), smoothly.
+    /// Applies the volumes (the master's and each bus's), smoothly.
     fn apply(&mut self, s: &AudioSettings) {
         if self.applied.as_ref() == Some(s) {
             return;
         }
-        let t = self.ctx.current_time();
-        let m = if s.muted { 0.0 } else { s.master };
-        let _ = self.master.gain().set_target_at_time(m, t, 0.05);
-        for (k, b) in self.buses.iter().enumerate() {
-            let _ = b.gain().set_target_at_time(s.buses[k], t, 0.05);
+        self.out.master(if s.muted { 0.0 } else { s.master }, 0.05);
+        for (k, v) in s.buses.iter().enumerate() {
+            self.out.bus(k, *v, 0.05);
         }
         self.applied = Some(s.clone());
     }
 
-    /// Starts `stem` on `out`: through a low pass at `lowpass` Hz (none for 0), at `gain`, panned to
-    /// `pan` (none for a bus that isn't placed), at a pitch `cents` off. Its length, if it started.
-    #[allow(clippy::too_many_arguments)]
-    fn start(
-        &self,
-        stem: &str,
-        out: &GainNode,
-        gain: f32,
-        pan: Option<f32>,
-        lowpass: f32,
-        cents: f32,
-        looped: bool,
-    ) -> Option<(AudioBufferSourceNode, GainNode, f64, Option<web_sys::StereoPannerNode>)> {
-        let buf = self.buffer(stem)?;
-        let ctx = &self.ctx;
-        let src = js(ctx.create_buffer_source())?;
-        src.set_buffer(Some(&buf));
-        src.set_loop(looped);
-        if cents != 0.0 {
-            src.playback_rate().set_value(2f32.powf(cents / 1_200.0));
-        }
-        let g = js(ctx.create_gain())?;
-        g.gain().set_value(gain);
-        let mut head: web_sys::AudioNode = src.clone().into();
-        if lowpass > 0.0 && lowpass < 17_000.0 {
-            let f = js(ctx.create_biquad_filter())?;
-            f.set_type(BiquadFilterType::Lowpass);
-            f.frequency().set_value(lowpass);
-            js(head.connect_with_audio_node(&f))?;
-            head = f.into();
-        }
-        js(head.connect_with_audio_node(&g))?;
-        let mut panner = None;
-        match pan {
-            Some(p) => {
-                let pn = js(ctx.create_stereo_panner())?;
-                pn.pan().set_value(p);
-                js(g.connect_with_audio_node(&pn))?;
-                js(pn.connect_with_audio_node(out))?;
-                panner = Some(pn);
-            }
-            None => {
-                js(g.connect_with_audio_node(out))?;
-            }
-        }
-        js(src.start())?;
-        let secs = buf.duration() / f64::from(2f32.powf(cents / 1_200.0));
-        Some((src, g, secs, panner))
-    }
-
     /// Stops a sound the mixer cut, with a quick fade so it doesn't click.
     fn cut(&mut self, id: u32) {
-        let t = self.ctx.current_time();
         if let Some(k) = self.playing.iter().position(|p| p.id == id) {
             let p = self.playing.remove(k);
-            let _ = p.gain.gain().set_target_at_time(0.0, t, 0.015);
-            let _ = stop(&p.src, t + 0.08);
+            self.out.stop(p.voice, 0.015, 0.08);
         }
     }
 
     /// A bed: started if it isn't playing, its gain and pan eased toward `gain` and `pan`.
-    fn bed(&self, bed: &mut Option<Bed>, sfx: Sfx, bus: Bus, gain: f32, pan: Option<f32>) {
-        let t = self.ctx.current_time();
+    fn bed(&mut self, bed: &mut Option<Bed>, sfx: Sfx, to: Bus, gain: f32, pan: Option<f32>) {
         if bed.as_ref().is_some_and(|b| b.sfx != sfx)
             && let Some(b) = bed.take()
         {
-            let _ = b.gain.gain().set_target_at_time(0.0, t, 0.4);
-            let _ = stop(&b.src, t + 2.0);
+            self.out.stop(b.voice, 0.4, 2.0);
         }
         if bed.is_none() && gain > 0.001 {
-            let Some((src, g, _, pn)) =
-                self.start(&sfx.file(0), &self.buses[bus.index()], 0.0, pan, 0.0, 0.0, true)
-            else {
+            let Some((voice, _)) = self.out.start(&sfx.file(0), bus(to), 0.0, pan, 0.0, 0.0, true) else {
                 return;
             };
-            *bed = Some(Bed { sfx, src, gain: g, pan: pn });
+            *bed = Some(Bed { sfx, voice, placed: pan.is_some() });
         }
         if let Some(b) = bed {
-            let _ = b.gain.gain().set_target_at_time(gain, t, 0.5);
-            if let (Some(pn), Some(p)) = (&b.pan, pan) {
-                let _ = pn.pan().set_target_at_time(p, t, 0.3);
+            self.out.gain(b.voice, gain, 0.5);
+            if let (true, Some(p)) = (b.placed, pan) {
+                self.out.pan(b.voice, p, 0.3);
             }
         }
     }
-}
-
-/// Whether the browser plays Opus in Ogg.
-fn can_play_opus() -> bool {
-    web_sys::window()
-        .and_then(|w| w.document())
-        .and_then(|d| d.create_element("audio").ok())
-        .and_then(|e| e.dyn_into::<web_sys::HtmlMediaElement>().ok())
-        .is_some_and(|a| !a.can_play_type("audio/ogg; codecs=opus").is_empty())
-}
-
-/// Resumes the audio on the page's first click or key (a browser keeps it suspended until one).
-fn unlock_on_gesture(ctx: &AudioContext, unlocked: Rc<Cell<bool>>) {
-    let Some(window) = web_sys::window() else { return };
-    let ctx = ctx.clone();
-    let f = Closure::<dyn FnMut()>::new(move || {
-        if !unlocked.get() {
-            unlocked.set(true);
-            let _ = ctx.resume();
-        }
-    });
-    for ev in ["pointerdown", "keydown", "touchstart"] {
-        let _ = window.add_event_listener_with_callback(ev, f.as_ref().unchecked_ref());
-    }
-    f.forget();
-}
-
-/// Stops a source at `t` (the scheduled node's call: the buffer source's own is deprecated).
-fn stop(src: &AudioBufferSourceNode, t: f64) -> Result<(), JsValue> {
-    let s: &web_sys::AudioScheduledSourceNode = src;
-    s.stop_with_when(t)
-}
-
-async fn fetch_text(url: &str) -> Option<String> {
-    let window = web_sys::window()?;
-    let res: web_sys::Response = JsFuture::from(window.fetch_with_str(url)).await.ok()?.dyn_into().ok()?;
-    if !res.ok() {
-        return None;
-    }
-    JsFuture::from(res.text().ok()?).await.ok()?.as_string()
-}
-
-/// Fetches and decodes `stem`, if the server has it.
-fn load(store: &Rc<RefCell<Store>>, ctx: &AudioContext, stem: String, ext: &'static str) {
-    {
-        let mut s = store.borrow_mut();
-        let listed = s.listed.as_ref().is_some_and(|l| l.contains(&stem));
-        if !listed || !s.asked.insert(stem.clone()) {
-            return;
-        }
-    }
-    let store = store.clone();
-    let ctx = ctx.clone();
-    wasm_bindgen_futures::spawn_local(async move {
-        let url = format!("assets/audio/{stem}.{ext}");
-        let got = async {
-            let window = web_sys::window()?;
-            let res: web_sys::Response =
-                JsFuture::from(window.fetch_with_str(&url)).await.ok()?.dyn_into().ok()?;
-            if !res.ok() {
-                return None;
-            }
-            let bytes: js_sys::ArrayBuffer =
-                JsFuture::from(res.array_buffer().ok()?).await.ok()?.dyn_into().ok()?;
-            let buf: AudioBuffer =
-                JsFuture::from(ctx.decode_audio_data(&bytes).ok()?).await.ok()?.dyn_into().ok()?;
-            Some(buf)
-        }
-        .await;
-        let mut s = store.borrow_mut();
-        match got {
-            Some(b) => {
-                s.buffers.insert(stem, b);
-            }
-            None => s.failed += 1,
-        }
-    });
 }
 
 pub struct AudioPlugin;
@@ -483,7 +287,7 @@ impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
         // No match to hear in the transport smoke test.
         if app.world().resource::<crate::look::Look>().art
-            && let Some(e) = Engine::new()
+            && let Some(e) = Engine::new(&crate::app::asset_root())
         {
             app.insert_non_send(e);
         }
@@ -500,11 +304,17 @@ fn play(
     settings: Res<AudioSettings>,
     rig: Res<crate::camera::Rig>,
     cam: Single<(&Camera, &GlobalTransform), With<MainCamera>>,
+    mut figures: ResMut<crate::champions::FigureSounds>,
     mut status: ResMut<DevStatus>,
 ) {
-    let Some(mut e) = engine else { return };
+    let Some(mut e) = engine else {
+        figures.list.clear();
+        return;
+    };
     let e = &mut *e;
     let now = now_s();
+    e.out.poll();
+    e.load_shared();
     e.apply(&settings);
     let (camera, view) = *cam;
     let ndc = |at: Vec2| camera.world_to_ndc(view, world(at, 1.0)).map_or(Vec2::splat(9.0), |n| n.truncate());
@@ -520,11 +330,15 @@ fn play(
             e.champion(c.def);
         }
     }
-    let t = e.ctx.current_time();
+    let t = e.out.time();
+    let ended: Vec<Voice> = e.playing.iter().filter(|p| p.ends <= t).map(|p| p.voice).collect();
+    for v in ended {
+        e.out.forget(v);
+    }
     e.playing.retain(|p| p.ends > t);
     // Under a big moment, the lower rungs sit back.
     let duck = mix::db(e.mixer.duck(now));
-    let _ = e.back.gain().set_target_at_time(duck, t, 0.06);
+    e.out.back(duck, 0.06);
     for q in &cues.list {
         let Some(sfx) = q.sound else { continue };
         let d = sfx.def();
@@ -539,7 +353,7 @@ fn play(
         }
         // The mixer says whether it starts, and draws its take; one not loaded yet isn't heard.
         let rung = q.rung.min(mix::RUNGS - 1);
-        let secs = e.buffer(&sfx.file(0)).map_or(0.5, |b| b.duration());
+        let secs = e.out.duration(&sfx.file(0)).unwrap_or(0.5);
         let (id, take, cents) = match e.mixer.admit(sfx, rung, now, secs) {
             Admit::Drop => {
                 e.stats.dropped += 1;
@@ -558,17 +372,14 @@ fn play(
             Some(p) => {
                 // What matters more is a little louder.
                 let weight = 0.55 + 0.05 * f32::from(q.rating.clamp(1, 10));
-                let out = if rung <= 2 { e.front.clone() } else { e.back.clone() };
-                e.start(&file, &out, level * p.gain * weight, Some(p.pan), p.lowpass, cents, false)
+                let out = if rung <= 2 { Route::Front } else { Route::Back };
+                e.out.start(&file, out, level * p.gain * weight, Some(p.pan), p.lowpass, cents, false)
             }
-            None => {
-                let out = e.buses[Bus::Ui.index()].clone();
-                e.start(&file, &out, level, None, 0.0, 0.0, false)
-            }
+            None => e.out.start(&file, bus(Bus::Ui), level, None, 0.0, 0.0, false),
         };
         match started {
-            Some((src, gain, secs, _)) => {
-                e.playing.push(Playing { id, src, gain, ends: t + secs });
+            Some((voice, secs)) => {
+                e.playing.push(Playing { id, voice, ends: t + secs });
                 e.stats.played += 1;
                 e.stats.last = d.name;
                 if q.own && q.what == el_client_core::fx::director::What::Part(Part::Cast) {
@@ -578,29 +389,49 @@ fn play(
             None => e.stats.missing += 1,
         }
     }
+    // What the figures make (the player's own steps): the lowest rung, where it happens, behind
+    // everything else.
+    for (sfx, at) in figures.list.drain(..) {
+        let p = mix::place(ndc(at));
+        if p.gain <= 0.0 {
+            continue;
+        }
+        let secs = e.out.duration(&sfx.file(0)).unwrap_or(0.2);
+        let Admit::Play { id, cut, take, cents } = e.mixer.admit(sfx, mix::RUNGS - 1, now, secs) else {
+            e.stats.dropped += 1;
+            continue;
+        };
+        if let Some(c) = cut {
+            e.cut(c);
+        }
+        let level = mix::db(sfx.def().gain_db) * p.gain;
+        if let Some((voice, secs)) =
+            e.out.start(&sfx.file(take), Route::Back, level, Some(p.pan), p.lowpass, cents, false)
+        {
+            e.playing.push(Playing { id, voice, ends: t + secs });
+            e.stats.played += 1;
+            e.stats.steps += 1;
+        }
+    }
     e.stats.peak = e.stats.peak.max(e.playing.len());
     voices(e, &mut cues, &ndc, now, t);
     interface(e, &session, now);
     beds(e, &session, &rig, ndc, now);
-    status.set(
-        "audio_state",
-        match e.ctx.state() {
-            AudioContextState::Running => "running",
-            AudioContextState::Suspended => "suspended",
-            _ => "closed",
-        },
-    );
-    status.set("audio_format", e.ext);
-    status.set("audio_loaded", e.store.borrow().buffers.len() as u32);
-    status.set("audio_failed", e.store.borrow().failed);
+    status.set("audio_state", e.out.state());
+    status.set("audio_format", e.out.format());
+    status.set("audio_loaded", e.out.loaded() as u32);
+    status.set("audio_failed", e.out.failed());
     status.set("audio_played", e.stats.played);
     status.set("audio_dropped", e.stats.dropped);
+    // Commands the output couldn't take (the desktop's ring full, or no device).
+    status.set("audio_refused", e.out.dropped);
     status.set("audio_missing", e.stats.missing);
     status.set("audio_peak", e.stats.peak as u32);
     status.set("audio_lines", e.stats.lines);
     status.set("audio_own_casts", e.stats.own_casts);
+    status.set("audio_steps", e.stats.steps);
     status.set("audio_last", e.stats.last);
-    status.set("audio_unlocked", e.unlocked.get());
+    status.set("audio_unlocked", e.out.unlocked());
     status.set("vo_lines", e.stats.vo_lines);
     status.set("vo_missing", e.stats.vo_missing);
     status.set("vo_dropped", e.stats.vo_dropped);
@@ -613,6 +444,10 @@ fn play(
 /// champions at most at once (the player's own always gets through); a little under the
 /// announcer while it speaks.
 fn voices(e: &mut Engine, cues: &mut Cues, ndc: &impl Fn(Vec2) -> Vec2, now: f64, t: f64) {
+    let ended: Vec<Voice> = e.talking.iter().filter(|v| v.ends <= t).map(|v| v.voice).collect();
+    for v in ended {
+        e.out.forget(v);
+    }
     e.talking.retain(|v| v.ends > t);
     let spoken = std::mem::take(&mut cues.voice);
     for s in &spoken {
@@ -625,8 +460,7 @@ fn voices(e: &mut Engine, cues: &mut Cues, ndc: &impl Fn(Vec2) -> Vec2, now: f64
                 continue;
             }
             let v = e.talking.remove(k);
-            let _ = v.gain.gain().set_target_at_time(0.0, t, 0.02);
-            let _ = stop(&v.src, t + 0.1);
+            e.out.stop(v.voice, 0.02, 0.1);
         }
         if e.talking.len() >= VO_VOICES {
             // The player's own makes room: the oldest of the others gives way.
@@ -636,8 +470,7 @@ fn voices(e: &mut Engine, cues: &mut Cues, ndc: &impl Fn(Vec2) -> Vec2, now: f64
             match k {
                 Some(k) if s.rung == 0 => {
                     let v = e.talking.remove(k);
-                    let _ = v.gain.gain().set_target_at_time(0.0, t, 0.02);
-                    let _ = stop(&v.src, t + 0.1);
+                    e.out.stop(v.voice, 0.02, 0.1);
                 }
                 _ => {
                     e.stats.vo_dropped += 1;
@@ -649,11 +482,10 @@ fn voices(e: &mut Engine, cues: &mut Cues, ndc: &impl Fn(Vec2) -> Vec2, now: f64
         let weight = [1.0, 0.95, 0.85, 0.7, 0.6][usize::from(s.rung.min(4))];
         let under = if now < e.voice_until { 0.7 } else { 1.0 };
         let gain = place.map_or(1.0, |p| p.gain) * weight * under;
-        let out = e.buses[Bus::Champions.index()].clone();
         let lowpass = place.map_or(0.0, |p| p.lowpass);
-        match e.start(&file, &out, gain, place.map(|p| p.pan), lowpass, 0.0, false) {
-            Some((src, g, secs, _)) => {
-                e.talking.push(Talking { seat: s.seat, own: s.rung == 0, src, gain: g, ends: t + secs });
+        match e.out.start(&file, bus(Bus::Champions), gain, place.map(|p| p.pan), lowpass, 0.0, false) {
+            Some((voice, secs)) => {
+                e.talking.push(Talking { seat: s.seat, own: s.rung == 0, voice, ends: t + secs });
                 e.stats.vo_lines += 1;
                 e.stats.vo_last = file;
                 if let Some(d) = cues.director() {
@@ -677,14 +509,24 @@ fn announce(
     mut until: Local<f64>,
 ) {
     let now = now_s();
+    let mut engine = engine;
+    // The last line's voice, let go once it's over.
+    if let Some(e) = engine.as_deref_mut()
+        && let Some((v, ends)) = e.line
+        && e.out.time() >= ends
+    {
+        e.out.forget(v);
+        e.line = None;
+    }
     let busy = now < *until;
     let Some(said) = cues.director().and_then(|d| d.announcer.next(now, busy)) else { return };
     let mut secs = 0.6 + 0.065 * said.says().len() as f64;
-    if let Some(mut e) = engine {
-        let out = e.buses[Bus::Voice.index()].clone();
-        if let Some((_, _, s, _)) =
-            e.start(&said.line.file(0), &out, mix::db(said.line.def().gain_db), None, 0.0, 0.0, false)
-        {
+    if let Some(e) = engine.as_deref_mut() {
+        let gain = mix::db(said.line.def().gain_db);
+        if let Some((v, s)) = e.out.start(&said.line.file(0), bus(Bus::Voice), gain, None, 0.0, 0.0, false) {
+            if let Some((old, _)) = e.line.replace((v, e.out.time() + s)) {
+                e.out.forget(old);
+            }
             secs = s;
             e.stats.lines += 1;
         }
@@ -694,11 +536,10 @@ fn announce(
     banner.show(said, now);
 }
 
-/// The page's own sounds: a match found, champion select's last seconds, ready, a reroll.
+/// The game's own sounds: a match found, champion select's last seconds, ready, a reroll.
 fn interface(e: &mut Engine, session: &Session, now: f64) {
     let ui = |e: &mut Engine, s: Sfx| {
-        let out = e.buses[Bus::Ui.index()].clone();
-        if e.start(&s.file(0), &out, mix::db(s.def().gain_db), None, 0.0, 0.0, false).is_some() {
+        if e.out.start(&s.file(0), bus(Bus::Ui), mix::db(s.def().gain_db), None, 0.0, 0.0, false).is_some() {
             e.stats.played += 1;
             e.stats.last = s.def().name;
         }
@@ -723,26 +564,23 @@ fn interface(e: &mut Engine, session: &Session, now: f64) {
     // The champion dealt (or rerolled, or swapped to) says its pick line, once its file is in.
     let mine = session.select.as_ref().and_then(|s| s.mine());
     if let Some(c) = mine.filter(|&c| Some(c) != e.picked) {
-        e.champion(c);
         e.pick_due = Some((c, now));
     }
     e.picked = mine;
     if let Some((c, at)) = e.pick_due {
-        // Asked for again while it's due (the file list may not have been in when it was dealt).
+        // Asked for while it's due (the file list may not have been in when it was dealt).
         e.champion(c);
         let file = vo::file(c, Line::Pick, 0);
         if mine != Some(c) || now - at > 3.0 {
             e.pick_due = None;
-        } else if e.buffer(&file).is_some() {
+        } else if e.out.duration(&file).is_some() {
             e.pick_due = None;
-            for v in e.talking.drain(..) {
-                let _ = v.gain.gain().set_target_at_time(0.0, e.ctx.current_time(), 0.02);
-                let _ = stop(&v.src, e.ctx.current_time() + 0.1);
+            for v in std::mem::take(&mut e.talking) {
+                e.out.stop(v.voice, 0.02, 0.1);
             }
-            let out = e.buses[Bus::Champions.index()].clone();
-            if let Some((src, gain, secs, _)) = e.start(&file, &out, 1.0, None, 0.0, 0.0, false) {
-                let ends = e.ctx.current_time() + secs;
-                e.talking.push(Talking { seat: 0, own: true, src, gain, ends });
+            if let Some((voice, secs)) = e.out.start(&file, bus(Bus::Champions), 1.0, None, 0.0, 0.0, false) {
+                let ends = e.out.time() + secs;
+                e.talking.push(Talking { seat: 0, own: true, voice, ends });
                 e.stats.vo_lines += 1;
                 e.stats.vo_last = file;
             }
@@ -785,22 +623,21 @@ fn beds(e: &mut Engine, session: &Session, rig: &crate::camera::Rig, ndc: impl F
         },
         _ => Music::Quiet,
     };
-    let t = e.ctx.current_time();
     if e.music.as_ref().map(|(m, _)| *m) != Some(want) {
         if let Some((_, b)) = e.music.take() {
-            let _ = b.gain.gain().set_target_at_time(0.0, t, 0.6);
-            let _ = stop(&b.src, t + 3.0);
+            e.out.stop(b.voice, 0.6, 3.0);
         }
-        if let Some(s) = want.sound() {
-            let out = e.buses[Bus::Music.index()].clone();
-            if let Some((src, g, _, _)) = e.start(&s.file(0), &out, 0.0, None, 0.0, 0.0, s.def().looped) {
-                e.music = Some((want, Bed { sfx: s, src, gain: g, pan: None }));
-            }
+        if let Some(s) = want.sound()
+            && let Some((voice, _)) =
+                e.out.start(&s.file(0), bus(Bus::Music), 0.0, None, 0.0, 0.0, s.def().looped)
+        {
+            e.music = Some((want, Bed { sfx: s, voice, placed: false }));
         }
     }
     // Under the announcer's line, the music dips.
     if let Some((_, b)) = &e.music {
         let level = mix::db(b.sfx.def().gain_db) * if now < e.voice_until { 0.5 } else { 1.0 };
-        let _ = b.gain.gain().set_target_at_time(level, t, 0.4);
+        let v = b.voice;
+        e.out.gain(v, level, 0.4);
     }
 }

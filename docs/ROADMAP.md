@@ -335,18 +335,103 @@ stops against it. The prediction steps the same code against the minions of the 
 walking among a moving wave is corrected, now counted apart as bodies (p99 12 to 38 units, at most
 87, over the netcode test's bad link), and walking anywhere else is as exact as before.
 
+Then the frame, measured where it can be, after Riot's posts on League's frame rate: the
+profiling series ("Random Acts of Optimization", 2015; "Profiling: Measurement and Analysis",
+"Optimisation", "Real World Performance in League" and "The Case of the Missing Milliseconds",
+2018), "Down the Rabbit Hole of Performance Monitoring" (2019) and "An Update on In-Game
+Performance" (2018). What they say that this game didn't do: time the frame in milliseconds by
+its parts, each with its own timer, and count its spikes, since an average hides them; hitches are
+"more impactful than low average FPS", they land on ability casts, and the worst come from what
+wasn't ready before the game began; and "without intervention, performance in an evolving
+software product will inevitably degrade over time". The server needed none of it: VALORANT's
+budget was 2.34 ms a frame for three games a core at 128 Hz, and a shard here runs 265 matches a
+core at p99 at 30.
+- **The frame's parts** (`el-client/src/frame.rs`): on wasm the main world's schedules and the
+  render world's run on the page's one thread, so a mark at each boundary splits the frame's CPU
+  time exactly: `pre`, `update` (the game), `post` (scenes, animation, transforms, the UI's
+  layout), `last`, `extract`, `prepare`, `pipelines`, `draw` (the render graph encoded, submitted,
+  presented) and `cleanup`; what's left of the interval is the page waiting on the display or the
+  GPU. That's the wasm's own work, so headless Chromium measures it too, where only the
+  rasterising is in software. In a match, spikes (over 16.7 ms) and hitches (over 50) are counted
+  by the part that took most. `?bench=1`'s phases have their CPU's median, 99th percentile and
+  parts beside their frame times.
+- **What's built once a match is in view**: Bevy builds a render pipeline the first frame
+  something visible needs it, and on wasm it builds it there and then (`create_pipeline_task`
+  blocks). Counted and named with the match's frame (`pipelines_late`), with the textures and
+  meshes added then.
+- **The warm-up** (`el-client/src/warm.rs`): in the lobby, the queue and champion select, what a
+  match will draw is drawn once, a speck in front of the camera: the bursts' two materials on a
+  mesh with nothing in it, a live quad, each champion's and minion's model with the materials the
+  match gives it (and a champion's again for the portrait's camera, under the map), and each
+  thing not in view (`view.rs`'s hidden pools, the map's far places) with its own material on its
+  mesh's layout, and a gizmo's line and circle (the move marker, the hover ring, an ability's
+  indicator). The pieces go as the match comes into view; the other team's models, which come
+  with the match, are warmed as they arrive. `?warm=0` leaves it all to the match.
+- **`scripts/e2e.sh hitches`**: a match played through champion select, the match in view, the
+  other team's models in, Q's indicator held, Q, W, E and Blink cast, down the lane to the first
+  waves meeting, and `pipelines_late` held at 0. The match suite, which does more, logs its count:
+  it named the gizmos' pipeline, built as it held Q's indicator, before they were warmed, and
+  none after.
+
+Measured (headless Chromium, the same match each time):
+- Without the warm-up, on the low tier, 12 of the match's 24 pipelines were built once it was in
+  view: the stone, the fogged ground and the champions' rim (twice: the main view and the
+  portrait's multisampled one) in its first three frames, the bursts on the first cast (frame
+  20), the live quads (28), the minions as the first wave came into sight (40), and a brazier's
+  flame and a fogged mesh as the camera went down the lane (48, 49). The frames that built them
+  took 22.7 s of CPU in SwiftShader, 13 hitches over 59 frames.
+- With it: none of 27 on the low tier, the gizmos' two among them (3 hitches over 63 frames,
+  SwiftShader's own drawing), and none of 27 in the match suite either; none of 35 on the high
+  tier (shadows, HDR, multisampling), measured before the gizmos were warmed and the suite held an
+  indicator. 56 pieces. Textures and meshes still arrive once the match is in view (15 and 11 by
+  the first wave, 12 and 11 of them in its first frames), most with the other team's models:
+  champion select shows a team only its own.
+- The CPU's parts there are SwiftShader's and mean nothing for a real machine, beyond that they're
+  counted; on one, `?bench=1` says them per phase.
+
+Then the motion (`CHAMPIONS.md`, "The motion", "The second clips", "The stage"), the moba's feel,
+which the first pass of the champions had left at "the right clip at the right moment". Client-side
+only: nothing on the wire, in the record or in the sim. A strike's wind-up eased in, held on its
+contact and followed through, still landing as the windup ends; two attacks a champion,
+alternated; a stance each by what it holds; the legs running under a cast (each clip twice in a
+model's graph, Bevy's masks); a flinch over the upper body when hit, a reel when the hit is heavy;
+the figure turned in a few hundredths of a second instead of snapped at 30 Hz, leant into turns
+and as it speeds up, pushed back from a hit and squashed as it lands; and from its sockets a
+swing's arc, a casting hand's light, shots leaving the muzzle, a running foot's dust and the
+player's own steps heard. The champions' own colours richer and warmly lit against the cold
+stone, the team's rim softer, what they hold a quarter bigger, a blob of shadow on the low tier.
+Eighteen clips came from Quaternius's CC0 Universal Animation Library, retargeted from its T-pose
+onto each champion's A-pose (Meshy's credits were spent). And the anim stage, the fx stage's loop
+for motion (`scripts/anim.sh`, 260 acts by name, knobs without a rebuild, a skill and a judge),
+which found Meshy's slash striking a tenth of a second early and the rim drowning the textures.
+Measured: the models 30 KiB bigger each (595 KiB over twenty); the golden hashes held.
+
 Left, in no order:
 - **A name**: a guest's is `?name=` or the server's; the page doesn't ask for one.
 - **A real GPU.** Nobody has seen the game on one: the frame rate on either tier (the target is 60
   fps at 1080p on integrated graphics, and a ten-way fight at 60 on `high`), and the effects'
   share of the frame (`FX.md`, step 6). `?bench=1` (`el-client/src/bench.rs`) collects the
   numbers in one visit: eight phases of eight seconds over the map's places and a fight, each
-  phase's frames a second and its median, 99th-percentile and longest frame, as JSON
-  (`window.__elBench`) to paste here.
+  phase's frames a second and its median, 99th-percentile and longest frame, and its CPU's by
+  part, as JSON (`window.__elBench`) to paste here.
+- **The numbers from the field**, as Riot keeps them ("Down the Rabbit Hole of Performance
+  Monitoring"): a small report a match from each page (`frame.rs`'s histogram of CPU work, its
+  spikes by part, the tier, the API, the GPU's name, the canvas, the tick of the worst spike) to
+  the server, kept beside the record. A slow moment reported is then replayed exactly at its tick
+  (`?replay=`), which League's own replays can't do (its client isn't deterministic).
+- **Animation for what's drawn**: a minion hidden in fog keeps its clips on its player, sampled
+  every frame as far as Bevy's code reads (not measured); stopped while hidden, and the far ones
+  at a lower rate (VALORANT animated every fourth frame on its servers, 75% less).
+- **An effect's cost on the fx stage**: its vertices, draw calls and screen area times layers in
+  `numbers.json` beside its look, with a budget (Riot's Rakan trail and Swain outline: "we should
+  have known how expensive this effect was before we shipped it").
+- **Gates on the numbers**: `match_tick`'s and the shard's instruction counts and the draws a
+  frame against their last values in CI, as `pipelines_late` is (`hitches` runs with `EL_E2E=1`).
 - **Listening.** The sounds were judged by their spectrograms and measures, not by ear.
 - **Tuning by hand**: each ability's look (`FX.md`, step 5; the stage and its strips are the
   loop, `scripts/fx.sh`, and a dozen of the 296 have been through it), each champion's clip
-  windows (`CHAMPIONS.md`).
+  windows and its motion (`CHAMPIONS.md`; the anim stage is the loop, `scripts/anim.sh`, and a
+  handful of its 260 acts have been through it).
 - **Art**: an outline drawn as a line, where the rim stands in (`CHAMPIONS.md`); the HUD's last
   draw calls.
 - **The announcer's and the music's files**: wired, optional, dropped in by name (`FX.md`).
@@ -361,3 +446,42 @@ Left, in no order:
   restart; a running server remakes the one and reads the other again (`net::endpoint::rotate`,
   on SIGHUP and every hour, a test dialling with the new hash and the old). Still theirs: the
   port and the host in the unit and the nginx file are placeholders until the box says.
+
+## 9. The desktop, the main menu, and Elo Pros
+
+A desktop build (`eloram`, Linux and Windows) from the same crate as the browser's: the
+browser-only halves (`platform/`, `transport/`, `net/`, `config/`, `audio/`) sit beside native
+ones (wtransport over a tokio runtime, `settings.toml`, cpal with a no-alloc mixer in
+`el_client_core::fx::out`, the Elo launcher through `crates/el-launcher`). The desktop client never
+turns on glam's scalar maths (Bevy's glam won't build with it): its prediction is `glam::Vec2` only,
+and the golden hashes hold with and without it, and on wasm. Run under Xvfb and lavapipe it plays
+a match against a local server. Windows is cross-built (`x86_64-pc-windows-gnu`), not run here.
+
+The main menu, after Gates' (`render/menu.rs`, `render/ui.rs`) in Eloram's colours, in the game's
+own UI on both builds: PLAY (NORMAL, bots in the empty seats; RANKED, ten wallets rated on Elo
+Pros), PRACTICE, WATCH (the server's records, live a minute behind), FRIENDS, NEWS, STORE,
+PROFILE, OPTIONS (the Esc menu's pages) and, on the desktop, QUIT. A plain load opens it; a deep
+link (`?queue=1`, `?practice=1`, `?watch=`) goes past it. LEAVE MATCH in the Esc menu lets the
+seat go for good.
+
+Protocol 7: `QueueRanked`; `About` after the Welcome (who the server knows the player as, and
+whether it holds practice and ranked); `Ranked` (the store's queue's state) and `Refused`; a
+seated `Leave` forgets the seat's token. `/online.json` says what each player is doing; a session
+idle at the menu for 30 minutes is let go. The record's own protocol (`RECORD_PROTOCOL`) stays at 6,
+so a deploy takes up live records and every past replay plays.
+
+Elo Pros from the server (`el-server/src/elopros/`): a server key (`--keygen`, the SDK's signed
+text, checked against the platform's vectors), each finished match's stats, unlocks and board
+scores against `elo.json`'s definitions, a ranked match's result with its record's hash, both kept
+in an outbox on disk until the store takes them, and the RANKED queue through the store's
+matchmaker, seating its two sides here with no bots (`tests/elopros.rs` against a stand-in meter).
+The store's side: the listing row (hidden until the page is published), the launcher manifest, the
+hosted servers' row, the play block, and the per-title tables (scry-forge).
+
+Then protocol 8 and the rest of the menu: parties (up to five on a server, the leader queues them
+onto one side, NORMAL or RANKED); a ranked select someone leaves is called off and the others
+queued again; FRIENDS and PROFILE read from Elo Pros (the friends texts and the platform's answers
+checked against its own vectors, changes signed by the page's wallet or the launcher); REPORT A BUG
+(F8) to the store's intake with a picture, and a desktop crash's note offered on the next start;
+and the menu's backdrop, the Causeway shot from a match with the HUD off (`scripts/e2e.sh
+backdrop`, `art/tools/menu_backdrop.py`).

@@ -40,6 +40,8 @@ pub struct Menu {
     pub tab: Tab,
     /// The volume's slider held (0 the master's, then each bus's).
     drag: Option<usize>,
+    /// LEAVE MATCH pressed once: a second press leaves.
+    leave_armed: bool,
 }
 
 impl Menu {
@@ -47,6 +49,7 @@ impl Menu {
         self.open = open;
         if !open {
             self.drag = None;
+            self.leave_armed = false;
         }
     }
 }
@@ -94,6 +97,10 @@ enum Do {
     Low(bool),
     Reload,
     Mute,
+    /// Out of the match (or practice) for good, back to the main menu: two presses.
+    Leave,
+    /// REPORT A BUG (F8).
+    Report,
 }
 
 /// The menu: the world dimmed, the panel in the middle.
@@ -123,7 +130,13 @@ enum Words {
     Mute,
     /// What draws now: the API, the tier, the frame rate.
     Now,
+    /// LEAVE MATCH, or its second press's ask.
+    Leave,
 }
+
+/// The LEAVE MATCH button, shown while there's a match to leave.
+#[derive(Component)]
+struct LeaveButton;
 
 /// The note and the button that say the tier changes at a reload, while it would.
 #[derive(Component)]
@@ -159,8 +172,11 @@ fn keys(
     mut menu: ResMut<Menu>,
     mut controls: ResMut<Controls>,
     session: Res<Session>,
+    front: Res<crate::front::Front>,
 ) {
-    if keys.just_pressed(KeyCode::Escape) {
+    if keys.just_pressed(KeyCode::Escape) && front.up && !menu.open {
+        // The main menu's own (`front`): back to PLAY, never the Esc menu over it.
+    } else if keys.just_pressed(KeyCode::Escape) {
         // The shop as it's drawn (`hud.rs`): left open off the platform, it isn't there to close.
         let shop = controls.shop_open
             && session.phase == Phase::Playing
@@ -277,6 +293,10 @@ fn setup(mut commands: Commands) {
                 r.spawn(button(Do::Tab(t), t.title(), percent(100), OFF));
             }
             r.spawn(Node { flex_grow: 1.0, ..default() });
+            r.spawn((button_node(Do::Leave, percent(100), OFF), LeaveButton)).with_children(|b| {
+                b.spawn((text("LEAVE MATCH", 14.0, TEXT), Words::Leave));
+            });
+            r.spawn(button(Do::Report, "REPORT A BUG (F8)", percent(100), OFF));
             r.spawn(button(Do::Resume, "RESUME", percent(100), ON));
             r.spawn((
                 text("Esc closes it", 11.0, DIM),
@@ -474,6 +494,7 @@ fn press(
     mut rig: ResMut<crate::camera::Rig>,
     mut audio: ResMut<AudioSettings>,
     mut controls: ResMut<Controls>,
+    session: Res<Session>,
 ) {
     for (i, act) in &q {
         if *i != Interaction::Pressed {
@@ -510,13 +531,22 @@ fn press(
                 }
             }
             Do::Reload => {
-                if let Some(w) = web_sys::window() {
-                    let _ = w.location().reload();
-                }
+                crate::platform::reload();
             }
             Do::Mute => {
                 audio.muted = !audio.muted;
                 audio.save();
+            }
+            Do::Report => {
+                menu.show(false);
+                crate::front::report::ask();
+            }
+            Do::Leave if !menu.leave_armed => menu.leave_armed = true,
+            Do::Leave => {
+                if in_match(session.phase) {
+                    controls.lobby.push(el_client_core::lobby::ToServer::Leave);
+                }
+                menu.show(false);
             }
         }
     }
@@ -556,21 +586,30 @@ fn volume(audio: &AudioSettings, k: usize) -> f32 {
 
 /// The menu shown or not, its page, each choice lit or not, the volumes, the words.
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
+/// While there's a seat to leave.
+fn in_match(phase: Phase) -> bool {
+    matches!(phase, Phase::Playing | Phase::Reconnecting | Phase::Selecting)
+}
+
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn show(
     menu: Res<Menu>,
+    session: Res<Session>,
     prefs: Res<Prefs>,
     rig: Res<crate::camera::Rig>,
     audio: Res<AudioSettings>,
     mut status: ResMut<DevStatus>,
     mut nodes: Query<
-        (&mut Node, Option<&Root>, Option<&Page>, Option<&Pending>, Option<&SliderFill>),
-        Or<(With<Root>, With<Page>, With<Pending>, With<SliderFill>)>,
+        (&mut Node, Option<&Root>, Option<&Page>, Option<&Pending>, Option<&SliderFill>, Has<LeaveButton>),
+        Or<(With<Root>, With<Page>, With<Pending>, With<SliderFill>, With<LeaveButton>)>,
     >,
     mut buttons: Query<(&Do, &Interaction, &mut Tint, &mut BackgroundColor, &mut BorderColor)>,
     mut words: Query<(&Words, &mut Text)>,
 ) {
-    for (mut node, root, page, pending, fill) in &mut nodes {
-        let display = if root.is_some() {
+    for (mut node, root, page, pending, fill, leave) in &mut nodes {
+        let display = if leave {
+            Some(in_match(session.phase))
+        } else if root.is_some() {
             Some(menu.open)
         } else if let Some(p) = page {
             Some(p.0 == menu.tab)
@@ -601,7 +640,8 @@ fn show(
             Do::Locked(on) => rig.locked == on,
             Do::Low(low) => prefs.low_next == low,
             Do::Mute => audio.muted,
-            Do::Resume | Do::Reload => continue,
+            Do::Leave => menu.leave_armed,
+            Do::Resume | Do::Reload | Do::Report => continue,
         };
         let base = if lit { ON } else { OFF };
         if tint.0 != base {
@@ -619,7 +659,7 @@ fn show(
     // Its words are inside it: worked out only while it's open (the frame it opens included), not
     // formatted every frame for a menu nobody sees.
     if menu.open {
-        words_now(&prefs, &audio, &status, &mut words);
+        words_now(&prefs, &audio, &status, menu.leave_armed, &mut words);
     }
     status.set("menu_open", menu.open);
     status.set("menu_tab", menu.tab.title().to_lowercase());
@@ -633,6 +673,7 @@ fn words_now(
     prefs: &Prefs,
     audio: &AudioSettings,
     status: &DevStatus,
+    leave_armed: bool,
     words: &mut Query<(&Words, &mut Text)>,
 ) {
     let fps = status.fields.iter().find(|(k, _)| *k == "fps").and_then(|(_, v)| match v {
@@ -648,8 +689,15 @@ fn words_now(
         let want = match *w {
             Words::Percent(k) => format!("{:.0}%", volume(audio, k) * 100.0),
             Words::Mute => if audio.muted { "UNMUTE" } else { "MUTE" }.to_string(),
+            Words::Leave => if leave_armed { "AGAIN TO LEAVE" } else { "LEAVE MATCH" }.to_string(),
             Words::Now => {
-                let api = if crate::look::WEBGPU { "WebGPU" } else { "WebGL 2" };
+                let api = if !crate::platform::DESKTOP && crate::look::WEBGPU {
+                    "WebGPU"
+                } else if crate::look::WEBGPU {
+                    "Vulkan or DirectX 12"
+                } else {
+                    "WebGL 2"
+                };
                 let tier = if prefs.low { "low" } else { "high" };
                 let now = match fps.map(f64::round) {
                     Some(1.0) => format!("Drawing now: {api}, {tier}, a frame a second"),

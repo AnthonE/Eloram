@@ -1,0 +1,38 @@
+{
+ "elo": 1,
+ "game": "eloram",
+ "terms": "2026-10-27",
+ "multiplayer": "match",
+ "_server_keys": "The operator adds a server_keys block here once the box's key exists (el-server --keygen prints the row): \"server_keys\": [{\"id\": \"game-1\", \"pub\": \"...\"}]. An empty list would revoke every key, so it is left out until then.",
+ "stats": {
+  "stats": [
+   {"id": "matches", "name": "Matches", "agg": "sum"},
+   {"id": "wins", "name": "Wins", "agg": "sum"},
+   {"id": "kills", "name": "Takedowns", "agg": "sum"},
+   {"id": "deaths", "name": "Falls", "agg": "sum"},
+   {"id": "assists", "name": "Assists", "agg": "sum"},
+   {"id": "last_hits", "name": "Last hits", "agg": "sum"},
+   {"id": "ranked_matches", "name": "Ranked matches", "agg": "sum"},
+   {"id": "ranked_wins", "name": "Ranked wins", "agg": "sum"}
+  ],
+  "achievements": [
+   {"id": "FIRST_MATCH", "name": "Onto the Causeway", "desc": "Play a match to its end.", "icon": "first_match"},
+   {"id": "FIRST_WIN", "name": "First light", "desc": "Win a match.", "icon": "first_win"},
+   {"id": "TEN_WINS", "name": "Ten dawns", "desc": "Win ten matches.", "icon": "ten_wins", "progress": {"stat": "wins", "max": 10}},
+   {"id": "HUNDRED_MATCHES", "name": "Worn stones", "desc": "Play a hundred matches.", "icon": "hundred_matches", "progress": {"stat": "matches", "max": 100}},
+   {"id": "UNTOUCHED", "name": "Untouched", "desc": "Win a match without falling once.", "icon": "untouched"},
+   {"id": "TEN_TAKEDOWNS", "name": "The tide turns", "desc": "Ten takedowns in one match.", "icon": "ten_takedowns"},
+   {"id": "RANKED_WIN", "name": "Rated", "desc": "Win a ranked match.", "icon": "ranked_win"}
+  ],
+  "boards": [
+   {"id": "most_kills", "name": "Most takedowns in a match", "sort": "desc", "keep": "best", "format": "number"},
+   {"id": "fastest_win", "name": "Fastest win", "sort": "asc", "keep": "best", "format": "time_ms"}
+  ],
+  "challenges": [
+   {"id": "daily_three", "name": "Three matches", "desc": "Play three matches today.", "stat": "matches", "goal": 3, "every": "day"},
+   {"id": "daily_win", "name": "A win a day", "desc": "Win a match today.", "stat": "wins", "goal": 1, "every": "day"},
+   {"id": "weekly_takedowns", "name": "Fifty takedowns", "desc": "Fifty takedowns this week.", "stat": "kills", "goal": 50, "every": "week"},
+   {"id": "weekly_ranked", "name": "Five ranked", "desc": "Play five ranked matches this week.", "stat": "ranked_matches", "goal": 5, "every": "week"}
+  ]
+ }
+}

@@ -1,0 +1,39 @@
+{
+ "_note": "A game server's signed request (meter/serverkeys.py). Ed25519 is deterministic, so this seed signs each text to exactly this signature in every SDK.",
+ "seed_hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+ "public_b64": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+ "private_pkcs8_b64": "MC4CAQAwBQYDK2VwBCIEIAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8g",
+ "_pem_note": "the seed above as PKCS#8; each test wraps it in the PEM armour itself, so no key header ships in a published tree",
+ "cases": [
+  {
+   "method": "POST",
+   "path": "/serverkeys/check",
+   "who": "my-game/eu-1",
+   "at": "1761400000",
+   "nonce": "n0nce-0001-abcdef",
+   "body_utf8": "",
+   "text": "elo server\nPOST\n/serverkeys/check\nmy-game/eu-1\n1761400000\nn0nce-0001-abcdef\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "signature_b64": "80O/HZgevJNMbZboQ5+3c4oA2LLlQIGXzM1IXnLlCArMV7KWRBL3jO8G64jLI00gtqkfJB0iyQ0ueHh855cKAw=="
+  },
+  {
+   "method": "PUT",
+   "path": "/cloud/my-game/0x1111111111111111111111111111111111111111/save",
+   "who": "my-game/eu-1",
+   "at": "1761400001",
+   "nonce": "AbCdEfGh_12345678",
+   "body_utf8": "{\"level\":3}",
+   "text": "elo server\nPUT\n/cloud/my-game/0x1111111111111111111111111111111111111111/save\nmy-game/eu-1\n1761400001\nAbCdEfGh_12345678\nc8d699b727ef627e5a749364246158a85fca1de82b2a7ce89bb177d2528b632a",
+   "signature_b64": "Lf1u9oyWEdSUetrRGYbZbMJLV+P4NAk5n+PikS8GwGq93p0bvES/Sh8bw0YY8PA7vJIRtGUBwnowQrMew6H+CQ=="
+  },
+  {
+   "method": "GET",
+   "path": "/cloud/my-game/0x1111111111111111111111111111111111111111",
+   "who": "my-game/eu-1",
+   "at": "1761400002",
+   "nonce": null,
+   "body_utf8": "",
+   "text": "elo server\nGET\n/cloud/my-game/0x1111111111111111111111111111111111111111\nmy-game/eu-1\n1761400002\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "signature_b64": "/7P17hK4NVi9+DeWylntDFVmQBHAXPGGRzW5raJRs5ihnyyMkevVv9YkvYgti0E7Ww6Oi0mk0ESdTLzKqtqoAQ=="
+  }
+ ]
+}

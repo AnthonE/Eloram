@@ -27,7 +27,7 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   const logs = collectConsole(page);
   const shots = `artifacts/match-${info.project.name}`;
   // The camera locked on the champion (free is the default), so the pictures follow it down the lane.
-  await page.goto(`/?gfx=${info.project.name}&name=Tester&camera=locked`);
+  await page.goto(`/?gfx=${info.project.name}&name=Tester&camera=locked&queue=1`);
   let s: Record<string, any>;
   let chosen = "";
   try {
@@ -65,10 +65,11 @@ test("a match: queue, champion select, augment, shop, walk, cast, fog", async ({
   // The match's headliner, shown as it starts.
   expect(s.headliner).toBeTruthy();
   // The champions drawn (docs/CHAMPIONS.md): the team's five fetched in champion select, the
-  // other five with the match; the own champion's figure is its model, standing.
+  // other five with the match; the own champion's figure is its model, standing in its stance (a
+  // blade's guard, a shield, a light held up..., or the idle: `pose::Kit::idle`).
   s = await until(page, "the champions' models", (s) => s.champion_models >= 10, 120_000);
   const posing = (s: Record<string, any>, clip: string) => String(s.champion_poses).split(",").includes(`${s.seat}:${clip}`);
-  s = await until(page, "the own champion standing", (s) => posing(s, "idle"));
+  s = await until(page, "the own champion standing", (s) => !!s.champion_stance && posing(s, s.champion_stance));
   // The minions' four models, in before the first wave.
   s = await until(page, "the minions' models", (s) => s.minion_models === 4, 60_000);
   await page.screenshot({ path: `${shots}-start.png` });
@@ -170,7 +171,7 @@ test("WASD and the menu: the keys walk the champion, Esc holds them", async ({ p
   test.setTimeout(300_000);
   const logs = collectConsole(page);
   const shots = `artifacts/match-${info.project.name}`;
-  await page.goto(`/?gfx=${info.project.name}&name=Walker&keys=wasd`);
+  await page.goto(`/?gfx=${info.project.name}&name=Walker&keys=wasd&queue=1`);
   let s: Record<string, any>;
   try {
     s = await until(page, "champion select", (s) => s.phase === "selecting", 150_000);
@@ -243,7 +244,7 @@ test("WASD and the menu: the keys walk the champion, Esc holds them", async ({ p
 // page sees close is dialled again on its own.
 test("a reload or a dropped link takes the seat back", async ({ page }, info) => {
   const logs = collectConsole(page);
-  await page.goto(`/?gfx=${info.project.name}&name=Rejoiner`);
+  await page.goto(`/?gfx=${info.project.name}&name=Rejoiner&queue=1`);
   let s: Record<string, any>;
   try {
     s = await until(page, "champion select", (s) => s.phase === "selecting", 150_000);

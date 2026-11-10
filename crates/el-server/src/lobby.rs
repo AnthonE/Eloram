@@ -22,7 +22,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use el_client_core::lobby::{Player, ToClient, UNSEEN};
-use el_match::{Control, MatchState, Outcome, SeatLease, ShardShared};
+use el_match::{Control, MatchState, Outcome, SeatLease, SeatLine, ShardShared};
 use el_proto::auth::PlayerId;
 use el_sim::content::champions::CHAMPIONS;
 use el_sim::math::Rng;
@@ -43,8 +43,6 @@ const STALLED: Duration = Duration::from_secs(3);
 const AFTER: Duration = Duration::from_secs(5);
 /// How long a match with none of its players connected is kept for them to rejoin.
 pub const REJOIN_FOR: Duration = Duration::from_secs(60);
-/// Seats in the order people fill them: a side each in turn.
-const SEAT_ORDER: [u8; SEATS] = [0, 5, 1, 6, 2, 7, 3, 8, 4, 9];
 /// How long champion select lasts, unless everyone seated is ready sooner.
 pub const SELECT_FOR: Duration = Duration::from_secs(20);
 /// Rerolls a seat has in a select until its player's are known: a signed-in player's are their
@@ -65,6 +63,8 @@ pub enum LobbyEvent {
     },
     /// The seat was taken back on another connection (its rejoin token): this one is done.
     Replaced,
+    /// A message to pass on as it is (the ranked queue's state, a refusal).
+    Tell(ToClient),
 }
 
 /// A session's seat in a match.
@@ -78,16 +78,19 @@ pub struct Seating {
     pub shared: Arc<ShardShared>,
 }
 
-struct Waiting {
-    session: u32,
-    name: String,
-    agent: bool,
-    max_datagram: u16,
-    tx: UnboundedSender<LobbyEvent>,
+#[derive(Clone)]
+pub(crate) struct Waiting {
+    pub(crate) session: u32,
+    pub(crate) name: String,
+    pub(crate) agent: bool,
+    pub(crate) max_datagram: u16,
+    pub(crate) tx: UnboundedSender<LobbyEvent>,
     /// The rejoin token it came with (rejoining; empty in the queue).
-    token: String,
+    pub(crate) token: String,
     /// Its wallet, signed in (a guest: none).
-    wallet: Option<PlayerId>,
+    pub(crate) wallet: Option<PlayerId>,
+    /// The party it queued with (its leader's session; 0: alone). A party is seated on one side.
+    pub(crate) party: u32,
 }
 
 struct Live {
@@ -107,6 +110,12 @@ struct Live {
     /// The wallet in each seat (a guest's, a bot's: none): those still seated as it ends each earn
     /// a reroll.
     wallets: [Option<PlayerId>; SEATS],
+    /// The seats agents took.
+    agents: [bool; SEATS],
+    /// Its record's id (`{id}.elr`).
+    record: String,
+    /// The store's match id, for a ranked match (`crate::elopros::ranked`).
+    ranked: Option<String>,
 }
 
 /// What a match tells `seat`: `told`, with the seat, its rejoin token and its stream.
@@ -126,6 +135,29 @@ fn token_hash(token: &str) -> [u8; 32] {
 }
 
 impl Live {
+    /// The match at its end, as Elo Pros is told it.
+    fn done(&self, winner: u8, tick: u32, line: &[SeatLine; SEATS]) -> crate::elopros::report::MatchDone {
+        use crate::elopros::report::{MatchDone, SeatDone};
+        MatchDone {
+            record: self.record.clone(),
+            ranked: self.ranked.clone(),
+            winner,
+            practice: matches!(self.told, ToClient::Match { practice: true, .. }),
+            tick,
+            seats: (0..SEATS)
+                .map(|s| SeatDone {
+                    player: self.wallets[s].map(|w| w.to_string()),
+                    agent: self.agents[s],
+                    kills: line[s].kills,
+                    deaths: line[s].deaths,
+                    assists: line[s].assists,
+                    last_hits: line[s].last_hits,
+                    level: line[s].level,
+                })
+                .collect(),
+        }
+    }
+
     /// What `seat` is told of the match: everything, its rejoin token and its stream.
     fn match_msg(&self, seat: u8, token: &str, stream: u8) -> ToClient {
         seat_msg(&self.told, seat, token, stream)
@@ -205,7 +237,7 @@ impl Select {
 
     /// What `seat` is sent: every seat's champion as its team sees them (the other team's
     /// unseen), its team's bench, its rerolls.
-    pub fn view(&self, seat: usize, ends_in: u32, roster: &[Player]) -> ToClient {
+    pub fn view(&self, seat: usize, ends_in: u32, roster: &[Player], ranked: bool) -> ToClient {
         let team = team_of_seat(seat);
         ToClient::Select {
             seat: seat as u8,
@@ -214,6 +246,7 @@ impl Select {
             rerolls: self.rerolls[seat],
             ends_in,
             roster: roster.to_vec(),
+            ranked,
         }
     }
 }
@@ -230,6 +263,8 @@ struct Selecting {
     ends: Instant,
     /// A practice match (`el_sim::practice`).
     practice: bool,
+    /// The store's match id, for a ranked match.
+    ranked: Option<String>,
 }
 
 impl Selecting {
@@ -247,7 +282,7 @@ impl Selecting {
         let ends_in = self.ends.saturating_duration_since(Instant::now()).as_secs_f32().ceil() as u32;
         for (seat, w) in &self.players {
             if team.is_none_or(|t| team_of_seat(usize::from(*seat)) == t) {
-                let msg = self.select.view(usize::from(*seat), ends_in, &self.roster);
+                let msg = self.select.view(usize::from(*seat), ends_in, &self.roster, self.ranked.is_some());
                 let _ = w.tx.send(LobbyEvent::Select(msg));
             }
         }
@@ -267,6 +302,9 @@ struct Inner {
     beats: Vec<(u64, Instant)>,
     /// Shards taken as gone.
     dead: Vec<bool>,
+    /// The players of ranked selects called off (someone left): back to the ranked queue, once
+    /// the lock is let go (`Lobby::requeue`).
+    requeue: Vec<Waiting>,
 }
 
 pub struct Lobby {
@@ -282,6 +320,10 @@ pub struct Lobby {
     /// Seatings so far: each one's snapshots go on a stream of its own ([`Lobby::next_stream`]).
     seatings: std::sync::atomic::AtomicU32,
     inner: Mutex<Inner>,
+    /// Elo Pros, when this server reports to it (`--server-key`): a match's end owes it reports.
+    pub elopros: std::sync::OnceLock<Arc<crate::elopros::EloPros>>,
+    /// The parties on this server (`crate::party`).
+    pub parties: crate::party::Parties,
 }
 
 /// A practice match's seats: the player's, and nine dummies.
@@ -294,6 +336,51 @@ fn practice_roster(player: Player) -> Vec<Player> {
 /// The seats with nobody in them, as the scoreboard names them.
 fn bots_roster() -> Vec<Player> {
     (0..SEATS).map(|s| Player { name: format!("Bot {}", s + 1), agent: false, bot: true }).collect()
+}
+
+/// The next match's players off the queue, each with a seat: in the queue's order, a party (by
+/// its leader) whole on one side, the side with more room first; a party too big for the room
+/// left waits for the next match. Alone, people fill a side each in turn (seats 0, 5, 1, 6...).
+fn take_match(queue: &mut Vec<Waiting>) -> Vec<(u8, Waiting)> {
+    let mut groups: Vec<Vec<usize>> = Vec::new();
+    for (i, w) in queue.iter().enumerate() {
+        match groups.iter_mut().find(|g| w.party != 0 && queue[g[0]].party == w.party) {
+            Some(g) => g.push(i),
+            None => groups.push(vec![i]),
+        }
+    }
+    let size = el_sim::units::TEAM_SIZE;
+    let mut used = [0usize; 2];
+    let mut chosen: Vec<(usize, u8)> = Vec::new();
+    for g in groups {
+        let (big, small) = if used[0] <= used[1] { (0, 1) } else { (1, 0) };
+        let side = if used[big] + g.len() <= size {
+            big
+        } else if used[small] + g.len() <= size {
+            small
+        } else {
+            continue;
+        };
+        for i in g {
+            chosen.push((i, (side * size + used[side]) as u8));
+            used[side] += 1;
+        }
+        if used == [size, size] {
+            break;
+        }
+    }
+    chosen.sort_unstable_by_key(|(i, _)| *i);
+    let seats: std::collections::BTreeMap<usize, u8> = chosen.into_iter().collect();
+    let mut out = Vec::with_capacity(seats.len());
+    let mut kept = Vec::with_capacity(queue.len());
+    for (i, w) in queue.drain(..).enumerate() {
+        match seats.get(&i) {
+            Some(&seat) => out.push((seat, w)),
+            None => kept.push(w),
+        }
+    }
+    *queue = kept;
+    out
 }
 
 impl Lobby {
@@ -326,6 +413,9 @@ impl Lobby {
                 told: r.live.told,
                 pending: Vec::new(),
                 wallets: [None; SEATS],
+                agents: [false; SEATS],
+                record: r.id.clone(),
+                ranked: None,
             })
             .collect();
         let rerolls = dir.as_ref().map_or_else(Bank::default, |d| Bank::kept(d.join("rerolls.json")));
@@ -338,6 +428,8 @@ impl Lobby {
             practice: std::sync::atomic::AtomicBool::new(false),
             rerolls,
             seatings: std::sync::atomic::AtomicU32::new(0),
+            elopros: std::sync::OnceLock::new(),
+            parties: crate::party::Parties::default(),
             inner: Mutex::new(Inner {
                 next: seed,
                 live,
@@ -382,6 +474,7 @@ impl Lobby {
             tx,
             token: String::new(),
             wallet,
+            party: 0,
         });
         if inner.since.is_none() {
             inner.since = Some(Instant::now());
@@ -396,6 +489,23 @@ impl Lobby {
     /// Lets sessions ask for practice matches (`el-server --practice`).
     pub fn allow_practice(&self) {
         self.practice.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Whether this server holds practice matches.
+    pub fn practice_allowed(&self) -> bool {
+        self.practice.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// A seated session leaves its match on purpose: its rejoin token is forgotten (a reload
+    /// doesn't pull the player back in), then the seat goes to a bot as any unseat's does.
+    pub fn leave_seat(&self, s: Seating) {
+        {
+            let mut inner = self.inner();
+            if let Some(l) = inner.live.iter_mut().find(|l| l.shard == s.shard && l.m == s.m) {
+                l.tokens[usize::from(s.seat)] = [0; 32];
+            }
+        }
+        self.unseat(s);
     }
 
     /// Starts a practice match for `session` as champion `champ` (`el_sim::practice`): seat 0 its,
@@ -436,6 +546,7 @@ impl Lobby {
             tx,
             token: String::new(),
             wallet: None,
+            party: 0,
         };
         let roster = practice_roster(Player { name: name.to_string(), agent, bot: false });
         let s = Selecting {
@@ -447,6 +558,7 @@ impl Lobby {
             roster,
             ends: Instant::now(),
             practice: true,
+            ranked: None,
         };
         match self.start(s) {
             Some(live) => {
@@ -458,20 +570,74 @@ impl Lobby {
         }
     }
 
-    /// Takes a session out of the queue, or out of its champion select (a bot takes its seat).
-    pub fn leave(&self, session: u32) {
+    /// Takes a session out of the queue, or out of its champion select (a bot takes its seat; a
+    /// ranked select is called off). Out of the queue, its party goes with it; the sessions taken
+    /// out with it are given back, to be told.
+    pub fn leave(&self, session: u32) -> Vec<u32> {
         let mut inner = self.inner();
-        inner.queue.retain(|w| w.session != session);
+        let party = inner.queue.iter().find(|w| w.session == session).map_or(0, |w| w.party);
+        let mut gone = Vec::new();
+        inner.queue.retain(|w| {
+            let out = w.session == session || (party != 0 && w.party == party);
+            if out && w.session != session {
+                gone.push(w.session);
+            }
+            !out
+        });
         if inner.queue.is_empty() {
             inner.since = None;
         }
         Self::out_of_select(&mut inner, session);
+        drop(inner);
+        self.requeue();
+        gone
+    }
+
+    /// Whether a session is in champion select or seated in a match.
+    pub fn busy(&self, session: u32) -> bool {
+        let inner = self.inner();
+        inner.selecting.iter().any(|s| s.seat_of(session).is_some())
+            || inner
+                .live
+                .iter()
+                .any(|l| l.over_at.is_none() && l.sessions.iter().any(|(s, _, _)| *s == session))
+    }
+
+    /// A party into the queue together (its leader first): seated on one side of one match.
+    pub(crate) fn enqueue_party(&self, members: Vec<Waiting>) {
+        let mut inner = self.inner();
+        let leader = members.first().map_or(0, |w| w.session);
+        for w in &members {
+            Self::out_of_select(&mut inner, w.session);
+            inner.queue.retain(|q| q.session != w.session);
+        }
+        inner.queue.extend(members.into_iter().map(|w| Waiting { party: leader, token: String::new(), ..w }));
+        if inner.since.is_none() {
+            inner.since = Some(Instant::now());
+        }
+        let waiting = inner.queue.len();
+        let left = self.fill_after.saturating_sub(inner.since.map_or(Duration::ZERO, |s| s.elapsed()));
+        for w in &inner.queue {
+            let _ = w.tx.send(LobbyEvent::Queued { waiting, fill_in: left.as_secs_f32().ceil() as u32 });
+        }
     }
 
     /// A session leaves the select it's in: its seat goes to a bot, and a select with nobody left
-    /// in it is over (nothing was started: its place is simply free again).
+    /// in it is over (nothing was started: its place is simply free again). A ranked select is
+    /// called off instead (a rated match is ten people): everyone else goes back to the ranked
+    /// queue ([`Lobby::requeue`]).
     fn out_of_select(inner: &mut Inner, session: u32) {
         let Some(k) = inner.selecting.iter().position(|s| s.seat_of(session).is_some()) else { return };
+        if inner.selecting[k].ranked.is_some() {
+            let s = inner.selecting.swap_remove(k);
+            tracing::info!(
+                ranked = s.ranked.as_deref().unwrap_or(""),
+                session,
+                "a ranked select called off: someone left"
+            );
+            inner.requeue.extend(s.players.into_iter().map(|(_, w)| w).filter(|w| w.session != session));
+            return;
+        }
         let s = &mut inner.selecting[k];
         if let Some(seat) = s.seat_of(session) {
             s.players.retain(|(st, _)| usize::from(*st) != seat);
@@ -581,7 +747,7 @@ impl Lobby {
             return false;
         };
         let Some(seat) = l.tokens.iter().position(|t| *t == hash).map(|s| s as u8) else { return false };
-        let w = Waiting { session, name: name.to_string(), agent, max_datagram, tx, token, wallet };
+        let w = Waiting { session, name: name.to_string(), agent, max_datagram, tx, token, wallet, party: 0 };
         l.pending.retain(|(st, _)| *st != seat);
         if let Some((_, _, old)) = l.sessions.iter().find(|(_, st, _)| *st == seat) {
             if old.send(LobbyEvent::Replaced).is_ok() {
@@ -630,6 +796,27 @@ impl Lobby {
         loop {
             tick.tick().await;
             self.pass();
+            self.requeue();
+        }
+    }
+
+    /// The players of ranked selects called off, back into the ranked queue with their parties
+    /// (outside the lobby's lock: it's the store's call).
+    fn requeue(&self) {
+        let back = std::mem::take(&mut self.inner().requeue);
+        if back.is_empty() {
+            return;
+        }
+        match self.elopros.get() {
+            Some(elo) => {
+                crate::elopros::ranked::requeue(elo, back, "someone left champion select: back in the queue")
+            }
+            None => {
+                for w in back {
+                    let why = "The ranked match was called off.".to_string();
+                    let _ = w.tx.send(LobbyEvent::Tell(ToClient::Refused { what: "ranked".into(), why }));
+                }
+            }
         }
     }
 
@@ -638,8 +825,8 @@ impl Lobby {
         // Results.
         for (k, s) in self.game.shards.iter().enumerate() {
             while let Some(o) = s.shared.outcomes.pop() {
-                let (m, winner) = match o {
-                    Outcome::Over { m, winner, tick, hash } => {
+                let (m, winner, end) = match o {
+                    Outcome::Over { m, winner, tick, hash, line } => {
                         tracing::info!(
                             shard = k,
                             m,
@@ -648,14 +835,14 @@ impl Lobby {
                             hash = format_args!("{hash:016x}"),
                             "match over"
                         );
-                        (m, winner)
+                        (m, winner, Some((tick, line)))
                     }
                     Outcome::Failed { m, tick } => {
                         tracing::error!(shard = k, m, tick, "a match panicked: stopped, no contest");
-                        (m, NO_CONTEST)
+                        (m, NO_CONTEST, None)
                     }
                 };
-                self.over(&mut inner, k, m, winner);
+                self.over(&mut inner, k, m, winner, end);
             }
         }
         // A shard whose thread has stopped ticking (it panicked outside a match): its matches are
@@ -673,7 +860,7 @@ impl Lobby {
                 inner.dead[k] = true;
                 let ms: Vec<u16> = inner.live.iter().filter(|l| l.shard == k).map(|l| l.m).collect();
                 for m in ms {
-                    self.over(&mut inner, k, m, NO_CONTEST);
+                    self.over(&mut inner, k, m, NO_CONTEST, None);
                 }
             }
         }
@@ -696,22 +883,19 @@ impl Lobby {
             let Some((shard, m)) = self.free_match(&inner) else {
                 break;
             };
-            let n = inner.queue.len().min(SEATS);
-            let waiting: Vec<Waiting> = inner.queue.drain(..n).collect();
+            let taken = take_match(&mut inner.queue);
             inner.since = (!inner.queue.is_empty()).then(Instant::now);
+            if taken.is_empty() {
+                break;
+            }
             inner.next =
                 inner.next.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
             let seed = inner.next;
             let mut roster = bots_roster();
-            let players: Vec<(u8, Waiting)> = waiting
-                .into_iter()
-                .enumerate()
-                .map(|(k, w)| {
-                    let seat = SEAT_ORDER[k];
-                    roster[usize::from(seat)] = Player { name: w.name.clone(), agent: w.agent, bot: false };
-                    (seat, w)
-                })
-                .collect();
+            for (seat, w) in &taken {
+                roster[usize::from(*seat)] = Player { name: w.name.clone(), agent: w.agent, bot: false };
+            }
+            let players = taken;
             // Each player's rerolls: their wallet's bank, or a guest's.
             let mut select = Select::new(seed);
             for (seat, w) in &players {
@@ -726,6 +910,7 @@ impl Lobby {
                 roster,
                 ends: Instant::now() + self.select_for,
                 practice: false,
+                ranked: None,
             };
             if !self.select_for.is_zero() {
                 s.announce(None);
@@ -738,7 +923,10 @@ impl Lobby {
 
     /// Match `m` of shard `k` is over: its players told who won, and each signed-in one still
     /// seated earns a reroll (a match that couldn't go on earns none).
-    fn over(&self, inner: &mut Inner, k: usize, m: u16, winner: u8) {
+    /// `end` is the tick it ended on and each seat's line (none for a match that couldn't go on):
+    /// with Elo Pros, what the match owes it is written to its outbox here, before anything can
+    /// take the match's lobby file away.
+    fn over(&self, inner: &mut Inner, k: usize, m: u16, winner: u8, end: Option<(u32, [SeatLine; SEATS])>) {
         if let Some(l) = inner.live.iter_mut().find(|l| l.shard == k && l.m == m && l.over_at.is_none()) {
             l.over_at = Some(Instant::now());
             for (_, _, tx) in &l.sessions {
@@ -748,6 +936,9 @@ impl Lobby {
                 let wallets = &l.wallets;
                 self.rerolls
                     .earn_all(l.sessions.iter().filter_map(|(_, seat, _)| wallets[usize::from(*seat)]));
+            }
+            if let (Some(elo), Some((tick, line))) = (self.elopros.get(), end) {
+                elo.outbox.owe(&l.done(winner, tick, &line));
             }
         }
     }
@@ -796,7 +987,7 @@ impl Lobby {
     /// Starts the match its select ended on, its players seated; `None` if every one of them had
     /// gone.
     fn start(&self, s: Selecting) -> Option<Live> {
-        let Selecting { shard, m, seed, select, players, roster, practice, .. } = s;
+        let Selecting { shard, m, seed, select, players, roster, practice, ranked, .. } = s;
         let picks = select.picks;
         let shared = self.game.shards[shard].shared.clone();
         let humans = players.iter().fold(0u16, |mask, (seat, _)| mask | 1 << seat);
@@ -807,6 +998,7 @@ impl Lobby {
         let mut sessions = Vec::new();
         let mut tokens = [[0u8; 32]; SEATS];
         let mut wallets = [None; SEATS];
+        let mut agents = [false; SEATS];
         // What a player is told of the match: never the seed, from which every seat's augment
         // offers follow.
         let told = ToClient::Match {
@@ -818,6 +1010,7 @@ impl Lobby {
             rejoin: String::new(),
             practice,
             stream: 0,
+            ranked: ranked.is_some(),
         };
         for (seat, p) in players {
             let g = u32::from(m) * SEATS as u32 + u32::from(seat);
@@ -846,6 +1039,7 @@ impl Lobby {
                 continue;
             }
             wallets[usize::from(seat)] = p.wallet;
+            agents[usize::from(seat)] = p.agent;
             sessions.push((p.session, seat, p.tx));
         }
         if sessions.is_empty() {
@@ -868,7 +1062,60 @@ impl Lobby {
             tokens,
             pending: Vec::new(),
             wallets,
+            agents,
+            record: format!("{seed:016x}"),
+            ranked,
         })
+    }
+
+    /// A ranked match the store made (`crate::elopros::ranked`): its two sides seated here, side
+    /// 0 in seats 0 to 4 and side 1 in 5 to 9, no bots, then champion select as any match's. The
+    /// sides given back if there's no room for it (a free match) or a side isn't five.
+    pub(crate) fn start_ranked(&self, id: &str, sides: [Vec<Waiting>; 2]) -> Result<(), [Vec<Waiting>; 2]> {
+        let mut inner = self.inner();
+        let Some((shard, m)) = self.free_match(&inner) else { return Err(sides) };
+        if sides.iter().any(|s| s.len() != el_sim::units::TEAM_SIZE) {
+            return Err(sides);
+        }
+        for w in sides.iter().flatten() {
+            inner.queue.retain(|q| q.session != w.session);
+            Self::out_of_select(&mut inner, w.session);
+        }
+        if inner.queue.is_empty() {
+            inner.since = None;
+        }
+        inner.next =
+            inner.next.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+        let seed = inner.next;
+        let mut roster = bots_roster();
+        let mut players = Vec::with_capacity(SEATS);
+        let [a, b] = sides;
+        for (seat, w) in (0u8..).zip(a.into_iter().chain(b)) {
+            roster[usize::from(seat)] = Player { name: w.name.clone(), agent: w.agent, bot: false };
+            players.push((seat, w));
+        }
+        let mut select = Select::new(seed);
+        for (seat, w) in &players {
+            select.rerolls[usize::from(*seat)] = self.rerolls.balance(w.wallet);
+        }
+        tracing::info!(shard, m, ranked = id, "a ranked match into champion select");
+        let s = Selecting {
+            shard,
+            m,
+            seed,
+            select,
+            players,
+            roster,
+            ends: Instant::now() + self.select_for,
+            practice: false,
+            ranked: Some(id.to_string()),
+        };
+        if !self.select_for.is_zero() {
+            s.announce(None);
+        }
+        inner.selecting.push(s);
+        self.start_due(&mut inner);
+        Ok(())
     }
 }
 
@@ -908,15 +1155,66 @@ mod tests {
         // A match that couldn't go on earns nothing; one that ends earns one back.
         {
             let mut inner = lobby.inner();
-            lobby.over(&mut inner, k, m, NO_CONTEST);
+            lobby.over(&mut inner, k, m, NO_CONTEST, None);
         }
         assert_eq!(lobby.rerolls.balance(Some(wallet)), BANK_MAX - 1);
         lobby.inner().live[0].over_at = None;
         {
             let mut inner = lobby.inner();
-            lobby.over(&mut inner, k, m, 0);
+            lobby.over(&mut inner, k, m, 0, None);
         }
         assert_eq!(lobby.rerolls.balance(Some(wallet)), BANK_MAX, "earned back");
+    }
+
+    fn waiting(session: u32, party: u32) -> Waiting {
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        Waiting {
+            session,
+            name: format!("P{session}"),
+            agent: false,
+            max_datagram: 1200,
+            tx,
+            token: String::new(),
+            wallet: None,
+            party,
+        }
+    }
+
+    /// Alone, people fill a side each in turn; a party sits on one side whole, and one too big for
+    /// the room left waits for the next match.
+    #[test]
+    fn a_party_sits_on_one_side() {
+        let mut q: Vec<Waiting> = (1..=3).map(|s| waiting(s, 0)).collect();
+        let seats: Vec<(u8, u32)> = take_match(&mut q).iter().map(|(seat, w)| (*seat, w.session)).collect();
+        assert_eq!(seats, [(0, 1), (5, 2), (1, 3)]);
+        assert!(q.is_empty());
+
+        // 1 alone, then a party of three (4, 5, 6), then 7 alone, then a party of four (8..11),
+        // then 12 alone: the four fit nowhere once the three and the singles are placed.
+        let mut q = vec![waiting(1, 0)];
+        q.extend((4..=6).map(|s| waiting(s, 4)));
+        q.push(waiting(7, 0));
+        q.extend((8..=11).map(|s| waiting(s, 8)));
+        q.push(waiting(12, 0));
+        let taken = take_match(&mut q);
+        let side = |s: u32| {
+            taken.iter().find(|(_, w)| w.session == s).map(|(seat, _)| team_of_seat(usize::from(*seat)))
+        };
+        assert_eq!(side(4), side(5));
+        assert_eq!(side(5), side(6));
+        assert_ne!(side(1), side(4), "the three go to the side with more room");
+        assert!(
+            taken.iter().all(|(_, w)| !(8..=11).contains(&w.session)) || {
+                let s8 = side(8);
+                (9..=11).all(|s| side(s) == s8)
+            }
+        );
+        let mut all: Vec<u8> = taken.iter().map(|(seat, _)| *seat).collect();
+        all.sort_unstable();
+        all.dedup();
+        assert_eq!(all.len(), taken.len(), "no seat twice");
+        assert!(taken.len() <= SEATS);
+        assert_eq!(taken.len() + q.len(), 10, "nobody lost");
     }
 
     #[test]
@@ -974,7 +1272,7 @@ mod tests {
     #[test]
     fn a_team_sees_its_own_champions_only() {
         let s = Select::new(3);
-        let ToClient::Select { picks, rerolls, .. } = s.view(6, 20, &bots_roster()) else { panic!() };
+        let ToClient::Select { picks, rerolls, .. } = s.view(6, 20, &bots_roster(), false) else { panic!() };
         assert_eq!(rerolls, REROLLS);
         for (seat, &c) in picks.iter().enumerate() {
             if team_of_seat(seat) == 1 {

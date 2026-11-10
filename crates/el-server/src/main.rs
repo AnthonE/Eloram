@@ -85,11 +85,40 @@ struct Args {
     /// every rank, no cooldowns, target dummies (`docs/FX.md`, "Practice").
     #[arg(long)]
     practice: bool,
+    /// Writes a new Elo Pros server key (PKCS#8 PEM, mode 0600) to this file, prints the row
+    /// `elo.json`'s `server_keys` takes, and exits.
+    #[arg(long, value_name = "PEM")]
+    keygen: Option<PathBuf>,
+    /// This server's Elo Pros key (`--keygen` makes one): with it, each finished match's stats go
+    /// to the store, and a ranked match's result to the ratings.
+    #[arg(long, value_name = "PEM")]
+    server_key: Option<PathBuf>,
+    /// The id `elo.json`'s `server_keys` names the key by.
+    #[arg(long, default_value = "game-1")]
+    server_key_id: String,
+    /// Elo Pros' API.
+    #[arg(long, default_value = "https://elopros.com/api")]
+    elo_api: String,
+    /// `host:port` as the title's server list names this server (the store's matchmaker puts
+    /// ranked matches on a server by it).
+    #[arg(long)]
+    public_addr: Option<String>,
+    /// Where this server's records are served from publicly (`https://.../records`), which a
+    /// ranked result names as its evidence.
+    #[arg(long)]
+    records_url: Option<String>,
+    /// Hold RANKED matches from the store's matchmaker (needs `--server-key` and `--public-addr`,
+    /// and the title on the store's shelf).
+    #[arg(long, requires = "server_key")]
+    ranked: bool,
 }
 
 fn main() -> anyhow::Result<()> {
     el_server::telemetry::init();
     let args = Args::parse();
+    if let Some(path) = &args.keygen {
+        return keygen(path, &args.server_key_id);
+    }
     let web_dir = args.web_dir.is_dir().then_some(args.web_dir.clone());
     if web_dir.is_none() {
         tracing::warn!(
@@ -125,6 +154,14 @@ fn main() -> anyhow::Result<()> {
         }),
         require_sign_in: args.require_sign_in,
         practice: args.practice,
+        elopros: args.server_key.map(|key_file| el_server::elopros::EloConfig {
+            api: args.elo_api,
+            key_file,
+            key_id: args.server_key_id,
+            public_addr: args.public_addr,
+            records_url: args.records_url,
+            ranked: args.ranked,
+        }),
         ..Config::default()
     };
     // Two workers are plenty: the matches run on their own shard threads.
@@ -137,6 +174,21 @@ fn main() -> anyhow::Result<()> {
         handle.shutdown();
         Ok(())
     })
+}
+
+/// `--keygen`: a new key in `path`, never over one that's there.
+fn keygen(path: &std::path::Path, id: &str) -> anyhow::Result<()> {
+    use std::io::Write as _;
+    let (pem, public) = el_server::elopros::key::generate().map_err(anyhow::Error::msg)?;
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create_new(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+    let mut f = opts.open(path).map_err(|e| anyhow::anyhow!("{}: {e}", path.display()))?;
+    f.write_all(pem.as_bytes())?;
+    println!("wrote {} (keep it on this server; it signs as eloram/{id})", path.display());
+    println!("elo.json's server_keys row: {}", serde_json::json!({"id": id, "pub": public}));
+    Ok(())
 }
 
 /// What the signals do (`ops/eloram.service`, as oneshot's server takes them): SIGTERM and SIGINT

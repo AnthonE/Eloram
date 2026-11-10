@@ -29,6 +29,9 @@ use crate::net::now_s;
 use crate::session::Session;
 use crate::view::{Drawn, facing_camera};
 
+/// How long a missile takes to come from its caster's muzzle onto its own path (s).
+const MUZZLE: f32 = 0.15;
+
 #[derive(ShaderType, Debug, Clone, Copy, Default, PartialEq)]
 pub struct LiveParams {
     pub core: Vec4,
@@ -328,6 +331,7 @@ pub fn draw(
     mut clock_v: ResMut<Time<Virtual>>,
     stage: Res<StageShots>,
     knobs: Res<super::burst::KnobsRes>,
+    muzzles: Res<crate::champions::Muzzles>,
 ) {
     let live = &mut *live;
     let now = now_s();
@@ -433,7 +437,15 @@ pub fn draw(
         let head_m = mat(shape::HEAD, live, &mut mats);
         let trail_m = mat(shape::TRAIL, live, &mut mats);
         let r = if s.homing { 0.16 } else { (s.width * S * 0.5).clamp(0.18, 0.7) };
-        let p3 = world(pos, 1.1);
+        // Leaving its caster's muzzle (`champions.rs`), then on its own path a moment later:
+        // where it is and what it hits stay the server's closed form.
+        let flown = s.flown(at) * S;
+        let lift = muzzles.0.get(usize::from(s.owner)).copied().flatten().map_or(Vec3::ZERO, |m| {
+            let age = flown / (s.speed * S).max(0.1);
+            let e = (1.0 - age / MUZZLE).clamp(0.0, 1.0);
+            (m - world(s.origin, 1.1)) * e * e
+        });
+        let p3 = world(pos, 1.1) + lift;
         show(
             &mut q,
             live.heads[k],
@@ -443,7 +455,6 @@ pub fn draw(
         );
         // The trail: behind the head, as long as it's fast (and no longer than it has flown), as
         // wide as its lane.
-        let flown = s.flown(at) * S;
         let len = (s.speed * 0.06 * S).clamp(0.3, 2.2).min(flown.max(0.05));
         let width = if s.homing { 0.14 } else { (s.width * S).max(0.14) };
         let d3 = Vec3::new(dir.x, 0.0, -dir.y);

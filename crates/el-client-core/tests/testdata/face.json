@@ -1,0 +1,99 @@
+{
+  "about": "GET /api/face/{wallet} (meter/faces.py face_get) for a wallet that set a face and one that did not; `prepare` is POST /api/face/prepare's reply. `cases` are signed texts: playauth.play_message('profile', wallet, faces._detail(at, …), day) — the detail is sorted compact JSON of `at` and only the fields sent (\"\" clears one); the server keys the day to today, so a client rebuilding the text takes the day from the text it was handed.",
+  "set": {
+    "wallet": "0x2222222222222222222222222222222222222222",
+    "name": "ash",
+    "picture": "/api/face/0x2222222222222222222222222222222222222222/pic.png?v=3c3c3c3c",
+    "pic": "3c3c3c3c",
+    "kind": "human",
+    "harness": "claude-code/2.1",
+    "model": "claude-opus-5-5",
+    "avatar": 2736784032,
+    "updated": 1761000000,
+    "guild": {
+      "color": "teal",
+      "name": "Night Owls",
+      "page": "/g/OWL",
+      "role": "member",
+      "shape": "hex",
+      "tag": "OWL"
+    }
+  },
+  "unset": {
+    "wallet": "0x4444444444444444444444444444444444444444",
+    "name": null,
+    "picture": null,
+    "pic": null,
+    "kind": null,
+    "harness": null,
+    "model": null,
+    "avatar": null,
+    "updated": null,
+    "guild": null
+  },
+  "prepare": {
+    "sign_this": "elo play\naction: profile\nwallet: 0x2222222222222222222222222222222222222222\nday: 2026-10-21\ndetail: {\"at\":1792555857,\"harness\":\"claude-code/2.1\",\"kind\":\"agent\",\"model\":\"claude-opus-5-5\",\"name\":\"ash\"}",
+    "at": 1792555857,
+    "detail": "{\"at\":1792555857,\"harness\":\"claude-code/2.1\",\"kind\":\"agent\",\"model\":\"claude-opus-5-5\",\"name\":\"ash\"}"
+  },
+  "cases": [
+    {
+      "wallet": "0x2222222222222222222222222222222222222222",
+      "at": 1761003600,
+      "fields": {
+        "name": "ash",
+        "kind": "agent",
+        "harness": "claude-code/2.1",
+        "model": "claude-opus-5-5"
+      },
+      "detail": "{\"at\":1761003600,\"harness\":\"claude-code/2.1\",\"kind\":\"agent\",\"model\":\"claude-opus-5-5\",\"name\":\"ash\"}",
+      "day": "2025-10-20",
+      "text": "elo play\naction: profile\nwallet: 0x2222222222222222222222222222222222222222\nday: 2025-10-20\ndetail: {\"at\":1761003600,\"harness\":\"claude-code/2.1\",\"kind\":\"agent\",\"model\":\"claude-opus-5-5\",\"name\":\"ash\"}"
+    },
+    {
+      "wallet": "0x2222222222222222222222222222222222222222",
+      "at": 1761003601,
+      "fields": {
+        "name": "Doc \"W\" \\o/",
+        "picture_sha256": "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c"
+      },
+      "detail": "{\"at\":1761003601,\"name\":\"Doc \\\"W\\\" \\\\o/\",\"picture_sha256\":\"3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c\"}",
+      "day": "2025-10-20",
+      "text": "elo play\naction: profile\nwallet: 0x2222222222222222222222222222222222222222\nday: 2025-10-20\ndetail: {\"at\":1761003601,\"name\":\"Doc \\\"W\\\" \\\\o/\",\"picture_sha256\":\"3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c\"}"
+    },
+    {
+      "wallet": "0x2222222222222222222222222222222222222222",
+      "at": 1761003602,
+      "fields": {
+        "name": "",
+        "picture_sha256": "",
+        "harness": "",
+        "model": ""
+      },
+      "detail": "{\"at\":1761003602,\"harness\":\"\",\"model\":\"\",\"name\":\"\",\"picture_sha256\":\"\"}",
+      "day": "2025-10-20",
+      "text": "elo play\naction: profile\nwallet: 0x2222222222222222222222222222222222222222\nday: 2025-10-20\ndetail: {\"at\":1761003602,\"harness\":\"\",\"model\":\"\",\"name\":\"\",\"picture_sha256\":\"\"}"
+    },
+    {
+      "wallet": "0x2222222222222222222222222222222222222222",
+      "at": 1761003603,
+      "fields": {
+        "avatar": 2736784032,
+        "name": "ash"
+      },
+      "detail": "{\"at\":1761003603,\"avatar\":2736784032,\"name\":\"ash\"}",
+      "day": "2025-10-20",
+      "text": "elo play\naction: profile\nwallet: 0x2222222222222222222222222222222222222222\nday: 2025-10-20\ndetail: {\"at\":1761003603,\"avatar\":2736784032,\"name\":\"ash\"}"
+    },
+    {
+      "wallet": "0x2222222222222222222222222222222222222222",
+      "at": 1761003604,
+      "fields": {
+        "avatar": 0
+      },
+      "detail": "{\"at\":1761003604,\"avatar\":0}",
+      "day": "2025-10-20",
+      "text": "elo play\naction: profile\nwallet: 0x2222222222222222222222222222222222222222\nday: 2025-10-20\ndetail: {\"at\":1761003604,\"avatar\":0}"
+    }
+  ]
+}

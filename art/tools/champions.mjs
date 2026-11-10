@@ -34,6 +34,7 @@ import { NodeIO, getBounds } from '@gltf-transform/core';
 import { dedup, prune, resample, simplify, textureCompress, weld } from '@gltf-transform/functions';
 import { MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
+import { MAPS, MESHY, length, retargetAcross, sheet, strike } from './retarget.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'web/assets/models/champions');
@@ -302,9 +303,10 @@ function packSkin(prim) {
   if (u.every((x) => x >= 0 && x <= 1)) uv.setArray(Uint16Array.from(u, (x) => Math.round(x * 65535))).setNormalized(true);
 }
 
-/** Rotations as normalised 16-bit integers: half the bytes, a ten-thousandth of a turn. */
-function shortRotations(doc) {
-  for (const anim of doc.getRoot().listAnimations())
+/** Rotations as normalised 16-bit integers: half the bytes, a ten-thousandth of a turn (every
+ *  clip's, or those of `anims`). */
+function shortRotations(doc, anims = doc.getRoot().listAnimations()) {
+  for (const anim of anims)
     for (const ch of anim.listChannels()) {
       if (ch.getTargetPath() !== 'rotation') continue;
       const out = ch.getSampler().getOutput();
@@ -322,6 +324,116 @@ async function dress(io, doc, dir, joints, scale, held) {
     const mesh = await prop(io, doc, def.prop, p, path.join(dir, 'props', `${p.mesh ?? def.prop}.glb`));
     hold(doc, joints, scale, mesh, def);
   }
+  tips(doc);
+}
+
+/** An empty node at the far end of each prop, `<prop>.tip`: where a swing's trail is drawn from
+ *  and a shot leaves (the client's sockets, `el-client/src/champions.rs`). A prop's mesh runs
+ *  along its +Y from its grip, `length` long. */
+function tips(doc) {
+  for (const node of doc.getRoot().listNodes()) {
+    const p = DRESS.props[node.getName()];
+    if (!p || !node.getMesh() || node.listChildren().some((c) => c.getName().endsWith('.tip'))) continue;
+    node.addChild(doc.createNode(`${node.getName()}.tip`).setTranslation([0, (1 - p.grip) * p.length, 0]));
+  }
+}
+
+/** The libraries' rigs, once (`python3 -I art/tools/ual.py` puts them in art/cache/ual/). */
+const LIBRARIES = new Map();
+async function library(io, name) {
+  if (!LIBRARIES.has(name)) {
+    const file = path.join(ROOT, 'art/cache/ual', `${name}.glb`);
+    if (!fs.existsSync(file)) throw new Error(`${file} is missing: python3 -I art/tools/ual.py`);
+    const doc = await io.read(file);
+    LIBRARIES.set(name, { doc, map: MAPS[name], anims: new Map(doc.getRoot().listAnimations().map((a) => [a.getName(), a])) });
+  }
+  return LIBRARIES.get(name);
+}
+
+/** The clips from Quaternius's library (art/champions.json, `ual`) that `name`'s kit plays
+ *  (art/clips.json), put on `doc` (rig `joints`): each its parts one after another, checked
+ *  against the clip table's length. Returns them. */
+async function second(io, doc, joints, name, plays) {
+  const made = [];
+  for (const clip of plays) {
+    const def = DRESS.ual[clip];
+    if (!def) continue;
+    const src = await library(io, def.from);
+    const parts = def.parts.map(([n, from, to]) => {
+      const anim = src.anims.get(n);
+      if (!anim) throw new Error(`${def.from} has no ${n}`);
+      return { anim, from, to: to ?? length(anim) };
+    });
+    const len = parts.reduce((s, p) => s + p.to - p.from, 0);
+    const want = CLIPS.clips[clip].length;
+    if (Math.abs(len - want) > 0.02) throw new Error(`${clip}'s parts are ${len.toFixed(3)} s, not ${want}`);
+    made.push(retargetAcross(src, parts, doc, joints, clip));
+  }
+  return made;
+}
+
+/** Where a clip's strike is fastest: the tip of what the right hand holds, or the hand. */
+function striker(doc) {
+  const hand = doc
+    .getRoot()
+    .listNodes()
+    .find((n) => n.getName() === 'RightHand');
+  const prop = hand.listChildren().find((c) => DRESS.props[c.getName()]);
+  const tip = prop?.listChildren().find((c) => c.getName().endsWith('.tip'));
+  return tip ?? hand;
+}
+
+/** `--ual [name ...]`: a model already made given its library clips (any it had replaced) and its
+ *  props' tips, in place; each clip's strike, measured, printed for el_client_core::pose. */
+async function secondInPlace(io, names) {
+  const strikes = {};
+  for (const name of names) {
+    const file = fs.existsSync(path.join(OUT, `${name}.glb`)) ? path.join(OUT, `${name}.glb`) : path.join(MINIONS, `${name}.glb`);
+    const doc = await io.read(file);
+    const plays = CLIPS.champions[name] ?? CLIPS.minions[name] ?? [];
+    // What it no longer plays goes (an idle given way to a stance), and the library's are made
+    // again.
+    for (const a of doc.getRoot().listAnimations()) if (DRESS.ual[a.getName()] || !plays.includes(a.getName())) a.dispose();
+    tips(doc);
+    const joints = skeleton(doc);
+    const made = await second(io, doc, joints, name, plays);
+    shortRotations(doc, made);
+    await doc.transform(prune({ keepLeaves: true }));
+    await io.write(file, doc);
+    const at = striker(doc);
+    for (const a of made) {
+      if (CLIPS.clips[a.getName()].strike > 0) (strikes[a.getName()] ??= []).push(+strike(doc, a, at).toFixed(3));
+    }
+    console.log(`${name} ${Math.round(fs.statSync(file).size / 1024)} KiB, ${made.length} library clips`);
+  }
+  for (const [clip, ts] of Object.entries(strikes)) {
+    ts.sort((a, b) => a - b);
+    console.log(`${clip}: strike (median of ${ts.length}) ${ts[ts.length >> 1]} s, ${ts[0]} to ${ts[ts.length - 1]}`);
+  }
+}
+
+/** `--sheet <glb> <png> [clip ...]`: stick figures of a model's clips (or a library's), a row a
+ *  clip, to look at without the browser (`retarget.mjs`, `sheet`). */
+async function drawSheet(io, file, out, want) {
+  const doc = await io.read(file);
+  const names = new Set(doc.getRoot().listNodes().map((n) => n.getName()));
+  const map = names.has('Hips') ? MESHY : names.has('pelvis') ? MAPS.ual2 : MAPS.ual1;
+  const anims = doc.getRoot().listAnimations().filter((a) => !want.length || want.includes(a.getName()));
+  const at = map === MESHY ? striker(doc) : null;
+  const extra = map === MESHY
+    ? doc
+        .getRoot()
+        .listNodes()
+        .filter((n) => n.getName().endsWith('.tip'))
+        .map((t) => [t.listParents().find((p) => p.propertyType === 'Node'), t.getTranslation()])
+    : [];
+  const rows = anims.map((a) => ({
+    name: a.getName(),
+    anim: a,
+    strike: at && CLIPS.clips[a.getName()]?.strike > 0 ? strike(doc, a, at) : null,
+  }));
+  await sheet(doc, map, rows, out, { extra });
+  console.log(`${out}: ${rows.length} clips`);
 }
 
 /** The clip's window in its source, checked against the length the clip table gives it. */
@@ -537,7 +649,8 @@ async function minion(io, dir, name, ref) {
     resample({ tolerance: 1e-4 }),
     // Names kept: the client finds the `team` material by its name.
     dedup({ keepUniqueNames: true }),
-    prune(),
+    // Leaves kept: the props' tips are empty nodes.
+    prune({ keepLeaves: true }),
     textureCompress({ encoder: sharp, targetFormat: 'jpeg', resize: [256, 256], quality: 85 }),
   );
   if (skinned) packSkin(skinned.getMesh().listPrimitives()[0]);
@@ -563,6 +676,8 @@ async function champion(io, dir, name, ref) {
   for (const a of doc.getRoot().listAnimations()) a.dispose();
   // The clips it plays (el_client_core::pose's kit): its own run, the rest shared.
   await clips(io, dir, doc, joints, ref, path.join(dir, 'champions', `${name}.run.glb`), CLIPS.champions[name]);
+  // And those from Quaternius's library (art/cache/ual/, `python3 -I art/tools/ual.py`).
+  await second(io, doc, joints, name, CLIPS.champions[name]);
   const skinned = doc
     .getRoot()
     .listNodes()
@@ -578,7 +693,8 @@ async function champion(io, dir, name, ref) {
     simplify({ simplifier: MeshoptSimplifier, ratio: TRIANGLES / (prim.getIndices().getCount() / 3), error: 0.002 }),
     resample({ tolerance: 1e-4 }),
     dedup(),
-    prune(),
+    // Leaves kept: the props' tips are empty nodes.
+    prune({ keepLeaves: true }),
     textureCompress({ encoder: sharp, targetFormat: 'jpeg', resize: [512, 512], quality: 85 }),
   );
   packSkin(skinned.getMesh().listPrimitives()[0]);
@@ -590,6 +706,14 @@ async function champion(io, dir, name, ref) {
 }
 
 const [dir, ...names] = process.argv.slice(2);
+if (dir === '--ual') {
+  await secondInPlace(new NodeIO(), names.length ? names : Object.keys(CLIPS.champions));
+  process.exit(0);
+}
+if (dir === '--sheet') {
+  await drawSheet(new NodeIO(), names[0], names[1], names.slice(2));
+  process.exit(0);
+}
 if (dir === '--wheels') {
   const io = new NodeIO();
   const doc = await io.read(names[0]);
