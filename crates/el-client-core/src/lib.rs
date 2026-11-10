@@ -7,6 +7,7 @@ pub mod baselines;
 pub mod client;
 pub mod clock;
 pub mod controls;
+pub mod elopros;
 pub mod fog;
 pub mod front;
 pub mod fx;

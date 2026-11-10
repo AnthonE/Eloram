@@ -59,6 +59,18 @@ pub fn prove_at(domain: &str, nonce_hex: &str, issued_at: u64) -> Result<Proved,
     elo.prove_at(domain, nonce_hex, issued_at)
 }
 
+/// Signs `text` (a change to the friends list on Elo Pros) through the launcher, which shows it to
+/// the player first: only for its own account, and only from a thread that may wait.
+pub fn sign(text: &str, account: &str) -> Result<String, String> {
+    let mut l = line().lock().map_err(|_| "the launcher's line broke")?;
+    let elo = l.as_mut().ok_or("the Elo launcher isn't running: start Eloram from it to sign")?;
+    let mine = elo.address().unwrap_or_default();
+    if !mine.eq_ignore_ascii_case(account) {
+        return Err("the launcher is signed in as another account".into());
+    }
+    elo.sign(text, "Eloram: a change to your Elo Pros friends")
+}
+
 /// Opens `url` in the player's browser. Never waits on a sign-in under way: then it says no.
 pub fn open(url: &str) -> Opened {
     let Ok(mut l) = line().try_lock() else { return Opened::Refused };

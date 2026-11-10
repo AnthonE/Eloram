@@ -167,3 +167,18 @@ pub(super) fn sign_with_wallet(
         error!("no thread to sign in on");
     }
 }
+
+/// Signs `text` through the Elo launcher (it shows the player the text and asks): the signature's
+/// text in the slot. `account` must be the launcher's own.
+pub fn sign_text(text: String, account: String) -> crate::platform::Slot {
+    let slot = crate::platform::Slot::default();
+    let out = slot.clone();
+    let spawned = std::thread::Builder::new().name("el-sign".into()).spawn(move || {
+        let got = crate::launcher::sign(&text, &account).map(String::into_bytes);
+        out.put(got);
+    });
+    if let Err(e) = spawned {
+        slot.put(Err(e.to_string()));
+    }
+    slot
+}

@@ -11,6 +11,7 @@
 //! `--queue`, `--practice`, `--watch`) skips it. While it's up the world isn't drawn: one window
 //! camera at a time (the menu's own 2D one), as Gates draws it.
 
+mod elo;
 pub mod ui;
 
 use bevy::prelude::*;
@@ -52,6 +53,8 @@ pub struct Front {
     pub ranked_here: bool,
     /// The ranked queue's state, as the server relays the store's.
     pub ranked_state: Option<String>,
+    /// FRIENDS and PROFILE: what Elo Pros keeps for the player (`elo.rs`).
+    pub elo: elo::EloState,
     manifest: Option<Result<Manifest, String>>,
     manifest_req: Option<Slot>,
     pub rows: Vec<WatchRow>,
@@ -78,6 +81,7 @@ impl Front {
             practice_here: false,
             ranked_here: false,
             ranked_state: None,
+            elo: elo::EloState::default(),
             manifest: None,
             manifest_req: None,
             rows: Vec::new(),
@@ -125,6 +129,7 @@ enum Pick {
     PartyJoin(u32),
     PartyDecline(u32),
     PartyLeave,
+    Friend(elo::FriendPick),
 }
 
 #[derive(Component)]
@@ -150,6 +155,7 @@ impl Plugin for FrontPlugin {
             (
                 steer,
                 refusals,
+                elo::reads,
                 fetches,
                 newest,
                 click,
@@ -241,6 +247,11 @@ fn steer(mut front: ResMut<Front>, session: Res<Session>) {
     if session.player.is_some() && front.who.id != session.player {
         front.who.id = session.player.clone();
         front.who.name = None;
+    }
+    if front.who.name.is_none()
+        && let Some(n) = front.elo.name()
+    {
+        front.who.name = Some(n);
     }
     if front.practice_here != session.practice_here {
         front.practice_here = session.practice_here;
@@ -376,6 +387,7 @@ fn act(
         Pick::PartyJoin(leader) => controls.lobby.push(ToServer::PartyAccept { leader }),
         Pick::PartyDecline(leader) => controls.lobby.push(ToServer::PartyDecline { leader }),
         Pick::PartyLeave => controls.lobby.push(ToServer::PartyLeave),
+        Pick::Friend(p) => elo::pick(front, p, controls),
         Pick::Profile => {
             let Some(id) = front.who.id.as_deref() else {
                 front.status = "Sign in to see your Elo Pros profile.".into();
@@ -466,7 +478,7 @@ fn key(front: &Front, session: &Session) -> String {
         front.ranked_here,
         session.signed_in,
         session.error.as_deref().unwrap_or(""),
-    ) + &format!("|{:?}", session.party)
+    ) + &format!("|{:?}|{}", session.party, front.elo.key())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -521,6 +533,40 @@ fn rebuild(
     commands.entity(root).add_children(&[header, body, footer]);
 }
 
+/// The identity chip's square: the face's picture once read, else the name's initial.
+fn chip(pic: Option<Handle<Image>>, initial: String) -> impl Bundle {
+    let shown = pic.is_some();
+    let image = ImageNode {
+        image: pic.unwrap_or_default(),
+        color: if shown { Color::WHITE } else { Color::NONE },
+        ..default()
+    };
+    (
+        Node {
+            width: px(50),
+            height: px(50),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            border: UiRect::all(px(1)),
+            ..default()
+        },
+        BackgroundColor(ROW_HOVER),
+        BorderColor::all(RULE),
+        children![
+            (
+                image,
+                Node {
+                    position_type: PositionType::Absolute,
+                    width: percent(100),
+                    height: percent(100),
+                    ..default()
+                }
+            ),
+            strong(if shown { String::new() } else { initial }, 22.0, GOLD),
+        ],
+    )
+}
+
 fn header(c: &mut Commands, front: &Front) -> Entity {
     let who = &front.who;
     let initial = who.shown_name().chars().next().unwrap_or('?').to_ascii_uppercase().to_string();
@@ -551,19 +597,7 @@ fn header(c: &mut Commands, front: &Front) -> Entity {
                         },
                         children![strong(who.shown_name(), 20.0, TITLE), label(who.line(), 15.0, DIM)],
                     ),
-                    (
-                        Node {
-                            width: px(50),
-                            height: px(50),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            border: UiRect::all(px(1)),
-                            ..default()
-                        },
-                        BackgroundColor(ROW_HOVER),
-                        BorderColor::all(RULE),
-                        children![strong(initial, 22.0, GOLD)],
-                    ),
+                    chip(front.elo.pic.clone().filter(|_| !who.streamer), initial),
                 ],
             ),
         ],
@@ -606,7 +640,8 @@ fn body(c: &mut Commands, front: &Front, session: &Session) -> Entity {
         Nav::Watch => watch_page(c, front),
         Nav::News => hub_page(c, front, Section::News),
         Nav::Store => hub_page(c, front, Section::Store),
-        Nav::Friends | Nav::Profile => soon_page(c, front),
+        Nav::Friends => elo::friends_page(c, front),
+        Nav::Profile => elo::profile_page(c, front),
         Nav::Options | Nav::Quit => play_page(c, front, session),
     };
     c.entity(row).add_children(&pages);
@@ -875,26 +910,6 @@ fn hub_page(c: &mut Commands, front: &Front, s: Section) -> Vec<Entity> {
     vec![panel, pane]
 }
 
-fn soon_page(c: &mut Commands, front: &Front) -> Vec<Entity> {
-    let panel = c.spawn(ui::panel(PANEL_W)).id();
-    let (t, b) = match front.nav {
-        Nav::Friends => ("FRIENDS", "Your Elo Pros friends: who's online and in a match, invites and asks."),
-        _ => ("PROFILE", "Your name and face on Elo Pros, your hours, your rating and the ladder."),
-    };
-    title_and_blurb(c, panel, t, b);
-    let signed = front.who.id.is_some();
-    let line = if signed {
-        "They live on your Elo Pros profile, which opens in your browser."
-    } else {
-        "Sign in to see this: a guest has no profile."
-    };
-    let l = c.spawn(label(line, 15.0, if signed { FAINT } else { DIM })).id();
-    let gap = c.spawn(ui::spacer()).id();
-    let open = c.spawn((ui::button("OPEN YOUR PROFILE", 0.0, signed), Pick::Profile)).id();
-    c.entity(panel).add_children(&[l, gap, open]);
-    vec![panel]
-}
-
 fn footer(c: &mut Commands, front: &Front) -> Entity {
     c.spawn((
         Node {
@@ -982,6 +997,9 @@ fn publish(front: Res<Front>, session: Res<Session>, mut dev: ResMut<DevStatus>)
     dev.set("ranked_state", front.ranked_state.clone().unwrap_or_default());
     dev.set("watch_rows", front.rows.len() as u32);
     dev.set("party_size", session.party.members.len() as u32);
+    dev.set("friends_state", front.elo.friends_state());
+    dev.set("friends_count", front.elo.friends_count());
+    dev.set("profile_state", front.elo.profile_state());
     dev.set("party_leader", session.party.leader);
     dev.set("party_asks", session.party.invites_in.len() as u32);
     dev.set("watch_error", front.rows_error.clone().unwrap_or_default());

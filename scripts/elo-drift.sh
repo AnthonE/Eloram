@@ -11,7 +11,7 @@ fail=0
 want=$(awk '$2 ~ /elo_overlay.rs$/ {print $1}' "$platform/sdk/SHA256SUMS")
 have=$(sha256sum crates/el-launcher/src/elo_overlay.rs | cut -d' ' -f1)
 if [ "$want" = "$have" ]; then echo "ok    elo_overlay.rs ($have)"; else echo "DRIFT elo_overlay.rs: ours $have, the platform's $want"; fail=1; fi
-for f in crates/el-auth/tests/testdata/*.json crates/el-server/src/elopros/testdata/*.json; do
+for f in crates/el-auth/tests/testdata/*.json crates/el-server/src/elopros/testdata/*.json crates/el-client-core/tests/testdata/*.json; do
   up="$platform/sdk/testdata/$(basename "$f")"
   if [ ! -f "$up" ]; then echo "gone  $(basename "$f") (no longer in the platform's sdk/testdata)"; fail=1
   elif cmp -s "$f" "$up"; then echo "ok    $(basename "$f")"

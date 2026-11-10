@@ -115,7 +115,11 @@ mod native;
 #[cfg(target_arch = "wasm32")]
 mod web;
 #[cfg(not(target_arch = "wasm32"))]
+pub use native::sign_text;
+#[cfg(not(target_arch = "wasm32"))]
 use native::{dial, goodbye_on_exit, sign_with_wallet};
+#[cfg(target_arch = "wasm32")]
+pub use web::sign_text;
 #[cfg(target_arch = "wasm32")]
 use web::{dial, sign_with_wallet};
 /// The page says its goodbye on `pagehide` (`web.rs`).

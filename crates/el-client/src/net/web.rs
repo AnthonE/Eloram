@@ -141,3 +141,26 @@ pub(super) fn sign_with_wallet(
         }
     });
 }
+
+/// Signs `text` with the page's wallet as `account` (an `0x` one with `personal_sign`, a Solana
+/// one with `signMessage`): the signature's text in the slot. The wallet asks the player first.
+pub fn sign_text(text: String, account: String) -> crate::platform::Slot {
+    let slot = crate::platform::Slot::default();
+    let out = slot.clone();
+    wasm_bindgen_futures::spawn_local(async move {
+        let got: Result<Vec<u8>, String> = async {
+            let on = wallet_call("connect", &[]).await?.as_string().unwrap_or_default();
+            if !on.eq_ignore_ascii_case(&account) {
+                return Err("the wallet on this page is another account: sign in with this one".to_string());
+            }
+            let method = if el_proto::auth::base58_key(&account).is_some() { "signSolana" } else { "sign" };
+            let sig = wallet_call(method, &[text.as_str().into(), account.as_str().into()]).await?;
+            sig.as_string()
+                .map(String::into_bytes)
+                .ok_or_else(|| "the wallet's answer isn't a signature".to_string())
+        }
+        .await;
+        out.put(got);
+    });
+    slot
+}
