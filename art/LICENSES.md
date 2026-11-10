@@ -8,6 +8,12 @@ here doesn't ship. Nothing is traced, sampled or named from Riot's games (`CLAUD
 `eloram-256.png`, `eloram.ico` and `eloram.rc`, the desktop's window and program icon: drawn by
 `art/tools/icon.py` from `web/favicon.svg`'s shapes (the lane between the two bases). Ours.
 
+## The menu's backdrop (`web/assets/menu/`)
+
+`causeway.jpg`, behind the main menu: the Causeway shot from a match of the game itself on the high
+tier with the HUD off (`scripts/e2e.sh backdrop`), cropped, quietened and darkened on the left by
+`art/tools/menu_backdrop.py`. Ours, made of the art listed below.
+
 ## The ground (`web/assets/ground/`)
 
 Made by `art/tools/textures.py` from [ambientCG](https://ambientcg.com) sets, all

@@ -47,7 +47,7 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   bots in the other nine seats after 3 s (`EL_FILL`), then 20 s of champion select (`--select-secs`;
   it ends sooner once everyone seated is ready, and agents are ready at once). The server alone:
   `cargo run -p el-server --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
-- `scripts/e2e.sh spike|match|menu|watch|login|art|recover|fx|draws [webgl2]`: Playwright against a real server
+- `scripts/e2e.sh spike|match|menu|backdrop|watch|login|art|recover|fx|draws [webgl2]`: Playwright against a real server
   (a plain load opens the main menu, so the suites that play go in with `&queue=1`; `menu`: the
   menu's pages, RANKED refused on a server without Elo Pros, PLAY into champion select, LEAVE MATCH
   back to the menu and a reload staying there; `match`: queue, champion select (a reroll, the bench, ready), the headliner, augment, shop,
@@ -120,8 +120,17 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   past it. One window camera at a time: while it's up its `Camera2d` draws and the match's camera
   is off. The inbox takes `{t:"front",open,nav}`, `{t:"play",mode}` and `{t:"back_to_menu"}`;
   `window.__el` has `front`, `front_nav`, `front_mode`, `front_status`, `play_label`, `identity`,
-  `practice_available`, `ranked_available`, `ranked_state` and `watch_rows`. The server tells the
-  page who it is and what it holds after the Welcome (`ToClient::About`).
+  `practice_available`, `ranked_available`, `ranked_state`, `watch_rows`, `party_size`,
+  `party_leader`, `party_asks`, `friends_state`, `friends_count`, `profile_state`, `report_open` and
+  `report_line`. The server tells the page who it is and what it holds after the Welcome
+  (`ToClient::About`). FRIENDS and PROFILE read Elo Pros (`front/elo.rs`;
+  `el_client_core::elopros`, tested against the platform's vectors in
+  `el-client-core/tests/testdata/`, which `scripts/elo-drift.sh` checks). Parties are the server's
+  (`el-server/src/party.rs`; inbox `{t:"party",op,player,leader}`). REPORT A BUG (F8,
+  `front/report.rs`) posts to `elopros.com/api/bugs`; `EL_BUGS_URL` points the desktop at a stub and
+  `{t:"report",title,text}` files one (tests never file a real one). `{t:"hud",on:false}` hides
+  the HUD and the units' rings and bars: `scripts/e2e.sh backdrop` shoots the menu's backdrop with
+  it, and `python3 -I art/tools/menu_backdrop.py` makes `web/assets/menu/causeway.jpg`.
 - The Esc menu (Esc, or the button at the top left: `menu.rs`; `docs/DESIGN.md`, "Controls"): Controls,
   Graphics, Sound, in the game's own UI (not the page's: the desktop build has it too). Settings are
   `config::Prefs` (the layout, the indicators, the tier now and at the next load, the first

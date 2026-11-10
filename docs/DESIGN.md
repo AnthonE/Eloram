@@ -151,12 +151,23 @@ A plain load opens the main menu (`el-client/src/front/`, after Gates' layout in
 PLAY, in two modes: NORMAL (five a side, the server's bots in the seats no one takes, unrated) and
 RANKED (ten signed-in wallets, no bots, every match rated on Elo Pros' `ranked` ladder by the
 store's matchmaker, `docs/NETCODE.md`); PRACTICE (a champion, the dummies); WATCH (the server's
-matches, live a minute behind, and finished ones as replays); FRIENDS, NEWS, STORE and PROFILE
-(Elo Pros' pages for the title: what a manifest or the launcher has, said honestly when it has
-nothing); OPTIONS (the Esc menu's pages); and QUIT on the desktop. The identity chip says who's
-playing (a guest, a wallet, an Elo Pros account). Champion select takes the menu away; a match's
-end offers PLAY AGAIN in the mode last played, or the menu. LEAVE MATCH in the Esc menu, pressed
-twice, lets the seat go (a ranked match still counts it).
+matches, live a minute behind, and finished ones as replays); FRIENDS (the player's Elo Pros
+friends: who's on and where, in Eloram first, the asks to accept, decline or cancel, REMOVE, and
+INVITE TO PARTY for a friend on this server; a change is signed by the page's wallet or the Elo
+launcher); NEWS and STORE (Elo Pros' pages for the title, opened in the browser); PROFILE (the
+face, the hours in Eloram, the ranked rating, the stats, achievements and boards Elo Pros keeps,
+each saying when there's nothing on record or it couldn't look); OPTIONS (the Esc menu's pages);
+and QUIT on the desktop. The identity chip says who's playing (a guest, a wallet, an Elo Pros
+account) with their Elo Pros name and picture. Champion select takes the menu away; a match's end
+offers PLAY AGAIN in the mode last played, or the menu. LEAVE MATCH in the Esc menu, pressed twice,
+lets the seat go (a ranked match still counts it; leaving ranked champion select calls the match
+off and sends the other nine back to the queue).
+
+A **party** is up to five players on one server: the leader asks a signed-in player in (from
+FRIENDS), they JOIN from the card on PLAY, and the leader's PLAY queues everyone, NORMAL or RANKED,
+on one side of one match. **REPORT A BUG** (F8, the menu's footer, the Esc menu) files the player's
+words, this build's name and a picture of the screen with Elo Pros; on the desktop the note a crash
+left is offered on the next start.
 
 ## Controls
 

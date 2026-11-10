@@ -393,6 +393,10 @@ matchmaker, seating its two sides here with no bots (`tests/elopros.rs` against 
 The store's side: the listing row (hidden until the page is published), the launcher manifest, the
 hosted servers' row, the play block, and the per-title tables (scry-forge).
 
-Not yet: FRIENDS and PROFILE read nothing yet (sign in, then the store's reads), the bug report,
-the menu's backdrop picture, a party queueing ranked together, and a ranked match whose player
-leaves in champion select still rates the rest.
+Then protocol 8 and the rest of the menu: parties (up to five on a server, the leader queues them
+onto one side, NORMAL or RANKED); a ranked select someone leaves is called off and the others
+queued again; FRIENDS and PROFILE read from Elo Pros (the friends texts and the platform's answers
+checked against its own vectors, changes signed by the page's wallet or the launcher); REPORT A BUG
+(F8) to the store's intake with a picture, and a desktop crash's note offered on the next start;
+and the menu's backdrop, the Causeway shot from a match with the HUD off (`scripts/e2e.sh
+backdrop`, `art/tools/menu_backdrop.py`).

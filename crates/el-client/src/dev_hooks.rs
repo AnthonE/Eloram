@@ -381,6 +381,7 @@ impl Plugin for InboxPlugin {
                 inbox.after(crate::net::NetSet::Receive).before(crate::net::NetSet::Send),
                 match_status.after(crate::net::NetSet::Send),
                 hide_hud.after(crate::net::NetSet::Send),
+                hide_overlays.after(crate::view::ViewSet),
             ),
         );
     }
@@ -399,6 +400,24 @@ fn hide_hud(hidden: Res<HudHidden>, mut roots: Query<&mut Visibility, (With<Node
     for mut v in &mut roots {
         if *v != want {
             *v = want;
+        }
+    }
+}
+
+/// While the HUD is hidden, the world's own overlays are too: the units' rings and health bars.
+fn hide_overlays(
+    hidden: Res<HudHidden>,
+    units: Query<&crate::view::UnitView>,
+    mut vis: Query<&mut Visibility, Without<crate::view::UnitView>>,
+) {
+    if !hidden.0 {
+        return;
+    }
+    for u in &units {
+        for e in [u.ring, u.bar, u.fill, u.shield, u.ticks] {
+            if let Ok(mut v) = vis.get_mut(e) {
+                v.set_if_neq(Visibility::Hidden);
+            }
         }
     }
 }

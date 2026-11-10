@@ -44,6 +44,20 @@ test("the main menu: its pages, PLAY, and leaving a match for it", async ({ page
     await page.waitForTimeout(3000);
     s = await el(page);
     expect(s.watch_error).toBe("");
+    // A guest: FRIENDS and PROFILE say to sign in; nobody's party.
+    expect(s.party_size).toBe(0);
+    for (const nav of ["friends", "profile"]) {
+      await push(page, { t: "front", nav });
+      s = await until(page, `the ${nav} page`, (s) => s.front_nav === nav, 20_000);
+      expect(s.identity).toBe("");
+    }
+    // REPORT A BUG opens over the menu, and Esc closes it.
+    await page.keyboard.press("F8");
+    await until(page, "the report panel", (s) => s.report_open === true, 20_000);
+    await page.keyboard.type("x");
+    await page.keyboard.press("Escape");
+    s = await until(page, "the report panel closed", (s) => s.report_open === false, 20_000);
+    expect(s.front_nav).toBe("profile");
     for (const nav of ["watch", "practice", "store", "profile"]) {
       await push(page, { t: "front", nav });
       await until(page, `the ${nav} page`, (s) => s.front_nav === nav, 20_000);
