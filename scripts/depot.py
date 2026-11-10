@@ -218,7 +218,8 @@ def stage_build(out: Path, platform: str, do_build: bool, do_strip: bool) -> Pat
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / rel, dst)
     for name, src in [("LICENSE", "LICENSE"), ("NOTICE", "NOTICE"), ("ART-LICENSES.md", "art/LICENSES.md"),
-                      ("LICENSE-ROBOTO.txt", "crates/el-client/fonts/LICENSE-ROBOTO.txt")]:
+                      ("LICENSE-ROBOTO.txt", "crates/el-client/fonts/LICENSE-ROBOTO.txt"),
+                      ("LICENSE-CINZEL.txt", "crates/el-client/fonts/LICENSE-CINZEL.txt")]:
         p = ROOT / src
         if not p.is_file():
             sys.exit(f"depot: {src} is missing: the game ships with its licences")

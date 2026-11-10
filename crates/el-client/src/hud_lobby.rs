@@ -121,9 +121,9 @@ fn setup(mut commands: Commands) {
             framed(),
             children![
                 text("ELORAM", 12.0, DIM),
-                (text("", 22.0, GOLD), outline(), Words::Title),
-                (text("", 40.0, TEXT), outline(), Words::Big),
-                (text("", 13.0, DIM), TextLayout::justify(Justify::Center), Words::Line),
+                (crate::hud::title("", 24.0, GOLD), outline(), Words::Title),
+                (crate::hud::title("", 44.0, Color::srgb(1.0, 0.96, 0.88)), outline(), Words::Big),
+                (crate::hud::prose("", 15.0, DIM), TextLayout::justify(Justify::Center), Words::Line),
             ],
         ))
         .add_children(&[sweep, button])
@@ -161,7 +161,7 @@ fn setup(mut commands: Commands) {
             BackgroundColor(BUTTON_GOLD),
             Tint(BUTTON_GOLD),
             Act::Queue,
-            children![(text("PLAY AGAIN", 16.0, TEXT), outline())],
+            children![(crate::hud::title("PLAY AGAIN", 16.0, TEXT), outline())],
         ))
         .id();
     let menu = commands
@@ -180,7 +180,7 @@ fn setup(mut commands: Commands) {
             BackgroundColor(BUTTON),
             Tint(BUTTON),
             Act::Menu,
-            children![(text("MENU", 16.0, TEXT), outline())],
+            children![(crate::hud::title("MENU", 16.0, TEXT), outline())],
         ))
         .id();
     let again = commands
@@ -196,7 +196,7 @@ fn setup(mut commands: Commands) {
         })
         .with_children(|r| {
             r.spawn((
-                text("", 64.0, GOLD),
+                crate::hud::title("", 72.0, GOLD),
                 TextShadow { offset: Vec2::splat(3.0), color: Color::srgba(0.0, 0.0, 0.0, 0.9) },
                 Words::Result,
             ));

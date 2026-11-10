@@ -220,6 +220,32 @@ League's defaults, because that is what players' hands know:
   (`el_client_core::recap`, `hud_death.rs`). The scoreboard (Tab) has a row a player: the portrait,
   the player and the champion, the level, kills and deaths, and the items (the player's own;
   everyone's watching a record).
+- **The look of the UI** (`el-client/src/skin.rs`; `scripts/e2e.sh ui` shoots every screen): what
+  shipped MOBAs share, in materials of our own. They agree on the layout (the cluster at the
+  bottom's middle, the bars with their numbers on them, a key in each ability's corner and its ranks
+  under it, blue for one side and red for the other) and differ in what it's made of: League's
+  hairlines of gold metal on navy with one blue kept for what's pressed, Dota's flat matte stone,
+  Smite's heavy bevelled bronze, Heroes' hexagons and neon. Ours is the Causeway's: **slate plates
+  in rims of worked bronze**, lit from above, their free corners cut at 45° (a plate docked at an
+  edge keeps the corners against it square), and **ember** (the braziers' orange-gold, not a blue)
+  for the one thing to press, what's ready and what's picked. A plate is one shader
+  (`shaders/plate.wgsl`): the slab's gradient, a grain and a shade toward its edges, the rim as a
+  ridge with its lit and dark faces, a glow inside it that can breathe and a sheen that crosses it
+  (PLAY, READY, a card), in one draw where the stock panel took a shadow, a border and a gradient.
+  A control whose colours say its state (a button's tint, a card's tier) keeps them and wears a
+  **finish** over them: the same shader, clear but for its light. Health and mana are **gauges**
+  (`shaders/gauge.wgsl`): a well cut into the panel, the fill a glass lit along its upper half with
+  a bright edge where it ends and a slow light through it, a mark each hundred health and a heavier
+  one each thousand, what was just lost held behind the fill in orange a third of a second and then
+  let go, a shield a pale stretch past it, and the well beating red under 30%, when the screen's
+  edge beats red too. An ability's frame is ember when it's ready, iron cooling down, blue short of
+  mana and dark unlearned; its icon is set into it (a shade round its edge and a light across its
+  top, painted into the picture). An augment's card is a tall plate in its tier's colour: a band at
+  its head, a gem lit in it, the name carved, a sheen crossing. The menu has the braziers' sparks
+  rising over its backdrop (`shaders/sparks.wgsl`). The line in the middle (the headliner, as a
+  match starts) drops under the augment cards while they're up. The type is two faces, compiled in: **Cinzel**
+  for what's carved (the wordmark, the nav, a title, a champion's name, a result) and **Roboto
+  Condensed**, bold, for everything read at a glance.
 - **Around a match**: a card in the middle while the page connects, signs in, waits in the lobby
   (**Find a match**) or the queue (how long it's waited, who else is, the seconds before the bots
   take the empty seats, **Leave the queue**), reconnects or has failed (**Reload**), `hud_lobby.rs`.
@@ -265,5 +291,16 @@ League's defaults, because that is what players' hands know:
   [the support page](https://support.riotgames.com/league-of-legends/events/league-of-legends-aram-mayhem-game-mode),
   [the keyboard (WASD) input FAQ](https://support.riotgames.com/league-of-legends/gameplay/league-of-legends-keyboard-wasd-input-faq)
   and the wiki's [Controls and Hotkeys](https://wiki.leagueoflegends.com/en-us/Hotkeys) for WASD's layout.
+- The UI's look: Riot's [HUD update](https://www.surrenderat20.net/2015/07/red-post-collection-hud-update-coming.html)
+  (2015: less of the playspace covered, what belongs together grouped) and what's quoted of its
+  ["The Visual Language of Hextech"](https://www.surrenderat20.net/2017/01/red-post-collection-2016-playlist.html)
+  (metal linework, ornament kept for focal points, one colour for what acts), its health bars'
+  [goals](https://comicbook.com/gaming/news/league-of-legends-new-health-bars) (the chunk a hit
+  takes shown a moment), [Beaufort and Spiegel](https://www.fontsinuse.com/uses/26935/league-of-legends-game-and-website)
+  (a serif for titles, a sans for the rest); Valve's [7.00 HUD](https://www.dota2.com/700/hud/) and
+  its [Radiance](https://ianlynam.com/work/dota2-radiance/) face; and the games' screens at
+  [Interface In Game](https://interfaceingame.com/) (League, Dota 2, Heroes of the Storm, Smite,
+  Wild Rift), looked at for what they share. Nothing of theirs is copied: the palette, the shapes
+  and the shaders are Eloram's.
 - Unsettled in the sources, so ours to choose: Mayhem's starting gold since February 2026, and
   whether the first screen and level 3 are one screen or two (here they are one).

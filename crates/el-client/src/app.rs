@@ -132,6 +132,8 @@ pub fn run(cfg: LaunchConfig) {
     .insert_resource(Prefs::of(&cfg))
     .insert_resource(LaunchConfigRes(cfg))
     .insert_resource(MapRes(map))
+    // The UI's faces and plates, before anything is spawned with them.
+    .add_plugins(crate::skin::SkinPlugin)
     .add_plugins((
         DevHooksPlugin,
         InboxPlugin,

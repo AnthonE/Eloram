@@ -485,3 +485,41 @@ checked against its own vectors, changes signed by the page's wallet or the laun
 (F8) to the store's intake with a picture, and a desktop crash's note offered on the next start;
 and the menu's backdrop, the Causeway shot from a match with the HUD off (`scripts/e2e.sh
 backdrop`, `art/tools/menu_backdrop.py`).
+
+## 10. The UI's look
+
+The HUD and the menus had the right things in the right places and were made of flat rectangles
+in a programmer's monospace. Now they have a material (`DESIGN.md`, "The look of the UI";
+`el-client/src/skin.rs`): slate plates in rims of worked bronze with their free corners cut, ember
+for what's ready, picked or to be pressed, Cinzel for what's carved and Roboto Condensed for what's
+read at a glance.
+
+- **Three UI shaders.** `plate.wgsl` draws a whole panel in one draw (the slab's gradient, grain
+  and shade, the rim as a lit ridge, cut or rounded corners from a distance field, a glow that
+  breathes, a sheen that crosses): the bottom panel, the score, the minimap's frame, the allies'
+  rows, the tooltip, the shop, the scoreboard, the cards, the menus' panels, PLAY. `gauge.wgsl` is
+  health and mana: gloss, ticks by the hundred, the chunk just lost held behind the fill, a shield,
+  a low beat. `sparks.wgsl` is the braziers' sparks over the menu's backdrop. Normals are worked
+  out in the shader, not from screen derivatives (they turn over between WebGL2 and WebGPU).
+- **The screens**: the menu (the wordmark carved, an ember bar at the picked entry, the panels as
+  one cut plate, PLAY lit with a sheen), champion select (carved names, bevelled badges, READY lit
+  until it's said), the HUD (ability frames by state, icons set into them, the gauges, a score bar
+  with each side's line), the augment cards (tall plates in their tier's colour: a band, a gem, the
+  name carved), the shop, the scoreboard, the Esc menu, the death recap, the lobby's card and the
+  banner. The screen's edge beats red under 30% health.
+- **`scripts/e2e.sh ui`** shoots every screen at the design's 1600 by 900 (or `EL_UI_SIZE`), to look
+  at before and after a change to the look.
+- **What it costs.** Nothing is built once a match is in view (`hitches`: 0 pipelines late; a
+  speck of each UI material is drawn from the first frame). A UI material is a draw of its own, so
+  plates went only where they replace a panel's shadow, border and gradient or carry a state (the
+  six ability frames); wells, slots and marks stayed plain nodes, which batch, and the icons' set-in
+  is painted into their pictures. Fifteen plates a frame in a match. WebGL2's draws a frame
+  (`scripts/e2e.sh draws`, the same three places, main and this measured on the same machine): 95
+  to 156 on the low tier before and 104 to 142 after, 160 to 187 on the high before and 152 to 189
+  after. The same, within what the scene itself moves between two matches. (The first cut had
+  twenty-seven plates a frame and cost about twenty draws; the wells and the portraits' finishes
+  went back to plain nodes.)
+
+Not done: a champion's model shown in champion select (the seats are still badges of initials);
+a real GPU's frame times (`?bench=1`) for the three shaders; the WebGPU module's pictures (it
+lints and the shaders are the same WGSL, but only WebGL2's were shot).

@@ -78,7 +78,7 @@ fn bar(commands: &mut Commands, h: f32, fills: &[(Fill, Color)], words: Option<W
         commands.entity(e).add_child(fill);
     }
     if let Some(w) = words {
-        let t = commands.spawn((text("", 10.0, TEXT), outline(), w)).id();
+        let t = commands.spawn((text("", 11.0, TEXT), outline(), w)).id();
         commands.entity(e).add_child(t);
     }
     e
@@ -102,8 +102,8 @@ fn setup(mut commands: Commands) {
             children![(text("", 16.0, TEXT), outline(), Words::Badge)],
         ))
         .id();
-    let name = commands.spawn((text("", 13.0, TEXT), outline(), Words::Name)).id();
-    let level = commands.spawn((text("", 11.0, DIM), Words::Level)).id();
+    let name = commands.spawn((text("", 15.0, TEXT), outline(), Words::Name)).id();
+    let level = commands.spawn((text("", 12.0, DIM), Words::Level)).id();
     let head = commands
         .spawn(Node { justify_content: JustifyContent::SpaceBetween, width: percent(100), ..default() })
         .add_children(&[name, level])
@@ -115,7 +115,7 @@ fn setup(mut commands: Commands) {
         Some(Words::Hp),
     );
     let mana = bar(&mut commands, 6.0, &[(Fill::Mana, Color::srgb(0.30, 0.55, 0.98))], None);
-    let state = commands.spawn((text("", 10.0, Color::srgb(0.98, 0.82, 0.36)), Words::State)).id();
+    let state = commands.spawn((text("", 12.0, Color::srgb(0.98, 0.82, 0.36)), Words::State)).id();
     let side = commands
         .spawn(Node { flex_direction: FlexDirection::Column, row_gap: px(4), width: px(170), ..default() })
         .add_children(&[head, hp, mana, state])

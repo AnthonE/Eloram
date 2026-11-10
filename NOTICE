@@ -9,8 +9,13 @@ textures and sounds made for this project.
 
 **Roboto Condensed**: Apache-2.0, © 2011 Google Inc.
 `crates/el-client/fonts/RobotoCondensed-{Regular,Bold}.ttf`, compiled into the client with
-`include_bytes!` (the main menu's type). The licence that must travel with them is
+`include_bytes!` (the UI's type). The licence that must travel with them is
 `crates/el-client/fonts/LICENSE-ROBOTO.txt`, shipped beside the desktop build and the page.
+
+**Cinzel**: SIL Open Font License 1.1, © 2020 The Cinzel Project Authors
+(https://github.com/NDISCOVER/Cinzel). `crates/el-client/fonts/Cinzel-Bold.ttf`, compiled into the
+client the same way (the titles' type). Its licence is `crates/el-client/fonts/LICENSE-CINZEL.txt`,
+shipped beside the desktop build.
 
 **The mingw-w64 runtime** (the Windows desktop build only): `libgcc_s_seh-1.dll`,
 `libwinpthread-1.dll` and whatever else the build imports from the toolchain, shipped beside

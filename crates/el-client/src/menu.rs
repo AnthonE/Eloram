@@ -207,7 +207,7 @@ fn keys(
 fn row(label: &str) -> impl Bundle {
     (
         Node { align_items: AlignItems::Center, column_gap: px(10), min_height: px(38), ..default() },
-        children![(text(label, 12.0, DIM), Node { width: px(130), ..default() })],
+        children![(text(label, 13.0, DIM), Node { width: px(130), ..default() })],
     )
 }
 
@@ -234,7 +234,7 @@ fn button_node(act: Do, width: Val, base: Color) -> impl Bundle {
 
 /// A button of the menu.
 fn button(act: Do, words: &str, width: Val, base: Color) -> impl Bundle {
-    (button_node(act, width, base), children![(text(words, 13.0, TEXT), outline())])
+    (button_node(act, width, base), children![(text(words, 14.0, TEXT), outline())])
 }
 
 /// One of a row's choices.
@@ -287,8 +287,8 @@ fn setup(mut commands: Commands) {
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.25)),
         ))
         .with_children(|r| {
-            r.spawn((text("ELORAM", 22.0, GOLD), outline()));
-            r.spawn((text("MENU", 11.0, DIM), Node { margin: UiRect::bottom(px(14)), ..default() }));
+            r.spawn((crate::hud::title("ELORAM", 24.0, GOLD), outline()));
+            r.spawn((text("MENU", 12.0, DIM), Node { margin: UiRect::bottom(px(14)), ..default() }));
             for t in Tab::ALL {
                 r.spawn(button(Do::Tab(t), t.title(), percent(100), OFF));
             }
