@@ -58,7 +58,7 @@ test("a face a champion", async ({ page }) => {
         300_000,
       );
       const f = s.frames ?? 0;
-      await until(page, `${name}'s frames`, (s) => (s.frames ?? 0) >= f + 12, 300_000);
+      await until(page, `${name}'s frames`, (s) => (s.frames ?? 0) >= f + 24, 300_000);
       const shot = await page.screenshot({ clip: { x: 0, y: 0, width: SIDE, height: SIDE }, timeout: 180_000 });
       // A face, not the ground alone: a good part of it isn't the ground's colour (its corner's).
       const img = PNG.sync.read(shot);
