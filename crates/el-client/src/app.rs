@@ -166,7 +166,7 @@ pub fn run(cfg: LaunchConfig) {
         FramePlugin,
         WarmPlugin,
     ))
-    .add_plugins((TrailsPlugin, BannerPlugin));
+    .add_plugins((TrailsPlugin, BannerPlugin, crate::faces::FacesPlugin));
     #[cfg(target_arch = "wasm32")]
     app.add_plugins(AnimStagePlugin);
     #[cfg(not(target_arch = "wasm32"))]

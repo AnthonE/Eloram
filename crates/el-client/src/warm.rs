@@ -286,7 +286,7 @@ fn spawn_model(
     e.observe(dress);
     if portrait {
         // The portrait's camera frames it, and draws it (`portrait.rs`).
-        e.insert(PortraitSubject { view: 0, still: false });
+        e.insert(PortraitSubject { view: 0, still: false, head: None });
     }
     warm.spawned += 1;
 }

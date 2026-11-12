@@ -94,12 +94,16 @@ fn setup(mut commands: Commands) {
                 align_items: AlignItems::Center,
                 border: UiRect::all(px(2)),
                 border_radius: BorderRadius::all(px(6)),
+                overflow: Overflow::clip(),
                 ..default()
             },
             BorderColor::all(TEAM[0]),
             BackgroundColor(WELL),
             Badge,
-            children![(text("", 16.0, TEXT), outline(), Words::Badge)],
+            children![
+                (text("", 16.0, TEXT), outline(), Words::Badge),
+                crate::faces::face(crate::faces::Face::Target),
+            ],
         ))
         .id();
     let name = commands.spawn((text("", 15.0, TEXT), outline(), Words::Name)).id();
@@ -173,7 +177,7 @@ fn state_of(f: u32) -> String {
     on.join(", ")
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn show(
     session: Res<Session>,
     controls: Res<Controls>,
@@ -182,6 +186,7 @@ fn show(
     mut fills: Query<(&Fill, &mut Node), Without<Frame>>,
     mut words: Query<(&Words, &mut Text)>,
     mut badge: Query<(&mut BackgroundColor, &mut BorderColor), With<Badge>>,
+    mut face: ResMut<crate::faces::TargetFace>,
 ) {
     let now = crate::net::now_s();
     let c = session.client.as_deref().filter(|_| session.phase == Phase::Playing && session.watch.is_none());
@@ -204,6 +209,9 @@ fn show(
     let Some((c, i, q)) = sample else { return };
     let kind = Kind::from_u8(q.kind);
     let def = (i < SEATS).then(|| c.world.champs[i].def);
+    if face.0 != def {
+        face.0 = def;
+    }
     let max = (q.max_hp as f32).max(1.0);
     let hp = q.hp as f32 / 1_023.0 * max;
     let shield = q.shield as f32;

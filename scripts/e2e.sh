@@ -12,6 +12,7 @@
 #   scripts/e2e.sh draws [project]   # WebGL2's draw calls a frame on each tier, by shader and mesh
 #   scripts/e2e.sh hitches [project] # a match: nothing built once it's in view (casts, the lane, a wave)
 #   scripts/e2e.sh ui [project]      # the UI's look: a picture a screen (menu, select, HUD, shop, scores, Esc)
+#   scripts/e2e.sh faces [project]   # the champions' faces, a sitting each: web/assets/portraits/<name>.png
 # Anything after the project goes to Playwright.
 # The server listens on EL_HTTP_PORT (8080) and EL_WT_PORT (UDP, 4433).
 set -euo pipefail
@@ -56,7 +57,7 @@ case "$suite" in
     server --mode game --fill-after 1 --select-secs 45 --http "127.0.0.1:${port}" --wt-port "$wt" &
     pids+=($!)
     ;;
-  fx)
+  fx|faces)
     # Practice matches: one seat, any champion, the dummies (`el_sim::practice`).
     server --mode game --practice --http "127.0.0.1:${port}" --wt-port "$wt" &
     pids+=($!)

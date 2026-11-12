@@ -9,7 +9,7 @@
 //! allies' take turns, one a frame, so four more pictures cost about one.
 
 use bevy::camera::RenderTarget;
-use bevy::camera::visibility::RenderLayers;
+use bevy::camera::visibility::{RenderLayers, VisibilitySystems};
 use bevy::prelude::*;
 use bevy::render::render_resource::TextureFormat;
 
@@ -38,10 +38,59 @@ pub struct PortraitShown(pub [bool; VIEWS]);
 pub struct PortraitSubject {
     pub view: usize,
     pub still: bool,
+    /// Its head and shoulders, which the camera frames and faces: a stance that crouches, leans
+    /// or turns (an assassin's, a guard's behind its shield) carries the head out of any frame
+    /// fixed to the body, or shows the back of it. `None` until they're found (the warm-up's
+    /// piece): the frame is then a standing figure's.
+    pub head: Option<Head>,
+}
+
+/// A figure's head and shoulders by their bones: the head's base (the neck's top) and its crown
+/// (`Head`, `head_end` in the champions' models), and the two shoulders. Only where they are is
+/// read, never how they're turned: these rigs are made by a machine, and a head's skin doesn't
+/// always hang on its bone's turn.
+#[derive(Clone, Copy)]
+pub struct Head {
+    pub base: Entity,
+    pub top: Entity,
+    /// The left shoulder and the right.
+    pub shoulders: [Entity; 2],
+}
+
+impl Head {
+    /// The head among a figure's nodes, by their names.
+    pub fn find<'a>(nodes: impl IntoIterator<Item = (Entity, &'a str)>) -> Option<Head> {
+        let (mut base, mut top, mut left, mut right) = (None, None, None, None);
+        for (e, name) in nodes {
+            match name {
+                "Head" => base = Some(e),
+                "head_end" => top = Some(e),
+                "LeftArm" => left = Some(e),
+                "RightArm" => right = Some(e),
+                _ => {}
+            }
+        }
+        Some(Head { base: base?, top: top?, shoulders: [left?, right?] })
+    }
 }
 
 #[derive(Component)]
 struct PortraitCam(usize);
+
+/// A sitting (`{t:"face",on:true}`, `scripts/e2e.sh faces`): the player's own portrait drawn
+/// [`SITTING`] pixels a side over a plain ground and shown at the window's top left, alone and as
+/// it's drawn, for a picture of it to be taken (`faces.rs` shows those).
+#[derive(Resource, Default)]
+pub struct Sitting(pub bool);
+
+/// A sitting's side, in pixels.
+const SITTING: u32 = 256;
+/// What's behind a face: the UI's slate, a little lit.
+const SITTING_GROUND: Color = Color::srgb(0.085, 0.10, 0.135);
+
+/// The sitting's picture on the screen.
+#[derive(Component)]
+struct SittingNode;
 
 /// Whose turn it is among the allies' portraits.
 #[derive(Resource, Default)]
@@ -53,8 +102,16 @@ impl Plugin for PortraitPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PortraitShown>()
             .init_resource::<Turn>()
+            .init_resource::<Sitting>()
+            .add_systems(Update, sit.run_if(resource_changed::<Sitting>))
             .add_systems(Startup, setup)
-            .add_systems(PostUpdate, follow.before(TransformSystems::Propagate));
+            // After this frame's transforms (the figure and its bones where they'll be drawn: a
+            // frame behind, a champion running at a low frame rate is out of its own picture)
+            // and before the cameras' frusta are made from theirs.
+            .add_systems(
+                PostUpdate,
+                follow.after(TransformSystems::Propagate).before(VisibilitySystems::UpdateFrusta),
+            );
     }
 }
 
@@ -102,22 +159,40 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     commands.insert_resource(PortraitImage(handles));
 }
 
-/// Each camera in front of its subject's face, a little to its right, looking at its chest.
+/// Where the camera stands from the middle of the face, in the figure's heights: a little to the
+/// face's right, just under its eyes (a bowed head's face still shows), and out in front. The
+/// frame is then the head, a hood or a hat and the shoulders, whatever the stance.
+const EYE: Vec3 = Vec3::new(0.2, -0.03, 0.72);
+/// The middle of the face over the head's base, of the head's length.
+const FACE: f32 = 0.42;
+/// Where a standing figure's face is, of its height: the frame of one whose head isn't found.
+const FACE_AT: f32 = 0.83;
+/// How fast the frame follows the head (a share a second): the head bobs and turns, the picture
+/// breathes.
+const FOLLOW: f32 = 10.0;
+
+/// Each camera in front of its subject's face, a little to its right, looking at it.
+#[allow(clippy::too_many_arguments)]
 fn follow(
-    subjects: Query<(&PortraitSubject, &GlobalTransform, &InheritedVisibility)>,
-    mut cams: Query<(&PortraitCam, &mut Camera, &mut Transform)>,
+    time: Res<Time>,
+    subjects: Query<(&PortraitSubject, &GlobalTransform, &InheritedVisibility), Without<PortraitCam>>,
+    globals: Query<&GlobalTransform, Without<PortraitCam>>,
+    mut cams: Query<(&PortraitCam, &mut Camera, &mut Transform, &mut GlobalTransform)>,
     mut dev: ResMut<crate::dev_hooks::DevStatus>,
     mut drawn: ResMut<PortraitShown>,
     mut turn: ResMut<Turn>,
+    // Where each camera looked last, and from which way.
+    mut frames: Local<[Option<(Vec3, Vec3)>; VIEWS]>,
 ) {
-    let mut at: [Option<&GlobalTransform>; VIEWS] = [None; VIEWS];
+    let mut at: [Option<(&GlobalTransform, Option<Head>)>; VIEWS] = [None; VIEWS];
     // Down: still shown (its last face), not drawn again until it's up.
     let mut still = [false; VIEWS];
     for (s, gt, vis) in &subjects {
         if s.view < VIEWS && s.still {
             still[s.view] = true;
-        } else if s.view < VIEWS && vis.get() {
-            at[s.view] = Some(gt);
+        } else if s.view < VIEWS && vis.get() && (s.head.is_some() || at[s.view].is_none()) {
+            // (A figure with its head found over one without: the match's over the warm-up's.)
+            at[s.view] = Some((gt, s.head));
         }
     }
     // The next ally shown takes this frame's turn.
@@ -128,14 +203,41 @@ fn follow(
     }
     let ally_now = (n > 0).then(|| allies[turn.0 % n]);
     turn.0 = turn.0.wrapping_add(1);
-    for (cam, mut camera, mut tf) in &mut cams {
+    let ease = (FOLLOW * time.delta_secs()).min(1.0);
+    let place = |e: Entity| globals.get(e).ok().map(GlobalTransform::translation);
+    for (cam, mut camera, mut tf, mut global) in &mut cams {
         let view = cam.0;
         let draw = at[view].is_some() && (view == 0 || Some(view) == ally_now);
-        if let Some(gt) = at[view].filter(|_| draw) {
-            // The figure is scaled to its champion's height: these are shares of it.
-            let eye = gt.transform_point(Vec3::new(0.2, 0.86, 0.72));
-            let look = gt.transform_point(Vec3::new(0.0, 0.8, 0.0));
+        if let Some((gt, head)) = at[view].filter(|_| draw) {
+            // The figure is scaled to its champion's height: the frame is in shares of it.
+            let height = gt.affine().transform_vector3(Vec3::Y).length();
+            // The face's middle and the way it looks (level: the camera doesn't climb over a
+            // bowed head); a standing figure's, facing as its body does, where there's no head.
+            let body = gt.affine().transform_vector3(Vec3::Z).with_y(0.0).normalize_or(Vec3::Z);
+            let (want, facing) = head
+                .and_then(|h| {
+                    Some((place(h.base)?, place(h.top)?, place(h.shoulders[0])?, place(h.shoulders[1])?))
+                })
+                .map_or((gt.transform_point(Vec3::Y * FACE_AT), body), |(base, top, left, right)| {
+                    // Up from the neck by the head's own length; out the way the chest faces
+                    // (square to the line from the right shoulder to the left).
+                    let face = base + Vec3::Y * base.distance(top) * FACE;
+                    (face, (left - right).cross(Vec3::Y).with_y(0.0).normalize_or(body))
+                });
+            // Eased while it's near (the head's bob and turn); at once when it isn't (a blink, a
+            // respawn, an ally's turn come round again).
+            let (look, facing) = match frames[view] {
+                Some((was, way)) if was.distance(want) < height * 0.25 => {
+                    (was.lerp(want, ease), way.lerp(facing, ease).normalize_or(facing))
+                }
+                _ => (want, facing),
+            };
+            frames[view] = Some((look, facing));
+            let right = Vec3::Y.cross(facing);
+            let eye = look + (right * EYE.x + Vec3::Y * EYE.y + facing * EYE.z) * height;
             *tf = Transform::from_translation(eye).looking_at(look, Vec3::Y);
+            // This frame's, since the propagation has run (the cameras have no parent).
+            *global = GlobalTransform::from(*tf);
         }
         if camera.is_active != draw {
             camera.is_active = draw;
@@ -147,4 +249,52 @@ fn follow(
     }
     dev.set("portrait", shown[0]);
     dev.set("ally_portraits", shown[1..].iter().filter(|&&s| s).count());
+}
+
+/// A sitting begun or ended: the own portrait's picture bigger and on a ground, and on the screen.
+fn sit(
+    mut commands: Commands,
+    sitting: Res<Sitting>,
+    pictures: Option<Res<PortraitImage>>,
+    mut images: ResMut<Assets<Image>>,
+    mut cams: Query<(&PortraitCam, &mut Camera)>,
+    shown: Query<Entity, With<SittingNode>>,
+) {
+    let Some(pictures) = pictures else { return };
+    for e in &shown {
+        commands.entity(e).despawn();
+    }
+    let side = if sitting.0 { SITTING } else { SIDE[0] };
+    if let Some(mut image) = images.get_mut(&pictures.0[0])
+        && image.width() != side
+    {
+        image.resize(bevy::render::render_resource::Extent3d {
+            width: side,
+            height: side,
+            depth_or_array_layers: 1,
+        });
+    }
+    for (cam, mut camera) in &mut cams {
+        if cam.0 == 0 {
+            camera.clear_color =
+                ClearColorConfig::Custom(if sitting.0 { SITTING_GROUND } else { Color::NONE });
+        }
+    }
+    if sitting.0 {
+        commands.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(0),
+                top: px(0),
+                // The window's height a side, whatever the UI's scale: the suite's window is as
+                // tall as the picture.
+                width: Val::Vh(100.0),
+                height: Val::Vh(100.0),
+                ..default()
+            },
+            ImageNode::new(pictures.0[0].clone()),
+            GlobalZIndex(i32::MAX),
+            SittingNode,
+        ));
+    }
 }

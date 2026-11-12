@@ -394,7 +394,10 @@ fn ready(
         }
     });
     if let Some(v) = view {
-        commands.entity(e).insert(PortraitSubject { view: v, still: false });
+        let head = crate::portrait::Head::find(
+            children.iter_descendants(e).filter_map(|c| names.get(c).ok().map(|(n, _)| (c, n.as_str()))),
+        );
+        commands.entity(e).insert(PortraitSubject { view: v, still: false, head });
     }
     figure.sockets = Sockets::find(
         children
@@ -408,9 +411,23 @@ fn ready(
             }
         },
     );
+    // Whether a node hangs from a hand or a forearm.
+    let held = |mut c: Entity| {
+        while let Ok((name, parent)) = names.get(c) {
+            if matches!(name.as_str(), "LeftHand" | "RightHand" | "LeftForeArm" | "RightForeArm") {
+                return true;
+            }
+            let Some(p) = parent else { break };
+            c = p.parent();
+        }
+        false
+    };
     for c in children.iter_descendants(e) {
+        // In its portrait too, but for what it holds: a shield raised or a blade at guard stands
+        // between the face and the camera (what it wears on its head or its back stays).
         if let Some(v) = view
             && shapes.contains(c)
+            && !held(c)
         {
             commands.entity(c).insert(RenderLayers::from_layers(&[0, crate::portrait::layer(v)]));
         }
