@@ -48,7 +48,7 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   bots in the other nine seats after 3 s (`EL_FILL`), then 20 s of champion select (`--select-secs`;
   it ends sooner once everyone seated is ready, and agents are ready at once). The server alone:
   `cargo run -p el-server --release -- --fill-after 3` (`--mode echo` is the transport smoke test).
-- `scripts/e2e.sh spike|match|menu|backdrop|watch|login|art|recover|fx|draws|hitches|ui [webgl2]`: Playwright against a real server
+- `scripts/e2e.sh spike|match|menu|backdrop|watch|login|art|recover|fx|faces|draws|hitches|ui [webgl2]`: Playwright against a real server
   (a plain load opens the main menu, so the suites that play go in with `&queue=1`; `menu`: the
   menu's pages, RANKED refused on a server without Elo Pros, PLAY into champion select, LEAVE MATCH
   back to the menu and a reload staying there; `match`: queue, champion select (a reroll, the bench, ready), the headliner, augment, shop,
@@ -151,6 +151,13 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `hud_lobby.rs` (the connecting, lobby and queue card, and a match's end with Play again); the icons are painted by
   `el_client_core::icons`. `window.__el` has `portrait`, `ally_portraits`, `death_screen` and
   `recap_lines`.
+- The faces (`el-client/src/faces.rs`): a picture a champion, `web/assets/portraits/<name>.jpg`,
+  shown where a champion is named with no model to draw live (champion select's rows, card and
+  bench, the scoreboard, the target frame), over the badge's initials. They're the live
+  portrait's own picture (`portrait.rs`: the camera follows the head's bone, whatever the
+  stance): `scripts/e2e.sh faces` (rebuild `web/dist` first) practises as each champion, asks for
+  a sitting (`{t:"face",on:true}`) and writes the files (`EL_FACES=kesh,mira` for a few). Take
+  them again when a champion's model changes.
 - The UI's look (`docs/DESIGN.md`, "The look of the UI"): `el-client/src/skin.rs` is the palette
   (slate, bronze, ember), the two faces (Cinzel for titles, Roboto Condensed for the rest:
   `crates/el-client/fonts/`, each with its licence, `NOTICE`) and the four UI shaders: `Plate`

@@ -1593,12 +1593,16 @@ fn score_row(team: &mut ChildSpawnerCommands, t: u8, j: usize) {
                     align_items: AlignItems::Center,
                     border: UiRect::all(px(2)),
                     border_radius: BorderRadius::all(px(5)),
+                    overflow: Overflow::clip(),
                     ..default()
                 },
                 BorderColor::all(FRAME),
                 BackgroundColor(WELL),
                 ScoreBadge(t, j),
-                children![(text("", 12.0, TEXT), outline(), f(ScoreField::Initials))],
+                children![
+                    (text("", 12.0, TEXT), outline(), f(ScoreField::Initials)),
+                    crate::faces::face(crate::faces::Face::Score(t, j)),
+                ],
             ));
             row.spawn(Node { flex_direction: FlexDirection::Column, width: px(130), ..default() })
                 .with_children(|who| {
@@ -1759,7 +1763,8 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
             }
             (Label::Kda, Some(c)) => {
                 let (k, d) = session.kd[c.seat];
-                format!("{k} / {d}   {} cs", c.pred.champs[c.seat].last_hits)
+                let ch = &c.pred.champs[c.seat];
+                format!("{k} / {d} / {}   {} cs", ch.assists, ch.last_hits)
             }
             (Label::Level, Some(c)) => c.pred.champs[c.seat].level.to_string(),
             (Label::Initials, Some(c)) => initials(c.pred.champs[c.seat].def),

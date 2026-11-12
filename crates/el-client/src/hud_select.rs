@@ -10,6 +10,7 @@ use bevy::prelude::*;
 use el_sim::content::champions::{CHAMPIONS, ability};
 use el_sim::units::{SEATS, TEAM_SIZE, team_of_seat};
 
+use crate::faces::{Face, face};
 use crate::hud::{
     Act, BUTTON, BUTTON_GOLD, DIM, FRAME, FRAME_SOFT, GOLD, Icons, PANEL, TEXT, Tint, Tip, WELL, framed,
     icon_image, initials, outline, prose, shade, text, title,
@@ -104,7 +105,14 @@ impl Plugin for SelectPlugin {
 }
 
 /// A champion's badge: its colour, its initials, a darker rim.
-fn badge(commands: &mut Commands, side: f32, size: f32, words: Words, marker: impl Bundle) -> Entity {
+fn badge(
+    commands: &mut Commands,
+    side: f32,
+    size: f32,
+    words: Words,
+    marker: impl Bundle,
+    who: Face,
+) -> Entity {
     commands
         .spawn((
             Node {
@@ -115,13 +123,15 @@ fn badge(commands: &mut Commands, side: f32, size: f32, words: Words, marker: im
                 align_items: AlignItems::Center,
                 border: UiRect::all(px(2)),
                 border_radius: BorderRadius::all(px(3)),
+                overflow: Overflow::clip(),
                 ..default()
             },
             BorderColor::all(Color::srgba(0.0, 0.0, 0.0, 0.6)),
             BackgroundColor(WELL),
             MaterialNode(plates::FINISH_WIDE),
             marker,
-            children![(text("", size, TEXT), outline(), words)],
+            // The face over the initials, once its picture is in (`faces.rs`).
+            children![(text("", size, TEXT), outline(), words), face(who)],
         ))
         .id()
 }
@@ -199,7 +209,7 @@ fn setup(mut commands: Commands) {
     // The team down the left.
     let mut team = vec![commands.spawn((title("", 15.0, TEXT), outline(), Words::TeamHead)).id()];
     for i in 0..TEAM_SIZE {
-        let b = badge(&mut commands, 48.0, 17.0, Words::RowInitials(i), RowBadge(i));
+        let b = badge(&mut commands, 48.0, 17.0, Words::RowInitials(i), RowBadge(i), Face::SelectRow(i));
         let who = commands
             .spawn(Node {
                 flex_direction: FlexDirection::Column,
@@ -303,6 +313,23 @@ fn setup(mut commands: Commands) {
     let band = commands
         .spawn((Node { width: percent(100), height: px(4), ..default() }, BackgroundColor(GOLD), PickBand))
         .id();
+    // The champion's face, over its name.
+    let portrait = commands
+        .spawn((
+            Node {
+                width: px(112),
+                height: px(112),
+                margin: UiRect::top(px(12)),
+                border: UiRect::all(px(2)),
+                border_radius: BorderRadius::all(px(4)),
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BorderColor::all(FRAME),
+            BackgroundColor(WELL),
+            children![face(Face::Held)],
+        ))
+        .id();
     let role = commands
         .spawn((text("", 14.0, GOLD), Node { margin: UiRect::top(px(8)), ..default() }, Words::Role))
         .id();
@@ -329,7 +356,7 @@ fn setup(mut commands: Commands) {
             },
             framed(),
         ))
-        .add_children(&[band, role, name, title, kit, hint])
+        .add_children(&[band, portrait, role, name, title, kit, hint])
         .id();
 
     let middle = commands
@@ -348,7 +375,7 @@ fn setup(mut commands: Commands) {
     // The bench, under the card.
     let tiles: Vec<Entity> = (0..BENCH)
         .map(|k| {
-            let b = badge(&mut commands, 32.0, 12.0, Words::BenchInitials(k), BenchBadge(k));
+            let b = badge(&mut commands, 32.0, 12.0, Words::BenchInitials(k), BenchBadge(k), Face::Bench(k));
             let words = commands
                 .spawn(Node { flex_direction: FlexDirection::Column, ..default() })
                 .with_children(|w| {

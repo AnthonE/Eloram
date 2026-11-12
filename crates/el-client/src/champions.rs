@@ -394,7 +394,10 @@ fn ready(
         }
     });
     if let Some(v) = view {
-        commands.entity(e).insert(PortraitSubject { view: v, still: false });
+        let head = crate::portrait::Head::find(
+            children.iter_descendants(e).filter_map(|c| names.get(c).ok().map(|(n, _)| (c, n.as_str()))),
+        );
+        commands.entity(e).insert(PortraitSubject { view: v, still: false, head });
     }
     figure.sockets = Sockets::find(
         children

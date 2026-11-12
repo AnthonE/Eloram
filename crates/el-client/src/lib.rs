@@ -18,6 +18,7 @@ mod config;
 mod coords;
 mod dev_hooks;
 mod edges;
+mod faces;
 mod figure;
 mod frame;
 mod front;

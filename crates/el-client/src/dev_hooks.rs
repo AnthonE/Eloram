@@ -329,6 +329,11 @@ enum Cmd {
     Hud {
         on: bool,
     },
+    /// A sitting: the own portrait big, on a plain ground, at the window's top left, for its
+    /// picture to be taken (`portrait::Sitting`; `scripts/e2e.sh faces`).
+    Face {
+        on: bool,
+    },
     /// A bug report filed as if typed into the panel (F8), to the intake (`EL_BUGS_URL` on the
     /// desktop: tests never file a real one).
     Report {
@@ -443,6 +448,7 @@ fn inbox(
     mut front: ResMut<crate::front::Front>,
     mut session: ResMut<crate::session::Session>,
     mut hud: ResMut<HudHidden>,
+    mut sitting: ResMut<crate::portrait::Sitting>,
 ) {
     use el_client_core::lobby::ToServer;
     use el_proto::{Aim, Order, UnitRef};
@@ -514,6 +520,10 @@ fn inbox(
             }
             Cmd::Hud { on } => {
                 hud.0 = !on;
+                continue;
+            }
+            Cmd::Face { on } => {
+                sitting.0 = on;
                 continue;
             }
             Cmd::Report { title, text } => {

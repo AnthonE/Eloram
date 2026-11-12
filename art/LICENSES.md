@@ -91,6 +91,12 @@ Standard sets, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (fe
 | `vessa.glb` | Vessa: crossbow |
 | `vire.glb` | Vire: greatsword |
 
+## The champions' faces (`web/assets/portraits/`)
+
+| File | What it is |
+|---|---|
+| `<name>.jpg`, one a champion | the game's own picture of that champion's model above, from the shoulders up, as the HUD's portrait draws it (`crates/el-client/src/portrait.rs`), taken by `scripts/e2e.sh faces`; ours, under the models' own terms. |
+
 ## The minions (`web/assets/models/minions/`)
 
 Made with Meshy (`art/meshy.json`, `minions`) as the champions are: the melee minion's and the
