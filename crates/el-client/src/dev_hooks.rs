@@ -259,6 +259,11 @@ enum Cmd {
     Shop {
         open: bool,
     },
+    /// The augment cards drawn one a tier (silver, gold, prismatic) whatever is offered: the
+    /// `ui` suite's picture of all three.
+    Tiers {
+        on: bool,
+    },
     Lock {
         on: bool,
     },
@@ -485,6 +490,10 @@ fn inbox(
             }
             Cmd::Shop { open } => {
                 controls.shop_open = open;
+                continue;
+            }
+            Cmd::Tiers { on } => {
+                controls.show_tiers = on;
                 continue;
             }
             Cmd::Lock { on } => {

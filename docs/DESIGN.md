@@ -212,9 +212,17 @@ League's defaults, because that is what players' hands know:
   shield, mana and what holds it, `hud_target.rs`); a tooltip over an ability, an item or a shop's
   item says what it does (`el_client_core::tips`, read from the same tables the sim plays). Every
   champion's health bar in the world has a mark each hundred and a heavier one each thousand, a
-  shield a white stretch past the health. The shop (P) opens in the middle: a Recommended row for
-  the champion's role (`el_client_core::tips::recommended`, starred wherever the item shows), then
-  the components and the finished items, each a tile with its icon. Dying greys the screen, puts the
+  shield a white stretch past the health. The shop (P) opens in the middle, laid out as League's
+  (`hud_shop.rs`): on the left the items as a grid of framed icons, each with its price under it (a
+  Recommended row for the champion's role first, `el_client_core::tips::recommended`, a gold mark
+  on each of them wherever it shows, then the components and the finished items); on the right a
+  pane for the one picked (or under the pointer): its picture in a heavy frame, its name, what it
+  gives a line each with the number in gold, its active, and **BUY** with the price on it, greyed
+  with the reason over it (the gold still needed, or six slots full); along the foot the champion's
+  own six, each with what selling it gives back, and the purse at the head. A click picks; a second
+  click, a right click or BUY buys. A tile's frame says its state: ember with a light running round
+  it picked, bright bronze under the pointer, iron and the picture dimmed while the gold's short.
+  Dying greys the screen, puts the
   seconds to respawn over the portrait and shows the death recap: who killed the champion and what
   hurt it in the last fifteen seconds, each line split physical, magic and true
   (`el_client_core::recap`, `hud_death.rs`). The scoreboard (Tab) has a row a player: the portrait,
@@ -233,15 +241,23 @@ League's defaults, because that is what players' hands know:
   ridge with its lit and dark faces, a glow inside it that can breathe and a sheen that crosses it
   (PLAY, READY, a card), in one draw where the stock panel took a shadow, a border and a gradient.
   A control whose colours say its state (a button's tint, a card's tier) keeps them and wears a
-  **finish** over them: the same shader, clear but for its light. Health and mana are **gauges**
+  **finish** over them: the same shader, clear but for its light. A plate can be **dressed**: a
+  hairline inlaid a little inside the rim, bright in a bracket at each corner (League's double
+  line); veins through the stone; a light falling in from the top's middle; a gem set in the top
+  rim; a band across its head; a light that runs round the rim (what's picked); and metal that
+  turns through the colours as it goes round (a prismatic card). The panels, the docks and the
+  tooltip wear the inlay and the veins. A **rule** (`shaders/rule.wgsl`) parts a panel: a bronze
+  hairline fading at both ends, a gem in its middle. Health and mana are **gauges**
   (`shaders/gauge.wgsl`): a well cut into the panel, the fill a glass lit along its upper half with
   a bright edge where it ends and a slow light through it, a mark each hundred health and a heavier
   one each thousand, what was just lost held behind the fill in orange a third of a second and then
   let go, a shield a pale stretch past it, and the well beating red under 30%, when the screen's
   edge beats red too. An ability's frame is ember when it's ready, iron cooling down, blue short of
   mana and dark unlearned; its icon is set into it (a shade round its edge and a light across its
-  top, painted into the picture). An augment's card is a tall plate in its tier's colour: a band at
-  its head, a gem lit in it, the name carved, a sheen crossing. The menu has the braziers' sparks
+  top, painted into the picture). An augment's card is a tall plate in its tier's metal (silver, gold with a
+  light running round it, prismatic turning through the colours): the band at its head, a gem in
+  its top rim and a larger one cut from a plate in its middle, the name carved, a sheen crossing,
+  all brighter under the pointer. The menu has the braziers' sparks
   rising over its backdrop (`shaders/sparks.wgsl`). The line in the middle (the headliner, as a
   match starts) drops under the augment cards while they're up. The type is two faces, compiled in: **Cinzel**
   for what's carved (the wordmark, the nav, a title, a champion's name, a result) and **Roboto

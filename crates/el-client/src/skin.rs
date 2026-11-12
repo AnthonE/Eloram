@@ -3,12 +3,13 @@
 //! pressed; a carved face for titles and a condensed one for everything read at a glance.
 //!
 //! The plates are drawn by a shader ([`Plate`], `shaders/plate.wgsl`): one draw for a panel's
-//! slab, rim, grain and glow, where the stock nodes took a shadow, a border and a gradient. The
+//! slab, rim, grain and glow, where the stock nodes took a shadow, a border and a gradient, and
+//! for its dressings ([`Make`]'s inlay, veins, gem, band, runner and prism). The
 //! styles are a handful of fixed handles ([`plates`]), put in the assets as the plugin is built, so
 //! a bundle names one without a resource in hand. A control whose colours the game's own systems
 //! write (a button's tint, a frame in a tier's colour) keeps them and wears a [`finish`] over
 //! them: the same shader, clear but for the light it adds. The gauges (health, mana) are
-//! [`Gauge`], `shaders/gauge.wgsl`.
+//! [`Gauge`], `shaders/gauge.wgsl`; the line that parts a panel is [`Rule`], `shaders/rule.wgsl`.
 //!
 //! The faces: Cinzel Bold (OFL) for titles, Roboto Condensed (Apache-2.0) for the rest, compiled
 //! in (`crates/el-client/fonts/`).
@@ -50,6 +51,9 @@ pub struct PlateParams {
     pub cuts: Vec4,
     pub shape: Vec4,
     pub live: Vec4,
+    pub dress: Vec4,
+    pub orn: Vec4,
+    pub more: Vec4,
 }
 
 #[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
@@ -109,6 +113,45 @@ impl UiMaterial for Sparks {
     }
 }
 
+/// A rule's uniform (`shaders/rule.wgsl`).
+#[derive(Clone, Copy, Debug, ShaderType)]
+pub struct RuleParams {
+    pub hi: Vec4,
+    pub lo: Vec4,
+    pub gem: Vec4,
+    /// x: the gem's half-width (px); y: the fade at each end; z: the line's strength.
+    pub shape: Vec4,
+}
+
+#[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
+pub struct Rule {
+    #[uniform(0)]
+    pub r: RuleParams,
+}
+
+impl UiMaterial for Rule {
+    fn fragment_shader() -> ShaderRef {
+        "embedded://el_client/shaders/rule.wgsl".into()
+    }
+}
+
+/// The rule between a panel's parts, with its gem; and the plain one, a hairline that fades.
+pub const RULE: Handle<Rule> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9c01");
+pub const RULE_PLAIN: Handle<Rule> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9c02");
+
+/// A rule across its parent, a gem in its middle (`plain`: none, and fainter).
+pub fn rule(plain: bool) -> impl Bundle {
+    (
+        Node {
+            width: percent(100),
+            height: px(if plain { 5.0 } else { 15.0 }),
+            flex_shrink: 0.0,
+            ..default()
+        },
+        MaterialNode(if plain { RULE_PLAIN } else { RULE }),
+    )
+}
+
 /// The menu's sparks, one material for every rebuild of it.
 pub const SPARKS: Handle<Sparks> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9b01");
 
@@ -149,6 +192,23 @@ pub struct Make {
     pub breath: f32,
     pub sheen: f32,
     pub sheen_secs: f32,
+    /// A hairline inlaid this far inside the rim (px; 0: none), its strength, and how long the
+    /// bright bracket at each corner is (px).
+    pub inlay: f32,
+    pub inlay_lit: f32,
+    pub bracket: f32,
+    /// A light falling into the slab from the top's middle, and the stone's veins.
+    pub head: f32,
+    pub veins: f32,
+    /// A gem hung from the middle of the top rim: its half-width (px; 0: none).
+    pub gem: f32,
+    /// A light that runs round the rim: its strength, and its lap (s).
+    pub runner: f32,
+    pub runner_secs: f32,
+    /// How far the metal turns through the colours as it goes round (a prismatic thing).
+    pub prism: f32,
+    /// A band across the head, in the metal's colour: its height (px; 0: none).
+    pub band: f32,
 }
 
 impl Make {
@@ -168,6 +228,16 @@ impl Make {
         breath: 0.0,
         sheen: 0.0,
         sheen_secs: 4.0,
+        inlay: 0.0,
+        inlay_lit: 0.0,
+        bracket: 18.0,
+        head: 0.0,
+        veins: 0.0,
+        gem: 0.0,
+        runner: 0.0,
+        runner_secs: 6.0,
+        prism: 0.0,
+        band: 0.0,
     };
 
     pub const fn cut(mut self, tl: f32, tr: f32, br: f32, bl: f32) -> Self {
@@ -186,6 +256,9 @@ impl Make {
                 cuts: Vec4::from_array(self.cuts),
                 shape: Vec4::new(self.rim, self.grain, self.shade, self.glow_reach),
                 live: Vec4::new(self.sheen, self.sheen_secs, self.breath, self.lip),
+                dress: Vec4::new(self.inlay, self.inlay_lit, self.head, self.veins),
+                orn: Vec4::new(self.gem, self.runner, self.runner_secs, self.bracket),
+                more: Vec4::new(self.prism, self.band, 0.0, 0.0),
             },
         }
     }
@@ -235,6 +308,34 @@ pub mod plates {
     pub const FINISH_CARD: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a19");
     /// A finish for the one button to press now: lit from inside, a sheen crossing it.
     pub const FINISH_HOT: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a1b");
+    /// A shop tile's frame: at rest, under the pointer, picked (ember, a light running round
+    /// it), and while the gold's short (iron).
+    pub const TILE: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a20");
+    pub const TILE_OVER: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a21");
+    pub const TILE_PICKED: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a22");
+    pub const TILE_SHORT: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a23");
+    /// The frame of the one picture a panel is about: a heavy bronze ridge, a gem in its top, a
+    /// slow light round it.
+    pub const GRAND: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a24");
+    /// A pane set into a panel: darker than it, a hairline rim, an inlay with its brackets.
+    pub const INSET: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a25");
+    /// An augment's card in its tier's metal (silver, gold, prismatic: `CARDS[tier]`), the same
+    /// under the pointer (`CARDS_OVER`), and the gem in its middle (`GEMS`).
+    pub const CARDS: [Handle<Plate>; 3] = [
+        uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a30"),
+        uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a31"),
+        uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a32"),
+    ];
+    pub const CARDS_OVER: [Handle<Plate>; 3] = [
+        uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a33"),
+        uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a34"),
+        uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a35"),
+    ];
+    pub const GEMS: [Handle<Plate>; 3] = [
+        uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a36"),
+        uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a37"),
+        uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a38"),
+    ];
     /// The screen's edge while the champion's health is low: red, beating, clear in the middle.
     pub const DANGER: Handle<Plate> = uuid_handle!("6a1f0c22-51d7-4a3e-8f10-0c5e7d2b9a1c");
 }
@@ -268,6 +369,9 @@ fn styles() -> Vec<(Handle<Plate>, Make)> {
             grain: 0.08,
             shade: 0.18,
             lip: 0.30,
+            inlay: 3.0,
+            inlay_lit: 0.35,
+            bracket: 12.0,
             glow: EMBER.with_alpha(glow),
             glow_reach: 14.0,
             breath: 0.5,
@@ -290,11 +394,66 @@ fn styles() -> Vec<(Handle<Plate>, Make)> {
         lip: 0.0,
         ..slate
     };
-    vec![
-        (PANEL, slate.cut(12.0, 12.0, 12.0, 12.0)),
-        (DOCK_BOTTOM, slate.cut(14.0, 14.0, 0.0, 0.0)),
-        (DOCK_TOP, slate.cut(0.0, 0.0, 12.0, 12.0)),
-        (DOCK_CORNER, slate.cut(14.0, 0.0, 0.0, 0.0)),
+    let tile = |hi: Color, lo: Color, glow: Color, runner: f32| Make {
+        glow,
+        glow_reach: 7.0,
+        runner,
+        runner_secs: 3.4,
+        ..slot(hi, lo, clear, 0.0)
+    };
+    // The panels' dressing: the inlaid hairline with its brackets, and the stone's veins.
+    let dressed = Make { inlay: 5.0, inlay_lit: 0.55, bracket: 26.0, veins: 0.22, ..slate };
+    let mut all = vec![
+        (
+            PANEL,
+            Make {
+                // Whole: a hundredth of the bright ground through near-black shows as a tenth.
+                top: SLATE_TOP.with_alpha(1.0),
+                bottom: SLATE.with_alpha(1.0),
+                head: 0.05,
+                gem: 7.0,
+                glow: EMBER.with_alpha(0.0),
+                ..dressed
+            }
+            .cut(12.0, 12.0, 12.0, 12.0),
+        ),
+        (TILE, tile(BRONZE, BRONZE_LO, clear, 0.0)),
+        (TILE_OVER, tile(BRONZE_HI, BRONZE, BRONZE_HI.with_alpha(0.22), 0.0)),
+        (TILE_PICKED, tile(EMBER_HI, Color::srgb(0.55, 0.30, 0.06), EMBER.with_alpha(0.55), 0.9)),
+        (TILE_SHORT, tile(Color::srgb(0.30, 0.31, 0.36), IRON_LO, clear, 0.0)),
+        (
+            GRAND,
+            Make {
+                rim: 4.0,
+                gem: 6.0,
+                runner: 0.55,
+                runner_secs: 7.0,
+                glow: EMBER.with_alpha(0.25),
+                glow_reach: 9.0,
+                ..slot(BRONZE_HI, BRONZE_LO, clear, 0.0)
+            },
+        ),
+        (
+            INSET,
+            Make {
+                top: Color::srgba(0.018, 0.023, 0.038, 0.92),
+                bottom: Color::srgba(0.030, 0.038, 0.060, 0.92),
+                rim_hi: BRONZE.with_alpha(0.9),
+                rim_lo: BRONZE_LO,
+                rim: 1.0,
+                shade: 0.35,
+                lip: 0.0,
+                inlay: 4.0,
+                inlay_lit: 0.45,
+                bracket: 14.0,
+                veins: 0.15,
+                ..slate
+            }
+            .cut(8.0, 8.0, 8.0, 8.0),
+        ),
+        (DOCK_BOTTOM, dressed.cut(14.0, 14.0, 0.0, 0.0)),
+        (DOCK_TOP, Make { inlay: 4.0, bracket: 20.0, ..dressed }.cut(0.0, 0.0, 12.0, 12.0)),
+        (DOCK_CORNER, dressed.cut(14.0, 0.0, 0.0, 0.0)),
         (
             SOFT,
             Make {
@@ -316,6 +475,10 @@ fn styles() -> Vec<(Handle<Plate>, Make)> {
                 bottom: Color::srgba(0.03, 0.038, 0.06, 0.985),
                 rim: 2.0,
                 shade: 0.2,
+                inlay: 3.0,
+                inlay_lit: 0.40,
+                bracket: 12.0,
+                veins: 0.15,
                 ..slate
             }
             .cut(7.0, 0.0, 7.0, 0.0),
@@ -409,6 +572,9 @@ fn styles() -> Vec<(Handle<Plate>, Make)> {
                 bottom: Color::srgba(0.022, 0.03, 0.05, 0.92),
                 rim: 2.0,
                 shade: 0.22,
+                inlay: 5.0,
+                inlay_lit: 0.40,
+                bracket: 24.0,
                 ..slate
             }
             .cut(14.0, 0.0, 0.0, 14.0),
@@ -437,11 +603,82 @@ fn styles() -> Vec<(Handle<Plate>, Make)> {
                 rim: 1.0,
                 shade: 0.16,
                 lip: 0.04,
+                inlay: 5.0,
+                inlay_lit: 0.40,
+                bracket: 24.0,
                 ..slate
             }
             .cut(14.0, 14.0, 14.0, 14.0),
         ),
-    ]
+    ];
+    // The augments' cards, a tier each: silver, gold, prismatic.
+    let tiers = [
+        (
+            Color::srgb(0.86, 0.90, 0.97),
+            Color::srgb(0.24, 0.27, 0.34),
+            Color::srgb(0.62, 0.74, 0.95),
+            0.0,
+            0.0,
+        ),
+        (EMBER_HI, Color::srgb(0.42, 0.26, 0.06), EMBER, 0.55, 0.0),
+        (Color::srgb(0.96, 0.70, 1.0), Color::srgb(0.30, 0.12, 0.46), Color::srgb(0.80, 0.42, 1.0), 0.9, 1.0),
+    ];
+    for (t, (hi, lo, light, runner, prism)) in tiers.into_iter().enumerate() {
+        let tint = |c: Color, by: f32| Color::from(c.to_srgba().mix(&light.to_srgba(), by));
+        let card = |over: bool| {
+            Make {
+                top: tint(Color::srgb(0.085, 0.10, 0.14), if over { 0.16 } else { 0.07 }),
+                bottom: tint(Color::srgb(0.022, 0.028, 0.045), if over { 0.06 } else { 0.02 }),
+                rim_hi: hi,
+                rim_lo: lo,
+                rim: 3.0,
+                shade: 0.34,
+                lip: 0.25,
+                inlay: 6.0,
+                inlay_lit: 0.60,
+                bracket: 30.0,
+                head: if over { 0.11 } else { 0.06 },
+                veins: 0.25,
+                gem: 8.0,
+                band: 36.0,
+                glow: light.with_alpha(if over { 0.40 } else { 0.16 }),
+                glow_reach: 18.0,
+                breath: 0.4,
+                sheen: if over { 0.10 } else { 0.05 },
+                sheen_secs: 5.0,
+                runner: if over { f32::max(runner, 0.6) } else { runner },
+                runner_secs: 5.0,
+                prism,
+                ..slate
+            }
+            .cut(13.0, 13.0, 13.0, 13.0)
+        };
+        all.push((CARDS[t].clone(), card(false)));
+        all.push((CARDS_OVER[t].clone(), card(true)));
+        // The gem: a plate cut to a diamond, lit from inside.
+        all.push((
+            GEMS[t].clone(),
+            Make {
+                top: tint(Color::srgb(0.30, 0.32, 0.38), 0.75),
+                bottom: tint(Color::srgb(0.04, 0.05, 0.08), 0.35),
+                rim_hi: hi,
+                rim_lo: lo,
+                rim: 3.0,
+                grain: 0.0,
+                shade: 0.0,
+                lip: 0.5,
+                glow: light.with_alpha(0.55),
+                glow_reach: 7.0,
+                breath: 0.6,
+                sheen: 0.22,
+                sheen_secs: 3.4,
+                prism,
+                ..slate
+            }
+            .cut(23.0, 23.0, 23.0, 23.0),
+        ));
+    }
+    all
 }
 
 pub struct SkinPlugin;
@@ -451,7 +688,9 @@ impl Plugin for SkinPlugin {
         bevy::asset::embedded_asset!(app, "shaders/plate.wgsl");
         bevy::asset::embedded_asset!(app, "shaders/gauge.wgsl");
         bevy::asset::embedded_asset!(app, "shaders/sparks.wgsl");
+        bevy::asset::embedded_asset!(app, "shaders/rule.wgsl");
         app.add_plugins((
+            UiMaterialPlugin::<Rule>::default(),
             UiMaterialPlugin::<Plate>::default(),
             UiMaterialPlugin::<Gauge>::default(),
             UiMaterialPlugin::<Sparks>::default(),
@@ -462,6 +701,19 @@ impl Plugin for SkinPlugin {
                 s: SparksParams { color: lin(EMBER).with_w(0.85), shape: Vec4::new(1.0, 0.16, 0.35, 0.0) },
             },
         );
+        {
+            let mut rules = app.world_mut().resource_mut::<Assets<Rule>>();
+            let make = |gem: f32, k: f32| Rule {
+                r: RuleParams {
+                    hi: lin(BRONZE_HI),
+                    lo: lin(BRONZE_LO),
+                    gem: lin(EMBER_HI).with_w(0.9),
+                    shape: Vec4::new(gem, 0.55, k, 0.0),
+                },
+            };
+            let _ = rules.insert(RULE.id(), make(5.5, 0.85));
+            let _ = rules.insert(RULE_PLAIN.id(), make(0.0, 0.5));
+        }
         // The faces and the styles are in before the first frame: a handle that never resolves
         // draws nothing at all.
         {
@@ -573,7 +825,12 @@ pub fn display(s: impl Into<String>, size: f32, color: Color) -> impl Bundle {
 /// The plates' and the gauges' pipelines, built before a match is in view (`warm.rs`,
 /// `frame.rs`): a speck of each, clear, in the screen's corner from the first frame. The gauges
 /// come up only with the match, and `?queue=1` skips the menu's plates.
-fn warm(mut commands: Commands, mut plates: ResMut<Assets<Plate>>, mut gauges: ResMut<Assets<Gauge>>) {
+fn warm(
+    mut commands: Commands,
+    mut plates: ResMut<Assets<Plate>>,
+    mut gauges: ResMut<Assets<Gauge>>,
+    mut rules: ResMut<Assets<Rule>>,
+) {
     let speck = || {
         (
             Node {
@@ -589,6 +846,8 @@ fn warm(mut commands: Commands, mut plates: ResMut<Assets<Plate>>, mut gauges: R
     };
     let clear = Make { top: Color::NONE, bottom: Color::NONE, rim: 0.0, ..Make::SLATE }.plate();
     commands.spawn((speck(), MaterialNode(plates.add(clear))));
+    let none = RuleParams { hi: Vec4::ZERO, lo: Vec4::ZERO, gem: Vec4::ZERO, shape: Vec4::ZERO };
+    commands.spawn((speck(), MaterialNode(rules.add(Rule { r: none }))));
     let empty = GaugeParams {
         lo: Vec4::ZERO,
         hi: Vec4::ZERO,

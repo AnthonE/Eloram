@@ -5,7 +5,8 @@
 //! mana, the items and the gold; the score and the clock at the top; the allies down the left (F2
 //! to F5 look at them); the kill feed at the right; the minimap at the bottom right with the
 //! camera's view on it; a tooltip over anything with something to say (an ability, an item, a card);
-//! the augment cards while a screen is open and the shop may be used; the shop (P); the scoreboard
+//! the augment cards while a screen is open and the shop may be used (the shop itself, P, is
+//! `hud_shop.rs`); the scoreboard
 //! (Tab), with a button to open a vote to surrender from 8:00; the vote while it's open; and the
 //! line in the middle that says what's happening (taking the field, the headliner). All of it read
 //! from the prediction, so it moves when the player does.
@@ -46,7 +47,7 @@ pub(crate) const FRAME_SOFT: Color = Color::srgba(0.47, 0.39, 0.24, 0.55);
 pub(crate) const TEXT: Color = Color::srgb(0.92, 0.93, 0.96);
 pub(crate) const DIM: Color = Color::srgb(0.56, 0.59, 0.66);
 pub(crate) const GOLD: Color = Color::srgb(0.98, 0.82, 0.36);
-const SHORT: Color = Color::srgb(0.90, 0.40, 0.36);
+pub(crate) const SHORT: Color = Color::srgb(0.90, 0.40, 0.36);
 const HP: [Color; 2] = [Color::srgb(0.20, 0.62, 0.24), Color::srgb(0.38, 0.86, 0.36)];
 /// Seconds the headliner stays in the middle of the screen as a match starts.
 const HEADLINER_SHOWN: u32 = 12;
@@ -90,9 +91,6 @@ enum Label {
     ItemKey(usize),
     /// The trinket's treats.
     Treats,
-    Shop(usize),
-    ShopCost(usize),
-    ShopGold,
     ScoreHead,
     /// A scoreboard row's words: team, row, and which.
     Score(u8, usize, ScoreField),
@@ -109,8 +107,6 @@ enum Label {
     Stat(usize),
     /// The seconds to respawn, over the portrait.
     Respawn,
-    /// The Recommended row's title.
-    ShopRec,
 }
 
 /// A bar's fill.
@@ -124,7 +120,7 @@ enum Fill {
 
 /// A panel shown only at times.
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
-enum Panel {
+pub(crate) enum Panel {
     Top,
     Bottom,
     Allies,
@@ -146,7 +142,6 @@ enum Panel {
 pub(crate) enum Act {
     Pick(u8),
     Reroll(u8),
-    Buy(u8),
     Sell(u8),
     /// A point into Q, W, E or R (the "+" over it).
     Level(u8),
@@ -170,7 +165,6 @@ pub(crate) enum Act {
 pub(crate) enum Tip {
     Ability(usize),
     Item(usize),
-    Shop(usize),
     Trinket,
     /// Champion select: ability `.0` of the champion the player holds there.
     Pick(usize),
@@ -194,8 +188,8 @@ pub(crate) struct Icons(pub(crate) std::collections::HashMap<(u8, u8), Handle<Im
 
 /// An item's icon: in an inventory slot, on the shop's tile for it, or on a scoreboard row (team,
 /// row, slot).
-#[derive(Component, Clone, Copy)]
-enum ItemIcon {
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ItemIcon {
     Held(usize),
     Shop(usize),
     Score(u8, usize, usize),
@@ -208,19 +202,6 @@ struct ScoreBadge(u8, usize);
 /// A scoreboard row's item slot, shown only where the items are known.
 #[derive(Component)]
 struct ScoreWell(u8, usize);
-
-/// A tile of the shop's Recommended row: which of the four, and its icon, name and cost.
-#[derive(Component)]
-struct RecTile {
-    j: usize,
-    icon: Entity,
-    name: Entity,
-    cost: Entity,
-}
-
-/// The gold mark on item `.0`'s tile while it's recommended.
-#[derive(Component)]
-struct RecMark(usize);
 
 /// The items' icons painted so far, in `ITEMS`' order.
 #[derive(Resource, Default)]
@@ -249,8 +230,6 @@ struct LevelUp(usize);
 /// An augment card's frame, in its tier's colour; the band at its head and its gem, too.
 #[derive(Component)]
 struct CardFrame(usize);
-#[derive(Component)]
-struct CardBand(usize);
 #[derive(Component)]
 struct CardGem(usize);
 
@@ -304,7 +283,7 @@ impl Plugin for HudPlugin {
                         colors,
                     )
                         .after(crate::net::NetSet::Send),
-                    (ability_icons, item_icons, portrait_picture, rec_tiles, ally_ults, sweeps, score_badges)
+                    (ability_icons, item_icons, portrait_picture, ally_ults, sweeps, score_badges)
                         .after(crate::net::NetSet::Send),
                 ),
             );
@@ -723,7 +702,6 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
         ))
         .add_child(square);
     cards(&mut commands);
-    shop(&mut commands);
     // The scoreboard.
     let teams: Vec<Entity> = (0..2u8)
         .map(|t| {
@@ -846,6 +824,7 @@ fn setup(mut commands: Commands, floor: Res<FloorImage>, portrait: Res<crate::po
         Panel::Tip,
         children![
             (skin::display("", 15.0, GOLD), Label::TipTitle),
+            skin::rule(true),
             (prose("", 14.0, Color::srgb(0.84, 0.86, 0.90)), Label::TipBody)
         ],
     ));
@@ -1418,56 +1397,50 @@ fn cards(commands: &mut Commands) {
     let cards: Vec<Entity> = (0..3)
         .map(|k| {
             let reroll = button(commands, Act::Reroll(k as u8), Label::CardReroll, 120.0, BUTTON);
-            let base = Color::srgb(0.055, 0.066, 0.095);
+            // The card is a plate in its tier's metal (`card_frames` says which): the band across
+            // its head, the gem in its top rim and the light round it are the shader's.
             let card = commands
                 .spawn((
                     Button,
                     Node {
                         width: px(CARD_W),
                         height: px(CARD_H),
-                        border: UiRect::all(px(2)),
-                        border_radius: BorderRadius::all(px(4)),
+                        border: UiRect::all(px(3)),
                         flex_direction: FlexDirection::Column,
                         align_items: AlignItems::Center,
-                        overflow: Overflow::clip(),
                         ..default()
                     },
-                    BorderColor::all(GOLD),
-                    BackgroundColor(base),
-                    Tint(base),
                     BoxShadow::new(Color::srgba(0.0, 0.0, 0.0, 0.7), px(0), px(8), px(0), px(26)),
-                    MaterialNode(plates::FINISH_CARD),
+                    MaterialNode(plates::CARDS[0].clone()),
+                    skin::Press {
+                        idle: plates::CARDS[0].clone(),
+                        over: plates::CARDS_OVER[0].clone(),
+                        down: plates::CARDS[0].clone(),
+                    },
                     CardFrame(k),
                     Act::Pick(k as u8),
                     children![
                         (
-                            // The head: the tier's name on a band of its colour.
+                            // The head: the tier's name on the plate's band.
                             Node {
                                 width: percent(100),
-                                height: px(34),
+                                height: px(36),
                                 justify_content: JustifyContent::Center,
                                 align_items: AlignItems::Center,
-                                border: UiRect::bottom(px(1)),
                                 ..default()
                             },
-                            BorderColor::all(GOLD),
-                            BackgroundColor(Color::NONE),
-                            CardBand(k),
                             children![(text("", 13.0, GOLD), outline(), Label::CardTier(k))],
                         ),
                         (
-                            // The gem: a square on its corner, lit in the tier's colour.
+                            // The gem: a plate cut to a diamond, lit in the tier's colour.
                             Node {
-                                width: px(26),
-                                height: px(26),
-                                margin: UiRect::new(px(0), px(0), px(26), px(18)),
-                                border: UiRect::all(px(2)),
+                                width: px(46),
+                                height: px(46),
+                                margin: UiRect::new(px(0), px(0), px(18), px(12)),
+                                border: UiRect::all(px(3)),
                                 ..default()
                             },
-                            UiTransform { rotation: Rot2::degrees(45.0), ..UiTransform::IDENTITY },
-                            BorderColor::all(GOLD),
-                            BackgroundColor(Color::NONE),
-                            BoxShadow::new(Color::NONE, px(0), px(0), px(2), px(16)),
+                            MaterialNode(plates::GEMS[0].clone()),
                             CardGem(k),
                         ),
                         (
@@ -1534,15 +1507,16 @@ fn cards(commands: &mut Commands) {
             TextShadow { offset: Vec2::new(0.0, 3.0), color: Color::srgba(0.0, 0.0, 0.0, 0.9) },
         ))
         .id();
+    let rule = commands.spawn(skin::rule(false)).id();
     let row = commands.spawn(Node { column_gap: px(22), ..default() }).add_children(&cards).id();
     let body = commands
         .spawn(Node {
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
-            row_gap: px(16),
+            row_gap: px(10),
             ..default()
         })
-        .add_children(&[heading, row])
+        .add_children(&[heading, rule, row])
         .id();
     commands
         .spawn((
@@ -1555,145 +1529,6 @@ fn cards(commands: &mut Commands) {
                 ..default()
             },
             Panel::Cards,
-        ))
-        .add_child(body);
-}
-
-/// The shop: the items in two columns, each with its price, the gold at the top.
-/// A tile of the shop: the item's icon, its name and its cost; a click buys it, a gold mark in its
-/// corner while it's one recommended for the champion (`Label::ShopRec`).
-fn shop_tile(commands: &mut Commands, k: usize) -> (Entity, [Entity; 3]) {
-    let icon = commands
-        .spawn((
-            Node { width: px(44), height: px(44), border_radius: BorderRadius::all(px(4)), ..default() },
-            ImageNode::default(),
-            Visibility::Hidden,
-            ItemIcon::Shop(k),
-        ))
-        .id();
-    let name =
-        commands.spawn((text("", 10.0, TEXT), TextLayout::justify(Justify::Center), Label::Shop(k))).id();
-    let cost = commands.spawn((text("", 11.0, GOLD), Label::ShopCost(k))).id();
-    let mark = commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                top: px(3),
-                right: px(3),
-                width: px(8),
-                height: px(8),
-                border_radius: BorderRadius::all(px(1)),
-                ..default()
-            },
-            UiTransform { rotation: Rot2::degrees(45.0), ..UiTransform::IDENTITY },
-            BackgroundColor(GOLD),
-            Visibility::Hidden,
-            RecMark(k),
-        ))
-        .id();
-    let tile = commands
-        .spawn((
-            Button,
-            Node {
-                width: px(86),
-                height: px(92),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                row_gap: px(3),
-                padding: UiRect::all(px(4)),
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(5)),
-                ..default()
-            },
-            BorderColor::all(Color::srgb(0.22, 0.21, 0.18)),
-            BackgroundColor(BUTTON),
-            Tint(BUTTON),
-            Act::Buy(k as u8),
-            Tip::Shop(k),
-        ))
-        .add_children(&[icon, name, cost, mark])
-        .id();
-    (tile, [icon, name, cost])
-}
-
-/// A titled row of tiles.
-fn shop_section(commands: &mut Commands, title: Entity, tiles: &[Entity]) -> Entity {
-    let row = commands
-        .spawn(Node { flex_wrap: FlexWrap::Wrap, column_gap: px(6), row_gap: px(6), ..default() })
-        .add_children(tiles)
-        .id();
-    commands
-        .spawn(Node { flex_direction: FlexDirection::Column, row_gap: px(6), ..default() })
-        .add_children(&[title, row])
-        .id()
-}
-
-/// The shop (P), in the middle of the screen as League's: what's recommended for the champion's
-/// role first, then every item, the parts and the finished ones apart.
-fn shop(commands: &mut Commands) {
-    let rec: Vec<Entity> = (0..4)
-        .map(|j| {
-            let (tile, [icon, name, cost]) = shop_tile(commands, 0);
-            commands.entity(tile).insert(RecTile { j, icon, name, cost });
-            tile
-        })
-        .collect();
-    let (parts, done): (Vec<usize>, Vec<usize>) = (0..ITEMS.len()).partition(|&k| ITEMS[k].cost < 1_000);
-    let parts: Vec<Entity> = parts.into_iter().map(|k| shop_tile(commands, k).0).collect();
-    let done: Vec<Entity> = done.into_iter().map(|k| shop_tile(commands, k).0).collect();
-    let rec_title = commands.spawn((text("", 12.0, GOLD), Label::ShopRec)).id();
-    let parts_title = commands.spawn(text("COMPONENTS", 12.0, DIM)).id();
-    let done_title = commands.spawn(text("FINISHED ITEMS", 12.0, DIM)).id();
-    let rec = shop_section(commands, rec_title, &rec);
-    let parts = shop_section(commands, parts_title, &parts);
-    let done = shop_section(commands, done_title, &done);
-    let title = commands.spawn((skin::display("SHOP", 20.0, GOLD), outline())).id();
-    let gold = commands.spawn((text("", 15.0, GOLD), outline(), Label::ShopGold)).id();
-    let head = commands
-        .spawn(Node {
-            justify_content: JustifyContent::SpaceBetween,
-            align_items: AlignItems::Center,
-            ..default()
-        })
-        .add_children(&[title, gold])
-        .id();
-    let hint =
-        commands.spawn(text("Click to buy. Click an item you hold to sell it. P closes.", 11.0, DIM)).id();
-    let rule = || {
-        (
-            Node { height: px(1), width: percent(100), ..default() },
-            BackgroundColor(Color::srgba(0.47, 0.39, 0.24, 0.4)),
-        )
-    };
-    let rule_a = commands.spawn(rule()).id();
-    let rule_b = commands.spawn(rule()).id();
-    let body = commands
-        .spawn((
-            Node {
-                flex_direction: FlexDirection::Column,
-                row_gap: px(10),
-                width: px(7.0 * 92.0 + 24.0),
-                padding: UiRect::all(px(14)),
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(10)),
-                ..default()
-            },
-            framed(),
-        ))
-        .add_children(&[head, hint, rec, rule_a, parts, rule_b, done])
-        .id();
-    commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                top: percent(9),
-                width: percent(100),
-                justify_content: JustifyContent::Center,
-                display: Display::None,
-                ..default()
-            },
-            Panel::Shop,
         ))
         .add_child(body);
 }
@@ -1928,13 +1763,6 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
             }
             (Label::Level, Some(c)) => c.pred.champs[c.seat].level.to_string(),
             (Label::Initials, Some(c)) => initials(c.pred.champs[c.seat].def),
-            (Label::ShopRec, Some(c)) => format!(
-                "RECOMMENDED FOR {}",
-                el_sim::content::champions::CHAMPIONS[usize::from(c.pred.champs[c.seat].def) % 20]
-                    .role
-                    .name()
-                    .to_uppercase()
-            ),
             (Label::Respawn, Some(c)) if !c.pred.units[c.seat].alive => {
                 let left = c.pred.champs[c.seat].dead_until.saturating_sub(c.pred.tick);
                 if left > 0 { left.div_ceil(TICK_HZ).to_string() } else { String::new() }
@@ -1952,7 +1780,7 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                     _ => format!("{:.0}", st.range),
                 }
             }
-            (Label::Gold | Label::ShopGold, Some(c)) => {
+            (Label::Gold, Some(c)) => {
                 format!("{:.0} g", c.pred.champs[c.seat].gold.floor())
             }
             (Label::Hp, Some(c)) => {
@@ -1983,8 +1811,7 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                 }
             }
             (Label::CardTier(k), Some(c)) => {
-                let a = &AUGMENTS[usize::from(c.pred.champs[c.seat].screen.offers[k]) % AUGMENTS.len()];
-                tips::tier_name(a.tier).to_uppercase()
+                tips::tier_name(card_tier(&c.pred.champs[c.seat], &controls, k)).to_uppercase()
             }
             (Label::CardName(k), Some(c)) => {
                 AUGMENTS[usize::from(c.pred.champs[c.seat].screen.offers[k]) % AUGMENTS.len()].name.into()
@@ -2012,8 +1839,6 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
                 if active { ["1", "2", "3", "5", "6", "7"][k].into() } else { String::new() }
             }
             (Label::Treats, Some(c)) => format!("x{}", c.pred.champs[c.seat].treats),
-            (Label::Shop(k), _) => ITEMS[k].name.into(),
-            (Label::ShopCost(k), _) => ITEMS[k].cost.to_string(),
             (Label::Vote, Some(c)) => {
                 let v = &c.world.surrender[usize::from(c.team)];
                 let mine = 1u8 << (c.seat % el_sim::units::TEAM_SIZE);
@@ -2077,7 +1902,7 @@ fn texts(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &
 }
 
 /// Text colours that say something: an ability not learned, an item too dear, a dead ally.
-fn colors(session: Res<Session>, mut q: Query<(&Label, &mut TextColor)>) {
+fn colors(session: Res<Session>, controls: Res<Controls>, mut q: Query<(&Label, &mut TextColor)>) {
     let Some(c) = session.client.as_deref() else { return };
     let ch = &c.pred.champs[c.seat];
     for (label, mut color) in &mut q {
@@ -2089,30 +1914,24 @@ fn colors(session: Res<Session>, mut q: Query<(&Label, &mut TextColor)>) {
                     DIM
                 }
             }
-            Label::Shop(k) => {
-                if ch.gold >= ITEMS[k].cost as f32 {
-                    TEXT
-                } else {
-                    DIM
-                }
-            }
-            Label::ShopCost(k) => {
-                if ch.gold >= ITEMS[k].cost as f32 {
-                    GOLD
-                } else {
-                    SHORT
-                }
-            }
             Label::AllyName(i) => match ally_seats(c).nth(i) {
                 Some(s) if !c.world.units[s].alive => DIM,
                 _ => TEXT,
             },
-            Label::CardTier(k) => {
-                tier_color(AUGMENTS[usize::from(ch.screen.offers[k]) % AUGMENTS.len()].tier)
-            }
+            Label::CardTier(k) => tier_color(card_tier(ch, &controls, k)),
             _ => continue,
         };
         color.set_if_neq(TextColor(want));
+    }
+}
+
+/// Card `k`'s tier: its augment's (or one a tier, for a test's picture: `{t:"tiers"}`).
+fn card_tier(ch: &el_sim::game::Champ, controls: &Controls, k: usize) -> Tier {
+    match (controls.show_tiers, k) {
+        (true, 1) => Tier::Gold,
+        (true, 2) => Tier::Prismatic,
+        (true, _) => Tier::Silver,
+        _ => AUGMENTS[usize::from(ch.screen.offers[k]) % AUGMENTS.len()].tier,
     }
 }
 
@@ -2306,28 +2125,34 @@ fn level_ups(session: Res<Session>, mut q: Query<(&LevelUp, &mut Visibility)>) {
 }
 
 /// A card's frame: its rim and the light under it.
-type FrameLook = (&'static CardFrame, &'static mut BorderColor, &'static mut BoxShadow);
-/// A card's gem: its rim, its fill and its light.
-type GemLook =
-    (&'static CardGem, &'static mut BorderColor, &'static mut BackgroundColor, &'static mut BoxShadow);
-
-/// Each card in its tier's colour: its rim, its head's band and the rule under it, its gem and
-/// the gem's light, and the light under the card itself.
+/// Each card in its tier's metal, its gem with it, and the tier's light under the card.
 fn card_frames(
     session: Res<Session>,
-    mut q: Query<FrameLook, (Without<CardBand>, Without<CardGem>)>,
-    mut bands: Query<(&CardBand, &mut BorderColor, &mut BackgroundColor), Without<CardGem>>,
-    mut gems: Query<GemLook>,
+    controls: Res<Controls>,
+    mut q: Query<(&CardFrame, &mut skin::Press, &mut MaterialNode<Plate>, &Interaction, &mut BoxShadow)>,
+    mut gems: Query<(&CardGem, &mut MaterialNode<Plate>), Without<CardFrame>>,
 ) {
     let Some(c) = session.client.as_deref() else { return };
     let screen = &c.pred.champs[c.seat].screen;
     if !screen.open {
         return;
     }
-    let tier = |k: usize| tier_color(AUGMENTS[usize::from(screen.offers[k]) % AUGMENTS.len()].tier);
-    for (f, mut border, mut shadow) in &mut q {
-        let t = tier(f.0);
-        border.set_if_neq(BorderColor::all(t));
+    let tier = |k: usize| card_tier(&c.pred.champs[c.seat], &controls, k);
+    let nth = |t: Tier| match t {
+        Tier::Silver => 0,
+        Tier::Gold => 1,
+        Tier::Prismatic => 2,
+    };
+    for (f, mut press, mut plate, i, mut shadow) in &mut q {
+        let t = nth(tier(f.0));
+        if press.idle != plates::CARDS[t] {
+            *press = skin::Press {
+                idle: plates::CARDS[t].clone(),
+                over: plates::CARDS_OVER[t].clone(),
+                down: plates::CARDS[t].clone(),
+            };
+            plate.0 = if *i == Interaction::None { press.idle.clone() } else { press.over.clone() };
+        }
         // A dark fall under the card, and its tier's light round it.
         let want = BoxShadow(vec![
             ShadowStyle {
@@ -2338,7 +2163,7 @@ fn card_frames(
                 blur_radius: px(26),
             },
             ShadowStyle {
-                color: t.with_alpha(0.30),
+                color: tier_color(tier(f.0)).with_alpha(0.30),
                 x_offset: px(0),
                 y_offset: px(0),
                 spread_radius: px(1),
@@ -2349,18 +2174,10 @@ fn card_frames(
             *shadow = want;
         }
     }
-    for (b, mut border, mut bg) in &mut bands {
-        let t = tier(b.0);
-        border.set_if_neq(BorderColor::all(t.with_alpha(0.7)));
-        bg.set_if_neq(BackgroundColor(t.with_alpha(0.16)));
-    }
-    for (g, mut border, mut bg, mut shadow) in &mut gems {
-        let t = tier(g.0);
-        border.set_if_neq(BorderColor::all(shade(t, 0.12)));
-        bg.set_if_neq(BackgroundColor(t.with_alpha(0.55)));
-        let want = BoxShadow::new(t.with_alpha(0.65), px(0), px(0), px(2), px(16));
-        if *shadow != want {
-            *shadow = want;
+    for (g, mut plate) in &mut gems {
+        let want = &plates::GEMS[nth(tier(g.0))];
+        if plate.0 != *want {
+            plate.0 = want.clone();
         }
     }
 }
@@ -2618,43 +2435,6 @@ fn ally_ults(
     }
 }
 
-/// The Recommended row's tiles, for the champion's role, and the gold mark on every tile that's
-/// recommended.
-#[allow(clippy::type_complexity)]
-fn rec_tiles(
-    session: Res<Session>,
-    mut tiles: Query<(&RecTile, &mut Act, &mut Tip)>,
-    mut icons: Query<&mut ItemIcon>,
-    mut labels: Query<&mut Label>,
-    mut marks: Query<(&RecMark, &mut Visibility)>,
-) {
-    let Some(c) = session.client.as_deref() else { return };
-    let def = usize::from(c.pred.champs[c.seat].def) % el_sim::content::champions::CHAMPIONS.len();
-    let rec = tips::recommended(el_sim::content::champions::CHAMPIONS[def].role);
-    for (t, mut act, mut tip) in &mut tiles {
-        let k = usize::from(rec[t.j]);
-        if *act != Act::Buy(k as u8) {
-            *act = Act::Buy(k as u8);
-        }
-        if *tip != Tip::Shop(k) {
-            *tip = Tip::Shop(k);
-        }
-        if let Ok(mut i) = icons.get_mut(t.icon) {
-            *i = ItemIcon::Shop(k);
-        }
-        for (e, want) in [(t.name, Label::Shop(k)), (t.cost, Label::ShopCost(k))] {
-            if let Ok(mut l) = labels.get_mut(e)
-                && *l != want
-            {
-                *l = want;
-            }
-        }
-    }
-    for (m, mut v) in &mut marks {
-        v.set_if_neq(if rec.contains(&(m.0 as u8)) { Visibility::Inherited } else { Visibility::Hidden });
-    }
-}
-
 /// The portraits' pictures: grey while their champion's dead; the initials only while it isn't
 /// drawn.
 fn portrait_picture(
@@ -2824,7 +2604,6 @@ fn tooltip(
                     s
                 }
                 Tip::Item(_) => String::new(),
-                Tip::Shop(k) => tips::item_tip(k as u8),
                 Tip::Trinket => tips::treat_tip(ch.treats),
                 Tip::Pick(_) => String::new(),
             }
@@ -2849,15 +2628,10 @@ fn tooltip(
             **t = want.to_string();
         }
     }
-    // Over it, their left edges together and kept in the window; beside it in the shop, which is
-    // at the top.
+    // Over it, their left edges together and kept in the window.
     let size = window.size() / ui.0;
-    let ((at, its), shop) = (over, matches!(tip, Some(Tip::Shop(_))));
-    let (top, bottom, left) = if shop {
-        (px(at.y), Val::Auto, at.x + its.x + 8.0)
-    } else {
-        (Val::Auto, px(size.y - at.y + 8.0), at.x)
-    };
+    let (at, _) = over;
+    let (top, bottom, left) = (Val::Auto, px(size.y - at.y + 8.0), at.x);
     let left = px(left.clamp(4.0, (size.x - TIP_W - 4.0).max(4.0)));
     // (Written only when it changes: a write marks the node changed, and lays the UI out again.)
     if node.display != Display::Flex {
@@ -2989,7 +2763,6 @@ fn press(
         let order = match *act {
             Act::Pick(card) => Order::PickAugment { card },
             Act::Reroll(card) => Order::Reroll { card },
-            Act::Buy(item) => Order::Buy { item },
             Act::Sell(inv) => Order::Sell { inv },
             Act::Level(slot) => Order::LevelSkill { slot },
             Act::Vote(yes) => Order::Surrender { yes },

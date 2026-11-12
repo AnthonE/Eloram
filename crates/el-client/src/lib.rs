@@ -29,6 +29,7 @@ mod hud_death;
 mod hud_first;
 mod hud_lobby;
 mod hud_select;
+mod hud_shop;
 mod hud_target;
 mod input;
 mod look;

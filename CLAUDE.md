@@ -147,22 +147,25 @@ Before Colony's patterns (`AnthonE/Before-Colony`) and listed on the Elo Pros st
   `web/assets/fx/cloud_{a,b}.png`, remade by `python3 -I art/tools/flipbooks.py` (`--preview DIR`
   writes it lit, to look at); a test holds its cut to the baker's and the shader's.
 - The HUD (`docs/DESIGN.md`, "The HUD"): `hud.rs`, `hud_death.rs` (the grey, the recap), `hud_target.rs`
-  (the target frame), `portrait.rs` (the live portraits), `hud_select.rs` (champion select's screen),
+  (the target frame), `hud_shop.rs` (the shop: the grid, the pane, BUY), `portrait.rs` (the live portraits), `hud_select.rs` (champion select's screen),
   `hud_lobby.rs` (the connecting, lobby and queue card, and a match's end with Play again); the icons are painted by
   `el_client_core::icons`. `window.__el` has `portrait`, `ally_portraits`, `death_screen` and
   `recap_lines`.
 - The UI's look (`docs/DESIGN.md`, "The look of the UI"): `el-client/src/skin.rs` is the palette
   (slate, bronze, ember), the two faces (Cinzel for titles, Roboto Condensed for the rest:
-  `crates/el-client/fonts/`, each with its licence, `NOTICE`) and the three UI shaders: `Plate`
-  (`shaders/plate.wgsl`: a panel, a frame, a finish over a control's own colours; the styles are
-  fixed handles in `skin::plates`, so a bundle names one with no resource in hand), `Gauge`
+  `crates/el-client/fonts/`, each with its licence, `NOTICE`) and the four UI shaders: `Plate`
+  (`shaders/plate.wgsl`: a panel, a frame, a finish over a control's own colours, and its
+  dressings: `Make`'s `inlay`, `veins`, `head`, `gem`, `band`, `runner`, `prism`; the styles are
+  fixed handles in `skin::plates`, so a bundle names one with no resource in hand), `Rule`
+  (`shaders/rule.wgsl`: the line that parts a panel, `skin::rule`), `Gauge`
   (`shaders/gauge.wgsl`: health and mana, told again only when a value moves) and `Sparks`
   (`shaders/sparks.wgsl`: the menu's embers). A UI material doesn't batch: a plate goes where it
   replaces a panel's shadow, border and gradient, a finish where the control's colours are
   written by a system, and what can be painted into a picture is (`hud::icon_image`'s set-in).
   Their pipelines are built from the first frame (`skin::warm`'s specks), so `hitches` stays at 0.
   `scripts/e2e.sh ui` shoots every screen into `e2e/artifacts/ui-<project>-<name>.png`
-  (`EL_UI_SIZE=1280x720`, `EL_UI_ONLY=menu|hud`, `EL_UI_QUALITY=high`).
+  (`EL_UI_SIZE=1280x720`, `EL_UI_ONLY=menu|hud`, `EL_UI_QUALITY=high`); `{t:"tiers",on}` draws the
+  augment cards one a tier for its picture.
 - The main menu (`el-client/src/front/`, its words and decisions in `el_client_core::front`;
   `docs/DESIGN.md`, "The menu"): PLAY (NORMAL, RANKED), PRACTICE, WATCH, FRIENDS, NEWS, STORE,
   PROFILE, OPTIONS, QUIT (desktop). Up on a plain load; `?queue=1`, `?practice=1` and `?watch=` go
