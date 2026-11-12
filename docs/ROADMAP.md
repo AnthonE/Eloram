@@ -520,6 +520,30 @@ read at a glance.
   twenty-seven plates a frame and cost about twenty draws; the wells and the portraits' finishes
   went back to plain nodes.)
 
-Not done: a champion's model shown in champion select (the seats are still badges of initials);
-a real GPU's frame times (`?bench=1`) for the three shaders; the WebGPU module's pictures (it
+Not done: a real GPU's frame times (`?bench=1`) for the three shaders; the WebGPU module's pictures (it
 lints and the shaders are the same WGSL, but only WebGL2's were shot).
+
+## 11. Faces
+
+A pass over every screen's picture (`scripts/e2e.sh ui`), worst first. What it found was the
+portraits.
+
+- **The live portrait was empty for some champions, and for any ally on the move.** Its camera
+  framed a fixed height in front of the body, from the frame before's place. Kesh's stance
+  crouches under that frame (a red square where its face should be, the whole match); a guard's
+  stance turns the head away; at a low frame rate a running ally had left its own picture. The
+  camera now reads this frame's transforms (after the propagation, before the frusta), frames the
+  face over the neck's top by the head's own length, and stands square to the shoulders, eased.
+  Only where bones are is read, never how they're turned: on these machine-made rigs a head's
+  skin doesn't always follow its bone's turn (Brun's face, by its bone, was the back of his
+  head). What a champion holds is left out of its portrait: a raised shield hid Liora and Pell.
+- **A face a champion** (`faces.rs`, `web/assets/portraits/`, 221 kB for the twenty): where a
+  champion was two letters on a coloured square (champion select's rows, card and bench, the
+  scoreboard, the target frame) it's its face, taken from that same portrait in a sitting
+  (`scripts/e2e.sh faces`). The initials stay underneath for a file that isn't in.
+- The HUD's line is kills / deaths / assists (the champion's own assists were sent and not shown).
+
+Seen and left: the scoreboard has no assists, minions or gold for the others (not on the wire: a
+protocol change); a champion on the Causeway is small and dark against the paving at the default
+height (a real GPU's picture should judge that, not SwiftShader's); Brun's and Brakka's faces are
+a profile and a three-quarter (their stances: a sitting in a pose of its own would square them).
