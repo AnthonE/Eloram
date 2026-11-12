@@ -52,6 +52,8 @@ pub struct Controls {
     /// WASD's steer (0 none, 1 to 8 the eight directions, `el_sim::steer_dir`).
     pub steer: u8,
     pub shop_open: bool,
+    /// The augment cards drawn one a tier, whatever is offered (`{t:"tiers"}`: a test's picture).
+    pub show_tiers: bool,
     pub scoreboard: bool,
     /// The keys are League's WASD layout (the menu's, or `?keys=wasd`), not its default.
     pub wasd: bool,

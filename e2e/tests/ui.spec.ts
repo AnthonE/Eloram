@@ -71,6 +71,11 @@ test("the UI, a picture a screen", async ({ page }, info) => {
     // The augment cards, while their screen is open.
     if (s.screen_open || (await el(page)).screen_open) {
       await shoot("cards");
+      // One a tier, whatever was offered: silver, gold, prismatic.
+      await push(page, { t: "tiers", on: true });
+      await page.waitForTimeout(500);
+      await shoot("cards-tiers");
+      await push(page, { t: "tiers", on: false });
       await push(page, { t: "pick", card: 0 });
       await until(page, "the card taken", (s) => !s.screen_open, 30_000).catch(() => null);
     }
