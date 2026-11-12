@@ -38,35 +38,39 @@ pub struct PortraitShown(pub [bool; VIEWS]);
 pub struct PortraitSubject {
     pub view: usize,
     pub still: bool,
-    /// Its head, which the camera frames and faces: a stance that crouches, leans or turns (an
-    /// assassin's, a guard's behind its shield) carries the head out of any frame fixed to the
-    /// body, or shows the back of it. `None` until it's found (the warm-up's piece): the frame is
-    /// then a standing figure's.
+    /// Its head and shoulders, which the camera frames and faces: a stance that crouches, leans
+    /// or turns (an assassin's, a guard's behind its shield) carries the head out of any frame
+    /// fixed to the body, or shows the back of it. `None` until they're found (the warm-up's
+    /// piece): the frame is then a standing figure's.
     pub head: Option<Head>,
 }
 
-/// A figure's head by its nodes: the bone (its base, the neck's top), its crown and the point in
-/// front of its face (`Head`, `head_end` and `headfront` in the champions' models).
+/// A figure's head and shoulders by their bones: the head's base (the neck's top) and its crown
+/// (`Head`, `head_end` in the champions' models), and the two shoulders. Only where they are is
+/// read, never how they're turned: these rigs are made by a machine, and a head's skin doesn't
+/// always hang on its bone's turn.
 #[derive(Clone, Copy)]
 pub struct Head {
     pub base: Entity,
     pub top: Entity,
-    pub front: Entity,
+    /// The left shoulder and the right.
+    pub shoulders: [Entity; 2],
 }
 
 impl Head {
     /// The head among a figure's nodes, by their names.
     pub fn find<'a>(nodes: impl IntoIterator<Item = (Entity, &'a str)>) -> Option<Head> {
-        let (mut base, mut top, mut front) = (None, None, None);
+        let (mut base, mut top, mut left, mut right) = (None, None, None, None);
         for (e, name) in nodes {
             match name {
                 "Head" => base = Some(e),
                 "head_end" => top = Some(e),
-                "headfront" => front = Some(e),
+                "LeftArm" => left = Some(e),
+                "RightArm" => right = Some(e),
                 _ => {}
             }
         }
-        Some(Head { base: base?, top: top?, front: front? })
+        Some(Head { base: base?, top: top?, shoulders: [left?, right?] })
     }
 }
 
@@ -159,7 +163,7 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
 /// face's right, just under its eyes (a bowed head's face still shows), and out in front. The
 /// frame is then the head, a hood or a hat and the shoulders, whatever the stance.
 const EYE: Vec3 = Vec3::new(0.2, -0.03, 0.72);
-/// The middle of the face, from the head's base to its crown.
+/// The middle of the face over the head's base, of the head's length.
 const FACE: f32 = 0.42;
 /// Where a standing figure's face is, of its height: the frame of one whose head isn't found.
 const FACE_AT: f32 = 0.83;
@@ -211,9 +215,14 @@ fn follow(
             // bowed head); a standing figure's, facing as its body does, where there's no head.
             let body = gt.affine().transform_vector3(Vec3::Z).with_y(0.0).normalize_or(Vec3::Z);
             let (want, facing) = head
-                .and_then(|h| Some((place(h.base)?, place(h.top)?, place(h.front)?)))
-                .map_or((gt.transform_point(Vec3::Y * FACE_AT), body), |(base, top, front)| {
-                    (base.lerp(top, FACE), (front - base).with_y(0.0).normalize_or(body))
+                .and_then(|h| {
+                    Some((place(h.base)?, place(h.top)?, place(h.shoulders[0])?, place(h.shoulders[1])?))
+                })
+                .map_or((gt.transform_point(Vec3::Y * FACE_AT), body), |(base, top, left, right)| {
+                    // Up from the neck by the head's own length; out the way the chest faces
+                    // (square to the line from the right shoulder to the left).
+                    let face = base + Vec3::Y * base.distance(top) * FACE;
+                    (face, (left - right).cross(Vec3::Y).with_y(0.0).normalize_or(body))
                 });
             // Eased while it's near (the head's bob and turn); at once when it isn't (a blink, a
             // respawn, an ally's turn come round again).
